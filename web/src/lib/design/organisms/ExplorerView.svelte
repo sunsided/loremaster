@@ -2,6 +2,7 @@
 	import type { Exploration } from '#lib/engine/types.ts';
 	import Button from '../atoms/Button.svelte';
 	import Heading from '../atoms/Heading.svelte';
+	import HelpNote from '../molecules/HelpNote.svelte';
 	import SectionRule from '../molecules/SectionRule.svelte';
 
 	interface Props {
@@ -37,11 +38,13 @@
 	how the text reads in each state it found, which text never shows, and whether the player can get stuck.
 -->
 <section class="explorer" aria-labelledby="explore-title">
-	<Heading level={2} id="explore-title">Explore</Heading>
-	<p class="muted">
-		The explorer plays all ways through the story from the start, within a budget. It tries the actions that move the
-		story forward. Use it to see how complicated text reads in each state, and to find text that never shows.
-	</p>
+	<div class="head">
+		<Heading level={2} id="explore-title">Explore</Heading>
+		<HelpNote id="explore" topic="Explore">
+			The explorer plays all ways through the story from the start, within a budget. It tries the actions that move the
+			story forward. Use it to see how complicated text reads in each state, and to find text that never shows.
+		</HelpNote>
+	</div>
 	<div><Button variant="primary" onclick={onrun} disabled={running}>{running ? 'Exploring…' : result ? 'Explore again' : 'Explore all states'}</Button></div>
 
 	{#if result}
@@ -118,6 +121,12 @@
 	}
 	p {
 		margin: 0;
+	}
+	.head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3) var(--space-4);
 	}
 	.muted {
 		color: var(--color-text-muted);

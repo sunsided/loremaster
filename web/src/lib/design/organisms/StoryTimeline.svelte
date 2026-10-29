@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Heading from '../atoms/Heading.svelte';
+	import HelpNote from '../molecules/HelpNote.svelte';
 	import type { StoryStep } from '../types.ts';
 
 	interface Props {
@@ -14,11 +15,13 @@
 	which rules fired and what state changed. It is an ordered list, oldest first.
 -->
 <section class="timeline" aria-labelledby="timeline-title">
-	<Heading level={2} id="timeline-title">Story so far</Heading>
-	<p class="summary">
-		This is the playthrough of this session. Each step is one turn. Rule names and state changes show why the
-		story went this way.
-	</p>
+	<div class="head">
+		<Heading level={2} id="timeline-title">Story so far</Heading>
+		<HelpNote id="story" topic="Story">
+			This is the playthrough of this session. Each step is one turn. Rule names and state changes show why the story
+			went this way.
+		</HelpNote>
+	</div>
 	<ol>
 		{#each steps as step, i (i)}
 			<li class="step" class:ended={step.ended}>
@@ -53,9 +56,11 @@
 		flex-direction: column;
 		gap: var(--space-6);
 	}
-	.summary {
-		margin: 0;
-		color: var(--color-text-muted);
+	.head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3) var(--space-4);
 	}
 	ol {
 		margin: 0;
