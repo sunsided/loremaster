@@ -45,3 +45,8 @@ export interface StoryStep {
 	changes: string[];
 	ended: boolean;
 }
+
+export interface TabItem {
+	id: string;
+	label: string;
+}

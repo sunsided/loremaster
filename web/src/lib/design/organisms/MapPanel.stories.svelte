@@ -24,7 +24,7 @@ Each room has its grid position from the story file (\`position\`). A room witho
 
 The drawing is for sighted users only. The same facts are in a list for screen readers: each room with its state, then each connection.
 
-The page layout shows the map on the left on ultrawide screens (21:9 and wider).`
+The map shows in the Map tab of the inspector. On ultrawide screens (21:9 and wider) it has its own column on the left; then set \`framed\`, so it gets its own padding, background and scroll.`
 				}
 			}
 		}

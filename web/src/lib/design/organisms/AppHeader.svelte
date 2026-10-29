@@ -5,8 +5,9 @@
 
 	interface Props {
 		title: string;
-		views: View[];
-		current: string;
+		/** Top-level views. Leave empty when the page has only one view. */
+		views?: View[];
+		current?: string;
 		/** Facts about the game now, for example the time and the room. */
 		now?: string[];
 		settingsOpen?: boolean;
@@ -14,11 +15,12 @@
 		onsettings: () => void;
 	}
 
-	let { title, views, current, now = [], settingsOpen = false, onview, onsettings }: Props = $props();
+	let { title, views = [], current = '', now = [], settingsOpen = false, onview, onsettings }: Props = $props();
 </script>
 
 <header class="app-header">
 	<h1 class="title">{title}</h1>
+	{#if views.length}
 	<nav aria-label="Views">
 		<ul>
 			{#each views as view (view.id)}
@@ -35,6 +37,7 @@
 			{/each}
 		</ul>
 	</nav>
+	{/if}
 	<div class="now">
 		{#if now.length}
 			<span class="now-label">now</span>

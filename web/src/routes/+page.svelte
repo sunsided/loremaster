@@ -16,24 +16,29 @@
 	import Transcript from '#lib/design/organisms/Transcript.svelte';
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
-	import PageLayout from '#lib/design/templates/PageLayout.svelte';
+	import InspectorPanel from '#lib/design/organisms/InspectorPanel.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
-	import type { View } from '#lib/design/types.ts';
+	import type { TabItem } from '#lib/design/types.ts';
 
 	let session: Session | undefined = $state();
 	let problems: Diagnostic[] = $state([]);
 	let failure = $state('');
 	let showSettings = $state(false);
-	let view = $state('play');
 	let hidden = $state(false);
 
-	const views: View[] = [
-		{ id: 'play', label: 'Play and write' },
-		{ id: 'map', label: 'Map' },
+	// On ultrawide screens the map has its own column, so the inspector does not repeat it.
+	let ultrawide = $state(false);
+	let inspector = $state('assembly');
+	const inspectorTabs = $derived<TabItem[]>([
+		{ id: 'assembly', label: 'Assembly' },
+		...(ultrawide ? [] : [{ id: 'map', label: 'Map' }]),
 		{ id: 'story', label: 'Story' },
 		{ id: 'rules', label: 'Rules' }
-	];
+	]);
+	$effect(() => {
+		if (ultrawide && inspector === 'map') inspector = 'assembly';
+	});
 
 	onMount(() => {
 		Game.open(lighthouse)
@@ -42,9 +47,17 @@
 				if (e instanceof ProjectError) problems = e.diagnostics;
 				else failure = String(e);
 			});
+		// Same query as --bp-ultrawide in PlayerLayout.
+		const wide = window.matchMedia('(min-width: 2200px) and (min-aspect-ratio: 21/9)');
+		ultrawide = wide.matches;
+		const onWide = () => (ultrawide = wide.matches);
+		wide.addEventListener('change', onWide);
 		const onVisibility = () => (hidden = document.hidden);
 		document.addEventListener('visibilitychange', onVisibility);
-		return () => document.removeEventListener('visibilitychange', onVisibility);
+		return () => {
+			document.removeEventListener('visibilitychange', onVisibility);
+			wide.removeEventListener('change', onWide);
+		};
 	});
 
 	const fxClass = $derived(
@@ -59,40 +72,17 @@
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
 </svelte:head>
 
-{#snippet appHeader(s: Session)}
-	<AppHeader
-		title={s.game.title}
-		{views}
-		current={view}
-		now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name]}
-		settingsOpen={showSettings}
-		onview={(id) => (view = id)}
-		onsettings={() => (showSettings = true)}
-	/>
-{/snippet}
-
-{#if session && view === 'map'}
-	{@const s = session}
-	<PageLayout maxWidth="var(--width-dialog)">
-		{#snippet header()}{@render appHeader(s)}{/snippet}
-		<MapPanel map={s.map} />
-	</PageLayout>
-{:else if session && view === 'story'}
-	{@const s = session}
-	<PageLayout>
-		{#snippet header()}{@render appHeader(s)}{/snippet}
-		<StoryTimeline steps={s.history} />
-	</PageLayout>
-{:else if session && view === 'rules'}
-	{@const s = session}
-	<PageLayout>
-		{#snippet header()}{@render appHeader(s)}{/snippet}
-		<RulesView rules={s.rules} />
-	</PageLayout>
-{:else if session}
+{#if session}
 	{@const s = session}
 	<PlayerLayout {fxClass} {glow}>
-		{#snippet header()}{@render appHeader(s)}{/snippet}
+		{#snippet header()}
+			<AppHeader
+				title={s.game.title}
+				now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name]}
+				settingsOpen={showSettings}
+				onsettings={() => (showSettings = true)}
+			/>
+		{/snippet}
 		{#snippet effects()}
 			<ScreenEffects theme={settings.theme} effects={settings.effects} />
 		{/snippet}
@@ -135,18 +125,28 @@
 			{/if}
 		{/snippet}
 		{#snippet map()}
-			<MapPanel map={s.map} />
+			<MapPanel map={s.map} framed />
 		{/snippet}
 		{#snippet panel()}
-			<AssemblyPanel
-				room={s.scene.room}
-				fragments={s.assembly}
-				parts={s.parts}
-				focus={s.focus}
-				time={s.scene.time}
-				phase={s.scene.phase}
-				onfocus={(i) => (s.focus = i)}
-			/>
+			<InspectorPanel tabs={inspectorTabs} bind:selected={inspector}>
+				{#if inspector === 'map'}
+					<MapPanel map={s.map} />
+				{:else if inspector === 'story'}
+					<StoryTimeline steps={s.history} />
+				{:else if inspector === 'rules'}
+					<RulesView rules={s.rules} />
+				{:else}
+					<AssemblyPanel
+						room={s.scene.room}
+						fragments={s.assembly}
+						parts={s.parts}
+						focus={s.focus}
+						time={s.scene.time}
+						phase={s.scene.phase}
+						onfocus={(i) => (s.focus = i)}
+					/>
+				{/if}
+			</InspectorPanel>
 		{/snippet}
 	</PlayerLayout>
 	<SettingsDialog

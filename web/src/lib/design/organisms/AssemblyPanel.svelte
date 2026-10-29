@@ -43,9 +43,7 @@
 	Shows how the runtime assembles the room text now: each layer in order,
 	each fragment with its state. Hidden fragments show why they are hidden.
 -->
-<!-- The panel scrolls, so it must be focusable: keyboard users scroll it with the arrow keys. -->
-<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<aside class="assembly" aria-labelledby="assembly-title" tabindex="0">
+<div class="assembly">
 	<header>
 		<Heading level={2} id="assembly-title">Assembly · room.{room}</Heading>
 	</header>
@@ -94,18 +92,14 @@
 	<footer>
 		<span>time {time} · {phase}</span>
 	</footer>
-</aside>
+</div>
 
 <style>
 	.assembly {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-6);
-		box-sizing: border-box;
-		min-height: 0;
-		padding: var(--space-7) var(--space-7);
-		overflow-y: auto;
-		background: var(--color-surface-raised);
+		min-height: 100%;
 	}
 	.intro,
 	.empty {

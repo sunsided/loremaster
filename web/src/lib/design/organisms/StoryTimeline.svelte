@@ -14,7 +14,7 @@
 	which rules fired and what state changed. It is an ordered list, oldest first.
 -->
 <section class="timeline" aria-labelledby="timeline-title">
-	<Heading level={2} look="title" id="timeline-title">Story so far</Heading>
+	<Heading level={2} id="timeline-title">Story so far</Heading>
 	<p class="summary">
 		This is the playthrough of this session. Each step is one turn. Rule names and state changes show why the
 		story went this way.
@@ -65,8 +65,8 @@
 	}
 	.step {
 		display: grid;
-		grid-template-columns: 7ch minmax(0, 1fr);
-		gap: var(--space-6);
+		grid-template-columns: 6ch minmax(0, 1fr);
+		gap: var(--space-5);
 		padding: var(--space-4) 0 var(--space-4) var(--space-6);
 		position: relative;
 	}

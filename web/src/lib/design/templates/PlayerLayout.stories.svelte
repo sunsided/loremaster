@@ -1,6 +1,7 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { entries, exits, fragments, inventory, map as lighthouseMap, parts, things, verbs } from '../fixtures.ts';
+	import InspectorPanel from '../organisms/InspectorPanel.svelte';
 	import CommandPrompt from '../molecules/CommandPrompt.svelte';
 	import StatusBar from '../molecules/StatusBar.svelte';
 	import AppHeader from '../organisms/AppHeader.svelte';
@@ -28,7 +29,7 @@ The layout has four steps:
 4. Wider than \`--width-content-max\` (2400px): the content stays at that width, in the center.
 
 The first element is a skip link. It shows when it gets focus. It moves focus to the command input.
-The player screen is the \`main\` landmark. The panel is a complementary landmark.
+The player screen is the \`main\` landmark. The panel holds the InspectorPanel with its tabs. The player stays on the screen for all inspector tabs.
 
 Use the viewport menu in the toolbar to see the layout at phone width. To see the map, open the story in a new tab on a screen that is 2200px wide or more.`
 				},
@@ -43,8 +44,6 @@ Use the viewport menu in the toolbar to see the layout at phone width. To see th
 		{#snippet header()}
 			<AppHeader
 				title="The Lighthouse"
-				views={[{ id: 'play', label: 'Play and write' }, { id: 'map', label: 'Map', disabled: true }]}
-				current="play"
 				now={['day 1 · 20:30 · dusk', 'The Shore']}
 				onsettings={() => {}}
 			/>
@@ -59,10 +58,12 @@ Use the viewport menu in the toolbar to see the layout at phone width. To see th
 			<VerbBar verbs={verbs} {things} {inventory} {exits} onverb={() => {}} onthing={() => {}} onexit={() => {}} />
 		{/snippet}
 		{#snippet map()}
-			<MapPanel map={lighthouseMap} />
+			<MapPanel map={lighthouseMap} framed />
 		{/snippet}
 		{#snippet panel()}
-			<AssemblyPanel room="shore" {fragments} {parts} time="20:30" phase="dusk" />
+			<InspectorPanel tabs={[{ id: 'assembly', label: 'Assembly' }, { id: 'story', label: 'Story' }, { id: 'rules', label: 'Rules' }]} selected="assembly">
+				<AssemblyPanel room="shore" {fragments} {parts} time="20:30" phase="dusk" />
+			</InspectorPanel>
 		{/snippet}
 	</PlayerLayout>
 </Story>

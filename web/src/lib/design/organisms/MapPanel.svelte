@@ -4,9 +4,11 @@
 
 	interface Props {
 		map: MapView;
+		/** Give the map its own padding, background and scroll. Use it when the map is not in a panel. */
+		framed?: boolean;
 	}
 
-	let { map }: Props = $props();
+	let { map, framed = false }: Props = $props();
 
 	// Grid cell and room box size, in SVG units.
 	const CELL_X = 210;
@@ -67,7 +69,7 @@
 	The map shows all rooms on their grid positions and the links between them.
 	The SVG is decoration for sighted users. The same facts are in a list for screen readers.
 -->
-<section class="map-panel" aria-labelledby="map-title">
+<section class="map-panel" class:framed aria-labelledby="map-title">
 	<Heading level={2} id="map-title">Map</Heading>
 	{#if current}<p class="where">You are in {current.name}.</p>{/if}
 
@@ -132,6 +134,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);
+	}
+	/* Standalone use, for example the map column on ultrawide screens. */
+	.map-panel.framed {
 		box-sizing: border-box;
 		min-height: 0;
 		padding: var(--space-7);

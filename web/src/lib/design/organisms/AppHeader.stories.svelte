@@ -29,7 +29,7 @@
 				description: {
 					component: `The app header shows the story title, the views and the state of the game now.
 
-The views are a \`nav\` list. The current view has \`aria-current="page"\`. A view that is not available yet is disabled.
+The page has one view now, so it passes no views. The views are for later top-level views, such as a project list. They are a \`nav\` list. The current view has \`aria-current="page"\`. A view that is not available yet is disabled.
 The "now" tags show facts, not controls.
 The "Look and motion" button opens the settings dialog. It has \`aria-haspopup="dialog"\` and \`aria-expanded\`.
 
@@ -40,5 +40,6 @@ On narrow screens the header wraps to more lines.`
 	});
 </script>
 
-<Story name="Default" />
+<Story name="Default" args={{ views: [], current: '' }} />
+<Story name="With views" />
 <Story name="Before the game starts" args={{ now: [] }} />
