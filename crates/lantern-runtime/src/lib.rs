@@ -12,6 +12,7 @@
 //! through dramaturge's `Custom` condition.
 
 mod eval;
+mod explore;
 mod game;
 mod output;
 mod parser;
@@ -20,6 +21,7 @@ mod state;
 mod text;
 mod world;
 
+pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
 pub use game::{
     AuthorCommand, ExitInfo, FragmentView, Game, Inspect, MapLink, MapRoom, MapView, PartView,
     PhaseView, RoomParts, RuleView, Scene, ThingInfo, VarView, VerbInfo,

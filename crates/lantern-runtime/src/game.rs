@@ -294,6 +294,14 @@ impl Game {
         crate::parser::preview(&self.world.verbs, &self.parse_scope(), text)
     }
 
+    /// The room description as it would show now, without changing the game.
+    pub fn describe_preview(&self) -> Turn {
+        let mut copy = self.clone();
+        let mut turn = Turn::default();
+        copy.describe_room(&mut turn);
+        turn
+    }
+
     /// Handle a typed command.
     pub fn input(&mut self, text: &str) -> Turn {
         let mut turn = Turn::default();
@@ -505,7 +513,7 @@ impl Game {
     }
 
     /// Things the player can see and refer to.
-    fn in_scope(&self) -> Vec<Id> {
+    pub(crate) fn in_scope(&self) -> Vec<Id> {
         let dark = self.is_dark();
         let room = self.state.room.as_str();
         let mut ids: Vec<Id> = self
@@ -531,7 +539,7 @@ impl Game {
         self.in_scope().iter().any(|t| t.as_str() == id)
     }
 
-    fn visible_exits(&self) -> Vec<(usize, &lantern_model::Exit)> {
+    pub(crate) fn visible_exits(&self) -> Vec<(usize, &lantern_model::Exit)> {
         let Some(ri) = self.world.room_idx(self.state.room.as_str()) else {
             return Vec::new();
         };

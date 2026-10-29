@@ -13,11 +13,11 @@ dramaturge-runtime.workspace = true
 lantern-lang.workspace = true
 lantern-model.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 assert2.workspace = true
 lantern-project.workspace = true
-serde_json.workspace = true
 
 [lints]
 workspace = true

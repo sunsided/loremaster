@@ -41,6 +41,11 @@ tasks:
     cmds:
       - "{{.CARGO}} run -q -p lantern-cli -- check examples/lighthouse"
 
+  explore:
+    desc: Walk all reachable states of the lighthouse example and report coverage
+    cmds:
+      - "{{.CARGO}} run -q -p lantern-cli -- explore examples/lighthouse"
+
   wasm:
     desc: Build the WASM package into the web app with Trunk (release)
     dir: crates/lantern-wasm

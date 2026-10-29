@@ -1,13 +1,13 @@
 //! `lantern play <dir>` and `lantern check <dir>`.
 
 use lantern_project::{Project, Severity, check, load, read_dir};
-use lantern_runtime::{BlockKind, Game, Turn, World};
+use lantern_runtime::{BlockKind, Budget, Game, Turn, World};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: lantern <play|check> <project-folder>";
+const USAGE: &str = "usage: lantern <play|check|explore> <project-folder>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -30,6 +30,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         "play" => play(project),
+        "explore" => explore(project),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
@@ -100,6 +101,58 @@ fn play(project: Project) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+/// Walk all reachable states and print what the walk found.
+fn explore(project: Project) -> ExitCode {
+    let world = match World::compile(project.story) {
+        Ok(w) => Arc::new(w),
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let result = lantern_runtime::explore(&Game::new(world), Budget::default());
+    let more = if result.truncated {
+        " (budget reached; results are incomplete)"
+    } else {
+        ""
+    };
+    println!("{} states explored{more}.", result.states);
+    for room in &result.rooms {
+        let state = if room.reached {
+            format!("{} text variants", room.variants.len())
+        } else {
+            "NOT REACHED".into()
+        };
+        println!("  {} ({}): {state}", room.name, room.id);
+    }
+    for ending in &result.endings {
+        println!(
+            "Ending in {} commands: {}",
+            ending.path.len(),
+            ending.path.join(", ")
+        );
+    }
+    if result.stuck > 0 {
+        println!(
+            "{} states cannot reach an ending. Shortest way in: {}",
+            result.stuck,
+            result.stuck_path.join(", ")
+        );
+    }
+    for f in &result.never_shown {
+        println!("Never shown: {f}");
+    }
+    for r in &result.never_fired {
+        println!("Never fired: {r}");
+    }
+    let problems = result.stuck > 0 || result.rooms.iter().any(|r| !r.reached);
+    if problems {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 fn print_turn(turn: &Turn, style: bool) {

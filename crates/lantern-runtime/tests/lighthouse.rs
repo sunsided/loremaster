@@ -363,3 +363,28 @@ fn names_change_with_what_the_player_knows() {
         "counters are in the save state"
     );
 }
+
+#[test]
+fn the_explorer_reaches_the_ending_and_reports_coverage() {
+    use lantern_runtime::{Budget, explore};
+    let game = lighthouse();
+    let result = explore(&game, Budget::default());
+    assert!(!result.truncated, "{} states", result.states);
+    assert!(
+        result.rooms.iter().all(|r| r.reached),
+        "every room is reachable"
+    );
+    assert_eq!(result.endings.len(), 1, "{:#?}", result.endings);
+    let path = &result.endings[0].path;
+    assert!(
+        path.iter().any(|c| c.starts_with("turn_on lens")),
+        "{path:?}"
+    );
+    assert_eq!(result.stuck, 0, "no soft-lock: {:?}", result.stuck_path);
+    let shore = result.rooms.iter().find(|r| r.id == "shore").unwrap();
+    assert!(shore.variants.len() >= 2, "dusk and night read differently");
+    println!(
+        "{} states, never shown: {:?}, never fired: {:?}",
+        result.states, result.never_shown, result.never_fired
+    );
+}
