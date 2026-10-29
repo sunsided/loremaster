@@ -56,6 +56,7 @@ impl Eval<'_> {
             Derived::Day => FactValue::Int(i64::from(s.minutes / TimeOfDay::MINUTES_PER_DAY) + 1),
             Derived::Turns => FactValue::Int(i64::from(s.turns)),
             Derived::Here => FactValue::Text(s.room.to_string()),
+            Derived::Level => FactValue::Int(self.world.level_of(s.room.as_str()).into()),
             Derived::FirstVisit => FactValue::Bool(s.visits_to(s.room.as_str()) <= 1),
             Derived::Visits(r) => FactValue::Int(i64::from(s.visits_to(r.as_str()))),
             Derived::Visited(r) => FactValue::Bool(s.visits_to(r.as_str()) > 0),

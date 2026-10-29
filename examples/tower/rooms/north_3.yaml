@@ -1,0 +1,12 @@
+name: "North Landing, Third Floor"
+level: 3
+position: [1, 0]
+description:
+  - "A slit window looks out over the courtyard{level == 1 ? , close enough to touch the rain : , far below}."
+  - layer: ambient
+    when: level == 2
+    text: "Pigeons shift and mutter somewhere above."
+exits:
+  - { direction: southeast, to: east_3 }
+  - { direction: southwest, to: west_3 }
+  - { direction: down, to: west_2 }

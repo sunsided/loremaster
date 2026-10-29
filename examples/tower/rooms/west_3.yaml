@@ -1,0 +1,9 @@
+name: "West Landing, Third Floor"
+level: 3
+position: [0, 1]
+description:
+  - "Steps curl up into the dark{level == 3 ? , and a cold wind falls down them from above : }."
+exits:
+  - { direction: southeast, to: south_3 }
+  - { direction: northeast, to: north_3 }
+  - { direction: up, to: bell_chamber }

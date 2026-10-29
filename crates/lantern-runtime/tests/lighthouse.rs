@@ -523,3 +523,38 @@ fn the_writer_gets_symbols_checks_and_other_values() {
         "{texts:?}"
     );
 }
+
+#[test]
+fn the_spiral_tower_has_levels_and_an_ending() {
+    use lantern_runtime::{Budget, explore};
+    let mut game = example("tower");
+    game.start();
+    let map = game.map();
+    let level = |id: &str| map.rooms.iter().find(|r| r.id == id).unwrap().level;
+    assert_eq!(
+        (level("north_1"), level("west_2"), level("bell_chamber")),
+        (1, 2, 4)
+    );
+    game.input("in");
+    let text = game.input("sw").plain_text();
+    assert!(text.contains("Steps curl up into the dark."), "{text}");
+    game.input("up");
+    assert!(
+        game.describe_preview().plain_text().contains("Pigeons"),
+        "level 2 text"
+    );
+    let result = explore(&game, Budget::default());
+    assert_eq!(result.endings.len(), 1, "{:?}", result.endings);
+    assert_eq!(result.stuck, 0);
+}
+
+#[test]
+fn levels_come_from_up_and_down_exits_when_rooms_do_not_say() {
+    let game = lighthouse();
+    let map = game.map();
+    let level = |id: &str| map.rooms.iter().find(|r| r.id == id).unwrap().level;
+    assert_eq!(
+        (level("shore"), level("stairwell"), level("lantern_room")),
+        (0, 0, 1)
+    );
+}

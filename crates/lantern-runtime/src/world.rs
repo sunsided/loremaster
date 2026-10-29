@@ -21,6 +21,8 @@ pub struct World {
     thing_index: BTreeMap<Id, usize>,
     /// The names that conditions and markup can use, for checks in the editor.
     pub(crate) scope: Scope,
+    /// The level of each room, in the order of the rooms.
+    levels: Vec<i32>,
 }
 
 #[derive(Debug, Clone)]
@@ -269,7 +271,9 @@ impl World {
             .enumerate()
             .map(|(i, t)| (t.id.clone(), i))
             .collect();
+        let levels = levels(&story);
         Ok(Self {
+            levels,
             scope,
             story,
             verbs,
@@ -293,5 +297,52 @@ impl World {
 
     pub fn verb(&self, id: &str) -> Option<&VerbDef> {
         self.verbs.iter().find(|v| v.id.as_str() == id)
+    }
+}
+
+/// The level of each room: the `level` field, else counted from the start room (up is +1, down is −1).
+/// Rooms with a `level` field fix the count; rooms that the walk does not reach are on level 0.
+fn levels(story: &Story) -> Vec<i32> {
+    use lantern_model::Direction;
+    let index: BTreeMap<&Id, usize> = story
+        .rooms
+        .iter()
+        .enumerate()
+        .map(|(i, r)| (&r.id, i))
+        .collect();
+    let mut level: Vec<Option<i32>> = story.rooms.iter().map(|r| r.level).collect();
+    let mut queue: std::collections::VecDeque<usize> = (0..story.rooms.len())
+        .filter(|&i| level[i].is_some())
+        .collect();
+    if let Some(&start) = index.get(&story.start)
+        && level[start].is_none()
+    {
+        level[start] = Some(0);
+        queue.push_back(start);
+    }
+    while let Some(i) = queue.pop_front() {
+        let here = level[i].unwrap_or(0);
+        for exit in &story.rooms[i].exits {
+            let Some(&j) = index.get(&exit.to) else {
+                continue;
+            };
+            if level[j].is_some() {
+                continue;
+            }
+            level[j] = Some(match exit.direction {
+                Direction::Up => here + 1,
+                Direction::Down => here - 1,
+                _ => here,
+            });
+            queue.push_back(j);
+        }
+    }
+    level.into_iter().map(|l| l.unwrap_or(0)).collect()
+}
+
+impl World {
+    /// The level of a room. Up exits go one level higher.
+    pub fn level_of(&self, room: &str) -> i32 {
+        self.room_idx(room).map_or(0, |i| self.levels[i])
     }
 }

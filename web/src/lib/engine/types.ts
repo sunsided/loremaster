@@ -130,6 +130,8 @@ export interface MapRoom {
 	name: string;
 	x: number;
 	y: number;
+	/** The level, for towers and dungeons. Up exits go one level higher. */
+	level: number;
 	visited: boolean;
 	current: boolean;
 }

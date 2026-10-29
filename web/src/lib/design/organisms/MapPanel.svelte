@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { MapLink, MapRoom, MapView } from '#lib/engine/types.ts';
+	import Button from '../atoms/Button.svelte';
 	import Heading from '../atoms/Heading.svelte';
+	import RadioGroup from '../molecules/RadioGroup.svelte';
 
 	interface Props {
 		map: MapView;
@@ -9,6 +11,58 @@
 	}
 
 	let { map, framed = false }: Props = $props();
+	const uid = $props.id();
+
+	// Levels: towers and dungeons. With more than one level, the map shows one level in full (stacked)
+	// or all levels side by side in ring order (unfolded).
+	const levels = $derived([...new Set(map.rooms.map((r) => r.level))].sort((a, b) => a - b));
+	const multi = $derived(levels.length > 1);
+	const here = $derived(map.rooms.find((r) => r.current));
+	let view = $state<'stacked' | 'unfolded'>('stacked');
+	/** The level that the author picked. Null follows the player. */
+	let picked = $state<number | null>(null);
+	let lastLevel: number | undefined;
+	$effect(() => {
+		// When the player changes level, the map follows again.
+		const l = here?.level;
+		if (l !== lastLevel) picked = null;
+		lastLevel = l;
+	});
+	const shown = $derived(picked ?? here?.level ?? levels[0] ?? 0);
+
+	/** Rooms of one level, sorted around the middle of the level: north first, then clockwise. */
+	function ringOrder(level: number): MapRoom[] {
+		const rs = map.rooms.filter((r) => r.level === level);
+		const mx = rs.reduce((a, r) => a + r.x, 0) / (rs.length || 1);
+		const my = rs.reduce((a, r) => a + r.y, 0) / (rs.length || 1);
+		const angle = (r: MapRoom) => (Math.atan2(r.y - my, r.x - mx) + Math.PI * 2.5) % (Math.PI * 2);
+		return rs.sort((a, b) => angle(a) - angle(b) || a.id.localeCompare(b.id));
+	}
+
+	/** Grid positions for the current view. Rooms that the view does not show have no position. */
+	const layout = $derived.by(() => {
+		const pos = new Map<string, { x: number; y: number }>();
+		if (!multi || view === 'stacked') {
+			for (const r of map.rooms) if (!multi || r.level === shown) pos.set(r.id, { x: r.x, y: r.y });
+			return pos;
+		}
+		// One row for each level, the highest at the top. Each row starts one column further right,
+		// so a spiral reads as a staircase.
+		const top = levels.at(-1) ?? 0;
+		levels.forEach((l, li) => {
+			ringOrder(l).forEach((r, i) => pos.set(r.id, { x: li + i, y: top - l }));
+		});
+		return pos;
+	});
+	/** The rooms of the levels next to the shown level, drawn faint behind it in the stacked view. */
+	const ghosts = $derived(
+		multi && view === 'stacked' ? map.rooms.filter((r) => Math.abs(r.level - shown) === 1).map((r) => ({ r, d: r.level - shown })) : []
+	);
+	const placed = $derived(map.rooms.filter((r) => layout.has(r.id)));
+	const stairs = (r: MapRoom) => ({
+		up: map.links.some((l) => (l.from === r.id && l.direction === 'up') || (l.to === r.id && l.direction === 'down' && !l.one_way)),
+		down: map.links.some((l) => (l.from === r.id && l.direction === 'down') || (l.to === r.id && l.direction === 'up' && !l.one_way))
+	});
 
 	// Grid cell and room box size, in SVG units.
 	const CELL_X = 210;
@@ -18,8 +72,9 @@
 	const PAD = 24;
 
 	const bounds = $derived.by(() => {
-		const xs = map.rooms.map((r) => r.x);
-		const ys = map.rooms.map((r) => r.y);
+		const ps = [...layout.values()];
+		const xs = ps.map((p) => p.x);
+		const ys = ps.map((p) => p.y);
 		return {
 			minX: Math.min(0, ...xs),
 			minY: Math.min(0, ...ys),
@@ -32,8 +87,13 @@
 	const width = $derived((bounds.maxX - bounds.minX) * CELL_X + BOX_W + 2 * PAD + LABEL_ROOM);
 	const height = $derived((bounds.maxY - bounds.minY) * CELL_Y + BOX_H + 2 * PAD);
 
-	const cx = (r: MapRoom) => (r.x - bounds.minX) * CELL_X + PAD + BOX_W / 2;
-	const cy = (r: MapRoom) => (r.y - bounds.minY) * CELL_Y + PAD + BOX_H / 2;
+	/** A long name is cut to fit the box. The full name is in the title and in the list for screen readers. */
+	const short = (name: string) => (name.length > 21 ? `${name.slice(0, 20).trimEnd()}…` : name);
+	const at = (r: MapRoom) => layout.get(r.id) ?? { x: r.x, y: r.y };
+	const cx = (r: MapRoom) => (at(r).x - bounds.minX) * CELL_X + PAD + BOX_W / 2;
+	const cy = (r: MapRoom) => (at(r).y - bounds.minY) * CELL_Y + PAD + BOX_H / 2;
+	/** In the stacked view, the levels next to the shown one sit a little up and right (above) or down and left (below). */
+	const GHOST = 14;
 	const room = (id: string) => map.rooms.find((r) => r.id === id);
 
 	/** The point where the line from `a` to `b` leaves the box of `b`, so an arrow head stays visible. */
@@ -55,6 +115,31 @@
 			: link.direction;
 	}
 
+	/** A link to draw in the current view: both rooms placed, and not a stair in the stacked view. */
+	function drawn(link: MapLink): boolean {
+		if (!layout.has(link.from) || !layout.has(link.to)) return false;
+		return !(multi && view === 'stacked' && (link.direction === 'up' || link.direction === 'down'));
+	}
+
+	/** A path for a link. In the unfolded view, a link between rooms that are not next to each other bends. */
+	function path(a: MapRoom, b: MapRoom, end: { x: number; y: number }): string {
+		const pa = at(a);
+		const pb = at(b);
+		if (multi && view === 'unfolded') {
+			if (pa.y !== pb.y) {
+				// A stair: up or down from the side of the room, then across to the other room.
+				const side = cx(a) + (cx(b) >= cx(a) ? BOX_W / 2 : -BOX_W / 2) * 0.6;
+				return `M${side} ${cy(a)}V${end.y}H${end.x}`;
+			}
+			if (Math.abs(pa.x - pb.x) > 1) {
+				// The ring closes: an arc under the row.
+				const y = cy(a) + BOX_H / 2 + 18;
+				return `M${cx(a)} ${cy(a) + BOX_H / 2}V${y}H${end.x}V${end.y}`;
+			}
+		}
+		return `M${cx(a)} ${cy(a)}L${end.x} ${end.y}`;
+	}
+
 	function describe(link: MapLink): string {
 		const from = room(link.from)?.name ?? link.from;
 		const to = room(link.to)?.name ?? link.to;
@@ -69,43 +154,68 @@
 	The map shows all rooms on their grid positions and the links between them.
 	The SVG is decoration for sighted users. The same facts are in a list for screen readers.
 -->
-<section class="map-panel" class:framed aria-labelledby="map-title">
-	<Heading level={2} id="map-title">Map</Heading>
-	{#if current}<p class="where">You are in {current.name}.</p>{/if}
+<section class="map-panel" class:framed aria-labelledby="{uid}-title">
+	<Heading level={2} id="{uid}-title">Map</Heading>
+	{#if current}<p class="where">You are in {current.name}{multi ? `, on level ${current.level}` : ''}.</p>{/if}
+	{#if multi}
+		<div class="levels">
+			<RadioGroup legend="Map view" name="{uid}-view" look="pills" options={[{ value: 'stacked', label: 'One level' }, { value: 'unfolded', label: 'All levels, unfolded' }]} bind:value={view} />
+			{#if view === 'stacked'}
+				<div class="stepper" role="group" aria-label="Level">
+					<Button size="compact" variant="quiet" disabled={shown >= (levels.at(-1) ?? 0)} onclick={() => (picked = levels[levels.indexOf(shown) + 1])}
+						>Up<span class="visually-hidden"> one level</span></Button
+					>
+					<span class="level-name" aria-live="polite">Level {shown}{shown === here?.level ? ' (you)' : ''}</span>
+					<Button size="compact" variant="quiet" disabled={shown <= levels[0]} onclick={() => (picked = levels[levels.indexOf(shown) - 1])}
+						>Down<span class="visually-hidden"> one level</span></Button
+					>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<svg viewBox="0 0 {width} {height}" class="map" aria-hidden="true">
 		<defs>
-			<marker id="map-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+			<marker id="{uid}-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 				<path d="M0 0L10 5L0 10z" class="arrow" />
 			</marker>
 		</defs>
-		{#each map.links as link (link.from + link.to + link.direction)}
+		{#each ghosts as { r, d } (r.id)}
+			{@const gx = (r.x - bounds.minX) * CELL_X + PAD + d * GHOST}
+			{@const gy = (r.y - bounds.minY) * CELL_Y + PAD - d * GHOST}
+			<rect class="ghost" class:above={d > 0} x={gx} y={gy} width={BOX_W} height={BOX_H}><title>{r.name}, level {r.level}</title></rect>
+		{/each}
+		{#each map.links.filter(drawn) as link (link.from + link.to + link.direction)}
 			{@const a = room(link.from)}
 			{@const b = room(link.to)}
 			{#if a && b}
 				{@const end = link.one_way ? edge(a, b) : { x: cx(b), y: cy(b) }}
-				<line
-					x1={cx(a)}
-					y1={cy(a)}
-					x2={end.x}
-					y2={end.y}
+				<path
+					d={path(a, b, end)}
 					class="link"
+					class:stair={link.direction === 'up' || link.direction === 'down'}
 					class:hidden-link={!link.visible}
-					marker-end={link.one_way ? 'url(#map-arrow)' : undefined}
+					marker-end={link.one_way ? `url(#${uid}-arrow)` : undefined}
 				/>
-				{@const text = label(link)}
+				{@const text = multi && view === 'unfolded' ? null : label(link)}
 				{#if text}
 					<text x={(cx(a) + cx(b)) / 2 + 8} y={(cy(a) + cy(b)) / 2} class="link-label">{text}</text>
 				{/if}
 			{/if}
 		{/each}
-		{#each map.rooms as r (r.id)}
+		{#each placed as r (r.id)}
+			{@const st = multi ? stairs(r) : { up: false, down: false }}
 			<g class="room" class:current={r.current} class:unvisited={!r.visited}>
 				<rect x={cx(r) - BOX_W / 2} y={cy(r) - BOX_H / 2} width={BOX_W} height={BOX_H} />
 				{#if r.current}
 					<rect class="tint" x={cx(r) - BOX_W / 2} y={cy(r) - BOX_H / 2} width={BOX_W} height={BOX_H} />
 				{/if}
-				<text x={cx(r)} y={cy(r) + 4} text-anchor="middle">{r.name}</text>
+				<text x={cx(r)} y={cy(r) + 4} text-anchor="middle">{short(r.name)}<title>{r.name}</title></text>
+				{#if st.up || st.down}
+					<text x={cx(r) + BOX_W / 2 - 6} y={cy(r) - BOX_H / 2 + 13} text-anchor="end" class="stairs"
+						>{st.up ? '▲' : ''}{st.down ? '▼' : ''}</text
+					>
+				{/if}
 			</g>
 		{/each}
 	</svg>
@@ -120,7 +230,7 @@
 		<h3>Rooms</h3>
 		<ul>
 			{#each map.rooms as r (r.id)}
-				<li>{r.name}{r.current ? ', you are here' : r.visited ? ', visited' : ', not visited yet'}</li>
+				<li>{r.name}{multi ? `, level ${r.level}` : ''}{r.current ? ', you are here' : r.visited ? ', visited' : ', not visited yet'}</li>
 			{/each}
 		</ul>
 		<h3>Connections</h3>
@@ -164,6 +274,43 @@
 	.link {
 		stroke: var(--color-border-control);
 		stroke-width: 1;
+	}
+	.link {
+		fill: none;
+	}
+	.stair {
+		stroke: var(--color-accent);
+		stroke-width: 1.5;
+	}
+	.ghost {
+		fill: none;
+		stroke: var(--color-border-subtle);
+		stroke-width: 1;
+		stroke-dasharray: 2 4;
+	}
+	.ghost.above {
+		stroke: var(--color-border-control);
+	}
+	.stairs {
+		fill: var(--color-text-accent);
+		font-size: var(--font-size-xs);
+	}
+	.levels {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-3) var(--space-6);
+	}
+	.stepper {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+	.level-name {
+		min-width: 9ch;
+		text-align: center;
+		color: var(--color-text-strong);
+		font-size: var(--font-size-sm);
 	}
 	.hidden-link {
 		stroke-dasharray: 4 5;

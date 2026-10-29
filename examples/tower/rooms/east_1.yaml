@@ -1,0 +1,8 @@
+name: "East Landing, First Floor"
+level: 1
+position: [2, 1]
+description:
+  - "An iron ring is set into the wall. Whatever it held is gone."
+exits:
+  - { direction: northwest, to: north_1 }
+  - { direction: southwest, to: south_1 }

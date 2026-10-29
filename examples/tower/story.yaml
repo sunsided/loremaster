@@ -1,0 +1,19 @@
+title: The Spiral
+author: lantern example
+start: courtyard
+seed: 7
+
+intro:
+  - "The old bell tower has not rung in forty years. Tonight, somebody has to ring it."
+
+clock:
+  start: "23:00"
+  minutes_per_turn: 2
+
+verbs:
+  - id: ring
+    label: Ring
+    words: [ring, toll, pull]
+    slots: one
+    bar: false
+    default: "Nothing here rings."

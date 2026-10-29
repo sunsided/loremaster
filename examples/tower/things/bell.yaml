@@ -1,0 +1,6 @@
+name: bronze bell
+aliases: [bell]
+location: { room: bell_chamber }
+listed: false
+description:
+  - "Green with age, and big enough to sit in. The rope still hangs from its crown."

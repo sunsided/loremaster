@@ -61,6 +61,8 @@ pub enum Derived {
     Turns,
     /// `here`, the current room id.
     Here,
+    /// `level`, int: the level of the current room. Up exits go one level higher.
+    Level,
     /// `first_visit`: the current room is being seen for the first time.
     FirstVisit,
     /// `room.visits`, int.
@@ -98,6 +100,7 @@ impl Derived {
             Derived::Day => ("day", None),
             Derived::Turns => ("turns", None),
             Derived::Here => ("here", None),
+            Derived::Level => ("level", None),
             Derived::FirstVisit => ("first_visit", None),
             Derived::Visits(id) => ("visits", Some(id)),
             Derived::Visited(id) => ("visited", Some(id)),
@@ -121,6 +124,7 @@ impl Derived {
             "day" => Derived::Day,
             "turns" => Derived::Turns,
             "here" => Derived::Here,
+            "level" => Derived::Level,
             "first_visit" => Derived::FirstVisit,
             "visits" => Derived::Visits(id()),
             "visited" => Derived::Visited(id()),

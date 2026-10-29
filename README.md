@@ -17,8 +17,9 @@ The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
 | `examples/cantina` | A small story with a character whose name changes. |
 | `examples/zork1` | Zork I, imported from its ZIL source. A large map for tests. Read `examples/zork1/README.md`. |
+| `examples/tower` | A spiral tower on four levels, for the level map. |
 | `crates/lantern-zil` | The importer for ZIL games: `lantern-zil <zil-folder> <project-folder>`. |
-| `docs/writing-stories.md` | How to write a story: files, fragments, markup, conditions, frames and name stages. |
+| `docs/writing-stories.md` | How to write a story: files, fragments, markup, conditions, frames, name stages, levels, and how to write in the game. |
 | `web/` | The SvelteKit app and the design system with its Storybook. |
 
 ## Commands

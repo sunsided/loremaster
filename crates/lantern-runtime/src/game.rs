@@ -88,6 +88,8 @@ pub struct MapRoom {
     /// Grid position from the story, or a generated one when the story has none.
     pub x: f32,
     pub y: f32,
+    /// The level, for towers and dungeons. Up exits go one level higher.
+    pub level: i32,
     pub visited: bool,
     pub current: bool,
 }
@@ -1125,6 +1127,7 @@ impl Game {
                     name: r.name.clone(),
                     x,
                     y,
+                    level: self.world.level_of(r.id.as_str()),
                     visited: self.state.visits_to(r.id.as_str()) > 0,
                     current: r.id == self.state.room,
                 }

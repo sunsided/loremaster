@@ -1,0 +1,7 @@
+name: Bell Chamber
+level: 4
+position: [1, 1]
+description:
+  - "The top of the tower. Four open arches, and the whole town asleep below."
+exits:
+  - { direction: down, to: west_3 }

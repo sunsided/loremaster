@@ -1,0 +1,8 @@
+# Outside the tower. The tower stands to the north.
+name: Courtyard
+level: 1
+position: [1, -1]
+description:
+  - "Wet cobbles and a dead fountain. The tower stands to the north, a black finger against the clouds."
+exits:
+  - { direction: in, to: north_1 }

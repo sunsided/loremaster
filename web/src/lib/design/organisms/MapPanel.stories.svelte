@@ -1,7 +1,7 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import type { ComponentProps } from 'svelte';
-	import { map } from '../fixtures.ts';
+	import { map, towerMap } from '../fixtures.ts';
 	import MapPanel from './MapPanel.svelte';
 
 	const { Story } = defineMeta({
@@ -13,7 +13,9 @@
 			layout: 'fullscreen',
 			docs: {
 				description: {
-					component: `The map panel shows all rooms of the story and the links between them.
+					component: `**Levels.** When the rooms are on more than one level, the map has a "Map view" choice. "One level" shows the level of the player (or the level that "Up" and "Down" pick) in full, with the levels next to it faint behind it; ▲ and ▼ mark rooms with stairs. "All levels, unfolded" puts each level in one row, the highest at the top, with the rooms in ring order; each row starts one column further right, so a spiral reads as a staircase. Long names are cut to fit; the full name is in the tooltip and in the list for screen readers.
+
+The map panel shows all rooms of the story and the links between them.
 
 Each room has its grid position from the story file (\`position\`). A room without a position goes on a row under the map.
 - The current room has the accent colour.
@@ -43,10 +45,10 @@ The map shows in the Map tab of the inspector. On ultrawide screens (21:9 and wi
 	args={{
 		map: {
 			rooms: [
-				{ id: 'hall', name: 'Hall', x: 0, y: 0, visited: true, current: true },
-				{ id: 'study', name: 'Study', x: 1, y: 0, visited: false, current: false },
-				{ id: 'cellar', name: 'Cellar', x: 0, y: 1, visited: false, current: false },
-				{ id: 'mirror', name: 'Behind the Mirror', x: 1, y: 1, visited: false, current: false }
+				{ id: 'hall', name: 'Hall', x: 0, y: 0, level: 0, visited: true, current: true },
+				{ id: 'study', name: 'Study', x: 1, y: 0, level: 0, visited: false, current: false },
+				{ id: 'cellar', name: 'Cellar', x: 0, y: 1, level: -1, visited: false, current: false },
+				{ id: 'mirror', name: 'Behind the Mirror', x: 1, y: 1, level: 0, visited: false, current: false }
 			],
 			links: [
 				{ from: 'hall', to: 'study', direction: 'east', visible: true, one_way: false },
@@ -57,3 +59,7 @@ The map shows in the Map tab of the inspector. On ultrawide screens (21:9 and wi
 	}}
 	{template}
 />
+<Story name="Spiral tower, one level" args={{ map: towerMap }} {template} />
+<Story name="Spiral tower, unfolded" args={{ map: towerMap }} {template} play={async ({ canvasElement }) => {
+	canvasElement.querySelector<HTMLInputElement>('input[value="unfolded"]')?.click();
+}} />

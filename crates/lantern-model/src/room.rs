@@ -19,6 +19,10 @@ pub struct Room {
     /// Map position, owned by the editor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<[f32; 2]>,
+    /// The level of the room, for towers and dungeons. Without it, the level comes from
+    /// the `up` and `down` exits, counted from the start room.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<i32>,
     /// Author text around the responses to verbs in this room.
     #[serde(default, skip_serializing_if = "Frames::is_empty")]
     pub frames: Frames,

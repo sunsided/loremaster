@@ -204,10 +204,10 @@ export const fragments: FragmentView[] = [
 
 export const map: MapView = {
 	rooms: [
-		{ id: 'shore', name: 'The Shore', x: 0, y: 0, visited: true, current: false },
-		{ id: 'cottage', name: "Keeper's Cottage", x: 0, y: -1, visited: true, current: true },
-		{ id: 'stairwell', name: 'Lighthouse Stairwell', x: 1, y: 0, visited: false, current: false },
-		{ id: 'lantern_room', name: 'Lantern Room', x: 1, y: -1, visited: false, current: false }
+		{ id: 'shore', name: 'The Shore', x: 0, y: 0, level: 0, visited: true, current: false },
+		{ id: 'cottage', name: "Keeper's Cottage", x: 0, y: -1, level: 0, visited: true, current: true },
+		{ id: 'stairwell', name: 'Lighthouse Stairwell', x: 1, y: 0, level: 0, visited: false, current: false },
+		{ id: 'lantern_room', name: 'Lantern Room', x: 1, y: -1, level: 1, visited: false, current: false }
 	],
 	links: [
 		{ from: 'shore', to: 'cottage', direction: 'north', visible: true, one_way: false },
@@ -442,4 +442,39 @@ export const waveFragment: WriterFragment = {
 	mode: 'shuffle',
 	layer: 'ambient',
 	replaces: false
+};
+
+// The spiral tower example: three floors with a ring of four landings each. The west landing leads up to
+// the north landing of the next floor.
+const sides = [
+	['north', 1, 0],
+	['east', 2, 1],
+	['south', 1, 2],
+	['west', 0, 1]
+] as const;
+const floorNames = ['First', 'Second', 'Third'];
+export const towerMap: MapView = {
+	rooms: [
+		...[1, 2, 3].flatMap((lv) =>
+			sides.map(([side, x, y]) => ({
+				id: `${side}_${lv}`,
+				name: `${side[0].toUpperCase()}${side.slice(1)} Landing, ${floorNames[lv - 1]} Floor`,
+				x,
+				y,
+				level: lv,
+				visited: lv < 3,
+				current: side === 'north' && lv === 2
+			}))
+		),
+		{ id: 'bell_chamber', name: 'Bell Chamber', x: 1, y: 1, level: 4, visited: false, current: false }
+	],
+	links: [
+		...[1, 2, 3].flatMap((lv) => [
+			{ from: `north_${lv}`, to: `east_${lv}`, direction: 'southeast', visible: true, one_way: false },
+			{ from: `east_${lv}`, to: `south_${lv}`, direction: 'southwest', visible: true, one_way: false },
+			{ from: `south_${lv}`, to: `west_${lv}`, direction: 'northwest', visible: true, one_way: false },
+			{ from: `west_${lv}`, to: `north_${lv}`, direction: 'northeast', visible: true, one_way: false },
+			{ from: `west_${lv}`, to: lv < 3 ? `north_${lv + 1}` : 'bell_chamber', direction: 'up', visible: true, one_way: false }
+		])
+	]
 };

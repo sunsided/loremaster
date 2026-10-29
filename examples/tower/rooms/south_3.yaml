@@ -1,0 +1,8 @@
+name: "South Landing, Third Floor"
+level: 3
+position: [1, 2]
+description:
+  - "The landing is no wider than a cart. Someone has scratched marks into the stone, one for each step."
+exits:
+  - { direction: northeast, to: east_3 }
+  - { direction: northwest, to: west_3 }

@@ -46,7 +46,7 @@ Conditions use variables, thing properties and values that the runtime calculate
 
 - Variables and properties: `flooded`, `lamp.lit`, `sanity >= 3`, `weather == fog`.
 - Time: `night`, `time.phase == dusk`, `time.hour`, `time.day`, `turns`.
-- Place: `here == cellar`, `in(cellar)`, `cellar.visits`, `visited(cellar)`, `first_visit`.
+- Place: `here == cellar`, `in(cellar)`, `cellar.visits`, `visited(cellar)`, `first_visit`, `level`.
 - Things: `carried(lamp)`, `present(lamp)`, `lamp.location`, `lamp.interactions`, `lamp.talked`.
 - The current action: `action.repeat`, `action.count`, `action.total`, `action.verb`.
 
@@ -102,6 +102,28 @@ names:
 - The parser accepts the names of the current stage and of all stages before it. It does not accept a name that the player has not learned yet.
 - Set `proper: true` for a proper name. A proper name gets no article.
 - The author tooltip shows all stages and the current stage.
+
+## Levels
+
+A room can be on a level, for towers and dungeons. Up exits go one level higher, down exits one level lower.
+
+```yaml
+# rooms/north_2.yaml
+name: "North Landing, Second Floor"
+level: 2
+position: [1, 0]
+```
+
+- A room without `level` gets its level from the `up` and `down` exits, counted from the start room (level 0).
+- `position` is the place of the room on its level. Rooms on different levels can have the same position.
+- The condition `level` is the level of the current room, for example `level == 3`.
+
+With more than one level, the map has two views:
+
+- **One level**: the level of the player in full. The levels above and below show faint behind it. ▲ and ▼ mark rooms with stairs. "Up" and "Down" show another level.
+- **All levels, unfolded**: one row for each level, the highest at the top, the rooms of each level in ring order (north first, then clockwise). A spiral reads as a staircase, so a stair to the wrong room is easy to see.
+
+The example `examples/tower` ("The Spiral") is a tower with three floors of four landings each. The stair on each west landing goes up to the north landing of the next floor.
 
 ## Examine one room in all conditions
 

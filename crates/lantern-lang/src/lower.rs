@@ -154,6 +154,7 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
         ["time", "day"] => derived(Derived::Day, Ty::Int),
         ["turns"] => derived(Derived::Turns, Ty::Int),
         ["here"] => derived(Derived::Here, Ty::Room),
+        ["level"] => derived(Derived::Level, Ty::Int),
         ["first_visit"] => derived(Derived::FirstVisit, Ty::Bool),
         ["action", "repeat"] => derived(Derived::ActionRepeat, Ty::Int),
         ["action", "count"] => derived(Derived::ActionCount, Ty::Int),
