@@ -29,6 +29,14 @@
 	let showSettings = $state(false);
 	let prompt: HTMLInputElement | undefined = $state();
 	let showPalette = $state(false);
+	/** The kind of thing or exit under the pointer or with focus, for the verb hint. */
+	let hovered = $state<'thing' | 'exit' | null>(null);
+
+	function inspectKind(target: EventTarget | null): 'thing' | 'exit' | null {
+		const el = target instanceof Element ? target.closest<HTMLElement>('[data-inspect]') : null;
+		const kind = el?.dataset.inspect?.split(':')[0];
+		return kind === 'thing' || kind === 'exit' ? kind : null;
+	}
 
 	/** A rule for the Rules tab to show and focus. */
 	let revealRule = $state<string | null>(null);
@@ -194,6 +202,11 @@
 </script>
 
 <svelte:window onkeydown={onWindowKeydown} />
+<svelte:document
+	onpointerover={(e) => (hovered = inspectKind(e.target))}
+	onfocusin={(e) => (hovered = inspectKind(e.target))}
+	onfocusout={() => (hovered = null)}
+/>
 
 <svelte:head>
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
@@ -241,6 +254,7 @@
 					canRunPartial={s.canRunPartial}
 					marked={s.named}
 					markedExit={s.preview.direction}
+					hintedVerb={hovered ? s.clickVerb(hovered) : null}
 					things={s.scene.things}
 					inventory={s.scene.inventory}
 					exits={s.scene.exits}

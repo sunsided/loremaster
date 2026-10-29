@@ -15,6 +15,8 @@
 		marked?: string[];
 		/** The exit direction that the typed command names. It is marked. */
 		markedExit?: string | null;
+		/** The verb that a click on the thing or exit under the pointer would use. It is marked. */
+		hintedVerb?: string | null;
 		things: ThingInfo[];
 		inventory: ThingInfo[];
 		exits: ExitInfo[];
@@ -32,6 +34,7 @@
 		canRunPartial = false,
 		marked = [],
 		markedExit = null,
+		hintedVerb = null,
 		things,
 		inventory,
 		exits,
@@ -53,7 +56,12 @@
 <div class="verb-bar">
 	<div class="verbs" role="group" aria-label="Verbs">
 		{#each verbs as verb (verb.id)}
-			<Button block pressed={verb.id === selected} onclick={() => onverb(verb)}>{verb.label}</Button>
+			<Button
+				block
+				pressed={verb.id === selected}
+				marked={verb.id === hintedVerb && verb.id !== selected}
+				onclick={() => onverb(verb)}>{verb.label}</Button
+			>
 		{/each}
 	</div>
 

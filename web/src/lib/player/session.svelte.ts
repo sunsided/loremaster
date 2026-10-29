@@ -152,6 +152,16 @@ export class Session {
 		this.act({ type: 'go', direction });
 	}
 
+	/**
+	 * The verb that a click on a thing or an exit would use now: the verb in the prompt if it
+	 * applies, else "Walk to" for an exit and "Look at" for a thing.
+	 */
+	clickVerb(kind: 'thing' | 'exit'): string {
+		if (kind === 'exit') return 'go';
+		const verb = this.verb;
+		return verb && verb.id !== 'go' && verb.slots !== 'none' ? verb.id : 'examine';
+	}
+
 	/** Things the draft names or could still name, for highlights on the verb bar. */
 	get named(): string[] {
 		return [...this.preview.objects, ...this.preview.candidates];
