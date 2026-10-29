@@ -19,11 +19,13 @@ import type { StoryStep } from '#lib/design/types.ts';
 export interface Entry {
 	id: number;
 	turn: Turn;
+	/** True when an edit of the story wrote the room text of this turn again. */
+	rewritten?: boolean;
 }
 
 /** One play session: the transcript, the scene, and the verb bar state. */
 export class Session {
-	game: Game;
+	game = $state.raw<Game>() as Game;
 	entries = $state<Entry[]>([]);
 	scene = $state<Scene>() as Scene;
 	assembly = $state<FragmentView[]>([]);
@@ -66,13 +68,7 @@ export class Session {
 
 	#push(turn: Turn) {
 		this.entries.push({ id: this.#next++, turn });
-		this.scene = this.game.scene();
-		this.assembly = this.game.assembly();
-		this.map = this.game.map();
-		this.parts = this.game.roomParts();
-		this.rules = this.game.rules();
-		this.vars = this.game.vars();
-		this.frame = this.game.lastFrame();
+		this.#refresh();
 		const command = turn.blocks.find((b) => b.kind === 'command' || b.kind === 'author');
 		this.history.push({
 			turn: this.scene.turns,
@@ -86,6 +82,43 @@ export class Session {
 			changes: turn.log.filter((l) => l.kind !== 'rule').map((l) => l.text),
 			ended: turn.ended
 		});
+	}
+
+	/**
+	 * Continue in a new build of the story, after an edit. The state carries over, and the room text of the
+	 * last turn is written again with the new story. Older turns stay as they were played.
+	 */
+	carryOver(game: Game) {
+		game.carryOver(this.game);
+		this.game = game;
+		this.verbs = game.verbs();
+		this.phases = game.phases();
+		this.#refresh();
+		// The last turn that showed a room text, when that room is still the current room.
+		const at = this.entries.findLastIndex((e) => e.turn.blocks.some((b) => b.kind === 'title'));
+		const last = this.entries[at];
+		if (!last) return;
+		const blocks = last.turn.blocks;
+		const start = blocks.findLastIndex((b) => b.kind === 'title');
+		if (blocks[start].runs.map((r) => r.text).join('') !== this.scene.room_name) return;
+		let end = start + 1;
+		while (end < blocks.length && ['prose', 'objects', 'exits'].includes(blocks[end].kind)) end++;
+		const fresh = game.describe().blocks;
+		this.entries[at] = {
+			...last,
+			turn: { ...last.turn, blocks: [...blocks.slice(0, start), ...fresh, ...blocks.slice(end)] },
+			rewritten: true
+		};
+	}
+
+	#refresh() {
+		this.scene = this.game.scene();
+		this.assembly = this.game.assembly();
+		this.map = this.game.map();
+		this.parts = this.game.roomParts();
+		this.rules = this.game.rules();
+		this.vars = this.game.vars();
+		this.frame = this.game.lastFrame();
 	}
 
 	input(text: string) {

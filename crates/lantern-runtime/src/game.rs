@@ -281,6 +281,49 @@ impl Game {
         Self::restore(world, state)
     }
 
+    /// Continue the game of `self` in a changed world, for example after an edit of the story.
+    ///
+    /// The state carries over. A value that is still at its start value in the old world takes
+    /// the start value of the new world, so an edit of a start value shows at once. Values and
+    /// things that the new world does not have are dropped; new ones start at their start value.
+    /// A current room that is gone becomes the start room.
+    pub fn carry_over(&self, world: Arc<World>) -> Self {
+        let old_start = Game::new(self.world.clone()).state;
+        let new_start = Game::new(world.clone()).state;
+        let mut state = self.state.clone();
+        state.facts = new_start
+            .facts
+            .iter()
+            .map(|(k, start)| {
+                let value = match (self.state.facts.get(k), old_start.facts.get(k)) {
+                    (Some(now), Some(was)) if now != was => now.clone(),
+                    _ => start.clone(),
+                };
+                (k.clone(), value)
+            })
+            .collect();
+        let has_room = |id: &Id| world.story.room(id.as_str()).is_some();
+        state.locations = new_start
+            .locations
+            .iter()
+            .map(|(k, start)| {
+                let value = match (self.state.locations.get(k), old_start.locations.get(k)) {
+                    (Some(now), Some(was)) if now != was => match now {
+                        Location::Room(r) if !has_room(r) => start.clone(),
+                        _ => now.clone(),
+                    },
+                    _ => start.clone(),
+                };
+                (k.clone(), value)
+            })
+            .collect();
+        if !has_room(&state.room) {
+            state.room = world.story.start.clone();
+        }
+        state.visits.retain(|r, _| has_room(r));
+        Self::restore(world, state)
+    }
+
     /// Continue from a saved state.
     pub fn restore(world: Arc<World>, state: State) -> Self {
         let mut facts = DialogWorldState::new();

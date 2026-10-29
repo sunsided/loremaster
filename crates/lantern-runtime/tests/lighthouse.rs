@@ -475,3 +475,25 @@ fn the_room_matrix_follows_name_stages_and_characters() {
     assert!(!room.seen.contains(&odd.text), "{:#?}", room.seen);
     assert!(matrix.cells.iter().any(|c| room.seen.contains(&c.text)));
 }
+
+#[test]
+fn an_edited_story_keeps_the_game_state() {
+    let mut game = lighthouse();
+    game.start();
+    game.input("n");
+    game.input("take lamp");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse");
+    let mut files = read_dir(&root).unwrap();
+    for f in &mut files {
+        if f.path == "rooms/cottage.yaml" {
+            f.text = f
+                .text
+                .replace("description:\n", "description:\n  - \"A NEW LINE.\"\n");
+        }
+    }
+    let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
+    let next = game.carry_over(world);
+    assert_eq!(next.state().room.as_str(), "cottage");
+    assert!(next.state().is_carried("oil_lamp"));
+    assert!(next.describe_preview().plain_text().contains("A NEW LINE."));
+}

@@ -132,4 +132,29 @@ export class Game {
 	reset(): void {
 		this.#engine.reset();
 	}
+
+	/** The file of each entity, for example `room:shore` to `rooms/shore.yaml`. */
+	origins(): Record<string, string> {
+		return this.#engine.origins();
+	}
+
+	/** The room description as it would show now. It does not change the game. */
+	describe(): Turn {
+		return this.#engine.describe();
+	}
+
+	/** Continue the game of an earlier version of the story in this one. Values still at their start value take the new start value. */
+	carryOver(from: Game): void {
+		this.#engine.carryOver(from.#engine);
+	}
+
+	/** The save state, as JSON-compatible data. */
+	save(): unknown {
+		return this.#engine.save();
+	}
+
+	/** Continue from a save state, also one from an earlier version of the story. */
+	restore(state: unknown): void {
+		this.#engine.restore(state);
+	}
 }

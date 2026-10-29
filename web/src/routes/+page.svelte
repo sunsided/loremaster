@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Game, ProjectError, type Diagnostic } from '#lib/engine/index.ts';
+	import { Workspace } from '#lib/project/workspace.svelte.ts';
+	import { canLinkFolder } from '#lib/project/store.ts';
 	import { examples } from '#lib/engine/example.ts';
 	import { settings } from '#lib/settings.svelte.ts';
-	import { Session } from '#lib/player/session.svelte.ts';
 	import Button from '#lib/design/atoms/Button.svelte';
 	import Checkbox from '#lib/design/atoms/Checkbox.svelte';
 	import CommandPrompt from '#lib/design/molecules/CommandPrompt.svelte';
@@ -25,7 +25,8 @@
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
 	import type { PaletteItem, TabItem } from '#lib/design/types.ts';
 
-	let session: Session | undefined = $state();
+	let workspace: Workspace | undefined = $state();
+	const session = $derived(workspace?.session ?? undefined);
 	const STORY_KEY = 'lantern.story';
 	let storyName = $state(readStory());
 
@@ -46,18 +47,53 @@
 		} catch {
 			// Storage is not available: the choice lasts for this visit only.
 		}
-		problems = [];
 		failure = '';
 		exploration = null;
-		Game.open(examples[name])
-			.then((game) => (session = new Session(game)))
-			.catch((e) => {
-				if (e instanceof ProjectError) problems = e.diagnostics;
-				else failure = String(e);
-			});
+		workspace = undefined;
+		Workspace.open(name, examples[name])
+			.then((ws) => (workspace = ws))
+			.catch((e) => (failure = String(e)));
 	}
-	let problems: Diagnostic[] = $state([]);
+	const problems = $derived(workspace?.problems ?? []);
+	// In development, the workspace is on `window.lantern` for experiments in the browser console.
+	$effect(() => {
+		if (import.meta.env.DEV) (window as unknown as { lantern?: Workspace }).lantern = workspace;
+	});
 	let failure = $state('');
+	let zipInput: HTMLInputElement | undefined = $state();
+
+	/** Run a file action. A cancelled folder picker is not an error. */
+	function fileAction(action: () => Promise<unknown>) {
+		action().catch((e) => {
+			if (e instanceof DOMException && e.name === 'AbortError') return;
+			failure = String(e);
+		});
+	}
+
+	function exportZip(ws: Workspace) {
+		const blob = new Blob([ws.project.zip() as BlobPart], { type: 'application/zip' });
+		const a = document.createElement('a');
+		a.href = URL.createObjectURL(blob);
+		a.download = `${ws.project.name}.zip`;
+		a.click();
+		setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+	}
+
+	/** Where the changes go, in a few words for the header. */
+	const storageLabel = $derived.by(() => {
+		const p = workspace?.project;
+		if (!p) return '';
+		switch (p.storage) {
+			case 'folder':
+				return `saved to folder “${p.folderName}”`;
+			case 'folder-locked':
+				return 'folder needs access';
+			case 'browser':
+				return p.edited ? 'edited, saved in browser' : 'bundled example';
+			default:
+				return p.edited ? 'edited, not saved' : 'bundled example';
+		}
+	});
 	let showSettings = $state(false);
 	let prompt: HTMLInputElement | undefined = $state();
 	let showPalette = $state(false);
@@ -166,6 +202,20 @@
 		});
 		items.push({ id: 'settings', group: 'Look', label: 'Open look and motion settings', run: () => (showSettings = true) });
 		items.push({ id: 'restart', group: 'Game', label: 'Restart the game', run: () => s.restart() });
+		const ws = workspace!;
+		const p = ws.project;
+		if (canLinkFolder()) {
+			if (p.storage === 'folder-locked')
+				items.push({ id: 'files-reconnect', group: 'Files', label: `Give access to the folder “${p.folderName}” again`, run: () => fileAction(() => ws.reconnect()) });
+			if (p.storage === 'folder')
+				items.push({ id: 'files-unlink', group: 'Files', label: `Stop saving to the folder “${p.folderName}”`, run: () => fileAction(() => ws.unlinkFolder()) });
+			else
+				items.push({ id: 'files-link', group: 'Files', label: 'Open a story folder on disk', keywords: 'link save directory', run: () => fileAction(() => ws.linkFolder()) });
+		}
+		items.push({ id: 'files-export', group: 'Files', label: 'Export the story as a zip file', keywords: 'download save', run: () => exportZip(ws) });
+		items.push({ id: 'files-import', group: 'Files', label: 'Import a story from a zip file', keywords: 'upload load', run: () => zipInput?.click() });
+		if (p.edited || p.storage === 'folder')
+			items.push({ id: 'files-reset', group: 'Files', label: `Go back to the bundled example “${p.name}”`, keywords: 'discard revert', run: () => fileAction(() => ws.reset()) });
 		for (const name of Object.keys(examples).filter((n) => n !== storyName)) {
 			items.push({
 				id: `story-${name}`,
@@ -276,7 +326,7 @@
 		{#snippet header()}
 			<AppHeader
 				title={s.game.title}
-				now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name]}
+				now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name, storageLabel]}
 				settingsOpen={showSettings}
 				onsettings={() => (showSettings = true)}
 				onpalette={() => (showPalette = true)}
@@ -375,6 +425,17 @@
 	</PlayerLayout>
 	<AuthorTooltip inspect={(kind, id) => s.game.inspect(kind, id)} enabled={settings.tooltips} />
 	<CommandPalette bind:open={showPalette} items={paletteItems} fallback={playFallback} />
+	<input
+		bind:this={zipInput}
+		type="file"
+		accept=".zip,application/zip"
+		hidden
+		onchange={(e) => {
+			const file = e.currentTarget.files?.[0];
+			e.currentTarget.value = '';
+			if (file && workspace) fileAction(() => workspace!.importZip(file));
+		}}
+	/>
 	<SettingsDialog
 		bind:open={showSettings}
 		bind:theme={settings.theme}
@@ -393,6 +454,14 @@
 					<li><code>{p.file}{p.line ? `:${p.line}:${p.column}` : ''}</code> {p.at ? `(${p.at})` : ''} {p.message}</li>
 				{/each}
 			</ul>
+			{#if workspace?.project.edited}
+				{@const ws = workspace}
+				<p>The changed files do not build.</p>
+				<div class="actions">
+					<Button onclick={() => exportZip(ws)}>Export the changed files as a zip</Button>
+					<Button variant="primary" onclick={() => fileAction(() => ws.reset())}>Go back to the bundled example</Button>
+				</div>
+			{/if}
 		{:else if failure}
 			<h1>The engine did not start</h1>
 			<pre>{failure}</pre>
@@ -405,6 +474,11 @@
 <style>
 	.message {
 		padding: var(--space-9);
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-4);
 	}
 	h1 {
 		font-size: var(--font-size-heading);

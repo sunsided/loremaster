@@ -39,6 +39,7 @@ pub fn check_project(files: JsValue) -> Result<JsValue, JsValue> {
 pub struct Engine {
     world: Arc<World>,
     game: Game,
+    origins: std::collections::BTreeMap<String, String>,
 }
 
 #[wasm_bindgen]
@@ -68,7 +69,13 @@ impl Engine {
         Ok(Engine {
             game: Game::new(world.clone()),
             world,
+            origins: project.origins,
         })
+    }
+
+    /// The file of each entity, for example `room:shore` to `rooms/shore.yaml`.
+    pub fn origins(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.origins)
     }
 
     pub fn title(&self) -> String {
@@ -185,6 +192,17 @@ impl Engine {
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.verbs())
+    }
+
+    /// Continue the game of an engine with an earlier version of the story, after an edit.
+    #[wasm_bindgen(js_name = carryOver)]
+    pub fn carry_over(&mut self, from: &Engine) {
+        self.game = from.game.carry_over(self.world.clone());
+    }
+
+    /// The room description as it would show now, without changing the game.
+    pub fn describe(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.describe_preview())
     }
 
     pub fn save(&self) -> Result<JsValue, JsValue> {
