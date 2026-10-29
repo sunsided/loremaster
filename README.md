@@ -20,11 +20,15 @@ A world editor for text adventures, where every piece of text is a function of w
 ```sh
 task play        # play the example in the terminal
 task web:install # once
-task dev         # build WASM and start the web dev server
+task dev         # trunk watch (Rust -> WASM) plus the Vite dev server
 task verify      # fmt, clippy, tests
 ```
 
-Without go-task: `cargo run -p lantern-cli -- play examples/lighthouse`; for the web app run the `wasm-pack` command from `Taskfile.dist.yaml`, then `pnpm dev` in `web/`.
+Without go-task: `cargo run -p lantern-cli -- play examples/lighthouse`. For the web app, run `trunk watch` in `crates/lantern-wasm` and `pnpm dev` in `web/` side by side.
+
+### How Trunk and SvelteKit fit together
+
+Trunk owns the Rust side: `crates/lantern-wasm/Trunk.toml` builds the crate with wasm-bindgen (`web` target, TypeScript declarations, wasm-opt in release) and writes `lantern-wasm.js`, `lantern-wasm_bg.wasm` and `.d.ts` into `web/src/lib/engine/pkg/` without content hashes. `trunk watch` rebuilds when any crate changes. SvelteKit and Vite own the UI and import that package like any module, so a Rust change reaches the browser as a normal Vite reload.
 
 ## License
 

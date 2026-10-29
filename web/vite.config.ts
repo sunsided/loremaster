@@ -10,6 +10,9 @@ export default defineConfig({
 	],
 	server: {
 		// The example story lives outside the web app, in ../examples.
-		fs: { allow: ['..'] }
+		fs: { allow: ['..'] },
+		// Trunk stages each build in pkg/.stage before swapping it in; only the
+		// final files should trigger a reload.
+		watch: { ignored: ['**/engine/pkg/.stage/**'] }
 	}
 });

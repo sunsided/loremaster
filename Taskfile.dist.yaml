@@ -42,14 +42,23 @@ tasks:
       - "{{.CARGO}} run -q -p lantern-cli -- check examples/lighthouse"
 
   wasm:
-    desc: Build the WASM package into the web app
+    desc: Build the WASM package into the web app with Trunk (release)
+    dir: crates/lantern-wasm
     sources:
-      - crates/**/*.rs
-      - crates/**/Cargo.toml
+      - ../**/*.rs
+      - ../**/Cargo.toml
+      - Trunk.toml
+      - index.html
     generates:
-      - web/src/lib/engine/pkg/lantern_wasm_bg.wasm
+      - ../../web/src/lib/engine/pkg/lantern-wasm_bg.wasm
     cmds:
-      - wasm-pack build crates/lantern-wasm --target web --out-dir ../../web/src/lib/engine/pkg --out-name lantern_wasm --no-pack
+      - trunk build --release
+
+  wasm:watch:
+    desc: Rebuild the WASM package whenever Rust code changes
+    dir: crates/lantern-wasm
+    cmds:
+      - trunk watch
 
   web:install:
     desc: Install web dependencies
@@ -57,15 +66,25 @@ tasks:
     cmds:
       - pnpm install
 
-  web:dev:
-    desc: Build WASM and start the web dev server
-    aliases:
-      - dev
-    deps:
-      - wasm
+  web:serve:
+    desc: Start the Vite dev server only
     dir: web
     cmds:
       - pnpm dev
+
+  dev:
+    desc: Build WASM once, then run trunk watch and the Vite dev server together
+    aliases:
+      - web:dev
+    cmds:
+      - task: wasm
+      - task: dev:watch
+
+  dev:watch:
+    internal: true
+    deps:
+      - wasm:watch
+      - web:serve
 
   web:build:
     desc: Build the static web app

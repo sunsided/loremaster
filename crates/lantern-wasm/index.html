@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+	<head>
+		<!-- Trunk entry point: builds this crate to WASM for the SvelteKit app in web/. -->
+		<link
+			data-trunk
+			rel="rust"
+			href="Cargo.toml"
+			data-bindgen-target="web"
+			data-typescript
+			data-wasm-opt="s"
+		/>
+	</head>
+</html>

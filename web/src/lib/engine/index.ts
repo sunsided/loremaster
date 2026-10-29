@@ -1,4 +1,4 @@
-import init, { Engine as WasmEngine } from './pkg/lantern_wasm.js';
+import init, { Engine as WasmEngine } from './pkg/lantern-wasm.js';
 import type {
 	Command,
 	Diagnostic,
