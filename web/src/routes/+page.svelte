@@ -4,6 +4,9 @@
 	import { canLinkFolder } from '#lib/project/store.ts';
 	import { emptyFragment, insertFragment, removeFragment, writeFragment } from '#lib/project/yaml-edit.ts';
 	import FragmentWriter from '#lib/design/organisms/FragmentWriter.svelte';
+	import CreatePanel from '#lib/design/organisms/CreatePanel.svelte';
+	import { addExit, addResponseRule, directionOf, directions, opposite, roomFile, slug, step, thingFile, type Direction } from '#lib/project/create.ts';
+	import type { CreateRequest } from '#lib/design/types.ts';
 	import type { Source } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
@@ -216,6 +219,10 @@
 			else
 				items.push({ id: 'files-link', group: 'Files', label: 'Open a story folder on disk', keywords: 'link save directory', run: () => fileAction(() => ws.linkFolder()) });
 		}
+		items.push({ id: 'write-toggle', group: 'Write', label: writing ? 'Stop writing' : 'Write in the game', keywords: 'edit mode', run: toggleWriting });
+		items.push({ id: 'create-exit', group: 'Write', label: `Create an exit from ${s.scene.room_name}`, keywords: 'new room door', run: () => openPanel({ creating: { kind: 'exit' } }) });
+		items.push({ id: 'create-thing', group: 'Write', label: `Create a thing in ${s.scene.room_name}`, keywords: 'new object item', run: () => openPanel({ creating: { kind: 'thing' } }) });
+		items.push({ id: 'create-character', group: 'Write', label: `Create a character in ${s.scene.room_name}`, keywords: 'new person npc', run: () => openPanel({ creating: { kind: 'character' } }) });
 		items.push({ id: 'files-export', group: 'Files', label: 'Export the story as a zip file', keywords: 'download save', run: () => exportZip(ws) });
 		items.push({ id: 'files-import', group: 'Files', label: 'Import a story from a zip file', keywords: 'upload load', run: () => zipInput?.click() });
 		if (p.edited || p.storage === 'folder')
@@ -269,6 +276,9 @@
 	function toggleWriting() {
 		writing = !writing;
 		writingAt = null;
+		creating = null;
+		responding = null;
+		respondable = null;
 	}
 
 	/** The entry with the room text that the author can edit: the newest turn that showed a room. */
@@ -316,8 +326,131 @@
 	function writerTitle(at: WritingAt): string {
 		const [entity, part] = at.owner.split('/');
 		const [kind, id] = entity.split(':');
+		if (at.fragment === -2) return '';
 		const what = part === 'presence' ? `Presence text of ${id}` : kind === 'room' ? `Room text of ${session?.scene.room_name ?? id}` : `Text of ${entity}`;
 		return at.fragment < 0 ? `${what}: new fragment` : `${what}, fragment ${at.fragment + 1}`;
+	}
+
+	/** A panel at the end of the newest turn: a form for something new, or a new response. */
+	let creating = $state<{ kind: 'exit' | 'thing' | 'character'; direction?: string; name?: string } | null>(null);
+	let responding = $state<{ verb: string; thing: string | null; label: string } | null>(null);
+	/** The last command that got the default response, in write mode: the author can write a response for it. */
+	let respondable = $state<{ verb: string; thing: string | null; label: string } | null>(null);
+
+	function openPanel(panel: { creating?: typeof creating; responding?: typeof responding }) {
+		writing = true;
+		creating = panel.creating ?? null;
+		responding = panel.responding ?? null;
+		writingAt = { owner: 'panel', fragment: -2 };
+	}
+
+	function closeWriter() {
+		writingAt = null;
+		creating = null;
+		responding = null;
+		backToPrompt();
+	}
+
+	const ids = (kind: string) => new Set(Object.keys(workspace?.project.origins ?? {}).filter((k) => k.startsWith(`${kind}:`)).map((k) => k.slice(kind.length + 1)));
+
+	/** Play a typed command. In write mode, a direction without an exit offers a new exit. */
+	function play(text: string) {
+		const s = session;
+		if (!s) return;
+		const dir = directionOf(text);
+		if (writing && dir && !s.scene.exits.some((e) => e.direction === dir)) {
+			s.draft = '';
+			openPanel({ creating: { kind: 'exit', direction: dir } });
+			return;
+		}
+		const pv = s.preview;
+		s.input(text);
+		respondable = null;
+		const last = s.entries.at(-1)?.turn;
+		const quiet = ['go', 'look', 'examine', 'inventory', 'wait', 'take', 'drop'];
+		if (writing && last && pv.verb && pv.complete && !quiet.includes(pv.verb) && !last.log.some((l) => l.kind === 'rule')) {
+			respondable = { verb: pv.verb, thing: pv.objects[0] ?? null, label: text.trim() };
+		}
+	}
+
+	async function create(request: CreateRequest): Promise<string | null> {
+		const ws = workspace;
+		const s = session;
+		if (!ws || !s) return 'No story is open.';
+		const here = s.scene.room;
+		const hereFile = ws.project.listOf(`room:${here}`)?.file;
+		const hereText = hereFile && ws.project.file(hereFile)?.text;
+		if (!hereFile || !hereText) return 'The editor does not know the file of this room.';
+		if (request.kind === 'exit') {
+			const dir = request.direction as Direction;
+			const changes: { path: string; text: string }[] = [];
+			let to: string;
+			if ('name' in request.to) {
+				to = slug(request.to.name, ids('room'));
+				const me = s.map.rooms.find((r) => r.current);
+				const [dx, dy] = step(dir);
+				const position: [number, number] = [Math.round((me?.x ?? 0) + dx), Math.round((me?.y ?? 0) + dy)];
+				changes.push({
+					path: `rooms/${to}.yaml`,
+					text: roomFile({ name: request.to.name, position, exits: request.back ? [{ direction: opposite(dir), to: here }] : [] })
+				});
+			} else {
+				to = request.to.id;
+				if (request.back) {
+					const file = ws.project.listOf(`room:${to}`)?.file;
+					const text = file && ws.project.file(file)?.text;
+					if (file && text) changes.push({ path: file, text: addExit(text, opposite(dir), here) });
+				}
+			}
+			changes.push({ path: hereFile, text: addExit(hereText, dir, to) });
+			const problems = await ws.changeMany(changes);
+			if (problems?.length) return problems.map((p) => p.message).join(' ');
+			s.input(dir);
+			// A new room has no text yet: write it at once.
+			writingAt = 'name' in request.to ? { owner: `room:${to}`, fragment: -1 } : null;
+			creating = null;
+			return null;
+		}
+		const id = slug(request.name, new Set([...ids('thing'), ...ids('room')]));
+		const problems = await ws.changeMany([
+			{
+				path: `things/${id}.yaml`,
+				text: thingFile({ name: request.name, room: here, portable: request.portable, proper: request.proper })
+			}
+		]);
+		if (problems?.length) return problems.map((p) => p.message).join(' ');
+		creating = null;
+		// Write how the new thing shows in the room.
+		writingAt = { owner: `thing:${id}/presence`, fragment: -1 };
+		return null;
+	}
+
+	/** Create a thing for an unknown name in the text, and keep the writer open. */
+	async function createNamed(id: string, property: string | null) {
+		const ws = workspace;
+		const s = session;
+		if (!ws || !s) return;
+		const free = ids('thing').has(id) ? slug(id, ids('thing')) : id;
+		await ws.changeMany([
+			{
+				path: `things/${free}.yaml`,
+				text: thingFile({ name: free.replace(/_/g, ' '), room: s.scene.room, props: property ? { [property]: false } : undefined })
+			}
+		]);
+	}
+
+	async function saveResponse(r: { verb: string; thing: string | null }, f: WriterFragment): Promise<string | null> {
+		const ws = workspace;
+		const s = session;
+		if (!ws || !s) return 'No story is open.';
+		const path = `rules/${s.scene.room}.yaml`;
+		const id = slug(`${r.verb}_${r.thing ?? 'nothing'}`, ids('rule'));
+		const text = addResponseRule(ws.project.file(path)?.text ?? null, { id, verb: r.verb, thing: r.thing, when: f.when, say: f.variants[0] });
+		const problems = await ws.change(path, text);
+		if (problems?.length) return problems.map((p) => p.message).join(' ');
+		closeWriter();
+		respondable = null;
+		return null;
 	}
 
 	/** Write a change to the file of the fragment. Returns a problem text when the story does not build with it. */
@@ -334,7 +467,7 @@
 		}
 		const problems = await ws.change(where.file, text);
 		if (problems?.length) return problems.map((p) => p.message).join(' ');
-		writingAt = null;
+		closeWriter();
 		return null;
 	}
 	let hidden = $state(false);
@@ -447,9 +580,33 @@
 				writing={writingAt}
 				onwrite={startWriting}
 				onadd={() => (writingAt = { owner: `room:${s.scene.room}`, fragment: -1 })}
+				respond={respondable?.label ?? null}
+				onrespond={() => respondable && openPanel({ responding: respondable })}
 			>
 				{#snippet writer()}
-					{#if writingAt && writerFragment && writerTools}
+					{#if writingAt?.fragment === -2 && creating}
+						<CreatePanel
+							kind={creating.kind}
+							here={s.scene.room_name}
+							direction={creating.direction}
+							directions={directions.filter((d) => !s.scene.exits.some((e) => e.direction === d))}
+							rooms={s.map.rooms.filter((r) => !r.current).map((r) => ({ id: r.id, name: r.name }))}
+							name={creating.name}
+							onsubmit={create}
+							oncancel={closeWriter}
+						/>
+					{:else if writingAt?.fragment === -2 && responding && writerTools}
+						{@const r = responding}
+						<FragmentWriter
+							kind="response"
+							fragment={{ variants: [''], when: null, mode: 'always', layer: 'base', replaces: false }}
+							title="Response to “{r.label}” in {s.scene.room_name}"
+							tools={writerTools}
+							fresh
+							onsave={(f) => saveResponse(r, f)}
+							oncancel={closeWriter}
+						/>
+					{:else if writingAt && writerFragment && writerTools}
 						{@const at = writingAt}
 						{#key `${at.owner}#${at.fragment}`}
 							<FragmentWriter
@@ -462,15 +619,16 @@
 									saveFragment(at, (text, list) =>
 										at.fragment < 0 ? insertFragment(text, list, Number.MAX_SAFE_INTEGER, f) : writeFragment(text, list, at.fragment, f)
 									)}
-								oncancel={() => (writingAt = null)}
+								oncancel={closeWriter}
 								onremove={() => saveFragment(at, (text, list) => removeFragment(text, list, at.fragment))}
+								oncreate={createNamed}
 							/>
 						{/key}
 					{/if}
 				{/snippet}
 			</Transcript>
 			{#if !s.scene.ended}
-				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={(text) => s.input(text)} />
+				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={play} />
 				<VerbBar
 					verbs={s.barVerbs}
 					selected={s.preview.verb}

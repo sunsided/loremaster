@@ -28,7 +28,10 @@ export interface TranscriptEntry {
 	rewritten?: boolean;
 }
 
-/** The fragment that the writer edits: its owner and index. Index -1 is a new fragment. */
+/**
+ * The fragment that the writer edits: its owner and index. Index -1 is a new fragment.
+ * Index -2 is a panel at the end of the newest turn, for example the form for a new exit or a new response.
+ */
 export interface WritingAt {
 	owner: string;
 	fragment: number;
@@ -129,3 +132,8 @@ export interface WriterTools {
 	/** Check a condition and tell whether it holds now. */
 	tryCondition: (text: string) => { problem: TextProblem | null; holds: boolean | null };
 }
+
+/** What the author asks to create in the game. */
+export type CreateRequest =
+	| { kind: 'exit'; direction: string; to: { name: string } | { id: string }; back: boolean }
+	| { kind: 'thing' | 'character'; name: string; portable: boolean; proper: boolean };

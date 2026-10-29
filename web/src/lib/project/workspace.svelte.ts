@@ -50,9 +50,16 @@ export class Workspace {
 	 * Returns the problems when the new text does not build; then nothing is saved.
 	 */
 	async change(path: string, text: string): Promise<Diagnostic[] | null> {
-		const game = await this.#build(this.project.withFile(path, text));
+		return this.changeMany([{ path, text }]);
+	}
+
+	/** Change or add several files at once, for example a new room and the exit to it. */
+	async changeMany(changes: SourceFile[]): Promise<Diagnostic[] | null> {
+		let files = this.project.files;
+		for (const c of changes) files = [...files.filter((f) => f.path !== c.path), c];
+		const game = await this.#build(files);
 		if (!game) return this.problems;
-		await this.project.write(path, text);
+		for (const c of changes) await this.project.write(c.path, c.text);
 		this.project.origins = game.origins();
 		this.session?.carryOver(game);
 		return null;

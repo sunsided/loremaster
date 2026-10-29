@@ -21,9 +21,13 @@
 		onsave: (fragment: WriterFragment) => Promise<string | null>;
 		oncancel: () => void;
 		onremove?: () => void;
+		/** `fragment`: a text with layer, mode and variants. `response`: one text and a condition, for a rule. */
+		kind?: 'fragment' | 'response';
+		/** Create a thing for a name that the story does not know. When set, the writer offers it. */
+		oncreate?: (id: string, property: string | null) => void;
 	}
 
-	let { fragment, variant = 0, title, tools, fresh = false, onsave, oncancel, onremove }: Props = $props();
+	let { fragment, variant = 0, title, tools, fresh = false, onsave, oncancel, onremove, kind = 'fragment', oncreate }: Props = $props();
 
 	// The draft starts as a copy of the fragment and is not changed from outside.
 	const start = untrack(() => $state.snapshot(fragment));
@@ -66,6 +70,16 @@
 		return name && name !== typed ? { from: problem.from, to: problem.to, name } : null;
 	}
 	const textFix = $derived(fixFor(text, check.problem));
+
+	/** A name to create: `brass_key` from "unknown name `brass_key.the`", with the property when there is one. */
+	function newName(problem: TextProblem | null): { id: string; property: string | null } | null {
+		const m = problem && /^unknown name `([a-z_][\w]*)(?:\.(\w+))?`/.exec(problem.message);
+		if (!m) return null;
+		const forms = ['name', 'the', 'The', 'a', 'A'];
+		return { id: m[1], property: m[2] && !forms.includes(m[2]) ? m[2] : null };
+	}
+	const textNew = $derived(oncreate ? newName(check.problem) : null);
+	const whenNew = $derived(oncreate ? newName(condition.problem) : null);
 	const whenFix = $derived(fixFor(when, condition.problem));
 
 	function applyFix(fix: { from: number; to: number; name: string }, inWhen: boolean) {
@@ -135,9 +149,11 @@
 <section class="writer" aria-labelledby="{id}-title" bind:this={section}>
 	<div class="head">
 		<h2 id="{id}-title">{title}</h2>
-		<Select label="Layer" bind:value={layer} options={layers} />
-		<Select label="Shows" bind:value={mode} options={modes} />
-		<Checkbox bind:checked={replaces}>replaces earlier text in its layer</Checkbox>
+		{#if kind === 'fragment'}
+			<Select label="Layer" bind:value={layer} options={layers} />
+			<Select label="Shows" bind:value={mode} options={modes} />
+			<Checkbox bind:checked={replaces}>replaces earlier text in its layer</Checkbox>
+		{/if}
 	</div>
 
 	<div class="when">
@@ -145,7 +161,9 @@
 		<div class="when-editor">
 			<MarkupEditor
 				bind:value={when}
-				label="Condition: the fragment shows only when it holds. Empty means always."
+				label={kind === 'fragment'
+					? 'Condition: the fragment shows only when it holds. Empty means always.'
+					: 'Condition: the response applies only when it holds. Empty means always.'}
 				tokenize={(t) => tools.tokenize(t, true)}
 				problem={condition.problem}
 				placeholder="always"
@@ -161,6 +179,8 @@
 						size="compact"
 						variant="quiet"
 						onclick={() => applyFix(whenFix, true)}>Use {whenFix.name}</Button
+					>{:else if whenNew}<Button size="compact" variant="quiet" onclick={() => oncreate?.(whenNew.id, whenNew.property)}
+						>Create thing {whenNew.id}</Button
 					>{/if}{:else if condition.holds === true}<Tag>holds now</Tag>{:else if condition.holds === false}<Tag
 					tone="warning">does not hold now</Tag
 				>{/if}
@@ -197,7 +217,10 @@
 		{#if check.problem}
 			<p class="problem">
 				{check.problem.message}
-				{#if textFix}<Button size="compact" variant="quiet" onclick={() => applyFix(textFix, false)}>Use {textFix.name}</Button>{/if}
+				{#if textFix}<Button size="compact" variant="quiet" onclick={() => applyFix(textFix, false)}>Use {textFix.name}</Button
+					>{:else if textNew}<Button size="compact" variant="quiet" onclick={() => oncreate?.(textNew.id, textNew.property)}
+						>Create thing {textNew.id}</Button
+					>{/if}
 			</p>
 		{:else if text.trim()}
 			<p><span class="label">Now it reads</span> {#each emphasis(check.text) as p, i (i)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</p>
@@ -237,7 +260,7 @@
 	<div class="actions">
 		<Button variant="primary" size="compact" onclick={save} disabled={blocked}>{fresh ? 'Add' : 'Save'}</Button>
 		<Button size="compact" onclick={oncancel}>Cancel</Button>
-		<Button size="compact" variant="quiet" onclick={addVariant}>Add a variant</Button>
+		{#if kind === 'fragment'}<Button size="compact" variant="quiet" onclick={addVariant}>Add a variant</Button>{/if}
 		{#if onremove && !fresh}<Button size="compact" variant="quiet" onclick={onremove}>Remove this fragment</Button>{/if}
 		<span class="keys" aria-hidden="true">Enter saves · Shift+Enter new line · Esc cancels</span>
 	</div>

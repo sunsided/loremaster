@@ -34,6 +34,9 @@ The writer has these parts:
 Enter saves, Shift+Enter adds a line break, Escape cancels. Save is not available while the text or the condition has a problem.
 \`onsave\` returns a problem text when the story does not build with the change. The writer then stays open and shows it.
 
+With \`kind: 'response'\` the writer is for the text of a rule that answers a command: it has the condition and the text only.
+With \`oncreate\`, an unknown name in the text gets a "Create thing …" button, so the author can make the thing without leaving the text.
+
 The writer uses the interface font for its controls and the prose font for the text, so the text looks as it does in the game.`
 				}
 			}
@@ -47,4 +50,5 @@ The writer uses the interface font for its controls and the prose font for the t
 	name="New fragment"
 	args={{ fragment: { ...shoreFragment, variants: [''] }, fresh: true, title: 'Room text of The Shore: new fragment' }}
 />
+<Story name="Response" args={{ kind: 'response', fresh: true, fragment: { ...shoreFragment, variants: [''] }, title: 'Response to “push brass key” in The Beach' }} />
 <Story name="Save refused" args={{ onsave: fn(async () => 'There is no thing `lamp`.') }} />

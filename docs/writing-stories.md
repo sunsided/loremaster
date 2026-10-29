@@ -171,6 +171,19 @@ Help while you type:
 
 The editor examines the text while you type. A problem has a wavy line and a message, and you cannot save until you correct it. When a change does not build, the writer stays open with the message, and the game keeps the last good version.
 
+### Make new rooms, things and responses
+
+In write mode, the game helps you make what is not there yet:
+
+| You do | The game shows | It makes |
+| --- | --- | --- |
+| Walk in a direction that has no exit, for example `s`. | A form for a new exit. | The exit, a new room or a link to an existing room, and the way back. You walk into the new room, and the writer opens for its text. |
+| Write a name that the story does not know, for example `{brass_key.The}`. | "Create thing brass_key" under the problem. | A thing in the current room. The writer stays open. |
+| Give a command that gets the default response, for example `push brass key`. | "+ Write a response for “push brass key”". | A rule in `rules/<room>.yaml` that answers the command with your text. |
+| Ctrl+K, "Create a thing", "Create a character" or "Create an exit". | The same form. | A thing or a character in the current room (the writer then opens for its presence text), or an exit. |
+
+The editor makes the ids from the names. For example, "The Beach" becomes `the_beach`.
+
 ### Where the changes go
 
 A change goes into the story file. Only the changed lines in the file change, so comments and formatting stay.

@@ -161,6 +161,8 @@ export function insertFragment(text: string, list: YamlPath, index: number, data
 		seq = doc.getIn(list, true);
 	}
 	if (!isSeq(seq)) throw new EditError(`No list at ${list.join('.')}.`);
+	// `description: []` becomes a block list with its first fragment.
+	if (seq.items.length === 0) seq.flow = false;
 	seq.items.splice(Math.min(index, seq.items.length), 0, toNode(doc, data));
 	return serialize(doc);
 }

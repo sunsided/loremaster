@@ -30,6 +30,9 @@
 		onwrite?: (source: Source) => void;
 		/** Open the writer for a new room fragment. */
 		onadd?: () => void;
+		/** In write mode: the last command, when it got the default response. It offers "Write a response". */
+		respond?: string | null;
+		onrespond?: () => void;
 	}
 
 	let {
@@ -47,7 +50,9 @@
 		writing = null,
 		writer,
 		onwrite,
-		onadd
+		onadd,
+		respond = null,
+		onrespond
 	}: Props = $props();
 
 	const same = (a: Source | undefined, w: WritingAt | null) => !!a && !!w && a.owner === w.owner && a.fragment === w.fragment;
@@ -67,6 +72,7 @@
 
 	/** The block after which the writer shows: the block with the fragment, else the last block of room text. */
 	function writerAfter(blocks: Block[]): number {
+		if (writing && writing.fragment === -2) return -1;
 		const at = blocks.findIndex((b) => b.runs.some((r) => same(r.source, writing)));
 		if (at >= 0) return at;
 		const prose = blocks.findLastIndex((b) => b.kind === 'prose');
@@ -200,6 +206,12 @@
 					<p class="add"><button type="button" class="add-button" onclick={onadd}>+ Add room text</button></p>
 				{/if}
 				{#if entry.rewritten}<p class="rewritten">Written again after an edit of the story.</p>{/if}
+				{#if respond && onrespond && !writing && entry.id === latest}
+					<p class="add">
+						<button type="button" class="add-button" onclick={onrespond}>+ Write a response for “{respond}”</button>
+					</p>
+				{/if}
+				{#if writing?.fragment === -2 && entry.id === latest}{@render writer?.()}{/if}
 			</div>
 		{/each}
 	</div>
