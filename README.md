@@ -25,3 +25,7 @@ task verify      # fmt, clippy, tests
 ```
 
 Without go-task: `cargo run -p lantern-cli -- play examples/lighthouse`; for the web app run the `wasm-pack` command from `Taskfile.dist.yaml`, then `pnpm dev` in `web/`.
+
+## License
+
+EUPL-1.2, see [LICENSE](LICENSE).
