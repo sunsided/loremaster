@@ -10,9 +10,11 @@
 		shown: boolean;
 		/** Why the line is not in the room text. Only used when `shown` is false. */
 		why?: string | null;
+		/** What the line is part of, for screen readers, for example "room text" or "response". */
+		within?: string;
 	}
 
-	let { label, text, detail, shown, why }: Props = $props();
+	let { label, text, detail, shown, why, within = 'room text' }: Props = $props();
 </script>
 
 <!--
@@ -23,7 +25,7 @@
 <li class="part" class:shown>
 	<span class="mark" aria-hidden="true">{shown ? '✓' : '–'}</span>
 	<div>
-		<span class="visually-hidden">{shown ? 'In the room text' : 'Not in the room text'}:</span>
+		<span class="visually-hidden">{shown ? `In the ${within}` : `Not in the ${within}`}:</span>
 		<span class="label">{label}</span>
 		{#if text !== label}<span class="text">{text}</span>{/if}
 		<span class="meta"

@@ -23,8 +23,9 @@ mod world;
 
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
 pub use game::{
-    AuthorCommand, ExitInfo, FragmentView, Game, Inspect, MapLink, MapRoom, MapView, PartView,
-    PhaseView, RoomParts, RuleView, Scene, ThingInfo, VarView, VerbInfo,
+    AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game, Inspect,
+    MapLink, MapRoom, MapView, PartView, PhaseView, RoomParts, RuleView, Scene, ThingInfo, VarView,
+    VerbInfo,
 };
 pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
 pub use parser::{Command, Preview};

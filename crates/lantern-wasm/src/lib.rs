@@ -3,7 +3,7 @@
 //! shaped like the runtime's serde types.
 
 use lantern_project::{Diagnostic, Severity, SourceFile, check, load};
-use lantern_runtime::{AuthorCommand, Command, Game, State, World};
+use lantern_runtime::{AuthorCommand, Budget, Command, Game, State, World};
 use serde::Serialize;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -141,6 +141,27 @@ impl Engine {
     /// The phases of the day with their start times.
     pub fn phases(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.phases())
+    }
+
+    /// The action frame used for the last action, or null.
+    #[wasm_bindgen(js_name = lastFrame)]
+    pub fn last_frame(&self) -> Result<JsValue, JsValue> {
+        match self.game.last_frame() {
+            Some(f) => to_js(f),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
+    /// Walk all reachable states from the start of the story and report coverage.
+    pub fn explore(&self, max_states: usize, max_depth: usize) -> Result<JsValue, JsValue> {
+        let fresh = Game::new(self.world.clone());
+        to_js(&lantern_runtime::explore(
+            &fresh,
+            Budget {
+                max_states,
+                max_depth,
+            },
+        ))
     }
 
     /// All rules with their state now, for the rules view.

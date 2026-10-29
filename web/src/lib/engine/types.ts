@@ -222,3 +222,51 @@ export interface Inspect {
 	/** Ids of related rules. */
 	rules: string[];
 }
+
+/** One fragment of an action frame, with its state for the last action. */
+export interface FrameFragment {
+	index: number;
+	mode: FragmentMode;
+	condition: string | null;
+	text: string;
+	shown: boolean;
+	why: string | null;
+}
+
+/** The action frame used for the last action. */
+export interface FrameUse {
+	verb: string;
+	/** `story`, `room:<id>` or `thing:<id>`. */
+	scope: string;
+	repeat: number;
+	count: number;
+	total: number;
+	parts: { part: 'before' | 'instead' | 'after'; fragments: FrameFragment[] }[];
+}
+
+export interface TextVariant {
+	text: string;
+	states: number;
+	/** Commands from the start, as `go north` or `<verb> <thing ids>`. */
+	path: string[];
+	facts: string[];
+}
+
+export interface RoomCoverage {
+	id: string;
+	name: string;
+	reached: boolean;
+	variants: TextVariant[];
+}
+
+/** The result of the state explorer. */
+export interface Exploration {
+	states: number;
+	truncated: boolean;
+	rooms: RoomCoverage[];
+	never_shown: string[];
+	never_fired: string[];
+	endings: { text: string; path: string[] }[];
+	stuck: number;
+	stuck_path: string[];
+}

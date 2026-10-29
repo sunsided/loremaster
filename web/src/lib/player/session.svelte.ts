@@ -1,6 +1,7 @@
 import {
 	Game,
 	type AuthorCommand,
+	type FrameUse,
 	type PhaseView,
 	type VarView,
 	type Command,
@@ -30,6 +31,8 @@ export class Session {
 	parts = $state<RoomParts>({ objects: [], exits: [] });
 	rules = $state<RuleView[]>([]);
 	vars = $state<VarView[]>([]);
+	/** The action frame used for the last action, or null. */
+	frame = $state<FrameUse | null>(null);
 	phases: PhaseView[] = [];
 	/** The playthrough so far, one step per turn. */
 	history = $state<StoryStep[]>([]);
@@ -69,6 +72,7 @@ export class Session {
 		this.parts = this.game.roomParts();
 		this.rules = this.game.rules();
 		this.vars = this.game.vars();
+		this.frame = this.game.lastFrame();
 		const command = turn.blocks.find((b) => b.kind === 'command' || b.kind === 'author');
 		this.history.push({
 			turn: this.scene.turns,
@@ -152,6 +156,18 @@ export class Session {
 		const verb = this.verb;
 		const first = this.preview.objects[0];
 		if (verb && first) this.input(`${this.#phrase(verb)} ${this.#name(first)}`);
+	}
+
+	/**
+	 * Start again and play a path from the state explorer. A step is `go <direction>`
+	 * or `<verb> <thing ids>`.
+	 */
+	replay(path: string[]) {
+		this.restart();
+		for (const step of path) {
+			const [verb, ...objects] = step.split(' ');
+			this.act(verb === 'go' ? { type: 'go', direction: objects[0] } : { type: 'verb', verb, objects });
+		}
 	}
 
 	pickExit(direction: string) {

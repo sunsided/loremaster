@@ -306,6 +306,18 @@ fn look_around_teases_on_repeats_and_only_when_asked() {
             .plain_text()
             .contains("You look around, again.")
     );
+    let frame = game.last_frame().expect("the look frame was used");
+    assert_eq!(
+        (frame.verb.as_str(), frame.scope.as_str(), frame.repeat),
+        ("look", "story", 2)
+    );
+    let shown: Vec<usize> = frame.parts[0]
+        .fragments
+        .iter()
+        .filter(|f| f.shown)
+        .map(|f| f.index)
+        .collect();
+    assert_eq!(shown, vec![1]);
     assert!(
         game.input("l")
             .plain_text()

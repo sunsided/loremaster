@@ -20,6 +20,8 @@ pub struct Game {
     last_shown: Option<(Id, Vec<usize>)>,
     /// Rules that fired in the last turn, for the rules view.
     last_fired: Vec<Id>,
+    /// The frame used for the last action, for the assembly panel.
+    last_frame: Option<FrameUse>,
 }
 
 /// A verb for the verb bar.
@@ -200,6 +202,38 @@ pub struct Inspect {
     pub rules: Vec<String>,
 }
 
+/// The action frame used for the last action, as it was evaluated then.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FrameUse {
+    /// The verb id, for example `look`.
+    pub verb: String,
+    /// Where the frame is: `story`, `room:<id>` or `thing:<id>`.
+    pub scope: String,
+    /// `action.repeat`, `action.count` and `action.total` for that action.
+    pub repeat: u32,
+    pub count: u32,
+    pub total: u32,
+    pub parts: Vec<FramePart>,
+}
+
+/// One part of a frame: before, instead or after.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FramePart {
+    pub part: String,
+    pub fragments: Vec<FrameFragment>,
+}
+
+/// One fragment of a frame part, with its state for that action.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FrameFragment {
+    pub index: usize,
+    pub mode: lantern_model::FragmentMode,
+    pub condition: Option<String>,
+    pub text: String,
+    pub shown: bool,
+    pub why: Option<String>,
+}
+
 const MAX_RULE_DEPTH: u8 = 8;
 
 impl Game {
@@ -259,6 +293,7 @@ impl Game {
             facts,
             last_shown: None,
             last_fired: Vec::new(),
+            last_frame: None,
         }
     }
 
@@ -304,6 +339,7 @@ impl Game {
 
     /// Handle a typed command.
     pub fn input(&mut self, text: &str) -> Turn {
+        self.last_frame = None;
         let mut turn = Turn::default();
         turn.say(BlockKind::Command, text.trim());
         if self.state.ended {
@@ -319,6 +355,7 @@ impl Game {
 
     /// Handle a command picked on the verb bar.
     pub fn act(&mut self, cmd: Command) -> Turn {
+        self.last_frame = None;
         let mut turn = Turn::default();
         turn.say(BlockKind::Command, self.describe_command(&cmd));
         if self.state.ended {
@@ -454,18 +491,90 @@ impl Game {
     }
 
     /// The most specific frame for a verb: the thing's, then the room's, then the story's.
-    fn frame_for(&self, verb: &Id, thing: Option<&Id>) -> Option<crate::world::CFrame> {
-        let world = &self.world;
-        thing
-            .and_then(|t| world.thing_idx(t.as_str()))
-            .and_then(|ti| world.things[ti].frames.get(verb))
-            .or_else(|| {
-                world
-                    .room_idx(self.state.room.as_str())
-                    .and_then(|ri| world.rooms[ri].frames.get(verb))
+    fn frame_for(&mut self, verb: &Id, thing: Option<&Id>) -> Option<crate::world::CFrame> {
+        let world = self.world.clone();
+        let found = thing
+            .and_then(|t| {
+                let ti = world.thing_idx(t.as_str())?;
+                world.things[ti]
+                    .frames
+                    .get(verb)
+                    .map(|f| (format!("thing:{t}"), f))
             })
-            .or_else(|| world.frames.get(verb))
-            .cloned()
+            .or_else(|| {
+                let ri = world.room_idx(self.state.room.as_str())?;
+                world.rooms[ri]
+                    .frames
+                    .get(verb)
+                    .map(|f| (format!("room:{}", self.state.room), f))
+            })
+            .or_else(|| world.frames.get(verb).map(|f| ("story".to_string(), f)));
+        self.last_frame = found
+            .as_ref()
+            .map(|(scope, f)| self.frame_use(verb, scope, f));
+        found.map(|(_, f)| f.clone())
+    }
+
+    /// Evaluate a frame for the assembly panel, before its fragments are used.
+    fn frame_use(&self, verb: &Id, scope: &str, frame: &crate::world::CFrame) -> FrameUse {
+        let ev = self.eval();
+        let s = &self.state;
+        let part = |name: &str, fragments: &[CFragment]| {
+            let visible = text::visible(&ev, fragments, false);
+            FramePart {
+                part: name.to_string(),
+                fragments: fragments
+                    .iter()
+                    .enumerate()
+                    .map(|(i, f)| {
+                        let shown = visible.contains(&i);
+                        let seen = s.progress.get(&f.key).map_or(0, |p| p.shown);
+                        let why = if shown {
+                            None
+                        } else if f.mode == lantern_model::FragmentMode::Once && seen > 0 {
+                            Some("already shown once".to_string())
+                        } else if !ev.holds_opt(&f.when) {
+                            Some(format!(
+                                "{} is false",
+                                f.when_src.as_deref().unwrap_or("condition")
+                            ))
+                        } else {
+                            Some("replaced".to_string())
+                        };
+                        FrameFragment {
+                            index: i,
+                            mode: f.mode,
+                            condition: f.when_src.clone(),
+                            text: f.sources.join(" / "),
+                            shown,
+                            why,
+                        }
+                    })
+                    .collect(),
+            }
+        };
+        let room_key = format!("{verb}@{}", s.room);
+        FrameUse {
+            verb: verb.to_string(),
+            scope: scope.to_string(),
+            repeat: s.repeat,
+            count: s.action_counts.get(&room_key).copied().unwrap_or(0),
+            total: s.action_counts.get(verb.as_str()).copied().unwrap_or(0),
+            parts: [
+                ("before", &frame.before),
+                ("instead", &frame.instead),
+                ("after", &frame.after),
+            ]
+            .into_iter()
+            .filter(|(_, f)| !f.is_empty())
+            .map(|(name, f)| part(name, f))
+            .collect(),
+        }
+    }
+
+    /// The frame used for the last action, if there was one.
+    pub fn last_frame(&self) -> Option<&FrameUse> {
+        self.last_frame.as_ref()
     }
 
     /// Show frame fragments as one response block. Returns true if any showed.

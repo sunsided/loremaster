@@ -1,7 +1,7 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { ExitInfo, FragmentView, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { Exploration, ExitInfo, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
 import type { StoryStep, TranscriptEntry } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
@@ -292,3 +292,49 @@ export const history: StoryStep[] = [
 		ended: false
 	}
 ];
+
+/** The look frame after the second "Look around". */
+export const lookFrame: FrameUse = {
+	verb: 'look',
+	scope: 'story',
+	repeat: 2,
+	count: 2,
+	total: 2,
+	parts: [
+		{
+			part: 'before',
+			fragments: [
+				{ index: 0, mode: 'always', condition: 'action.repeat == 1', text: 'You look around.', shown: false, why: 'action.repeat == 1 is false' },
+				{ index: 1, mode: 'always', condition: 'action.repeat == 2', text: 'You look around, again.', shown: true, why: null },
+				{ index: 2, mode: 'always', condition: 'action.repeat >= 3', text: 'You keep looking around, and nothing seems to change.', shown: false, why: 'action.repeat >= 3 is false' }
+			]
+		}
+	]
+};
+
+export const exploration: Exploration = {
+	states: 287,
+	truncated: false,
+	endings: [
+		{
+			text: "Far below, the *Marigold*'s masthead light turns, and steadies, and comes home.",
+			path: ['go north', 'open drawer', 'take iron_key', 'take matches', 'take oil_lamp', 'go south', 'turn_on oil_lamp', 'unlock lighthouse_door iron_key', 'go east', 'go up', 'turn_on lens']
+		}
+	],
+	stuck: 0,
+	stuck_path: [],
+	rooms: [
+		{
+			id: 'shore',
+			name: 'The Shore',
+			reached: true,
+			variants: [
+				{ text: 'Shingle crunches underfoot. … pale against the dusk sky. The sun is a red coal sinking into the sea.', states: 40, path: [], facts: ['lighthouse_door.locked = true'] },
+				{ text: 'Shingle crunches underfoot. … black against the stars. Waves hiss on the stones.', states: 120, path: ['go north', 'go south', 'wait', 'wait'], facts: ['cottage_door.open = true', 'lighthouse_door.locked = true'] }
+			]
+		},
+		{ id: 'vault', name: 'The Vault', reached: false, variants: [] }
+	],
+	never_shown: ['room:vault#1: Cold stone and the smell of old coins.'],
+	never_fired: ['open_vault']
+};

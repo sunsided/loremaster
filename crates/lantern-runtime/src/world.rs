@@ -27,6 +27,8 @@ pub(crate) struct CFragment {
     pub owner: String,
     pub index: usize,
     pub variants: Vec<Vec<Segment>>,
+    /// The variants as written, for the editor.
+    pub sources: Vec<String>,
     pub when: Option<Condition>,
     pub when_src: Option<String>,
     pub mode: FragmentMode,
@@ -133,6 +135,7 @@ impl Compiler {
                         .iter()
                         .map(|v| self.markup(&at, v))
                         .collect::<Result<_, _>>()?,
+                    sources: f.variants.clone(),
                     when: self.cond(&at, &f.when)?,
                     when_src: f.when.clone(),
                     mode: f.mode,

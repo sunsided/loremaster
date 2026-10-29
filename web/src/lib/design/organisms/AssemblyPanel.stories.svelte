@@ -2,7 +2,7 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import type { ComponentProps } from 'svelte';
 	import { fn } from 'storybook/test';
-	import { fragments, parts } from '../fixtures.ts';
+	import { fragments, lookFrame, parts } from '../fixtures.ts';
 	import AssemblyPanel from './AssemblyPanel.svelte';
 
 	const { Story } = defineMeta({
@@ -21,6 +21,8 @@ Each fragment shows its source text, its mode and its condition. A hidden fragme
 The runtime makes the objects and exits layers from the things and exits of the room. These layers are in a dashed box with the tag \"generated\", so they look different from the written fragments. They show a hint, then each thing or exit with its state (PartItem).
 
 Hover on a fragment highlights the same text in the transcript.
+When the last action used an action frame, the panel starts with a \"last action\" box. It names the verb, the frame (on the story, a room or a thing) and the counters \`action.repeat\`, \`action.count\` and \`action.total\`. Then it lists each fragment of the frame: a check mark when it showed, or a dash and the reason when it did not.
+
 The panel does not change the game state.`
 				}
 			}
@@ -36,4 +38,5 @@ The panel does not change the game state.`
 
 <Story name="Shore at dusk" {template} />
 <Story name="Fragment highlighted" args={{ focus: 1 }} {template} />
+<Story name="After a framed action" args={{ frame: lookFrame }} {template} />
 <Story name="Empty room" args={{ fragments: [], parts: { objects: [], exits: [] } }} {template} />

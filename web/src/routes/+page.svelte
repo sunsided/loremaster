@@ -20,6 +20,8 @@
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
+	import ExplorerView from '#lib/design/organisms/ExplorerView.svelte';
+	import type { Exploration } from '#lib/engine/types.ts';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
 	import type { PaletteItem, TabItem } from '#lib/design/types.ts';
 
@@ -46,6 +48,7 @@
 		}
 		problems = [];
 		failure = '';
+		exploration = null;
 		Game.open(examples[name])
 			.then((game) => (session = new Session(game)))
 			.catch((e) => {
@@ -205,8 +208,23 @@
 		{ id: 'assembly', label: 'Assembly' },
 		...(ultrawide ? [] : [{ id: 'map', label: 'Map' }]),
 		{ id: 'story', label: 'Story' },
-		{ id: 'rules', label: 'Rules' }
+		{ id: 'rules', label: 'Rules' },
+		{ id: 'explore', label: 'Explore' }
 	]);
+
+	let exploration = $state<Exploration | null>(null);
+	let exploring = $state(false);
+
+	function runExplorer() {
+		const s = session;
+		if (!s) return;
+		exploring = true;
+		// Let the button show "Exploring…" before the walk blocks the page.
+		setTimeout(() => {
+			exploration = s.game.explore();
+			exploring = false;
+		}, 30);
+	}
 	$effect(() => {
 		if (ultrawide && inspector === 'map') inspector = 'assembly';
 	});
@@ -314,6 +332,16 @@
 					<MapPanel map={s.map} />
 				{:else if inspector === 'story'}
 					<StoryTimeline steps={s.history} />
+				{:else if inspector === 'explore'}
+					<ExplorerView
+						result={exploration}
+						running={exploring}
+						onrun={runExplorer}
+						onreplay={(path) => {
+							s.replay(path);
+							prompt?.focus();
+						}}
+					/>
 				{:else if inspector === 'rules'}
 					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
 				{:else}
@@ -321,6 +349,7 @@
 						room={s.scene.room}
 						fragments={s.assembly}
 						parts={s.parts}
+						frame={s.frame}
 						focus={s.focus}
 						time={s.scene.time}
 						phase={s.scene.phase}

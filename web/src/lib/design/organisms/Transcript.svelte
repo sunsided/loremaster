@@ -79,6 +79,20 @@
 		return src.fragment + 1;
 	}
 
+	/** True where a run of action frame text starts. */
+	function isFrameRun(runs: Run[], i: number): boolean {
+		const src = runs[i].source;
+		if (!src || !src.owner.includes('/frames/')) return false;
+		const prev = runs[i - 1]?.source;
+		return !(prev && prev.owner === src.owner && prev.fragment === src.fragment);
+	}
+
+	/** "story frame for look, before", from an owner such as `story/frames/look/before`. */
+	function frameScope(run: Run): string {
+		const [scope, , verb, part] = (run.source?.owner ?? '').split('/');
+		return `${scope} frame for ${verb}, ${part}`;
+	}
+
 	/** `*word*` in story text is emphasis. */
 	function pieces(text: string): { text: string; em: boolean }[] {
 		return text.split('*').map((t, i) => ({ text: t, em: i % 2 === 1 }));
@@ -86,7 +100,11 @@
 </script>
 
 <!-- Runs have no whitespace between tags: a gap would show in the prose. -->
-{#snippet runs(block: Block)}{#each block.runs as run, i (i)}{@const n = marker(block.runs, i)}{#if n !== null}<FragmentMarker
+{#snippet runs(block: Block)}{#each block.runs as run, i (i)}{@const n = marker(block.runs, i)}{#if showSources && isFrameRun(block.runs, i)}<span
+				class="frame-mark"
+				title="Action frame: {frameScope(run)}"
+				><span aria-hidden="true">frame</span><span class="visually-hidden">Action frame text:</span></span
+			>{/if}{#if n !== null}<FragmentMarker
 				number={n}
 				active={focus === n - 1}
 				onactivate={(on) => onfocus?.(on ? n - 1 : null)}
@@ -212,6 +230,17 @@
 		outline: var(--size-border) solid var(--color-warning);
 		outline-offset: 2px;
 		color: var(--color-text-strong);
+	}
+	.frame-mark {
+		margin-right: var(--space-2);
+		padding: 0 var(--space-2);
+		border: var(--size-border) dashed var(--color-border-control);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
+		vertical-align: middle;
+		text-shadow: none;
+		user-select: none;
 	}
 	.brief {
 		max-width: var(--measure-prose);

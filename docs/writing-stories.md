@@ -102,3 +102,21 @@ names:
 - The parser accepts the names of the current stage and of all stages before it. It does not accept a name that the player has not learned yet.
 - Set `proper: true` for a proper name. A proper name gets no article.
 - The author tooltip shows all stages and the current stage.
+
+## Examine all states
+
+The state explorer plays all ways through the story from the start. It stops at 2000 states or 40 commands.
+
+1. In the web app, open the "Explore" tab of the inspector and select "Explore all states".
+2. Or, run `task explore` or `cargo run -p lantern-cli -- explore <folder>` in a terminal.
+
+The explorer shows:
+
+- Each way the text of a room reads, with the shortest command list to it.
+- Fragments that never show and rules that never fire.
+- Endings, with the shortest command list to each.
+- Stuck states: states from which the player can not reach an ending.
+
+The explorer tries the actions that move the story forward: exits, verbs that rules listen to, take, open, turn on, unlock with a key in reach, and wait when the story reacts to time. It does not try drop, close, turn off or lock.
+
+In the web app, "Replay this path" starts the game again and plays the command list. You can then continue from that state.

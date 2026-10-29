@@ -1,6 +1,8 @@
 import init, { Engine as WasmEngine } from './pkg/lantern-wasm.js';
 import type {
 	AuthorCommand,
+	Exploration,
+	FrameUse,
 	Inspect,
 	PhaseView,
 	VarView,
@@ -66,6 +68,15 @@ export class Game {
 
 	inspect(kind: 'thing' | 'exit', id: string): Inspect | null {
 		return this.#engine.inspect(kind, id);
+	}
+
+	lastFrame(): FrameUse | null {
+		return this.#engine.lastFrame();
+	}
+
+	/** Walk all reachable states from the start of the story. This can take a moment. */
+	explore(maxStates = 2000, maxDepth = 40): Exploration {
+		return this.#engine.explore(maxStates, maxDepth);
 	}
 
 	vars(): VarView[] {
