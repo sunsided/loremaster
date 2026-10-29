@@ -735,7 +735,7 @@ impl Game {
                 kind: "author".into(),
                 text: text.clone(),
             });
-            turn.say(BlockKind::Command, format!("(author) {text}"));
+            turn.say(BlockKind::Author, text);
         };
         match cmd {
             AuthorCommand::Goto { room } => {
@@ -1210,7 +1210,7 @@ impl Game {
         for block in blocks.iter_mut() {
             if matches!(
                 block.kind,
-                BlockKind::Command | BlockKind::Title | BlockKind::Exits
+                BlockKind::Command | BlockKind::Title | BlockKind::Exits | BlockKind::Author
             ) {
                 continue;
             }
@@ -1250,7 +1250,7 @@ impl Game {
                     return;
                 }
                 self.set_fact(turn, &format!("{door}.open"), Value::Bool(true));
-                turn.say(BlockKind::Response, format!("(first opening the {name})"));
+                turn.say(BlockKind::Note, format!("(first opening the {name})"));
             }
         }
         if !self.eval().holds_opt(&compiled.passable) {
@@ -1372,7 +1372,7 @@ impl Game {
                 let with = objects.get(1).cloned().or_else(|| {
                     self.state.is_carried(key.as_str()).then(|| {
                         turn.say(
-                            BlockKind::Response,
+                            BlockKind::Note,
                             format!("(with the {})", self.name_of(&key)),
                         );
                         key.clone()

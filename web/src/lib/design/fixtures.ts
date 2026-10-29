@@ -63,6 +63,25 @@ export const drawerTurn: Turn = {
 	]
 };
 
+export const authorTurn: Turn = {
+	ended: false,
+	log: [{ kind: 'author', text: 'go to Lantern Room' }],
+	blocks: [
+		{ kind: 'author', runs: [{ text: 'go to Lantern Room' }] },
+		{ kind: 'title', runs: [{ text: 'Lantern Room' }] }
+	]
+};
+
+export const doorTurn: Turn = {
+	ended: false,
+	log: [{ kind: 'set', text: 'cottage_door.open = true' }],
+	blocks: [
+		{ kind: 'command', runs: [{ text: 'n' }] },
+		{ kind: 'note', runs: [{ text: '(first opening the ' }, { text: 'cottage door', link: { kind: 'thing', id: 'cottage_door' } }, { text: ')' }] },
+		{ kind: 'title', runs: [{ text: "Keeper's Cottage" }] }
+	]
+};
+
 export const endTurn: Turn = {
 	ended: true,
 	log: [],

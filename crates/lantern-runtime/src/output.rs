@@ -63,6 +63,12 @@ pub enum BlockKind {
     Narration,
     /// The closing text.
     End,
+    /// A short parser note about an action the game did by itself, for
+    /// example "(first opening the cottage door)". Show it apart from the prose.
+    Note,
+    /// An author action from the command palette, for example "go to Lantern Room".
+    /// It is not part of the game.
+    Author,
 }
 
 /// A stretch of text, with where it came from and what it points at.

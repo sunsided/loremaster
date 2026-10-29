@@ -30,7 +30,11 @@ export type BlockKind =
 	| 'exits'
 	| 'response'
 	| 'narration'
-	| 'end';
+	| 'end'
+	/** A parser note about an action the game did by itself, for example "(first opening the door)". */
+	| 'note'
+	/** An author action from the command palette. It is not part of the game. */
+	| 'author';
 
 export interface Block {
 	kind: BlockKind;

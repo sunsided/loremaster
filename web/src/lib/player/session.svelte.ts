@@ -68,13 +68,15 @@ export class Session {
 		this.parts = this.game.roomParts();
 		this.rules = this.game.rules();
 		this.vars = this.game.vars();
-		const command = turn.blocks.find((b) => b.kind === 'command');
+		const command = turn.blocks.find((b) => b.kind === 'command' || b.kind === 'author');
 		this.history.push({
 			turn: this.scene.turns,
 			time: this.scene.time,
 			phase: this.scene.phase,
 			room: this.scene.room_name,
-			command: command ? command.runs.map((r) => r.text).join('') : '',
+			command: command
+				? `${command.kind === 'author' ? '(author) ' : ''}${command.runs.map((r) => r.text).join('')}`
+				: '',
 			rules: turn.log.filter((l) => l.kind === 'rule').map((l) => l.text),
 			changes: turn.log.filter((l) => l.kind !== 'rule').map((l) => l.text),
 			ended: turn.ended

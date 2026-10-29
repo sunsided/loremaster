@@ -104,8 +104,9 @@
 						class:fx-line={fresh && entry.id > 0}
 						style:animation-delay={fresh ? `${revealDelay(bi)}ms` : undefined}
 					>{#if block.kind === 'command'}<span aria-hidden="true">&gt;&nbsp;</span><span class="visually-hidden"
-							>{block.runs[0]?.text.startsWith('(author)') ? 'Author action:' : 'You typed:'}</span
-						>{/if}{@render runs(block)}</p>
+							>You typed:</span
+						>{:else if block.kind === 'author'}<span class="badge">author</span><span class="visually-hidden">:</span
+						>{:else if block.kind === 'note'}<span class="visually-hidden">Parser note:</span>{/if}{@render runs(block)}</p>
 				{/each}
 			</div>
 		{/each}
@@ -156,6 +157,28 @@
 		margin-top: var(--space-7);
 		color: var(--color-text-accent);
 		font-style: italic;
+	}
+	/* A parser note: the game did an extra step by itself. Smaller, in the interface font, so it does not read as prose. */
+	.note {
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+		font-style: italic;
+		color: var(--color-text-muted);
+	}
+	/* An author action is not part of the game. It looks like an editor message, not like story text. */
+	.author {
+		margin-top: var(--space-7);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+		color: var(--color-text-warning);
+	}
+	.badge {
+		margin-right: var(--space-3);
+		padding: 0 var(--space-3);
+		border: var(--size-border) dashed var(--color-warning);
+		font-size: var(--font-size-xs);
+		text-transform: uppercase;
+		letter-spacing: var(--letter-spacing-caps);
 	}
 	.focused {
 		outline: var(--size-border) solid var(--color-warning);

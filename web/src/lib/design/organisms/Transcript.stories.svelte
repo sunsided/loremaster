@@ -2,7 +2,7 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import type { ComponentProps } from 'svelte';
 	import { fn } from 'storybook/test';
-	import { endTurn, entries, openingTurn } from '../fixtures.ts';
+	import { authorTurn, doorTurn, endTurn, entries, openingTurn } from '../fixtures.ts';
 	import Transcript from './Transcript.svelte';
 
 	const { Story } = defineMeta({
@@ -33,6 +33,10 @@ Each paragraph is one block from the runtime. Things and exits in the text are b
 The transcript is a \`log\` region. Screen readers announce new text when it arrives, but they do not read the full history again.
 Each echoed command starts with "You typed:" for screen readers.
 
+Two kinds of text are not story prose, and they look different:
+- A **parser note**, such as "(first opening the cottage door)", tells the player about a step that the game did by itself. It is small, italic and muted, in the interface font.
+- An **author action**, such as "go to Lantern Room" from the command palette, is not part of the game. It has an "author" badge and the warning colour.
+
 New text can show with a line reveal and a glitch. The glitch shows not more than one time in 2 s. With \`reduceMotion\` or with effects off, new text shows immediately.
 
 The transcript scrolls to the newest text. Put it in a container with a fixed height.`
@@ -51,4 +55,5 @@ The transcript scrolls to the newest text. Put it in a container with a fixed he
 <Story name="Opening and a command" {template} />
 <Story name="Fragment highlighted" args={{ focus: 1 }} {template} />
 <Story name="Without sources" args={{ showSources: false }} {template} />
+<Story name="Parser note and author action" args={{ entries: [{ id: 0, turn: openingTurn }, { id: 1, turn: doorTurn }, { id: 2, turn: authorTurn }] }} {template} />
 <Story name="Ending" args={{ entries: [{ id: 0, turn: openingTurn }, { id: 1, turn: endTurn }] }} {template} />
