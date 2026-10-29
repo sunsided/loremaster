@@ -20,8 +20,8 @@ const preview: Preview = {
 				icon: 'paintbrush',
 				items: [
 					{ value: 'phosphor', title: 'Phosphor' },
-					{ value: 'paper', title: 'Paper' },
-					{ value: 'night', title: 'Night' }
+					{ value: 'night', title: 'Night' },
+					{ value: 'paper', title: 'Paper' }
 				],
 				dynamicTitle: true
 			}

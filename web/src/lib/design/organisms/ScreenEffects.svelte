@@ -27,7 +27,7 @@
 	{#if theme === 'paper'}
 		<svg class="fx-overlay paper" aria-hidden="true">
 			<filter id="fx-paper">
-				<feTurbulence type="fractalNoise" baseFrequency="0.035 0.55" numOctaves="4" result="fibre" />
+				<feTurbulence type="fractalNoise" baseFrequency="0.02 0.3" numOctaves="3" result="fibre" />
 				<feDiffuseLighting in="fibre" lighting-color="#ffffff" surfaceScale="1.6">
 					<feDistantLight azimuth="45" elevation="58" />
 				</feDiffuseLighting>
@@ -60,7 +60,7 @@
 		width: 100%;
 		height: 100%;
 		z-index: var(--z-texture);
-		opacity: 0.38;
+		opacity: var(--fx-paper-opacity, 0.1);
 		mix-blend-mode: multiply;
 	}
 	.scan {

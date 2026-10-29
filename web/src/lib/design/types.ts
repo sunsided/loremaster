@@ -14,7 +14,8 @@ export interface ActionItem {
 	detail?: string;
 }
 
-export type Theme = 'phosphor' | 'paper' | 'night';
+/** In order of preference: phosphor is the default, then night, then paper. */
+export type Theme = 'phosphor' | 'night' | 'paper';
 export type EffectsLevel = 'full' | 'subtle' | 'off';
 export type MotionPreference = 'system' | 'reduce';
 

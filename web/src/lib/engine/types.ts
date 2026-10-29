@@ -109,3 +109,25 @@ export interface SourceFile {
 	path: string;
 	text: string;
 }
+
+export interface MapRoom {
+	id: string;
+	name: string;
+	x: number;
+	y: number;
+	visited: boolean;
+	current: boolean;
+}
+
+export interface MapLink {
+	from: string;
+	to: string;
+	direction: string;
+	visible: boolean;
+	one_way: boolean;
+}
+
+export interface MapView {
+	rooms: MapRoom[];
+	links: MapLink[];
+}

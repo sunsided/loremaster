@@ -3,6 +3,7 @@ import type {
 	Command,
 	Diagnostic,
 	FragmentView,
+	MapView,
 	Scene,
 	SourceFile,
 	Turn,
@@ -66,6 +67,10 @@ export class Game {
 
 	assembly(): FragmentView[] {
 		return this.#engine.assembly();
+	}
+
+	map(): MapView {
+		return this.#engine.map();
 	}
 
 	verbs(): VerbInfo[] {

@@ -1,4 +1,12 @@
-import { Game, type Command, type FragmentView, type Scene, type Turn, type VerbInfo } from '#lib/engine/index.ts';
+import {
+	Game,
+	type Command,
+	type FragmentView,
+	type MapView,
+	type Scene,
+	type Turn,
+	type VerbInfo
+} from '#lib/engine/index.ts';
 
 export interface Entry {
 	id: number;
@@ -17,6 +25,7 @@ export class Session {
 	entries = $state<Entry[]>([]);
 	scene = $state<Scene>() as Scene;
 	assembly = $state<FragmentView[]>([]);
+	map = $state<MapView>({ rooms: [], links: [] });
 	verbs: VerbInfo[];
 	pending = $state<Pending | null>(null);
 	/** Fragment highlighted in both the transcript and the assembly panel. */
@@ -38,6 +47,7 @@ export class Session {
 		this.entries.push({ id: this.#next++, turn });
 		this.scene = this.game.scene();
 		this.assembly = this.game.assembly();
+		this.map = this.game.map();
 	}
 
 	input(text: string) {

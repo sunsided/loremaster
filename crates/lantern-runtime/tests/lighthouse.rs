@@ -71,3 +71,18 @@ fn playthroughs_are_deterministic() {
     };
     assert_eq!(run(), run());
 }
+
+#[test]
+fn the_map_has_every_room_and_one_link_per_pair_of_exits() {
+    let mut game = lighthouse();
+    game.start();
+    let map = game.map();
+    assert_eq!(map.rooms.len(), 4);
+    assert_eq!(map.links.len(), 3, "{:#?}", map.links);
+    assert!(
+        map.rooms
+            .iter()
+            .any(|r| r.id == "shore" && r.current && r.visited)
+    );
+    assert!(map.rooms.iter().any(|r| r.id == "cottage" && !r.visited));
+}

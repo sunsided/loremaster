@@ -1,7 +1,7 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { ExitInfo, FragmentView, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { ExitInfo, FragmentView, MapView, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
 import type { TranscriptEntry } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
@@ -157,3 +157,17 @@ export const fragments: FragmentView[] = [
 		why: 'night and not beacon_lit is false'
 	}
 ];
+
+export const map: MapView = {
+	rooms: [
+		{ id: 'shore', name: 'The Shore', x: 0, y: 0, visited: true, current: false },
+		{ id: 'cottage', name: "Keeper's Cottage", x: 0, y: -1, visited: true, current: true },
+		{ id: 'stairwell', name: 'Lighthouse Stairwell', x: 1, y: 0, visited: false, current: false },
+		{ id: 'lantern_room', name: 'Lantern Room', x: 1, y: -1, visited: false, current: false }
+	],
+	links: [
+		{ from: 'shore', to: 'cottage', direction: 'north', visible: true, one_way: false },
+		{ from: 'shore', to: 'stairwell', direction: 'east', visible: true, one_way: false },
+		{ from: 'stairwell', to: 'lantern_room', direction: 'up', visible: true, one_way: false }
+	]
+};

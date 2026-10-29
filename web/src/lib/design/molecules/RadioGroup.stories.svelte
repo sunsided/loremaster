@@ -4,8 +4,8 @@
 
 	const themes = [
 		{ value: 'phosphor', label: 'Phosphor' },
-		{ value: 'paper', label: 'Paper' },
-		{ value: 'night', label: 'Night' }
+		{ value: 'night', label: 'Night' },
+		{ value: 'paper', label: 'Paper' }
 	];
 	const effects = [
 		{ value: 'full', label: 'Full', description: 'Moving grain, scanlines, glow, idle flicker, glitch on new text, line reveal.' },

@@ -101,6 +101,11 @@ impl Engine {
         to_js(&self.game.assembly())
     }
 
+    /// All rooms and exits, for the map panel.
+    pub fn map(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.map())
+    }
+
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.verbs())
     }

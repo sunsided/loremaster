@@ -9,7 +9,7 @@
 		tags: ['autodocs'],
 		args: { theme: 'phosphor', effects: 'full' },
 		argTypes: {
-			theme: { control: 'inline-radio', options: ['phosphor', 'paper', 'night'] },
+			theme: { control: 'inline-radio', options: ['phosphor', 'night', 'paper'] },
 			effects: { control: 'inline-radio', options: ['full', 'subtle', 'off'] }
 		},
 		parameters: {

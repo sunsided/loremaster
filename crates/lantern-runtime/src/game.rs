@@ -71,6 +71,38 @@ pub struct FragmentView {
     pub why: Option<String>,
 }
 
+/// A room on the map.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MapRoom {
+    pub id: String,
+    pub name: String,
+    /// Grid position from the story, or a generated one when the story has none.
+    pub x: f32,
+    pub y: f32,
+    pub visited: bool,
+    pub current: bool,
+}
+
+/// A connection between two rooms on the map. Paired exits show as one link.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MapLink {
+    pub from: String,
+    pub to: String,
+    /// Direction from `from`, for example `north` or `up`.
+    pub direction: String,
+    /// False while the exit is hidden from the player.
+    pub visible: bool,
+    /// True when there is no exit back.
+    pub one_way: bool,
+}
+
+/// The whole map, for the map panel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MapView {
+    pub rooms: Vec<MapRoom>,
+    pub links: Vec<MapLink>,
+}
+
 const MAX_RULE_DEPTH: u8 = 8;
 
 impl Game {
@@ -423,6 +455,55 @@ impl Game {
                 }
             })
             .collect()
+    }
+
+    /// All rooms and exits with the player's position and visits. Does not change any state.
+    pub fn map(&self) -> MapView {
+        let story = &self.world.story;
+        let ev = self.eval();
+        let mut next_free = 0.0_f32;
+        let rooms = story
+            .rooms
+            .iter()
+            .map(|r| {
+                let [x, y] = r.position.unwrap_or_else(|| {
+                    // Rooms without a position go on a row under the map.
+                    next_free += 1.0;
+                    [next_free - 1.0, 100.0]
+                });
+                MapRoom {
+                    id: r.id.to_string(),
+                    name: r.name.clone(),
+                    x,
+                    y,
+                    visited: self.state.visits_to(r.id.as_str()) > 0,
+                    current: r.id == self.state.room,
+                }
+            })
+            .collect();
+        let mut links: Vec<MapLink> = Vec::new();
+        for (ri, room) in story.rooms.iter().enumerate() {
+            for (ei, exit) in room.exits.iter().enumerate() {
+                let back = story
+                    .room(exit.to.as_str())
+                    .is_some_and(|t| t.exits.iter().any(|e| e.to == room.id));
+                if back
+                    && links
+                        .iter()
+                        .any(|l| l.from == exit.to.as_str() && l.to == room.id.as_str())
+                {
+                    continue;
+                }
+                links.push(MapLink {
+                    from: room.id.to_string(),
+                    to: exit.to.to_string(),
+                    direction: exit.direction.name().to_string(),
+                    visible: ev.holds_opt(&self.world.rooms[ri].exits[ei].visible),
+                    one_way: !back,
+                });
+            }
+        }
+        MapView { rooms, links }
     }
 
     pub fn verbs(&self) -> Vec<VerbInfo> {

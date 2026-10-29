@@ -7,7 +7,8 @@
  * Two tiers:
  * 1. Scale tokens (space, type, size, motion). They are the same in all themes.
  * 2. Semantic tokens (colour, font family, surface shape, effects). Each theme
- *    sets them under [data-theme].
+ *    sets them under [data-theme]. The order of preference is phosphor (default),
+ *    night, paper.
  *
  * Contrast (WCAG 2.2, against --color-surface and --color-surface-raised):
  * - --color-text, --color-text-strong, --color-text-muted, --color-text-accent,
@@ -15,8 +16,10 @@
  * - --color-border-control, --color-focus: 3:1 or more.
  * - --color-border-subtle is decoration only. Do not use it as the only edge of a control.
  *
- * Breakpoint: the layout stacks below 900px (--bp-stack). CSS cannot read a
- * custom property in a media query, so components write 900px and refer to this token.
+ * Breakpoints: the layout stacks below 900px (--bp-stack). From 2200px wide with an
+ * aspect ratio of 21:9 or more (--bp-ultrawide), the map shows on the left.
+ * CSS cannot read a custom property in a media query, so components write the
+ * value and refer to the token.
  */
 
 :root {
@@ -59,7 +62,11 @@
 	--measure-prose: 70ch;
 	--width-panel: 480px;
 	--width-dialog: 560px;
+	--width-map: 640px;
+	--width-player-max: 1280px;
+	--width-content-max: 2400px; /* Map + player + panel at their maximum. Wider screens center the content. */
 	--bp-stack: 900px;
+	--bp-ultrawide: 2200px;
 
 	/* Shape */
 	--radius-control: 0;
@@ -114,39 +121,6 @@
 	color-scheme: dark;
 }
 
-/* ---- Theme: paper ---- */
-[data-theme='paper'] {
-	--color-surface-outer: #e9e2d4;
-	--color-surface: #f4efe6;
-	--color-surface-raised: #fbf8f2;
-	--color-surface-control: #fffdf8;
-	--color-text: #2a2620;
-	--color-text-strong: #1e1b16;
-	--color-text-muted: #6b6358;
-	--color-text-accent: #2f4b8a;
-	--color-text-warning: #8a3320;
-	--color-text-on-accent: #ffffff;
-	--color-accent: #2f4b8a;
-	--color-warning: #b3412e;
-	--color-border-subtle: #ddd3c2;
-	--color-border-control: #8c7f6a;
-	--color-focus: #2f4b8a;
-
-	--font-ui: Inter, system-ui, sans-serif;
-	--font-prose: Literata, Georgia, serif;
-	--radius-screen: 6px;
-	--shadow-screen: 0 1px 0 #d8ccb6, 0 12px 30px rgb(60 40 20 / 12%);
-	--shadow-overlay: 0 16px 40px rgb(60 40 20 / 18%);
-
-	--fx-glow-full: 0 0 0.6px rgb(42 38 32 / 60%);
-	--fx-glow-soft: none;
-	--fx-grain-opacity: 0.07;
-	--fx-grain-blend: multiply;
-	--fx-scan-full: 0%;
-	--fx-scan-soft: 0%;
-	color-scheme: light;
-}
-
 /* ---- Theme: night ---- */
 [data-theme='night'] {
 	--color-surface-outer: #0f1115;
@@ -178,4 +152,38 @@
 	--fx-scan-full: 0%;
 	--fx-scan-soft: 0%;
 	color-scheme: dark;
+}
+
+/* ---- Theme: paper (quiet: near-neutral tones, light texture) ---- */
+[data-theme='paper'] {
+	--color-surface-outer: #e7e4dd;
+	--color-surface: #f2f0eb;
+	--color-surface-raised: #f8f7f4;
+	--color-surface-control: #fbfaf8;
+	--color-text: #2a2620;
+	--color-text-strong: #1e1b16;
+	--color-text-muted: #5f584e;
+	--color-text-accent: #2f4b8a;
+	--color-text-warning: #8a3320;
+	--color-text-on-accent: #ffffff;
+	--color-accent: #2f4b8a;
+	--color-warning: #b3412e;
+	--color-border-subtle: #dedad1;
+	--color-border-control: #857a67;
+	--color-focus: #2f4b8a;
+
+	--font-ui: Inter, system-ui, sans-serif;
+	--font-prose: Literata, Georgia, serif;
+	--radius-screen: 6px;
+	--shadow-screen: 0 0 0 1px #dedad1;
+	--shadow-overlay: 0 16px 40px rgb(40 35 25 / 14%);
+
+	--fx-glow-full: none;
+	--fx-glow-soft: none;
+	--fx-grain-opacity: 0.035;
+	--fx-grain-blend: multiply;
+	--fx-paper-opacity: 0.1;
+	--fx-scan-full: 0%;
+	--fx-scan-soft: 0%;
+	color-scheme: light;
 }

@@ -29,7 +29,7 @@ The app keeps these settings in the browser storage of the user.`
 
 <script lang="ts">
 	let open = $state(false);
-	let theme = $state<'phosphor' | 'paper' | 'night'>('phosphor');
+	let theme = $state<'phosphor' | 'night' | 'paper'>('phosphor');
 	let effects = $state<'full' | 'subtle' | 'off'>('full');
 	let motion = $state<'system' | 'reduce'>('system');
 	let sources = $state(true);

@@ -44,7 +44,10 @@ export const sizeTokens: TokenInfo[] = [
 	{ name: '--size-target-compact', use: 'Minimum height of a secondary control (32px).' },
 	{ name: '--measure-prose', use: 'Maximum line length of story text.' },
 	{ name: '--width-panel', use: 'Maximum width of the assembly panel.' },
-	{ name: '--width-dialog', use: 'Maximum width of a dialog.' }
+	{ name: '--width-dialog', use: 'Maximum width of a dialog.' },
+	{ name: '--width-map', use: 'Maximum width of the map on ultrawide screens.' },
+	{ name: '--width-player-max', use: 'Maximum width of the player on ultrawide screens.' },
+	{ name: '--width-content-max', use: 'Maximum width of all content. Wider screens center it.' }
 ];
 
 export const motionTokens: TokenInfo[] = [

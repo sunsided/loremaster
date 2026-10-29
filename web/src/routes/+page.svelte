@@ -10,6 +10,7 @@
 	import StatusBar from '#lib/design/molecules/StatusBar.svelte';
 	import AppHeader from '#lib/design/organisms/AppHeader.svelte';
 	import AssemblyPanel from '#lib/design/organisms/AssemblyPanel.svelte';
+	import MapPanel from '#lib/design/organisms/MapPanel.svelte';
 	import ScreenEffects from '#lib/design/organisms/ScreenEffects.svelte';
 	import SettingsDialog from '#lib/design/organisms/SettingsDialog.svelte';
 	import Transcript from '#lib/design/organisms/Transcript.svelte';
@@ -107,6 +108,9 @@
 			{:else}
 				<p id="command" tabindex="-1">The story has ended. <Button size="compact" onclick={() => s.restart()}>Play again</Button></p>
 			{/if}
+		{/snippet}
+		{#snippet map()}
+			<MapPanel map={s.map} />
 		{/snippet}
 		{#snippet panel()}
 			<AssemblyPanel
