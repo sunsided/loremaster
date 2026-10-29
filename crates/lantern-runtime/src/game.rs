@@ -586,6 +586,15 @@ impl Game {
         let dark = self.is_dark();
         let first = self.state.visits_to(room.id.as_str()) <= 1;
 
+        // The room text as it reads now, to check which things it mentions.
+        let fragments = &self.world.rooms[ri].description;
+        let room_text = text::visible(&ev, fragments, first)
+            .iter()
+            .flat_map(|&i| fragments[i].variants.iter().map(|v| text::render(&ev, v)))
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase();
+
         let objects = story
             .things
             .iter()
@@ -604,7 +613,15 @@ impl Game {
                         .join(" / ")
                 };
                 let why = if !t.listed {
-                    Some("not listed: the room text describes it".to_string())
+                    let door_of = room.exits.iter().find(|e| e.door.as_ref() == Some(&t.id));
+                    Some(if let Some(exit) = door_of {
+                        format!("not listed: it is the door of the {} exit", exit.direction.name())
+                    } else if t.nouns().any(|n| mentions(&room_text, &n)) {
+                        "not listed: the room text mentions it".to_string()
+                    } else {
+                        "not listed, and the room text does not mention it: the player cannot find it"
+                            .to_string()
+                    })
                 } else if dark {
                     Some("the room is dark".to_string())
                 } else if !t.presence.is_empty() && text::visible(&ev, presence, first).is_empty() {
@@ -1263,6 +1280,15 @@ fn rule_run(text: String, rule: &Id) -> Run {
         }),
         link: None,
     }
+}
+
+/// Does `text` contain `noun` as whole words? Both are lowercase.
+fn mentions(text: &str, noun: &str) -> bool {
+    text.match_indices(noun).any(|(i, _)| {
+        let before = text[..i].chars().next_back();
+        let after = text[i + noun.len()..].chars().next();
+        !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
+    })
 }
 
 /// Did the clock pass time of day `t` in `(before, after]`?

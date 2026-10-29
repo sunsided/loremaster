@@ -169,3 +169,26 @@ fn rules_report_events_and_state() {
         key.then
     );
 }
+
+#[test]
+fn unlisted_things_say_honestly_why() {
+    let mut game = lighthouse();
+    game.start();
+    let parts = game.room_parts();
+    let door = parts
+        .objects
+        .iter()
+        .find(|o| o.id == "cottage_door")
+        .unwrap();
+    assert_eq!(
+        door.why.as_deref(),
+        Some("not listed: it is the door of the north exit")
+    );
+    game.input("n");
+    let parts = game.room_parts();
+    let drawer = parts.objects.iter().find(|o| o.id == "drawer").unwrap();
+    assert_eq!(
+        drawer.why.as_deref(),
+        Some("not listed: the room text mentions it")
+    );
+}

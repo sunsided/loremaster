@@ -198,8 +198,8 @@ export const map: MapView = {
 
 export const parts: RoomParts = {
 	objects: [
-		{ id: 'cottage_door', label: 'cottage door', text: 'There is a cottage door here.', detail: null, shown: false, why: 'not listed: the room text describes it' },
-		{ id: 'lighthouse_door', label: 'lighthouse door', text: 'There is a lighthouse door here.', detail: null, shown: false, why: 'not listed: the room text describes it' }
+		{ id: 'cottage_door', label: 'cottage door', text: 'There is a cottage door here.', detail: null, shown: false, why: 'not listed: it is the door of the north exit' },
+		{ id: 'lighthouse_door', label: 'lighthouse door', text: 'There is a lighthouse door here.', detail: null, shown: false, why: 'not listed: it is the door of the east exit' }
 	],
 	exits: [
 		{ id: 'north', label: "north to Keeper's Cottage", text: 'north', detail: 'door: cottage door, closed', shown: true, why: null },
