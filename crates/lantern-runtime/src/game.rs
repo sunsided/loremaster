@@ -15,6 +15,9 @@ pub struct Game {
     world: Arc<World>,
     state: State,
     facts: DialogWorldState,
+    /// The room fragments in the last description the player saw, so the
+    /// assembly panel matches the screen even after once-only text is used up.
+    last_shown: Option<(Id, Vec<usize>)>,
 }
 
 /// A verb for the verb bar.
@@ -156,6 +159,7 @@ impl Game {
             world,
             state,
             facts,
+            last_shown: None,
         }
     }
 
@@ -417,7 +421,17 @@ impl Game {
         let fragments = &self.world.rooms[ri].description;
         let ev = self.eval();
         let first = self.state.visits_to(room.id.as_str()) <= 1;
-        let shown = text::visible(&ev, fragments, first);
+        let mut shown = text::visible(&ev, fragments, first);
+        // Text on screen counts as shown, even when it was once-only and is used up now.
+        if let Some((last_room, last)) = &self.last_shown
+            && *last_room == room.id
+        {
+            for i in last {
+                if !shown.contains(i) {
+                    shown.push(*i);
+                }
+            }
+        }
         let dark = self.is_dark();
         room.description
             .iter()
@@ -534,9 +548,17 @@ impl Game {
     // ---- text -----------------------------------------------------------
 
     fn assemble(&mut self, fragments: &[CFragment], first_visit: bool) -> Vec<Run> {
+        self.assemble_with_picks(fragments, first_visit).0
+    }
+
+    fn assemble_with_picks(
+        &mut self,
+        fragments: &[CFragment],
+        first_visit: bool,
+    ) -> (Vec<Run>, Vec<usize>) {
         let visible = text::visible(&self.eval(), fragments, first_visit);
         let picks = text::pick(&mut self.state, fragments, &visible);
-        text::runs(&self.eval(), fragments, &picks)
+        (text::runs(&self.eval(), fragments, &picks), visible)
     }
 
     fn render(&self, segments: &[lantern_lang::Segment]) -> String {
@@ -554,7 +576,8 @@ impl Game {
             turn.say(BlockKind::Prose, "It is pitch dark. You can't see a thing.");
         } else {
             let first = self.state.visits_to(room.id.as_str()) <= 1;
-            let runs = self.assemble(&world.rooms[ri].description, first);
+            let (runs, shown) = self.assemble_with_picks(&world.rooms[ri].description, first);
+            self.last_shown = Some((room.id.clone(), shown));
             turn.push(BlockKind::Prose, runs);
             let mut objects = Vec::new();
             for (ti, thing) in world.story.things.iter().enumerate() {

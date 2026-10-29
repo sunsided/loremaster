@@ -107,3 +107,27 @@ fn inline_branches_are_marked_active_or_not() {
     game.input("s");
     assert!(text_of(&game, false).contains(&", its windows dark".to_string()));
 }
+
+#[test]
+fn once_only_text_on_screen_counts_as_shown() {
+    let mut game = lighthouse();
+    game.start();
+    let turn = game.input("n");
+    assert!(turn.plain_text().contains("Hal's oilskin"));
+    let oilskin = game
+        .assembly()
+        .into_iter()
+        .find(|f| f.text.starts_with("Hal's oilskin"))
+        .unwrap();
+    assert!(oilskin.shown, "{oilskin:#?}");
+    // After leaving and coming back it is used up.
+    game.input("s");
+    game.input("n");
+    let oilskin = game
+        .assembly()
+        .into_iter()
+        .find(|f| f.text.starts_with("Hal's oilskin"))
+        .unwrap();
+    assert!(!oilskin.shown);
+    assert_eq!(oilskin.why.as_deref(), Some("already shown once"));
+}
