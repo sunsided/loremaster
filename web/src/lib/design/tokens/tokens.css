@@ -15,6 +15,7 @@
  *   --color-text-warning: 4.5:1 or more.
  * - --color-border-control, --color-focus: 3:1 or more.
  * - --color-border-subtle is decoration only. Do not use it as the only edge of a control.
+ * - --color-scrollbar-thumb uses the control edge colour, so the handle also has 3:1 or more.
  *
  * Breakpoints: the layout stacks below 900px (--bp-stack). From 2200px wide with an
  * aspect ratio of 21:9 or more (--bp-ultrawide), the map shows on the left.
@@ -105,6 +106,9 @@
 	--color-border-subtle: #1f2b22;
 	--color-border-control: #3a7a50;
 	--color-focus: #39ff88;
+	--color-scrollbar-thumb: var(--color-border-control);
+	--color-scrollbar-thumb-hover: #39ff88;
+	--color-scrollbar-track: transparent;
 
 	--font-ui: 'IBM Plex Mono', ui-monospace, monospace;
 	--font-prose: 'IBM Plex Mono', ui-monospace, monospace;
@@ -138,6 +142,9 @@
 	--color-border-subtle: #2d3240;
 	--color-border-control: #6a7388;
 	--color-focus: #5ec4b6;
+	--color-scrollbar-thumb: var(--color-border-control);
+	--color-scrollbar-thumb-hover: #5ec4b6;
+	--color-scrollbar-track: transparent;
 
 	--font-ui: Inter, system-ui, sans-serif;
 	--font-prose: Newsreader, Georgia, serif;
@@ -171,6 +178,9 @@
 	--color-border-subtle: #dedad1;
 	--color-border-control: #857a67;
 	--color-focus: #2f4b8a;
+	--color-scrollbar-thumb: var(--color-border-control);
+	--color-scrollbar-thumb-hover: #857a67;
+	--color-scrollbar-track: transparent;
 
 	--font-ui: Inter, system-ui, sans-serif;
 	--font-prose: Literata, Georgia, serif;

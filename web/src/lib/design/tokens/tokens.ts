@@ -21,7 +21,9 @@ export const colorTokens: TokenInfo[] = [
 	{ name: '--color-warning', use: 'Edges of highlighted fragments.' },
 	{ name: '--color-border-subtle', use: 'Dividers. Decoration only.' },
 	{ name: '--color-border-control', use: 'Edge of a control. Contrast 3:1 or more.' },
-	{ name: '--color-focus', use: 'Focus ring. Contrast 3:1 or more.' }
+	{ name: '--color-focus', use: 'Focus ring. Contrast 3:1 or more.' },
+	{ name: '--color-scrollbar-thumb', use: 'Scrollbar handle.' },
+	{ name: '--color-scrollbar-thumb-hover', use: 'Scrollbar handle under the pointer (WebKit only).' }
 ];
 
 export const spaceTokens: TokenInfo[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => ({

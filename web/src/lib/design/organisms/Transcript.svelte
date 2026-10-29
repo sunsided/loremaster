@@ -116,7 +116,6 @@
 		flex: 1 1 auto;
 		min-height: 0;
 		overflow-y: auto;
-		scrollbar-color: var(--color-border-control) transparent;
 	}
 	.transcript {
 		max-width: var(--measure-prose);
