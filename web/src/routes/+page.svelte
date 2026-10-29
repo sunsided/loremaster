@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Game, ProjectError, type Diagnostic } from '#lib/engine/index.ts';
-	import { lighthouse } from '#lib/engine/example.ts';
+	import { examples } from '#lib/engine/example.ts';
 	import { settings } from '#lib/settings.svelte.ts';
 	import { Session } from '#lib/player/session.svelte.ts';
 	import Button from '#lib/design/atoms/Button.svelte';
@@ -24,6 +24,35 @@
 	import type { PaletteItem, TabItem } from '#lib/design/types.ts';
 
 	let session: Session | undefined = $state();
+	const STORY_KEY = 'lantern.story';
+	let storyName = $state(readStory());
+
+	function readStory(): string {
+		try {
+			const name = localStorage.getItem(STORY_KEY);
+			return name && name in examples ? name : 'lighthouse';
+		} catch {
+			return 'lighthouse';
+		}
+	}
+
+	/** Load an example story and start a new session with it. */
+	function openStory(name: string) {
+		storyName = name;
+		try {
+			localStorage.setItem(STORY_KEY, name);
+		} catch {
+			// Storage is not available: the choice lasts for this visit only.
+		}
+		problems = [];
+		failure = '';
+		Game.open(examples[name])
+			.then((game) => (session = new Session(game)))
+			.catch((e) => {
+				if (e instanceof ProjectError) problems = e.diagnostics;
+				else failure = String(e);
+			});
+	}
 	let problems: Diagnostic[] = $state([]);
 	let failure = $state('');
 	let showSettings = $state(false);
@@ -134,6 +163,15 @@
 		});
 		items.push({ id: 'settings', group: 'Look', label: 'Open look and motion settings', run: () => (showSettings = true) });
 		items.push({ id: 'restart', group: 'Game', label: 'Restart the game', run: () => s.restart() });
+		for (const name of Object.keys(examples).filter((n) => n !== storyName)) {
+			items.push({
+				id: `story-${name}`,
+				group: 'Game',
+				label: `Open the example “${name}”`,
+				keywords: 'story switch load',
+				run: () => openStory(name)
+			});
+		}
 		return items;
 	});
 
@@ -174,12 +212,7 @@
 	});
 
 	onMount(() => {
-		Game.open(lighthouse)
-			.then((game) => (session = new Session(game)))
-			.catch((e) => {
-				if (e instanceof ProjectError) problems = e.diagnostics;
-				else failure = String(e);
-			});
+		openStory(storyName);
 		// Same query as --bp-ultrawide in PlayerLayout.
 		const wide = window.matchMedia('(min-width: 2200px) and (min-aspect-ratio: 21/9)');
 		ultrawide = wide.matches;

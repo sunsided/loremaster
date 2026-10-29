@@ -1,0 +1,21 @@
+# A character whose name changes with what the player knows.
+name: shadow
+location: { room: cantina }
+names:
+  - { text: shadow, aliases: [figure, shape] }
+  - { when: blackbeard.talked > 0, text: grim-looking man, aliases: [man] }
+  - { when: knows_blackbeard_name, text: Blackbeard, aliases: [captain], proper: true }
+presence:
+  - when: blackbeard.talked == 0
+    text: "{blackbeard.A} looms in the corner of the cantina."
+  - when: blackbeard.talked > 0 and not knows_blackbeard_name
+    text: "{blackbeard.The} is still staring at you from the corner."
+  - when: knows_blackbeard_name
+    text: "{blackbeard.The} is still sitting in the corner, nodding at you as you enter."
+description:
+  - "{blackbeard.talked == 0 ? A shape at the corner table, hood drawn low. | A weathered face, and a beard like spilled ink.}"
+frames:
+  examine:
+    before:
+      - when: action.repeat >= 2
+        text: "{blackbeard.The} notices you staring."

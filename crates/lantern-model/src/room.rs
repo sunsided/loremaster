@@ -1,4 +1,4 @@
-use crate::{Fragment, Id};
+use crate::{Fragment, Frames, Id};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -19,6 +19,9 @@ pub struct Room {
     /// Map position, owned by the editor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position: Option<[f32; 2]>,
+    /// Author text around the responses to verbs in this room.
+    #[serde(default, skip_serializing_if = "Frames::is_empty")]
+    pub frames: Frames,
 }
 
 impl Room {

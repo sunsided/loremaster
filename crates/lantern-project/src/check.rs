@@ -92,6 +92,23 @@ impl Checker<'_> {
         }
     }
 
+    fn frames(&mut self, file: &str, at: &str, frames: &lantern_model::Frames) {
+        let verbs: BTreeSet<String> = standard_verbs()
+            .iter()
+            .chain(self.story().verbs.iter())
+            .map(|v| v.id.to_string())
+            .collect();
+        for (verb, frame) in frames {
+            let at = format!("{at}.{verb}");
+            if !verbs.contains(verb.as_str()) {
+                self.error(file, &at, format!("unknown verb `{verb}`"));
+            }
+            self.fragments(file, &format!("{at}.before"), &frame.before);
+            self.fragments(file, &format!("{at}.instead"), &frame.instead);
+            self.fragments(file, &format!("{at}.after"), &frame.after);
+        }
+    }
+
     fn room_ref(&mut self, file: &str, at: &str, id: &str) {
         if self.story().room(id).is_none() {
             self.error(file, at, format!("unknown room `{id}`"));
@@ -108,6 +125,7 @@ impl Checker<'_> {
         let story = self.story().clone();
         self.room_ref("story.yaml", "start", story.start.as_str());
         self.fragments("story.yaml", "intro", &story.intro);
+        self.frames("story.yaml", "frames", &story.frames);
         for v in &story.vars {
             let ok = match (&v.ty, &v.initial) {
                 (lantern_model::VarType::Bool, lantern_model::Value::Bool(_)) => true,
@@ -133,6 +151,7 @@ impl Checker<'_> {
                 self.error(&file, "id", format!("room `{}` is defined twice", room.id));
             }
             self.fragments(&file, "description", &room.description);
+            self.frames(&file, "frames", &room.frames);
             for (i, exit) in room.exits.iter().enumerate() {
                 let at = format!("exits[{i}]");
                 self.room_ref(&file, &format!("{at}.to"), exit.to.as_str());
@@ -169,6 +188,12 @@ impl Checker<'_> {
             }
             self.fragments(&file, "description", &thing.description);
             self.fragments(&file, "presence", &thing.presence);
+            self.frames(&file, "frames", &thing.frames);
+            for (i, stage) in thing.names.iter().enumerate() {
+                if let Some(when) = &stage.when {
+                    self.condition(&file, &format!("names[{i}].when"), when);
+                }
+            }
         }
 
         let verbs: BTreeSet<String> = standard_verbs()

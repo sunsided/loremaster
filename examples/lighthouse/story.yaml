@@ -19,3 +19,14 @@ clock:
 vars:
   - { id: beacon_lit, type: bool, initial: false }
   - { id: drawer_searched, type: bool, initial: false }
+
+# Optional author text around verbs. Here: "Look around" teases a little when the player repeats it.
+frames:
+  look:
+    before:
+      - when: action.repeat == 1
+        text: "You look around."
+      - when: action.repeat == 2
+        text: "You look around, again."
+      - when: action.repeat >= 3
+        text: "You keep looking around, and nothing seems to change."

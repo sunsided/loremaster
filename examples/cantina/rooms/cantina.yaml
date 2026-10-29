@@ -1,0 +1,6 @@
+name: The Cantina
+position: [1, 0]
+description:
+  - "Low beams, smoke, a bar polished by elbows. {first: Every head turns when you come in, then turns away again.}"
+exits:
+  - { direction: out, to: street }

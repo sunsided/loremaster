@@ -16,6 +16,7 @@ pub struct World {
     pub(crate) rooms: Vec<CRoom>,
     pub(crate) things: Vec<CThing>,
     pub(crate) rules: Vec<CRule>,
+    pub(crate) frames: BTreeMap<Id, CFrame>,
     room_index: BTreeMap<Id, usize>,
     thing_index: BTreeMap<Id, usize>,
 }
@@ -36,6 +37,7 @@ pub(crate) struct CFragment {
 #[derive(Debug, Clone)]
 pub(crate) struct CRoom {
     pub description: Vec<CFragment>,
+    pub frames: BTreeMap<Id, CFrame>,
     pub exits: Vec<CExit>,
 }
 
@@ -51,6 +53,17 @@ pub(crate) struct CExit {
 pub(crate) struct CThing {
     pub description: Vec<CFragment>,
     pub presence: Vec<CFragment>,
+    /// The condition of each name stage.
+    pub names: Vec<Option<Condition>>,
+    pub frames: BTreeMap<Id, CFrame>,
+}
+
+/// A compiled action frame.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CFrame {
+    pub before: Vec<CFragment>,
+    pub instead: Vec<CFragment>,
+    pub after: Vec<CFragment>,
 }
 
 #[derive(Debug, Clone)]
@@ -131,6 +144,29 @@ impl Compiler {
     }
 }
 
+impl Compiler {
+    fn frames(
+        &self,
+        owner: &str,
+        frames: &lantern_model::Frames,
+    ) -> Result<BTreeMap<Id, CFrame>, CompileError> {
+        frames
+            .iter()
+            .map(|(verb, f)| {
+                let at = format!("{owner}/frames/{verb}");
+                Ok((
+                    verb.clone(),
+                    CFrame {
+                        before: self.fragments(&format!("{at}/before"), &f.before)?,
+                        instead: self.fragments(&format!("{at}/instead"), &f.instead)?,
+                        after: self.fragments(&format!("{at}/after"), &f.after)?,
+                    },
+                ))
+            })
+            .collect()
+    }
+}
+
 impl World {
     pub fn compile(story: Story) -> Result<Self, CompileError> {
         let c = Compiler {
@@ -144,6 +180,7 @@ impl World {
                 let owner = format!("room:{}", room.id);
                 Ok(CRoom {
                     description: c.fragments(&owner, &room.description)?,
+                    frames: c.frames(&owner, &room.frames)?,
                     exits: room
                         .exits
                         .iter()
@@ -177,6 +214,13 @@ impl World {
                 Ok(CThing {
                     description: c.fragments(&owner, &t.description)?,
                     presence: c.fragments(&format!("{owner}/presence"), &t.presence)?,
+                    names: t
+                        .names
+                        .iter()
+                        .enumerate()
+                        .map(|(i, n)| c.cond(&format!("{owner}/names[{i}]"), &n.when))
+                        .collect::<Result<_, _>>()?,
+                    frames: c.frames(&owner, &t.frames)?,
                 })
             })
             .collect::<Result<_, CompileError>>()?;
@@ -204,6 +248,7 @@ impl World {
                 })
             })
             .collect::<Result<_, CompileError>>()?;
+        let frames = c.frames("story", &story.frames)?;
         let mut verbs = standard_verbs();
         verbs.extend(story.verbs.iter().cloned());
         let room_index = story
@@ -225,6 +270,7 @@ impl World {
             rooms,
             things,
             rules,
+            frames,
             room_index,
             thing_index,
         })

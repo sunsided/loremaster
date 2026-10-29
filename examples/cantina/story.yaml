@@ -1,0 +1,14 @@
+title: The Cantina
+author: lantern example
+start: street
+seed: 3
+
+intro:
+  - "Rain, and the smell of fried onions. Somebody in this town knows where the *Marigold* went."
+
+clock:
+  start: "22:00"
+  minutes_per_turn: 3
+
+vars:
+  - { id: knows_blackbeard_name, type: bool, initial: false }

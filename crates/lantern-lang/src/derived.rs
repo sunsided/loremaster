@@ -73,6 +73,18 @@ pub enum Derived {
     Present(Id),
     /// `thing.location`: a room id, `carried` or `nowhere`.
     Location(Id),
+    /// `action.repeat`: how many times in a row the player gave the current command, this time included.
+    ActionRepeat,
+    /// `action.count`: how many times the player used the current verb in this room, this time included.
+    ActionCount,
+    /// `action.total`: how many times the player used the current verb in the game, this time included.
+    ActionTotal,
+    /// `action.verb`: the id of the current verb, text.
+    ActionVerb,
+    /// `thing.interactions`: how many commands named the thing.
+    Interactions(Id),
+    /// `thing.talked`: how many times the player talked to the thing.
+    Talked(Id),
 }
 
 /// The custom-condition key used for every derived comparison.
@@ -92,6 +104,12 @@ impl Derived {
             Derived::Carried(id) => ("carried", Some(id)),
             Derived::Present(id) => ("present", Some(id)),
             Derived::Location(id) => ("location", Some(id)),
+            Derived::ActionRepeat => ("action_repeat", None),
+            Derived::ActionCount => ("action_count", None),
+            Derived::ActionTotal => ("action_total", None),
+            Derived::ActionVerb => ("action_verb", None),
+            Derived::Interactions(id) => ("interactions", Some(id)),
+            Derived::Talked(id) => ("talked", Some(id)),
         }
     }
 
@@ -109,6 +127,12 @@ impl Derived {
             "carried" => Derived::Carried(id()),
             "present" => Derived::Present(id()),
             "location" => Derived::Location(id()),
+            "action_repeat" => Derived::ActionRepeat,
+            "action_count" => Derived::ActionCount,
+            "action_total" => Derived::ActionTotal,
+            "action_verb" => Derived::ActionVerb,
+            "interactions" => Derived::Interactions(id()),
+            "talked" => Derived::Talked(id()),
             _ => return None,
         })
     }
@@ -156,5 +180,21 @@ pub enum Operand {
     /// A world fact: a story variable `x` or a thing property `lamp.lit`.
     Fact(String),
     Derived(Derived),
-    ThingName(Id),
+    /// The current name of a thing, in a form.
+    ThingName(Id, NameForm),
+}
+
+/// How to write a thing's name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NameForm {
+    /// `{lamp.name}`: "oil lamp".
+    Bare,
+    /// `{lamp.the}`: "the oil lamp", or "Blackbeard" for a proper name.
+    The,
+    /// `{lamp.The}`: "The oil lamp".
+    TheCap,
+    /// `{lamp.a}`: "an oil lamp", or "Blackbeard" for a proper name.
+    A,
+    /// `{lamp.A}`: "An oil lamp".
+    ACap,
 }

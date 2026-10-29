@@ -15,6 +15,8 @@ The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge
 | `crates/lantern-wasm` | The WebAssembly bindings for the web app. Trunk builds them. |
 | `crates/lantern-cli` | The terminal player: `lantern play` and `lantern check`. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
+| `examples/cantina` | A small story with a character whose name changes. |
+| `docs/writing-stories.md` | How to write a story: files, fragments, markup, conditions, frames and name stages. |
 | `web/` | The SvelteKit app and the design system with its Storybook. |
 
 ## Commands

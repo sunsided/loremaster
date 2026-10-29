@@ -8,6 +8,7 @@
 
 mod clock;
 mod fragment;
+mod frame;
 mod id;
 mod room;
 mod rule;
@@ -18,10 +19,11 @@ mod verb;
 
 pub use clock::{ClockConfig, Phase, TimeOfDay};
 pub use fragment::{Fragment, FragmentMode, Layer};
+pub use frame::{Frame, Frames};
 pub use id::Id;
 pub use room::{Direction, Exit, Room};
 pub use rule::{Effect, EventPattern, Rule};
 pub use story::{Story, VarDef, VarType};
-pub use thing::{Location, Thing};
+pub use thing::{Location, NameStage, Thing};
 pub use value::Value;
 pub use verb::{VerbDef, VerbSlots, standard_verbs};

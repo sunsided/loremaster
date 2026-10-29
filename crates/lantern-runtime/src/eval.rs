@@ -1,7 +1,7 @@
 use crate::{State, World};
 use dramaturge_model::{Condition, FactValue};
 use dramaturge_runtime::{ConditionEvaluator, DefaultConditionEvaluator, DialogWorldState};
-use lantern_lang::{CmpOp, Derived, Operand};
+use lantern_lang::{CmpOp, Derived, NameForm, Operand};
 use lantern_model::{Location, TimeOfDay, Value};
 
 /// Evaluates conditions against a game: stored facts through dramaturge's
@@ -63,11 +63,86 @@ impl Eval<'_> {
             Derived::Present(t) => FactValue::Bool(
                 s.is_carried(t.as_str()) || s.is_in_room(t.as_str(), s.room.as_str()),
             ),
+            Derived::ActionRepeat => FactValue::Int(i64::from(s.repeat)),
+            Derived::ActionCount => FactValue::Int(i64::from(
+                s.action
+                    .as_ref()
+                    .and_then(|a| s.action_counts.get(&format!("{a}@{}", s.room)))
+                    .copied()
+                    .unwrap_or(0),
+            )),
+            Derived::ActionTotal => FactValue::Int(i64::from(
+                s.action
+                    .as_ref()
+                    .and_then(|a| s.action_counts.get(a.as_str()))
+                    .copied()
+                    .unwrap_or(0),
+            )),
+            Derived::ActionVerb => {
+                FactValue::Text(s.action.as_ref().map(|a| a.to_string()).unwrap_or_default())
+            }
+            Derived::Interactions(t) => {
+                FactValue::Int(i64::from(s.interactions.get(t).copied().unwrap_or(0)))
+            }
+            Derived::Talked(t) => FactValue::Int(i64::from(s.talked.get(t).copied().unwrap_or(0))),
             Derived::Location(t) => FactValue::Text(match s.location_of(t.as_str()) {
                 Some(Location::Room(r)) => r.to_string(),
                 Some(Location::Carried) => "carried".into(),
                 _ => "nowhere".into(),
             }),
+        }
+    }
+
+    /// The index of the thing's current name stage: the last one whose condition holds.
+    /// None when the thing has no stages.
+    pub fn name_stage(&self, id: &str) -> Option<usize> {
+        let ti = self.world.thing_idx(id)?;
+        let stages = &self.world.things[ti].names;
+        if stages.is_empty() {
+            return None;
+        }
+        Some(stages.iter().rposition(|c| self.holds_opt(c)).unwrap_or(0))
+    }
+
+    pub fn is_proper(&self, id: &str) -> bool {
+        let Some(t) = self.world.story.thing(id) else {
+            return false;
+        };
+        match self.name_stage(id) {
+            Some(i) => t.names[i].proper,
+            None => t.proper,
+        }
+    }
+
+    /// The current name of a thing in a form, with the right article.
+    pub fn thing_name(&self, id: &str, form: NameForm) -> String {
+        let Some(t) = self.world.story.thing(id) else {
+            return id.to_string();
+        };
+        let name = match self.name_stage(id) {
+            Some(i) => t.names[i].text.clone(),
+            None => t.name.clone(),
+        };
+        let proper = self.is_proper(id);
+        let with = |article: &str| {
+            if proper {
+                name.clone()
+            } else {
+                format!("{article} {name}")
+            }
+        };
+        let cap = |s: String| {
+            let mut c = s.chars();
+            c.next().map_or(String::new(), |f| {
+                f.to_uppercase().collect::<String>() + c.as_str()
+            })
+        };
+        match form {
+            NameForm::Bare => name.clone(),
+            NameForm::The => with("the"),
+            NameForm::TheCap => cap(with("the")),
+            NameForm::A => with(crate::text::article(&name)),
+            NameForm::ACap => cap(with(crate::text::article(&name))),
         }
     }
 
@@ -85,12 +160,7 @@ impl Eval<'_> {
                 FactValue::Bool(b) => b.to_string(),
                 other => format!("{other:?}"),
             },
-            Operand::ThingName(id) => self
-                .world
-                .story
-                .thing(id.as_str())
-                .map(|t| t.name.clone())
-                .unwrap_or_default(),
+            Operand::ThingName(id, form) => self.thing_name(id.as_str(), *form),
         }
     }
 }

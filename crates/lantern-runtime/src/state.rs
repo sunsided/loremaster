@@ -27,6 +27,24 @@ pub struct State {
     pub fired: BTreeSet<Id>,
     pub rng: u64,
     pub ended: bool,
+    /// The verb of the action being handled now, for `action.*` in conditions.
+    #[serde(default)]
+    pub action: Option<Id>,
+    /// The last command, as verb and objects, to count repeats.
+    #[serde(default)]
+    pub last_command: Option<String>,
+    /// How many times in a row the player gave the last command.
+    #[serde(default)]
+    pub repeat: u32,
+    /// Uses of each verb, as `verb` (whole game) and `verb@room`.
+    #[serde(default)]
+    pub action_counts: BTreeMap<String, u32>,
+    /// How many commands named each thing.
+    #[serde(default)]
+    pub interactions: BTreeMap<Id, u32>,
+    /// How many times the player talked to each thing.
+    #[serde(default)]
+    pub talked: BTreeMap<Id, u32>,
 }
 
 impl State {

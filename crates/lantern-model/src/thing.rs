@@ -1,4 +1,4 @@
-use crate::{Fragment, Id, Value};
+use crate::{Fragment, Frames, Id, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -40,6 +40,32 @@ pub struct Thing {
     pub presence: Vec<Fragment>,
     #[serde(default = "yes", skip_serializing_if = "Clone::clone")]
     pub listed: bool,
+    /// The name is a proper name, such as "Blackbeard": no article.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub proper: bool,
+    /// Names that change with the state. The last stage whose condition holds
+    /// is the current name; without stages, `name` and `aliases` apply.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub names: Vec<NameStage>,
+    /// Author text around the responses to verbs used on this thing.
+    #[serde(default, skip_serializing_if = "Frames::is_empty")]
+    pub frames: Frames,
+}
+
+/// One stage of a thing's name, for example "shadow", then "grim-looking man",
+/// then "Blackbeard".
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NameStage {
+    pub text: String,
+    /// Extra nouns for this stage.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
+    /// Condition source. A stage without a condition always applies.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub when: Option<String>,
+    /// A proper name: no article.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub proper: bool,
 }
 
 fn yes() -> bool {

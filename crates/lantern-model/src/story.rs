@@ -1,4 +1,4 @@
-use crate::{ClockConfig, Fragment, Id, Room, Rule, Thing, Value, VerbDef};
+use crate::{ClockConfig, Fragment, Frames, Id, Room, Rule, Thing, Value, VerbDef};
 use serde::{Deserialize, Serialize};
 
 /// The type of a story variable.
@@ -42,6 +42,9 @@ pub struct Story {
     pub things: Vec<Thing>,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    /// Author text around the responses to verbs, for the whole story.
+    #[serde(default, skip_serializing_if = "Frames::is_empty")]
+    pub frames: Frames,
     /// Seed for shuffled and sticky fragments; fixed so playthroughs replay.
     #[serde(default)]
     pub seed: u64,

@@ -172,7 +172,8 @@ pub(crate) fn runs(ev: &Eval, fragments: &[CFragment], picks: &[Pick]) -> Vec<Ru
     let mut out: Vec<Run> = Vec::new();
     for p in picks {
         let f = &fragments[p.index];
-        let text = render(ev, &f.variants[p.variant]);
+        // Markup that renders to nothing can leave a space at the end; it would show as a gap.
+        let text = render(ev, &f.variants[p.variant]).trim_end().to_string();
         if text.trim().is_empty() {
             continue;
         }

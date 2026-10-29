@@ -4,7 +4,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 fn lighthouse() -> Game {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse");
+    example("lighthouse")
+}
+
+fn example(name: &str) -> Game {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples")
+        .join(name);
     let project = load(read_dir(&root).unwrap()).unwrap_or_else(|e| panic!("{e:#?}"));
     let problems = check(&project);
     assert!(problems.is_empty(), "{problems:#?}");
@@ -279,5 +285,81 @@ fn inspect_gives_author_facts() {
     assert_eq!(
         fact(&east, "door").as_deref(),
         Some("lighthouse_door, locked")
+    );
+}
+
+#[test]
+fn look_around_teases_on_repeats_and_only_when_asked() {
+    let mut game = lighthouse();
+    let opening = game.start().plain_text();
+    assert!(
+        !opening.contains("You look around"),
+        "the automatic description is not framed"
+    );
+    let first = game.input("look").plain_text();
+    assert!(
+        first.contains("You look around.") && first.contains("The Shore"),
+        "{first}"
+    );
+    assert!(
+        game.input("look")
+            .plain_text()
+            .contains("You look around, again.")
+    );
+    assert!(
+        game.input("l")
+            .plain_text()
+            .contains("You keep looking around")
+    );
+    game.input("wait");
+    assert!(
+        game.input("look").plain_text().contains("You look around."),
+        "a different command resets the repeat"
+    );
+}
+
+#[test]
+fn names_change_with_what_the_player_knows() {
+    let mut game = example("cantina");
+    game.start();
+    let inside = game.input("in").plain_text();
+    assert!(inside.contains("A shadow looms in the corner"), "{inside}");
+    assert!(
+        game.input("talk to blackbeard")
+            .plain_text()
+            .contains("You see no blackbeard here.")
+    );
+    assert!(
+        game.input("talk to shadow")
+            .plain_text()
+            .contains("grim-looking")
+    );
+    assert!(
+        game.input("look")
+            .plain_text()
+            .contains("The grim-looking man is still staring")
+    );
+    assert!(
+        game.input("talk to man")
+            .plain_text()
+            .contains("They call me Blackbeard")
+    );
+    game.input("out");
+    let back = game.input("in").plain_text();
+    assert!(
+        back.contains("Blackbeard is still sitting in the corner"),
+        "{back}"
+    );
+    assert!(!back.contains("The Blackbeard"));
+    assert!(
+        game.input("x shadow")
+            .plain_text()
+            .contains("weathered face"),
+        "earlier names still work"
+    );
+    let save = serde_json::to_string(game.state()).unwrap();
+    assert!(
+        save.contains("\"talked\""),
+        "counters are in the save state"
     );
 }

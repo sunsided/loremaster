@@ -1,0 +1,6 @@
+name: Harbour Street
+position: [0, 0]
+description:
+  - "A narrow street of wet cobbles. The cantina's door spills yellow light onto the stones."
+exits:
+  - { direction: in, to: cantina }

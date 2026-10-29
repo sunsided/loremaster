@@ -42,6 +42,8 @@ struct StoryFile {
     #[serde(default)]
     verbs: Vec<VerbDef>,
     #[serde(default)]
+    frames: lantern_model::Frames,
+    #[serde(default)]
     seed: u64,
 }
 
@@ -130,6 +132,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         rooms,
         things,
         rules,
+        frames: header.frames,
         seed: header.seed,
     };
     Ok(Project {

@@ -215,7 +215,7 @@ mod tests {
         check!(
             segs[3]
                 == Segment::Insert {
-                    operand: Operand::ThingName("lamp".into()),
+                    operand: Operand::ThingName("lamp".into(), crate::NameForm::Bare),
                     source: "{lamp.name}".into()
                 }
         );

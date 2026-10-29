@@ -17,7 +17,7 @@ mod lower;
 mod markup;
 mod scope;
 
-pub use derived::{CmpOp, Derived, Operand};
+pub use derived::{CmpOp, Derived, NameForm, Operand};
 pub use error::{LangError, Span};
 pub use expr::{Expr, parse_expr};
 pub use lower::compile_condition;

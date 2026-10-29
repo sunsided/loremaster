@@ -221,6 +221,12 @@ impl Game {
             fired: Default::default(),
             rng: story.seed,
             ended: false,
+            action: None,
+            last_command: None,
+            repeat: 0,
+            action_counts: Default::default(),
+            interactions: Default::default(),
+            talked: Default::default(),
         };
         for v in &story.vars {
             state.facts.insert(v.id.to_string(), v.initial.clone());
@@ -336,25 +342,60 @@ impl Game {
         }
     }
 
+    /// The current name of a thing: its last name stage that applies, or its name.
     fn name_of(&self, id: &Id) -> String {
-        self.world
-            .story
-            .thing(id.as_str())
-            .map(|t| t.name.clone())
-            .unwrap_or_else(|| id.to_string())
+        self.eval()
+            .thing_name(id.as_str(), lantern_lang::NameForm::Bare)
+    }
+
+    /// "the oil lamp", "The oil lamp", or "Blackbeard" for a proper name.
+    fn the(&self, id: &Id, capital: bool) -> String {
+        let form = if capital {
+            lantern_lang::NameForm::TheCap
+        } else {
+            lantern_lang::NameForm::The
+        };
+        self.eval().thing_name(id.as_str(), form)
+    }
+
+    /// The nouns that name a thing now: those of its current name stage and of
+    /// the stages before it, lowercased. A later name is not known yet.
+    fn nouns_of(&self, t: &lantern_model::Thing) -> Vec<String> {
+        let ev = self.eval();
+        match ev.name_stage(t.id.as_str()) {
+            Some(current) => t.names[..=current]
+                .iter()
+                .flat_map(|stage| std::iter::once(&stage.text).chain(stage.aliases.iter()))
+                .map(|n| n.to_lowercase())
+                .collect(),
+            None => t.nouns().collect(),
+        }
     }
 
     fn perform(&mut self, turn: &mut Turn, cmd: Command) {
         match cmd {
-            Command::Go { direction } => self.go(turn, &direction),
+            Command::Go { direction } => {
+                let verb = Id::new("go");
+                self.begin_action(&verb, &[], &format!("go {direction}"));
+                let frame = self.frame_for(&verb, None);
+                self.frame_text(turn, frame.as_ref().map(|f| &f.before));
+                self.go(turn, &direction);
+                self.frame_text(turn, frame.as_ref().map(|f| &f.after));
+            }
             Command::Verb { verb, objects } => {
                 if let Some(missing) = objects.iter().find(|o| !self.reachable(o.as_str())) {
                     turn.say(
                         BlockKind::Response,
-                        format!("You can't see the {} here.", self.name_of(missing)),
+                        format!("You can't see {} here.", self.the(missing, false)),
                     );
                     return;
                 }
+                let key = std::iter::once(verb.as_str())
+                    .chain(objects.iter().map(Id::as_str))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                self.begin_action(&verb, &objects, &key);
+                let frame = self.frame_for(&verb, objects.first());
                 let on_verb = |rule: &lantern_model::Rule| match &rule.on {
                     EventPattern::Verb(parts) => {
                         parts.first() == Some(&verb)
@@ -363,16 +404,77 @@ impl Game {
                     }
                     _ => false,
                 };
+                self.frame_text(turn, frame.as_ref().map(|f| &f.before));
                 // `instead` rules run before the default and replace it;
                 // other rules run after it, so their text follows the response.
                 let instead = self.fire(turn, |r| r.instead && on_verb(r), 0);
                 if !instead {
-                    self.default_action(turn, verb.as_str(), &objects);
+                    // An `instead` frame replaces the default response, but not the rules.
+                    let replaced = self.frame_text(turn, frame.as_ref().map(|f| &f.instead));
+                    if !replaced {
+                        self.default_action(turn, verb.as_str(), &objects);
+                    }
                     self.fire(turn, |r| !r.instead && on_verb(r), 0);
                 }
+                self.frame_text(turn, frame.as_ref().map(|f| &f.after));
             }
         }
+        self.state.action = None;
         self.advance(turn);
+    }
+
+    /// Count an action before it runs, so `action.*` includes this time.
+    fn begin_action(&mut self, verb: &Id, objects: &[Id], key: &str) {
+        let s = &mut self.state;
+        s.repeat = if s.last_command.as_deref() == Some(key) {
+            s.repeat + 1
+        } else {
+            1
+        };
+        s.last_command = Some(key.to_string());
+        *s.action_counts.entry(verb.to_string()).or_default() += 1;
+        *s.action_counts
+            .entry(format!("{verb}@{}", s.room))
+            .or_default() += 1;
+        for o in objects {
+            *s.interactions.entry(o.clone()).or_default() += 1;
+            if verb.as_str() == "talk" {
+                *s.talked.entry(o.clone()).or_default() += 1;
+            }
+        }
+        s.action = Some(verb.clone());
+    }
+
+    /// The most specific frame for a verb: the thing's, then the room's, then the story's.
+    fn frame_for(&self, verb: &Id, thing: Option<&Id>) -> Option<crate::world::CFrame> {
+        let world = &self.world;
+        thing
+            .and_then(|t| world.thing_idx(t.as_str()))
+            .and_then(|ti| world.things[ti].frames.get(verb))
+            .or_else(|| {
+                world
+                    .room_idx(self.state.room.as_str())
+                    .and_then(|ri| world.rooms[ri].frames.get(verb))
+            })
+            .or_else(|| world.frames.get(verb))
+            .cloned()
+    }
+
+    /// Show frame fragments as one response block. Returns true if any showed.
+    fn frame_text(&mut self, turn: &mut Turn, fragments: Option<&Vec<CFragment>>) -> bool {
+        let Some(fragments) = fragments.filter(|f| !f.is_empty()) else {
+            return false;
+        };
+        let runs = self.assemble(fragments, false);
+        if runs.is_empty() {
+            return false;
+        }
+        turn.log.push(LogEntry {
+            kind: "frame".into(),
+            text: fragments[0].owner.clone(),
+        });
+        turn.push(BlockKind::Response, runs);
+        true
     }
 
     // ---- scope and light ------------------------------------------------
@@ -448,7 +550,7 @@ impl Game {
                 .in_scope()
                 .iter()
                 .filter_map(|id| self.world.story.thing(id.as_str()))
-                .map(|t| (t.id.clone(), t.nouns().collect()))
+                .map(|t| (t.id.clone(), self.nouns_of(t)))
                 .collect(),
             exits: self
                 .visible_exits()
@@ -660,7 +762,7 @@ impl Game {
             .filter(|(_, t)| self.state.is_in_room(t.id.as_str(), room.id.as_str()))
             .map(|(ti, t)| {
                 let presence = &self.world.things[ti].presence;
-                let generated = format!("There is {} {} here.", article(&t.name), t.name);
+                let generated = format!("There is {} here.", self.eval().thing_name(t.id.as_str(), lantern_lang::NameForm::A));
                 let text = if t.presence.is_empty() {
                     generated
                 } else {
@@ -674,7 +776,7 @@ impl Game {
                     let door_of = room.exits.iter().find(|e| e.door.as_ref() == Some(&t.id));
                     Some(if let Some(exit) = door_of {
                         format!("not listed: it is the door of the {} exit", exit.direction.name())
-                    } else if t.nouns().any(|n| mentions(&room_text, &n)) {
+                    } else if self.nouns_of(t).iter().any(|n| mentions(&room_text, n)) {
                         "not listed: the room text mentions it".to_string()
                     } else {
                         "not listed, and the room text does not mention it: the player cannot find it"
@@ -802,8 +904,30 @@ impl Game {
     pub fn inspect_thing(&self, id: &str) -> Option<Inspect> {
         let t = self.world.story.thing(id)?;
         let mut facts: Vec<(String, String)> = vec![("id".into(), t.id.to_string())];
-        if !t.aliases.is_empty() {
-            facts.push(("also called".into(), t.aliases.join(", ")));
+        let ev = self.eval();
+        match ev.name_stage(id) {
+            Some(current) => {
+                let stages: Vec<String> = t
+                    .names
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| {
+                        let when = n
+                            .when
+                            .as_deref()
+                            .map(|w| format!(" when {w}"))
+                            .unwrap_or_default();
+                        let now = if i == current { " (now)" } else { "" };
+                        format!("{}{when}{now}", n.text)
+                    })
+                    .collect();
+                facts.push(("names".into(), stages.join(" → ")));
+                facts.push(("player calls it".into(), self.nouns_of(t).join(", ")));
+            }
+            None if !t.aliases.is_empty() => {
+                facts.push(("also called".into(), t.aliases.join(", ")))
+            }
+            None => {}
         }
         let location = match self.state.location_of(id) {
             Some(Location::Room(r)) => self
@@ -860,7 +984,7 @@ impl Game {
         Some(Inspect {
             kind: "thing".into(),
             id: id.to_string(),
-            title: t.name.clone(),
+            title: self.name_of(&t.id),
             facts,
             rules,
         })
@@ -1161,11 +1285,16 @@ impl Game {
                 }
                 let mut runs = self.assemble(&world.things[ti].presence, first);
                 if runs.is_empty() {
-                    runs.push(Run::plain(format!(
-                        "There is {} {} here.",
-                        article(&thing.name),
-                        thing.name
-                    )));
+                    let a = self
+                        .eval()
+                        .thing_name(thing.id.as_str(), lantern_lang::NameForm::A);
+                    runs.push(Run::plain(
+                        if thing.proper || self.eval().is_proper(thing.id.as_str()) {
+                            format!("{a} is here.")
+                        } else {
+                            format!("There is {a} here.")
+                        },
+                    ));
                 }
                 if !objects.is_empty() {
                     objects.push(Run::plain(" "));
@@ -1356,7 +1485,11 @@ impl Game {
             .in_scope()
             .iter()
             .filter_map(|id| self.world.story.thing(id.as_str()))
-            .flat_map(|t| t.nouns().map(move |n| (n, t.id.to_string())))
+            .flat_map(|t| {
+                self.nouns_of(t)
+                    .into_iter()
+                    .map(move |n| (n, t.id.to_string()))
+            })
             .collect();
         needles.sort_by_key(|(n, _)| std::cmp::Reverse(n.len()));
         for block in blocks.iter_mut() {
@@ -1395,14 +1528,15 @@ impl Game {
         };
         let compiled = &world.rooms[ri].exits[ei];
         if let Some(door) = &exit.door {
-            let name = self.name_of(door);
+            let the = self.the(door, false);
+            let the_cap = self.the(door, true);
             if !self.state.flag(&format!("{door}.open")) {
                 if self.state.flag(&format!("{door}.locked")) {
-                    turn.say(BlockKind::Response, format!("The {name} is locked."));
+                    turn.say(BlockKind::Response, format!("{the_cap} is locked."));
                     return;
                 }
                 self.set_fact(turn, &format!("{door}.open"), Value::Bool(true));
-                turn.say(BlockKind::Note, format!("(first opening the {name})"));
+                turn.say(BlockKind::Note, format!("(first opening {the})"));
             }
         }
         if !self.eval().holds_opt(&compiled.passable) {
@@ -1424,7 +1558,8 @@ impl Game {
     fn default_action(&mut self, turn: &mut Turn, verb: &str, objects: &[Id]) {
         let say = |turn: &mut Turn, text: String| turn.say(BlockKind::Response, text);
         let first = objects.first();
-        let name = first.map(|o| self.name_of(o)).unwrap_or_default();
+        let the = first.map(|o| self.the(o, false)).unwrap_or_default();
+        let the_cap = first.map(|o| self.the(o, true)).unwrap_or_default();
         let thing = first
             .and_then(|o| self.world.story.thing(o.as_str()))
             .cloned();
@@ -1460,7 +1595,7 @@ impl Game {
                 let world = self.world.clone();
                 let runs = self.assemble(&world.things[ti].description, true);
                 if runs.is_empty() {
-                    say(turn, format!("You see nothing special about the {name}."));
+                    say(turn, format!("You see nothing special about {the}."));
                 } else {
                     turn.push(BlockKind::Prose, runs);
                 }
@@ -1468,9 +1603,9 @@ impl Game {
             "take" => {
                 let Some(t) = thing else { return };
                 if self.state.is_carried(t.id.as_str()) {
-                    say(turn, format!("You already have the {name}."));
+                    say(turn, format!("You already have {the}."));
                 } else if !t.portable {
-                    say(turn, format!("The {name} won't budge."));
+                    say(turn, format!("{the_cap} won't budge."));
                 } else {
                     self.move_thing(&t.id, Location::Carried);
                     turn.log.push(LogEntry {
@@ -1483,7 +1618,7 @@ impl Game {
             "drop" => {
                 let Some(t) = thing else { return };
                 if !self.state.is_carried(t.id.as_str()) {
-                    say(turn, format!("You don't have the {name}."));
+                    say(turn, format!("You don't have {the}."));
                 } else {
                     let here = Location::Room(self.state.room.clone());
                     turn.log.push(LogEntry {
@@ -1497,28 +1632,28 @@ impl Game {
             "open" | "close" => {
                 let opening = verb == "open";
                 if !has(self, "open") {
-                    say(turn, format!("The {name} isn't something you can {verb}."));
+                    say(turn, format!("{the_cap} isn't something you can {verb}."));
                 } else if opening && self.state.flag(&prop("locked")) {
-                    say(turn, format!("The {name} is locked."));
+                    say(turn, format!("{the_cap} is locked."));
                 } else if self.state.flag(&prop("open")) == opening {
                     let word = if opening { "open" } else { "closed" };
-                    say(turn, format!("The {name} is already {word}."));
+                    say(turn, format!("{the_cap} is already {word}."));
                 } else {
                     self.set_fact(turn, &prop("open"), Value::Bool(opening));
                     let word = if opening { "open" } else { "close" };
-                    say(turn, format!("You {word} the {name}."));
+                    say(turn, format!("You {word} {the}."));
                 }
             }
             "unlock" | "lock" => {
                 let locking = verb == "lock";
                 let Some(t) = thing else { return };
                 let Some(key) = t.key.clone().filter(|_| has(self, "locked")) else {
-                    say(turn, format!("The {name} has no lock."));
+                    say(turn, format!("{the_cap} has no lock."));
                     return;
                 };
                 if self.state.flag(&prop("locked")) == locking {
                     let word = if locking { "locked" } else { "unlocked" };
-                    say(turn, format!("The {name} is already {word}."));
+                    say(turn, format!("{the_cap} is already {word}."));
                     return;
                 }
                 let with = objects.get(1).cloned().or_else(|| {
@@ -1531,7 +1666,7 @@ impl Game {
                     })
                 });
                 match with {
-                    None => say(turn, format!("You have nothing to {verb} the {name} with.")),
+                    None => say(turn, format!("You have nothing to {verb} {the} with.")),
                     Some(k) if k != key => {
                         say(turn, format!("The {} doesn't fit.", self.name_of(&k)))
                     }
@@ -1540,7 +1675,7 @@ impl Game {
                             self.set_fact(turn, &prop("open"), Value::Bool(false));
                         }
                         self.set_fact(turn, &prop("locked"), Value::Bool(locking));
-                        say(turn, format!("You {verb} the {name}."));
+                        say(turn, format!("You {verb} {the}."));
                     }
                 }
             }
@@ -1549,22 +1684,19 @@ impl Game {
                 if !has(self, "lit") {
                     say(
                         turn,
-                        format!(
-                            "You can't {} the {name}.",
-                            if on { "light" } else { "put out" }
-                        ),
+                        format!("You can't {} {the}.", if on { "light" } else { "put out" }),
                     );
                 } else if self.state.flag(&prop("lit")) == on {
                     say(
                         turn,
-                        format!("The {name} is already {}.", if on { "lit" } else { "out" }),
+                        format!("{the_cap} is already {}.", if on { "lit" } else { "out" }),
                     );
                 } else {
                     let was_dark = self.is_dark();
                     self.set_fact(turn, &prop("lit"), Value::Bool(on));
                     say(
                         turn,
-                        format!("The {name} is now {}.", if on { "lit" } else { "out" }),
+                        format!("{the_cap} is now {}.", if on { "lit" } else { "out" }),
                     );
                     if was_dark != self.is_dark() {
                         self.describe_room(turn);
@@ -1593,9 +1725,9 @@ impl Game {
                 }
                 _ => say(turn, "Nothing happens.".into()),
             },
-            "talk" => say(turn, format!("The {name} has nothing to say.")),
+            "talk" => say(turn, format!("{the_cap} has nothing to say.")),
             "give" => say(turn, "Nobody seems interested.".into()),
-            "push" | "pull" => say(turn, format!("You {verb} the {name}. Nothing happens.")),
+            "push" | "pull" => say(turn, format!("You {verb} {the}. Nothing happens.")),
             "go" => {}
             custom => {
                 let text = self

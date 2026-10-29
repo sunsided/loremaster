@@ -1,4 +1,4 @@
-use crate::{CmpOp, Derived, Expr, LangError, Operand, Scope, Span, Ty, parse_expr};
+use crate::{CmpOp, Derived, Expr, LangError, NameForm, Operand, Scope, Span, Ty, parse_expr};
 use dramaturge_model::{Condition, FactId, FactScope, FactValue};
 use lantern_model::Id;
 
@@ -85,7 +85,7 @@ fn is_literal(expr: &Expr) -> bool {
 fn compare(operand: &Operand, op: CmpOp, value: FactValue) -> Condition {
     match operand {
         Operand::Derived(d) => d.to_condition(op, value),
-        Operand::ThingName(_) => Condition::Never,
+        Operand::ThingName(..) => Condition::Never,
         Operand::Fact(id) => {
             let fact = |value| Condition::FactEquals {
                 scope: FactScope::World,
@@ -155,6 +155,10 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
         ["turns"] => derived(Derived::Turns, Ty::Int),
         ["here"] => derived(Derived::Here, Ty::Room),
         ["first_visit"] => derived(Derived::FirstVisit, Ty::Bool),
+        ["action", "repeat"] => derived(Derived::ActionRepeat, Ty::Int),
+        ["action", "count"] => derived(Derived::ActionCount, Ty::Int),
+        ["action", "total"] => derived(Derived::ActionTotal, Ty::Int),
+        ["action", "verb"] => derived(Derived::ActionVerb, Ty::Text),
         [var] if scope.vars.contains_key(*var) => {
             Ok((Operand::Fact(var.to_string()), scope.vars[*var].clone()))
         }
@@ -175,7 +179,13 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
                 "carried" => derived(Derived::Carried(id), Ty::Bool),
                 "present" => derived(Derived::Present(id), Ty::Bool),
                 "location" => derived(Derived::Location(id), Ty::Room),
-                "name" => Ok((Operand::ThingName(id), Ty::Text)),
+                "name" => Ok((Operand::ThingName(id, NameForm::Bare), Ty::Text)),
+                "the" => Ok((Operand::ThingName(id, NameForm::The), Ty::Text)),
+                "The" => Ok((Operand::ThingName(id, NameForm::TheCap), Ty::Text)),
+                "a" => Ok((Operand::ThingName(id, NameForm::A), Ty::Text)),
+                "A" => Ok((Operand::ThingName(id, NameForm::ACap), Ty::Text)),
+                "interactions" => derived(Derived::Interactions(id), Ty::Int),
+                "talked" => derived(Derived::Talked(id), Ty::Int),
                 _ => match scope.things[*thing].get(*prop) {
                     Some(ty) => Ok((Operand::Fact(format!("{thing}.{prop}")), ty.clone())),
                     None => Err(LangError::new(
@@ -324,6 +334,14 @@ mod tests {
         assert!(let Condition::Custom { key, args } = c);
         let decoded = Derived::from_condition(&key, &args).unwrap();
         check!(decoded == (Derived::Phase, CmpOp::Eq, FactValue::Text("night".into())));
+    }
+
+    #[test]
+    fn action_counters_and_thing_counters_are_derived() {
+        let c = compile_condition("action.repeat >= 2 and lamp.talked == 0", &scope()).unwrap();
+        assert!(let Condition::All(items) = c);
+        check!(matches!(&items[0], Condition::Custom { .. }));
+        check!(matches!(&items[1], Condition::Custom { .. }));
     }
 
     #[test]
