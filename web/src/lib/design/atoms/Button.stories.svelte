@@ -27,6 +27,8 @@ The **default** size is 44px high. Use it for main controls, such as verbs. The 
 
 Set \`pressed\` for a toggle button, such as a verb on the verb bar. The value goes to \`aria-pressed\`. The pressed look is the same as the primary look.
 
+Set \`marked\` to show that the button is part of something else, for example a thing that the typed command names. A marked button has an accent edge and a faint accent fill. It is not pressed. Give screen readers the same fact in text, as ActionList does.
+
 The button text must say what the button does. Do not use "Click here".`
 				}
 			}
@@ -44,3 +46,4 @@ The button text must say what the button does. Do not use "Click here".`
 <Story name="Compact" args={{ size: 'compact' }} {template} />
 <Story name="Pressed" args={{ pressed: true }} {template} />
 <Story name="Disabled" args={{ disabled: true }} {template} />
+<Story name="Marked" args={{ marked: true, size: 'compact', variant: 'quiet' }} {template} />

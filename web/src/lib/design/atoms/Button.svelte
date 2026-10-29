@@ -11,6 +11,8 @@
 		pressed?: boolean;
 		/** Make the button fill the width of its grid cell. */
 		block?: boolean;
+		/** Show that the button is part of something else, for example a thing named in the typed command. */
+		marked?: boolean;
 		children: Snippet;
 	}
 
@@ -19,6 +21,7 @@
 		size = 'default',
 		pressed,
 		block = false,
+		marked = false,
 		type = 'button',
 		children,
 		...rest
@@ -29,6 +32,7 @@
 	{type}
 	class="button {variant} {size}"
 	class:block
+	class:marked
 	aria-pressed={pressed}
 	{...rest}>{@render children()}</button
 >
@@ -68,6 +72,11 @@
 	}
 	.quiet {
 		background: transparent;
+	}
+	.marked {
+		border-color: var(--color-accent);
+		box-shadow: inset 0 0 0 1px var(--color-accent);
+		background: var(--color-accent-tint);
 	}
 	.button:not(:disabled):hover {
 		border-color: var(--color-accent);

@@ -3,6 +3,7 @@ import {
 	type Command,
 	type FragmentView,
 	type MapView,
+	type Preview,
 	type RoomParts,
 	type RuleView,
 	type Scene,
@@ -14,12 +15,6 @@ import type { StoryStep } from '#lib/design/types.ts';
 export interface Entry {
 	id: number;
 	turn: Turn;
-}
-
-/** A verb picked on the verb bar, waiting for its objects. */
-export interface Pending {
-	verb: VerbInfo;
-	objects: { id: string; name: string }[];
 }
 
 /** One play session: the transcript, the scene, and the verb bar state. */
@@ -34,7 +29,16 @@ export class Session {
 	/** The playthrough so far, one step per turn. */
 	history = $state<StoryStep[]>([]);
 	verbs: VerbInfo[];
-	pending = $state<Pending | null>(null);
+	/**
+	 * The command in the prompt. It is the one source for the prompt and the verb bar:
+	 * typing changes it, and clicks on verbs and things write to it.
+	 */
+	draft = $state('');
+	/** What the draft refers to so far. It changes with the draft and after each turn. */
+	preview = $derived.by<Preview>(() => {
+		this.entries.length;
+		return this.game.preview(this.draft);
+	});
 	/** Fragment highlighted in both the transcript and the assembly panel. */
 	focus = $state<number | null>(null);
 	#next = 0;
@@ -72,62 +76,94 @@ export class Session {
 
 	input(text: string) {
 		if (!text.trim()) return;
-		this.pending = null;
+		this.draft = '';
 		this.#push(this.game.input(text));
 	}
 
 	act(command: Command) {
-		this.pending = null;
+		this.draft = '';
 		this.#push(this.game.act(command));
 	}
 
-	pickVerb(verb: VerbInfo) {
-		this.pending = this.pending?.verb.id === verb.id ? null : { verb, objects: [] };
+	/** The verb that the draft names, if any. */
+	get verb(): VerbInfo | undefined {
+		return this.verbs.find((v) => v.id === this.preview.verb);
 	}
 
-	/** A thing was clicked in the prose or in a list. */
+	#name(id: string): string {
+		return [...this.scene.things, ...this.scene.inventory].find((t) => t.id === id)?.name ?? id;
+	}
+
+	/** The words that write a verb into the prompt, for example "look at" or "pick up". */
+	#phrase(verb: VerbInfo): string {
+		return verb.label.toLowerCase();
+	}
+
+	/** A verb on the verb bar was clicked: write it into the prompt, or clear the prompt if it is there already. */
+	pickVerb(verb: VerbInfo) {
+		const onlyVerb = this.preview.verb === verb.id && this.preview.objects.length === 0;
+		this.draft = onlyVerb ? '' : `${this.#phrase(verb)} `;
+	}
+
+	/**
+	 * A thing was clicked in the prose or in a list. With no verb in the prompt, look at it.
+	 * Otherwise add it to the command. Run the command when it has all its things.
+	 */
 	pickThing(id: string, name: string) {
-		const p = this.pending;
-		if (!p || p.verb.id === 'go') {
-			this.act({ type: 'verb', verb: 'examine', objects: [id] });
+		const verb = this.verb;
+		if (!verb || verb.id === 'go' || verb.slots === 'none') {
+			this.input(`look at ${name}`);
 			return;
 		}
-		const objects = [...p.objects, { id, name }];
-		const want = p.verb.slots === 'two' ? 2 : 1;
-		if (objects.length >= want) {
-			this.act({ type: 'verb', verb: p.verb.id, objects: objects.map((o) => o.id) });
-		} else {
-			this.pending = { verb: p.verb, objects };
+		const names = [...this.preview.objects.map((o) => this.#name(o)), name];
+		if (verb.slots === 'two' && names.length === 1) {
+			this.draft = `${this.#phrase(verb)} ${names[0]} ${verb.preposition ?? 'with'} `;
+			return;
 		}
+		const command =
+			verb.slots === 'two'
+				? `${this.#phrase(verb)} ${names[0]} ${verb.preposition ?? 'with'} ${names[1]}`
+				: `${this.#phrase(verb)} ${names[0]}`;
+		this.input(command);
 	}
 
-	/** Run a two-object verb with only its first object, e.g. "Use lamp". */
+	/** Run a two-object verb with only its first thing, for example "use oil lamp". */
 	runPending() {
-		const p = this.pending;
-		if (p && p.objects.length > 0) {
-			this.act({ type: 'verb', verb: p.verb.id, objects: p.objects.map((o) => o.id) });
-		}
+		const verb = this.verb;
+		const first = this.preview.objects[0];
+		if (verb && first) this.input(`${this.#phrase(verb)} ${this.#name(first)}`);
 	}
 
 	pickExit(direction: string) {
 		this.act({ type: 'go', direction });
 	}
 
+	/** Things the draft names or could still name, for highlights on the verb bar. */
+	get named(): string[] {
+		return [...this.preview.objects, ...this.preview.candidates];
+	}
+
+	/** True when a two-object verb has its first thing and could also run with only that one. */
+	get canRunPartial(): boolean {
+		return this.verb?.slots === 'two' && this.preview.objects.length === 1;
+	}
+
+	/** The command as the game reads it so far, for example "Use oil lamp on _". */
+	get sentence(): string {
+		const verb = this.verb;
+		if (!verb) return '';
+		const parts = [verb.label, ...this.preview.objects.map((o) => this.#name(o))];
+		if (verb.id === 'go' && this.preview.direction) parts.push(this.preview.direction);
+		if (verb.slots === 'two' && this.preview.objects.length === 1) parts.push(verb.preposition ?? 'with');
+		if (!this.preview.complete) parts.push('_');
+		return parts.join(' ');
+	}
+
 	restart() {
 		this.game.reset();
 		this.entries = [];
 		this.history = [];
-		this.pending = null;
+		this.draft = '';
 		this.#push(this.game.start());
-	}
-
-	/** "Use oil lamp on _" */
-	get sentence(): string {
-		const p = this.pending;
-		if (!p) return '';
-		const parts = [p.verb.label, ...p.objects.map((o) => o.name)];
-		if (p.verb.slots === 'two' && p.objects.length === 1) parts.push(p.verb.preposition ?? 'with');
-		parts.push('_');
-		return parts.join(' ');
 	}
 }

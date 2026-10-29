@@ -230,6 +230,11 @@ impl Game {
         self.finish(turn)
     }
 
+    /// What a command that is still being typed refers to, for the verb bar.
+    pub fn preview(&self, text: &str) -> crate::Preview {
+        crate::parser::preview(&self.world.verbs, &self.parse_scope(), text)
+    }
+
     /// Handle a typed command.
     pub fn input(&mut self, text: &str) -> Turn {
         let mut turn = Turn::default();

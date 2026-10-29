@@ -25,6 +25,7 @@
 	let problems: Diagnostic[] = $state([]);
 	let failure = $state('');
 	let showSettings = $state(false);
+	let prompt: HTMLInputElement | undefined = $state();
 	let hidden = $state(false);
 
 	// On ultrawide screens the map has its own column, so the inspector does not repeat it.
@@ -105,20 +106,25 @@
 				onfocus={(i) => (s.focus = i)}
 			/>
 			{#if !s.scene.ended}
-				<CommandPrompt oncommand={(text) => s.input(text)} />
+				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={(text) => s.input(text)} />
 				<VerbBar
 					verbs={s.barVerbs}
-					selected={s.pending?.verb.id ?? null}
+					selected={s.preview.verb}
 					sentence={s.sentence}
-					canRunPartial={s.pending?.verb.slots === 'two' && s.pending.objects.length === 1}
+					canRunPartial={s.canRunPartial}
+					marked={s.named}
+					markedExit={s.preview.direction}
 					things={s.scene.things}
 					inventory={s.scene.inventory}
 					exits={s.scene.exits}
-					onverb={(v) => s.pickVerb(v)}
+					onverb={(v) => {
+						s.pickVerb(v);
+						prompt?.focus();
+					}}
 					onthing={(id, name) => s.pickThing(id, name)}
 					onexit={(dir) => s.pickExit(dir)}
 					onrun={() => s.runPending()}
-					oncancel={() => (s.pending = null)}
+					oncancel={() => (s.draft = '')}
 				/>
 			{:else}
 				<p id="command" tabindex="-1">The story has ended. <Button size="compact" onclick={() => s.restart()}>Play again</Button></p>

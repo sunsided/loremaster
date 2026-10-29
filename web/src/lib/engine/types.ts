@@ -171,3 +171,14 @@ export interface RuleView {
 	instead: boolean;
 	fired: boolean;
 }
+
+/** What a command that is still being typed refers to. */
+export interface Preview {
+	verb: string | null;
+	/** Things the command names without doubt, in order. */
+	objects: string[];
+	/** Things the last, unfinished noun phrase could still mean. */
+	candidates: string[];
+	direction: string | null;
+	complete: boolean;
+}

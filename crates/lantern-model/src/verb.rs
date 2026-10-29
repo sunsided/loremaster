@@ -56,7 +56,7 @@ pub fn standard_verbs() -> Vec<VerbDef> {
             "examine",
             "Look at",
             &[
-                "examine", "x", "look at", "l at", "inspect", "read", "check",
+                "examine", "x", "look at", "l at", "look", "l", "inspect", "read", "check",
             ],
             one,
             None,

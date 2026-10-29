@@ -11,6 +11,10 @@
 		sentence?: string;
 		/** True when a two-object verb has its first object and can also run without a second. */
 		canRunPartial?: boolean;
+		/** Ids of things that the typed command names or could still name. They are marked. */
+		marked?: string[];
+		/** The exit direction that the typed command names. It is marked. */
+		markedExit?: string | null;
 		things: ThingInfo[];
 		inventory: ThingInfo[];
 		exits: ExitInfo[];
@@ -26,6 +30,8 @@
 		selected = null,
 		sentence = '',
 		canRunPartial = false,
+		marked = [],
+		markedExit = null,
 		things,
 		inventory,
 		exits,
@@ -57,11 +63,12 @@
 				label="to"
 				empty="nowhere"
 				items={exits.map((e) => ({ id: e.direction, label: e.to_name, detail: e.direction }))}
+				marked={markedExit ? [markedExit] : []}
 				onpick={(item) => onexit(item.id)}
 			/>
 		{:else}
-			<ActionList label="here" empty="nothing in reach" items={things.map(toItem)} onpick={(i) => onthing(i.id, i.label)} />
-			<ActionList label="carrying" empty="nothing" items={inventory.map(toItem)} onpick={(i) => onthing(i.id, i.label)} />
+			<ActionList label="here" empty="nothing in reach" items={things.map(toItem)} {marked} onpick={(i) => onthing(i.id, i.label)} />
+			<ActionList label="carrying" empty="nothing" items={inventory.map(toItem)} {marked} onpick={(i) => onthing(i.id, i.label)} />
 		{/if}
 	</div>
 
@@ -73,7 +80,7 @@
 			{/if}
 			<Button size="compact" variant="quiet" onclick={() => oncancel?.()}>cancel</Button>
 		{:else}
-			<span class="hint">Select a verb, then click a thing. A click on a thing with no verb looks at it.</span>
+			<span class="hint">Select a verb, or type one. Then click or type a thing. A click on a thing with no verb looks at it.</span>
 		{/if}
 	</div>
 </div>

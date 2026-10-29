@@ -5,6 +5,8 @@
 		/** Called with the typed command when the player pushes Enter. */
 		oncommand: (text: string) => void;
 		placeholder?: string;
+		/** The text in the prompt. Bind it to keep the prompt and other controls in sync. */
+		value?: string;
 		/** The input element, for focus from outside (for example a skip link). */
 		input?: HTMLInputElement;
 	}
@@ -12,16 +14,15 @@
 	let {
 		oncommand,
 		placeholder = 'type a command, or use the verbs below',
+		value = $bindable(''),
 		input = $bindable()
 	}: Props = $props();
 
-	let text = $state('');
-
 	function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (!text.trim()) return;
-		oncommand(text);
-		text = '';
+		if (!value.trim()) return;
+		oncommand(value);
+		value = '';
 	}
 </script>
 
@@ -31,7 +32,7 @@
 		id="command"
 		label="Command"
 		hideLabel
-		bind:value={text}
+		bind:value
 		bind:element={input}
 		autocomplete="off"
 		spellcheck="false"

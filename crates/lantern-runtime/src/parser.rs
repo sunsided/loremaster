@@ -22,17 +22,7 @@ const ARTICLES: [&str; 6] = ["the", "a", "an", "some", "my", "this"];
 const PREPOSITIONS: [&str; 7] = ["with", "on", "to", "in", "into", "at", "using"];
 
 pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Result<Command, String> {
-    let cleaned: String = input
-        .to_lowercase()
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == ' ' || c == '-' || c == '\'' {
-                c
-            } else {
-                ' '
-            }
-        })
-        .collect();
+    let cleaned = clean(input);
     let words: Vec<&str> = cleaned.split_whitespace().collect();
     if words.is_empty() {
         return Err("Say something.".into());
@@ -106,21 +96,39 @@ fn direction(scope: &ParseScope, phrase: &str) -> Option<String> {
         .or(canonical)
 }
 
-/// Longest verb phrase at the start of the input.
+/// Longest verb phrase at the start of the input. When two verbs share the
+/// phrase (`look` and `look` for examine), prefer the one whose slots fit:
+/// a verb without objects when nothing follows, a verb with objects otherwise.
 fn match_verb<'a>(verbs: &'a [VerbDef], words: &[&str]) -> Option<(&'a VerbDef, Vec<String>)> {
-    let mut best: Option<(&VerbDef, usize)> = None;
+    match_verb_wanting(verbs, words, words.len() > 1)
+}
+
+fn match_verb_wanting<'a>(
+    verbs: &'a [VerbDef],
+    words: &[&str],
+    wants_objects: bool,
+) -> Option<(&'a VerbDef, Vec<String>)> {
+    let mut best: Vec<(&VerbDef, usize)> = Vec::new();
     for verb in verbs {
         for phrase in &verb.words {
             let pw: Vec<&str> = phrase.split_whitespace().collect();
-            if words.len() >= pw.len()
-                && words[..pw.len()] == pw[..]
-                && best.is_none_or(|(_, n)| pw.len() > n)
-            {
-                best = Some((verb, pw.len()));
+            if words.len() < pw.len() || words[..pw.len()] != pw[..] {
+                continue;
+            }
+            match best.first() {
+                Some((_, n)) if pw.len() < *n => {}
+                Some((_, n)) if pw.len() == *n => best.push((verb, pw.len())),
+                _ => best = vec![(verb, pw.len())],
             }
         }
     }
-    best.map(|(v, n)| (v, words[n..].iter().map(|w| w.to_string()).collect()))
+    let fits = |v: &VerbDef| (v.slots != VerbSlots::None) == wants_objects;
+    let (verb, n) = best
+        .iter()
+        .find(|(v, _)| fits(v))
+        .or(best.first())
+        .copied()?;
+    Some((verb, words[n..].iter().map(|w| w.to_string()).collect()))
 }
 
 fn split_objects(verb: &VerbDef, rest: &[String]) -> (Vec<String>, Vec<String>) {
@@ -141,8 +149,12 @@ fn strip_articles(words: &[String]) -> Vec<String> {
         .collect()
 }
 
-fn resolve(scope: &ParseScope, words: &[String]) -> Result<Id, String> {
+/// The things that best match a noun phrase. With `prefix`, the last word may
+/// be unfinished ("light" matches "lighthouse door").
+fn candidates(scope: &ParseScope, words: &[String], prefix: bool) -> Vec<Id> {
     let phrase = words.join(" ");
+    let word_ok =
+        |i: usize, w: &str, n: &str| n == w || (prefix && i + 1 == words.len() && n.starts_with(w));
     let score = |noun: &str| -> u8 {
         if noun == phrase {
             3
@@ -150,7 +162,8 @@ fn resolve(scope: &ParseScope, words: &[String]) -> Result<Id, String> {
             2
         } else if words
             .iter()
-            .all(|w| noun.split_whitespace().any(|n| n == w))
+            .enumerate()
+            .all(|(i, w)| noun.split_whitespace().any(|n| word_ok(i, w, n)))
         {
             1
         } else {
@@ -158,7 +171,7 @@ fn resolve(scope: &ParseScope, words: &[String]) -> Result<Id, String> {
         }
     };
     let mut best = 0;
-    let mut matches: Vec<&Id> = Vec::new();
+    let mut matches: Vec<Id> = Vec::new();
     for (id, nouns) in &scope.things {
         let s = nouns.iter().map(|n| score(n)).max().unwrap_or(0);
         if s == 0 || s < best {
@@ -168,17 +181,23 @@ fn resolve(scope: &ParseScope, words: &[String]) -> Result<Id, String> {
             best = s;
             matches.clear();
         }
-        if !matches.contains(&id) {
-            matches.push(id);
+        if !matches.contains(id) {
+            matches.push(id.clone());
         }
     }
+    matches
+}
+
+fn resolve(scope: &ParseScope, words: &[String]) -> Result<Id, String> {
+    let phrase = words.join(" ");
+    let matches = candidates(scope, words, false);
     match matches.as_slice() {
-        [one] => Ok((*one).clone()),
+        [one] => Ok(one.clone()),
         [] => Err(format!("You see no {phrase} here.")),
         many => {
             let names: Vec<String> = many
                 .iter()
-                .filter_map(|id| scope.things.iter().find(|(t, _)| t == *id))
+                .filter_map(|id| scope.things.iter().find(|(t, _)| t == id))
                 .map(|(_, nouns)| format!("the {}", nouns[0]))
                 .collect();
             Err(format!(
@@ -187,6 +206,107 @@ fn resolve(scope: &ParseScope, words: &[String]) -> Result<Id, String> {
             ))
         }
     }
+}
+
+/// What a command that is still being typed refers to so far.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Preview {
+    /// The verb, when the words so far name exactly one.
+    pub verb: Option<Id>,
+    /// Things the command names without doubt, in order.
+    pub objects: Vec<Id>,
+    /// Things the last, unfinished noun phrase could still mean.
+    pub candidates: Vec<Id>,
+    /// The exit, for a movement command.
+    pub direction: Option<String>,
+    /// True when the command can run as it is.
+    pub complete: bool,
+}
+
+/// Read a partial command. A space at the end means the last word is finished.
+pub(crate) fn preview(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Preview {
+    let finished = input.ends_with(' ');
+    let cleaned = clean(input);
+    let words: Vec<&str> = cleaned.split_whitespace().collect();
+    let mut out = Preview::default();
+    if words.is_empty() {
+        return out;
+    }
+    let phrase = words.join(" ");
+    if let Some(dir) = direction(scope, &phrase).filter(|_| Direction::from_word(&phrase).is_some())
+    {
+        out.verb = Some(Id::new("go"));
+        out.direction = Some(dir);
+        out.complete = true;
+        return out;
+    }
+
+    // "look " with a space: the player is about to name a thing, so prefer "look at".
+    let wants_objects = words.len() > 1 || finished;
+    let Some((verb, rest)) = match_verb_wanting(verbs, &words, wants_objects) else {
+        // An unfinished first word: name the verb only if exactly one verb starts with it.
+        if words.len() == 1 && !finished {
+            let mut found: Vec<&VerbDef> = verbs
+                .iter()
+                .filter(|v| v.words.iter().any(|w| w.starts_with(words[0])))
+                .collect();
+            found.dedup_by(|a, b| a.id == b.id);
+            if let [one] = found.as_slice() {
+                out.verb = Some(one.id.clone());
+            }
+        }
+        return out;
+    };
+    out.verb = Some(verb.id.clone());
+
+    if verb.id.as_str() == "go" {
+        let target = strip_articles(&rest).join(" ");
+        out.direction = direction(scope, &target);
+        out.complete = out.direction.is_some();
+        return out;
+    }
+
+    let (first, second) = split_objects(verb, &rest);
+    let has_second_slot = verb.slots == VerbSlots::Two && rest.len() > first.len();
+    for (i, words) in [first, second].iter().enumerate() {
+        if words.is_empty() {
+            continue;
+        }
+        let last = i == 1 || !has_second_slot;
+        let exact = candidates(scope, words, false);
+        let found = if exact.is_empty() && last && !finished {
+            candidates(scope, words, true)
+        } else {
+            exact
+        };
+        match found.as_slice() {
+            [one] => out.objects.push(one.clone()),
+            _ => out.candidates.extend(found),
+        }
+    }
+    let wanted = match verb.slots {
+        VerbSlots::None => 0,
+        VerbSlots::One => 1,
+        VerbSlots::Two => 1,
+    };
+    out.complete = out.candidates.is_empty()
+        && out.objects.len() >= wanted
+        && !(has_second_slot && out.objects.len() < 2);
+    out
+}
+
+fn clean(input: &str) -> String {
+    input
+        .to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' || c == '-' || c == '\'' {
+                c
+            } else {
+                ' '
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -235,6 +355,33 @@ mod tests {
                 })
         );
         check!(parse(&v, &s, "i") == Ok(verb("inventory", &[])));
+    }
+
+    #[test]
+    fn previews_follow_typing() {
+        let v = standard_verbs();
+        let s = scope();
+        let p = preview(&v, &s, "look ");
+        check!(p.verb == Some(Id::new("examine")));
+        check!(!p.complete);
+        let p = preview(&v, &s, "look oak");
+        check!(p.objects == vec![Id::new("door")]);
+        check!(p.complete);
+        let p = preview(&v, &s, "take ke");
+        check!(p.candidates.len() == 2);
+        let p = preview(&v, &s, "unlock door with bra");
+        check!(p.objects == vec![Id::new("door"), Id::new("brass_key")]);
+        check!(p.complete);
+        let p = preview(&v, &s, "unl");
+        check!(p.verb == Some(Id::new("unlock")));
+        check!(preview(&v, &s, "n").direction.as_deref() == Some("north"));
+    }
+
+    #[test]
+    fn look_with_a_thing_examines_it() {
+        let v = standard_verbs();
+        check!(parse(&v, &scope(), "look oak door") == Ok(verb("examine", &["door"])));
+        check!(parse(&v, &scope(), "look") == Ok(verb("look", &[])));
     }
 
     #[test]

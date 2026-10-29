@@ -80,6 +80,11 @@ impl Engine {
         to_js(&self.game.start())
     }
 
+    /// What a partial command refers to: `{ verb, objects, candidates, direction, complete }`.
+    pub fn preview(&self, text: &str) -> Result<JsValue, JsValue> {
+        to_js(&self.game.preview(text))
+    }
+
     /// A typed command.
     pub fn input(&mut self, text: &str) -> Result<JsValue, JsValue> {
         to_js(&self.game.input(text))

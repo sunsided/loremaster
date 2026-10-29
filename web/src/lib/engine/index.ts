@@ -4,6 +4,7 @@ import type {
 	Diagnostic,
 	FragmentView,
 	MapView,
+	Preview,
 	RoomParts,
 	RuleView,
 	Scene,
@@ -53,6 +54,10 @@ export class Game {
 
 	start(): Turn {
 		return this.#engine.start();
+	}
+
+	preview(text: string): Preview {
+		return this.#engine.preview(text);
 	}
 
 	input(text: string): Turn {
