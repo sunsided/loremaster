@@ -2,14 +2,14 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import type { ComponentProps } from 'svelte';
 	import { fn } from 'storybook/test';
-	import { fragments } from '../fixtures.ts';
+	import { fragments, parts } from '../fixtures.ts';
 	import AssemblyPanel from './AssemblyPanel.svelte';
 
 	const { Story } = defineMeta({
 		title: 'Organisms/AssemblyPanel',
 		component: AssemblyPanel,
 		tags: ['autodocs'],
-		args: { room: 'shore', fragments, focus: null, time: '20:30', phase: 'dusk', onfocus: fn() },
+		args: { room: 'shore', fragments, parts, focus: null, time: '20:30', phase: 'dusk', onfocus: fn() },
 		parameters: {
 			layout: 'fullscreen',
 			docs: {
@@ -18,7 +18,7 @@
 
 The panel has one section for each layer, in assembly order: base, ambient, event, objects, characters, exits.
 Each fragment shows its source text, its mode and its condition. A hidden fragment also shows the reason.
-The runtime makes the objects and exits layers from the things and exits of the room, so these layers have no fragments.
+The runtime makes the objects and exits layers from the things and exits of the room. These layers show a hint, then each thing or exit with its state (PartItem).
 
 Hover on a fragment highlights the same text in the transcript.
 The panel does not change the game state.`
@@ -36,4 +36,4 @@ The panel does not change the game state.`
 
 <Story name="Shore at dusk" {template} />
 <Story name="Fragment highlighted" args={{ focus: 1 }} {template} />
-<Story name="Empty room" args={{ fragments: [] }} {template} />
+<Story name="Empty room" args={{ fragments: [], parts: { objects: [], exits: [] } }} {template} />

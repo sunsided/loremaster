@@ -131,3 +131,23 @@ fn once_only_text_on_screen_counts_as_shown() {
     assert!(!oilskin.shown);
     assert_eq!(oilskin.why.as_deref(), Some("already shown once"));
 }
+
+#[test]
+fn room_parts_list_things_and_exits() {
+    let mut game = lighthouse();
+    game.start();
+    game.input("n");
+    let parts = game.room_parts();
+    let names: Vec<&str> = parts.objects.iter().map(|o| o.label.as_str()).collect();
+    assert!(
+        names.contains(&"oil lamp") && names.contains(&"drawer"),
+        "{names:?}"
+    );
+    let drawer = parts.objects.iter().find(|o| o.id == "drawer").unwrap();
+    assert!(!drawer.shown);
+    assert_eq!(parts.exits.len(), 1);
+    assert_eq!(
+        parts.exits[0].detail.as_deref(),
+        Some("door: cottage door, open")
+    );
+}

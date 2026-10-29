@@ -1,13 +1,16 @@
 <script lang="ts">
-	import type { FragmentView, Layer } from '#lib/engine/types.ts';
+	import type { FragmentView, Layer, RoomParts } from '#lib/engine/types.ts';
 	import Heading from '../atoms/Heading.svelte';
 	import FragmentItem from '../molecules/FragmentItem.svelte';
+	import PartItem from '../molecules/PartItem.svelte';
 	import SectionRule from '../molecules/SectionRule.svelte';
 
 	interface Props {
 		/** The current room id. */
 		room: string;
 		fragments: FragmentView[];
+		/** The things and exits of the generated layers. */
+		parts?: RoomParts;
 		/** The highlighted fragment index, or null. */
 		focus?: number | null;
 		/** The time of day and the phase, for the footer. */
@@ -16,13 +19,15 @@
 		onfocus?: (index: number | null) => void;
 	}
 
-	let { room, fragments, focus = null, time, phase, onfocus }: Props = $props();
+	let { room, fragments, parts, focus = null, time, phase, onfocus }: Props = $props();
 
 	const layers: Layer[] = ['base', 'ambient', 'event', 'objects', 'characters', 'exits'];
 	const generated: Partial<Record<Layer, string>> = {
-		objects: 'The runtime lists the things in the room.',
-		exits: 'The runtime lists the visible exits.'
+		objects: 'The runtime makes this layer from the things in the room.',
+		exits: 'The runtime makes this layer from the visible exits.'
 	};
+	const partsOf = (layer: Layer) =>
+		layer === 'objects' ? (parts?.objects ?? []) : layer === 'exits' ? (parts?.exits ?? []) : [];
 
 	const groups = $derived(layers.map((layer) => ({ layer, items: fragments.filter((f) => f.layer === layer) })));
 
@@ -67,8 +72,19 @@
 						/>
 					{/each}
 				</ul>
+			{:else if generated[g.layer]}
+				<p class="empty">{generated[g.layer]}</p>
+				{#if partsOf(g.layer).length}
+					<ul>
+						{#each partsOf(g.layer) as part (part.id)}
+							<PartItem label={part.label} text={part.text} detail={part.detail} shown={part.shown} why={part.why} />
+						{/each}
+					</ul>
+				{:else}
+					<p class="empty">{g.layer === 'objects' ? 'No things are in this room.' : 'This room has no exits.'}</p>
+				{/if}
 			{:else}
-				<p class="empty">{generated[g.layer] ?? 'This layer has no fragments.'}</p>
+				<p class="empty">This layer has no fragments.</p>
 			{/if}
 		</section>
 	{/each}

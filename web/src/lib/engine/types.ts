@@ -142,3 +142,19 @@ export interface MapView {
 	rooms: MapRoom[];
 	links: MapLink[];
 }
+
+export interface PartView {
+	/** A thing id, or an exit direction. */
+	id: string;
+	label: string;
+	/** The presence text of a thing, or the generated text. */
+	text: string;
+	detail: string | null;
+	shown: boolean;
+	why: string | null;
+}
+
+export interface RoomParts {
+	objects: PartView[];
+	exits: PartView[];
+}

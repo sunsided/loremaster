@@ -1,7 +1,7 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { ExitInfo, FragmentView, MapView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { ExitInfo, FragmentView, MapView, RoomParts, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
 import type { TranscriptEntry } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
@@ -193,5 +193,16 @@ export const map: MapView = {
 		{ from: 'shore', to: 'cottage', direction: 'north', visible: true, one_way: false },
 		{ from: 'shore', to: 'stairwell', direction: 'east', visible: true, one_way: false },
 		{ from: 'stairwell', to: 'lantern_room', direction: 'up', visible: true, one_way: false }
+	]
+};
+
+export const parts: RoomParts = {
+	objects: [
+		{ id: 'cottage_door', label: 'cottage door', text: 'There is a cottage door here.', detail: null, shown: false, why: 'not listed: the room text describes it' },
+		{ id: 'lighthouse_door', label: 'lighthouse door', text: 'There is a lighthouse door here.', detail: null, shown: false, why: 'not listed: the room text describes it' }
+	],
+	exits: [
+		{ id: 'north', label: "north to Keeper's Cottage", text: 'north', detail: 'door: cottage door, closed', shown: true, why: null },
+		{ id: 'east', label: 'east to Lighthouse Stairwell', text: 'east', detail: 'door: lighthouse door, locked', shown: true, why: null }
 	]
 };

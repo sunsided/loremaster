@@ -4,6 +4,7 @@ import type {
 	Diagnostic,
 	FragmentView,
 	MapView,
+	RoomParts,
 	Scene,
 	SourceFile,
 	Turn,
@@ -67,6 +68,10 @@ export class Game {
 
 	assembly(): FragmentView[] {
 		return this.#engine.assembly();
+	}
+
+	roomParts(): RoomParts {
+		return this.#engine.roomParts();
 	}
 
 	map(): MapView {

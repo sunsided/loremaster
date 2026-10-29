@@ -108,6 +108,28 @@ pub struct MapView {
     pub links: Vec<MapLink>,
 }
 
+/// One line of the generated objects or exits layer, for the assembly panel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PartView {
+    /// A thing id, or an exit direction.
+    pub id: String,
+    /// The thing name, or the direction and the room it leads to.
+    pub label: String,
+    /// The source text of the line: the thing's presence text, or the generated sentence.
+    pub text: String,
+    /// More facts, for example "door: cottage door, closed".
+    pub detail: Option<String>,
+    pub shown: bool,
+    pub why: Option<String>,
+}
+
+/// The generated layers of the current room.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoomParts {
+    pub objects: Vec<PartView>,
+    pub exits: Vec<PartView>,
+}
+
 const MAX_RULE_DEPTH: u8 = 8;
 
 impl Game {
@@ -529,6 +551,100 @@ impl Game {
             }
         }
         MapView { rooms, links }
+    }
+
+    /// The things and exits that make the objects and exits layers of the
+    /// current room, with what shows and why. Does not change any state.
+    pub fn room_parts(&self) -> RoomParts {
+        let Some(ri) = self.world.room_idx(self.state.room.as_str()) else {
+            return RoomParts {
+                objects: Vec::new(),
+                exits: Vec::new(),
+            };
+        };
+        let story = &self.world.story;
+        let room = &story.rooms[ri];
+        let ev = self.eval();
+        let dark = self.is_dark();
+        let first = self.state.visits_to(room.id.as_str()) <= 1;
+
+        let objects = story
+            .things
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| self.state.is_in_room(t.id.as_str(), room.id.as_str()))
+            .map(|(ti, t)| {
+                let presence = &self.world.things[ti].presence;
+                let generated = format!("There is {} {} here.", article(&t.name), t.name);
+                let text = if t.presence.is_empty() {
+                    generated
+                } else {
+                    t.presence
+                        .iter()
+                        .flat_map(|f| f.variants.iter().cloned())
+                        .collect::<Vec<_>>()
+                        .join(" / ")
+                };
+                let why = if !t.listed {
+                    Some("not listed: the room text describes it".to_string())
+                } else if dark {
+                    Some("the room is dark".to_string())
+                } else if !t.presence.is_empty() && text::visible(&ev, presence, first).is_empty() {
+                    Some("no presence text applies now".to_string())
+                } else {
+                    None
+                };
+                PartView {
+                    id: t.id.to_string(),
+                    label: t.name.clone(),
+                    text,
+                    detail: t.portable.then(|| "portable".to_string()),
+                    shown: why.is_none(),
+                    why,
+                }
+            })
+            .collect();
+
+        let exits = room
+            .exits
+            .iter()
+            .enumerate()
+            .map(|(ei, e)| {
+                let to = story
+                    .room(e.to.as_str())
+                    .map_or(e.to.to_string(), |r| r.name.clone());
+                let visible = ev.holds_opt(&self.world.rooms[ri].exits[ei].visible);
+                let door = e.door.as_ref().map(|d| {
+                    let state = if self.state.flag(&format!("{d}.locked")) {
+                        "locked"
+                    } else if self.state.flag(&format!("{d}.open")) {
+                        "open"
+                    } else {
+                        "closed"
+                    };
+                    format!("door: {}, {state}", self.name_of(d))
+                });
+                let passable = ev.holds_opt(&self.world.rooms[ri].exits[ei].passable);
+                let detail = match (door, passable) {
+                    (Some(d), true) => Some(d),
+                    (Some(d), false) => Some(format!("{d}; blocked now")),
+                    (None, false) => Some("blocked now".to_string()),
+                    (None, true) => None,
+                };
+                PartView {
+                    id: e.direction.name().to_string(),
+                    label: format!("{} to {to}", e.direction.name()),
+                    text: e.direction.name().to_string(),
+                    detail,
+                    shown: visible,
+                    why: (!visible).then(|| {
+                        format!("{} is false", e.visible.as_deref().unwrap_or("condition"))
+                    }),
+                }
+            })
+            .collect();
+
+        RoomParts { objects, exits }
     }
 
     pub fn verbs(&self) -> Vec<VerbInfo> {

@@ -116,6 +116,7 @@
 			<AssemblyPanel
 				room={s.scene.room}
 				fragments={s.assembly}
+				parts={s.parts}
 				focus={s.focus}
 				time={s.scene.time}
 				phase={s.scene.phase}

@@ -1,6 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { entries, exits, fragments, inventory, map as lighthouseMap, things, verbs } from '../fixtures.ts';
+	import { entries, exits, fragments, inventory, map as lighthouseMap, parts, things, verbs } from '../fixtures.ts';
 	import CommandPrompt from '../molecules/CommandPrompt.svelte';
 	import StatusBar from '../molecules/StatusBar.svelte';
 	import AppHeader from '../organisms/AppHeader.svelte';
@@ -62,7 +62,7 @@ Use the viewport menu in the toolbar to see the layout at phone width. To see th
 			<MapPanel map={lighthouseMap} />
 		{/snippet}
 		{#snippet panel()}
-			<AssemblyPanel room="shore" {fragments} time="20:30" phase="dusk" />
+			<AssemblyPanel room="shore" {fragments} {parts} time="20:30" phase="dusk" />
 		{/snippet}
 	</PlayerLayout>
 </Story>

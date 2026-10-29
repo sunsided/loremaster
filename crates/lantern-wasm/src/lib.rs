@@ -101,6 +101,12 @@ impl Engine {
         to_js(&self.game.assembly())
     }
 
+    /// The things and exits of the current room, for the assembly panel.
+    #[wasm_bindgen(js_name = roomParts)]
+    pub fn room_parts(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.room_parts())
+    }
+
     /// All rooms and exits, for the map panel.
     pub fn map(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.map())

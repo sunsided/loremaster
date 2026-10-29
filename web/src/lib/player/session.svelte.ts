@@ -3,6 +3,7 @@ import {
 	type Command,
 	type FragmentView,
 	type MapView,
+	type RoomParts,
 	type Scene,
 	type Turn,
 	type VerbInfo
@@ -26,6 +27,7 @@ export class Session {
 	scene = $state<Scene>() as Scene;
 	assembly = $state<FragmentView[]>([]);
 	map = $state<MapView>({ rooms: [], links: [] });
+	parts = $state<RoomParts>({ objects: [], exits: [] });
 	verbs: VerbInfo[];
 	pending = $state<Pending | null>(null);
 	/** Fragment highlighted in both the transcript and the assembly panel. */
@@ -48,6 +50,7 @@ export class Session {
 		this.scene = this.game.scene();
 		this.assembly = this.game.assembly();
 		this.map = this.game.map();
+		this.parts = this.game.roomParts();
 	}
 
 	input(text: string) {
