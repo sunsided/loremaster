@@ -20,9 +20,11 @@
 		time: string;
 		phase: string;
 		onfocus?: (index: number | null) => void;
+		/** Open the writer for a room fragment. When set, each fragment has an "Edit" button. */
+		onedit?: (index: number) => void;
 	}
 
-	let { room, fragments, parts, frame = null, focus = null, time, phase, onfocus }: Props = $props();
+	let { room, fragments, parts, frame = null, focus = null, time, phase, onfocus, onedit }: Props = $props();
 
 	const layers: Layer[] = ['base', 'ambient', 'event', 'objects', 'characters', 'exits'];
 	const generated: Partial<Record<Layer, string>> = {
@@ -107,6 +109,7 @@
 							why={f.why}
 							active={focus === f.index}
 							onactivate={(on) => onfocus?.(on ? f.index : null)}
+							onedit={onedit ? () => onedit(f.index) : undefined}
 						/>
 					{/each}
 				</ul>

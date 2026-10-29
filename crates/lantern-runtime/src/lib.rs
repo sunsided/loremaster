@@ -25,8 +25,8 @@ mod world;
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
 pub use game::{
     AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game, Inspect,
-    MapLink, MapRoom, MapView, PartView, PhaseView, RoomParts, RuleView, Scene, ThingInfo, VarView,
-    VerbInfo,
+    MapLink, MapRoom, MapView, MarkupCheck, PartView, PhaseView, RoomParts, RuleView, Scene,
+    TextError, ThingInfo, VarView, VerbInfo,
 };
 pub use matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix, room_matrix};
 pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};

@@ -12,6 +12,7 @@
 mod derived;
 mod error;
 mod expr;
+mod highlight;
 mod lexer;
 mod lower;
 mod markup;
@@ -20,6 +21,7 @@ mod scope;
 pub use derived::{CmpOp, Derived, NameForm, Operand};
 pub use error::{LangError, Span};
 pub use expr::{Expr, parse_expr};
+pub use highlight::{Token, TokenKind, condition_tokens, markup_tokens};
 pub use lower::compile_condition;
 pub use markup::{ChoiceSyntax, Segment, compile_markup};
 pub use scope::{Scope, Ty};

@@ -146,3 +146,29 @@ The explorer shows:
 The explorer tries the actions that move the story forward: exits, verbs that rules listen to, take, open, turn on, unlock with a key in reach, and wait when the story reacts to time. It does not try drop, close, turn off or lock.
 
 In the web app, "Replay this path" starts the game again and plays the command list. You can then continue from that state.
+
+## Write in the game
+
+You can change the story while you play it. The game keeps its state after each change.
+
+1. Select "Write" in the header, or push W.
+2. In the newest room text, select a fragment. The writer opens in place of the fragment.
+3. Change the text, the condition ("When"), the layer or the mode. "Now it reads" shows the text as the player reads it now.
+4. Push Enter to save. Push Shift+Enter for a line break. Push Escape to cancel.
+
+More actions in write mode:
+
+- "+ Add room text" adds a fragment to the current room.
+- In the "Assembly" tab, "Edit" opens the writer for a fragment that does not show now.
+- "Remove this fragment" removes the fragment from the file.
+
+The editor examines the text while you type. A problem has a wavy line and a message, and you cannot save until you correct it. When a change does not build, the writer stays open with the message, and the game keeps the last good version.
+
+### Where the changes go
+
+A change goes into the story file. Only the changed lines in the file change, so comments and formatting stay.
+
+- The browser keeps a working copy of each story (in the Origin Private File System). The header shows "edited, saved in browser".
+- In Chrome, Edge and other Chromium browsers, use the command palette (Ctrl+K), "Open a story folder on disk". Then each change goes to the folder too. After a reload of the page, the browser asks for access to the folder again: use "Give access to the folder again" in the command palette.
+- In all browsers, "Export the story as a zip file" and "Import a story from a zip file" move a story in and out.
+- "Go back to the bundled example" removes the working copy.

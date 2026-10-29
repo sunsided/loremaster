@@ -24,6 +24,14 @@ export type MotionPreference = 'system' | 'reduce';
 export interface TranscriptEntry {
 	id: number;
 	turn: import('#lib/engine/types.ts').Turn;
+	/** True when an edit of the story wrote the room text of this turn again. */
+	rewritten?: boolean;
+}
+
+/** The fragment that the writer edits: its owner and index. Index -1 is a new fragment. */
+export interface WritingAt {
+	owner: string;
+	fragment: number;
 }
 
 export interface View {
@@ -72,4 +80,36 @@ export interface RoomBrief {
 	room: string;
 	things: import('#lib/engine/types.ts').ThingInfo[];
 	exits: import('#lib/engine/types.ts').ExitInfo[];
+}
+
+/** A highlighted span of fragment text or of a condition, in UTF-16 offsets. */
+export interface MarkupToken {
+	from: number;
+	to: number;
+	kind: 'brace' | 'separator' | 'name' | 'operator' | 'literal' | 'escape' | 'emphasis' | 'invalid';
+}
+
+/** A problem in text that the author types, in UTF-16 offsets. */
+export interface TextProblem {
+	from: number;
+	to: number;
+	message: string;
+}
+
+/** A fragment in the writer: the same shape as in the project files. */
+export interface WriterFragment {
+	variants: string[];
+	when: string | null;
+	mode: 'always' | 'first_visit' | 'once' | 'cycle' | 'shuffle' | 'sticky';
+	layer: 'base' | 'ambient' | 'event' | 'objects' | 'characters' | 'exits';
+	replaces: boolean;
+}
+
+/** What the writer needs from the runtime. */
+export interface WriterTools {
+	tokenize: (text: string, condition: boolean) => MarkupToken[];
+	/** Check fragment text and render it in the current state. */
+	tryMarkup: (text: string) => { problem: TextProblem | null; text: string; pieces: import('#lib/engine/types.ts').SourcePiece[] };
+	/** Check a condition and tell whether it holds now. */
+	tryCondition: (text: string) => { problem: TextProblem | null; holds: boolean | null };
 }

@@ -1,8 +1,9 @@
 <script lang="ts">
-	import type { Block, Run } from '#lib/engine/types.ts';
+	import type { Snippet } from 'svelte';
+	import type { Block, Run, Source } from '#lib/engine/types.ts';
 	import FragmentMarker from '../atoms/FragmentMarker.svelte';
 	import ProseLink from '../atoms/ProseLink.svelte';
-	import type { EffectsLevel, RoomBrief, TranscriptEntry } from '../types.ts';
+	import type { EffectsLevel, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
 
 	interface Props {
 		entries: TranscriptEntry[];
@@ -19,6 +20,16 @@
 		onfocus?: (index: number | null) => void;
 		/** Where the player is and what is in reach, for the room brief under the newest turn. */
 		brief?: RoomBrief | null;
+		/** Write mode: the id of the entry whose text the author can edit, or null. */
+		writable?: number | null;
+		/** The fragment that the writer edits now, or null. */
+		writing?: WritingAt | null;
+		/** The writer, shown in place of the fragment that it edits. */
+		writer?: Snippet;
+		/** Open the writer for a fragment. */
+		onwrite?: (source: Source) => void;
+		/** Open the writer for a new room fragment. */
+		onadd?: () => void;
 	}
 
 	let {
@@ -31,8 +42,36 @@
 		onthing,
 		onexit,
 		onfocus,
-		brief = null
+		brief = null,
+		writable = null,
+		writing = null,
+		writer,
+		onwrite,
+		onadd
 	}: Props = $props();
+
+	const same = (a: Source | undefined, w: WritingAt | null) => !!a && !!w && a.owner === w.owner && a.fragment === w.fragment;
+	const editable = (kind: string) => kind === 'prose' || kind === 'objects';
+
+	/** The runs of a block in groups: one group for each fragment, and one for each run without a source. */
+	function groups(runs: Run[]): { source?: Source; runs: Run[] }[] {
+		const out: { source?: Source; runs: Run[] }[] = [];
+		for (const run of runs) {
+			const last = out.at(-1);
+			if (run.source && last?.source && last.source.owner === run.source.owner && last.source.fragment === run.source.fragment)
+				last.runs.push(run);
+			else out.push({ source: run.source, runs: [run] });
+		}
+		return out;
+	}
+
+	/** The block after which the writer shows: the block with the fragment, else the last block of room text. */
+	function writerAfter(blocks: Block[]): number {
+		const at = blocks.findIndex((b) => b.runs.some((r) => same(r.source, writing)));
+		if (at >= 0) return at;
+		const prose = blocks.findLastIndex((b) => b.kind === 'prose');
+		return prose >= 0 ? prose : blocks.findIndex((b) => b.kind === 'title');
+	}
 
 	/** Show the brief only when the newest turn did not print the room and the game goes on. */
 	const showBrief = $derived.by(() => {
@@ -120,23 +159,47 @@
 				>{#each pieces(run.text) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</span
 			>{/if}{/each}{/snippet}
 
+<!--
+	In write mode, each fragment of the room text is a button that opens the writer.
+	Links are plain text there: a click edits, it does not play.
+-->
+{#snippet writableRuns(block: Block)}{#each groups(block.runs) as g, gi (gi)}{#if same(g.source, writing)}<span class="being-written"
+				>{#each g.runs as run, i (i)}{run.text}{/each}</span
+			>{:else if g.source}{@const src = g.source}<button
+				type="button"
+				class="writable"
+				onclick={() => onwrite?.(src)}
+				><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#each pieces(run.text) as p, j (j)}{#if p.em}<em
+								>{p.text}</em
+							>{:else}{p.text}{/if}{/each}{/each}</button
+			>{:else}{#each g.runs as run, i (i)}{run.text}{/each}{/if}{/each}{/snippet}
+
 <!-- The log scrolls, so it must be focusable: keyboard users scroll it with the arrow keys. -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="scroller" bind:this={scroller} role="region" aria-label="Story" tabindex="0">
 	<div class="transcript" role="log" aria-label="Story transcript">
 		{#each entries as entry (entry.id)}
 			{@const fresh = entry.id === latest}
-			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh}>
+			{@const writeHere = entry.id === writable}
+			{@const writerAt = writeHere && writing ? writerAfter(entry.turn.blocks) : -1}
+			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere}>
 				{#each entry.turn.blocks as block, bi (bi)}
 					<p
 						class="block {block.kind}"
-						class:fx-line={fresh && entry.id > 0}
+						class:fx-line={fresh && entry.id > 0 && !writeHere}
 						style:animation-delay={fresh ? `${revealDelay(bi)}ms` : undefined}
 					>{#if block.kind === 'command'}<span aria-hidden="true">&gt;&nbsp;</span><span class="visually-hidden"
 							>You typed:</span
 						>{:else if block.kind === 'author'}<span class="badge">author</span><span class="visually-hidden">:</span
-						>{:else if block.kind === 'note'}<span class="visually-hidden">Parser note:</span>{/if}{@render runs(block)}</p>
+						>{:else if block.kind === 'note'}<span class="visually-hidden">Parser note:</span>{/if}{#if writeHere && editable(block.kind)}{@render writableRuns(
+								block
+							)}{:else}{@render runs(block)}{/if}</p>
+					{#if bi === writerAt}{@render writer?.()}{/if}
 				{/each}
+				{#if writeHere && !writing && onadd}
+					<p class="add"><button type="button" class="add-button" onclick={onadd}>+ Add room text</button></p>
+				{/if}
+				{#if entry.rewritten}<p class="rewritten">Written again after an edit of the story.</p>{/if}
 			</div>
 		{/each}
 	</div>
@@ -241,6 +304,61 @@
 		vertical-align: middle;
 		text-shadow: none;
 		user-select: none;
+	}
+	/* Write mode: each fragment is a button that looks like text, with an outline on hover and focus. */
+	.writable {
+		display: inline;
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: inherit;
+		text-shadow: inherit;
+		cursor: text;
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
+		border-bottom: var(--size-border) dashed var(--color-border-control);
+	}
+	.writable:hover {
+		background: var(--color-accent-tint);
+		border-bottom-color: var(--color-accent);
+	}
+	.writable:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 1px;
+	}
+	.being-written {
+		color: var(--color-text-muted);
+		text-decoration: line-through;
+		text-decoration-color: var(--color-border-control);
+	}
+	.add {
+		margin: var(--space-3) 0 0;
+	}
+	.add-button {
+		min-height: var(--size-target-compact);
+		padding: 0 var(--space-4);
+		border: var(--size-border) dashed var(--color-border-control);
+		background: none;
+		color: var(--color-text-muted);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+	}
+	.add-button:hover {
+		border-color: var(--color-accent);
+		color: var(--color-text-accent);
+	}
+	.add-button:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
+	}
+	.rewritten {
+		margin: var(--space-2) 0 0;
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
 	}
 	.brief {
 		max-width: var(--measure-prose);

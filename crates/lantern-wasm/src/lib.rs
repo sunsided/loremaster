@@ -14,6 +14,23 @@ fn to_js<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// A byte offset as a UTF-16 offset, for JavaScript strings.
+fn utf16(text: &str, byte: usize) -> usize {
+    text.get(..byte.min(text.len()))
+        .map_or(0, |s| s.encode_utf16().count())
+}
+
+fn utf16_error(
+    text: &str,
+    mut check: lantern_runtime::MarkupCheck,
+) -> lantern_runtime::MarkupCheck {
+    if let Some(e) = &mut check.error {
+        e.start = utf16(text, e.start);
+        e.end = utf16(text, e.end);
+    }
+    check
+}
+
 fn from_js<T: serde::de::DeserializeOwned>(value: JsValue) -> Result<T, JsValue> {
     serde_wasm_bindgen::from_value(value).map_err(|e| JsValue::from_str(&e.to_string()))
 }
@@ -198,6 +215,38 @@ impl Engine {
     #[wasm_bindgen(js_name = carryOver)]
     pub fn carry_over(&mut self, from: &Engine) {
         self.game = from.game.carry_over(self.world.clone());
+    }
+
+    /// Highlighted spans of fragment text (or of a condition), in UTF-16 offsets.
+    pub fn tokens(&self, text: &str, condition: bool) -> Result<JsValue, JsValue> {
+        let tokens = if condition {
+            lantern_lang::condition_tokens(text)
+        } else {
+            lantern_lang::markup_tokens(text)
+        };
+        let out: Vec<_> = tokens
+            .into_iter()
+            .map(|t| {
+                serde_json::json!({
+                    "from": utf16(text, t.span.start),
+                    "to": utf16(text, t.span.end),
+                    "kind": t.kind,
+                })
+            })
+            .collect();
+        to_js(&out)
+    }
+
+    /// Check fragment text and render it in the current state. Error offsets are UTF-16.
+    #[wasm_bindgen(js_name = tryMarkup)]
+    pub fn try_markup(&self, text: &str) -> Result<JsValue, JsValue> {
+        to_js(&utf16_error(text, self.game.try_markup(text)))
+    }
+
+    /// Check a condition and tell whether it holds now. Error offsets are UTF-16.
+    #[wasm_bindgen(js_name = tryCondition)]
+    pub fn try_condition(&self, text: &str) -> Result<JsValue, JsValue> {
+        to_js(&utf16_error(text, self.game.try_condition(text)))
     }
 
     /// The room description as it would show now, without changing the game.

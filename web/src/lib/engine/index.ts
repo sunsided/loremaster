@@ -4,6 +4,7 @@ import type {
 	Exploration,
 	RoomMatrix,
 	FrameUse,
+	MarkupCheck,
 	Inspect,
 	PhaseView,
 	VarView,
@@ -146,6 +147,21 @@ export class Game {
 	/** Continue the game of an earlier version of the story in this one. Values still at their start value take the new start value. */
 	carryOver(from: Game): void {
 		this.#engine.carryOver(from.#engine);
+	}
+
+	/** Highlighted spans of fragment text, or of a condition. Offsets are UTF-16, as in JavaScript strings. */
+	tokens(text: string, condition: boolean): { from: number; to: number; kind: string }[] {
+		return this.#engine.tokens(text, condition);
+	}
+
+	/** Check fragment text and render it in the current state. */
+	tryMarkup(text: string): MarkupCheck {
+		return this.#engine.tryMarkup(text);
+	}
+
+	/** Check a condition and tell whether it holds now. */
+	tryCondition(text: string): MarkupCheck {
+		return this.#engine.tryCondition(text);
 	}
 
 	/** The save state, as JSON-compatible data. */

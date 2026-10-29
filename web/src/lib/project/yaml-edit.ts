@@ -131,8 +131,20 @@ export function writeWhen(text: string, list: YamlPath, index: number, when: str
 	return serialize(doc);
 }
 
-/** Write all fields of a fragment. Fields with the default value are left out. */
+/**
+ * Write all fields of a fragment. When only the texts or the condition changed, only those values change in
+ * the file, so the quoting and the key order stay. Else the fragment is written again, without default fields.
+ */
 export function writeFragment(text: string, list: YamlPath, index: number, data: FragmentData): string {
+	const old = readFragment(text, list, index);
+	if (old.layer === data.layer && old.mode === data.mode && old.replaces === data.replaces && old.variants.length === data.variants.length) {
+		let out = text;
+		data.variants.forEach((v, i) => {
+			if (v !== old.variants[i]) out = writeVariant(out, list, index, i, v);
+		});
+		if ((data.when ?? '') !== (old.when ?? '')) out = writeWhen(out, list, index, data.when);
+		return out;
+	}
 	const doc = parse(text);
 	const seq = doc.getIn(list, true);
 	if (!isSeq(seq)) throw new EditError(`No list at ${list.join('.')}.`);

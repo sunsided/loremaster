@@ -2,6 +2,10 @@
 	import { onMount } from 'svelte';
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { canLinkFolder } from '#lib/project/store.ts';
+	import { emptyFragment, insertFragment, removeFragment, writeFragment } from '#lib/project/yaml-edit.ts';
+	import FragmentWriter from '#lib/design/organisms/FragmentWriter.svelte';
+	import type { Source } from '#lib/engine/types.ts';
+	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
 	import { settings } from '#lib/settings.svelte.ts';
 	import Button from '#lib/design/atoms/Button.svelte';
@@ -248,6 +252,87 @@
 			event.preventDefault();
 			if (!showSettings) showPalette = !showPalette;
 		}
+		// W toggles write mode, but not while the author types somewhere.
+		const t = event.target as HTMLElement | null;
+		const typing = !!t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
+		if (event.key.toLowerCase() === 'w' && !event.ctrlKey && !event.metaKey && !event.altKey && !typing && !showPalette && !showSettings) {
+			event.preventDefault();
+			toggleWriting();
+		}
+	}
+
+	// Write mode: the room text of the newest turn that shows a room is editable in place.
+	let writing = $state(false);
+	let writingAt = $state<WritingAt | null>(null);
+	let writingVariant = $state(0);
+
+	function toggleWriting() {
+		writing = !writing;
+		writingAt = null;
+	}
+
+	/** The entry with the room text that the author can edit: the newest turn that showed a room. */
+	const writableEntry = $derived.by(() => {
+		if (!writing || !session) return null;
+		return session.entries.findLast((e) => e.turn.blocks.some((b) => b.kind === 'title'))?.id ?? null;
+	});
+
+	const writerTools = $derived.by<WriterTools | null>(() => {
+		const s = session;
+		if (!s) return null;
+		const game = s.game;
+		const problem = (e: { start: number; end: number; message: string } | null) =>
+			e ? { from: e.start, to: e.end, message: e.message } : null;
+		return {
+			tokenize: (text, condition) => game.tokens(text, condition) as ReturnType<WriterTools['tokenize']>,
+			tryMarkup: (text) => {
+				const c = game.tryMarkup(text);
+				return { problem: problem(c.error), text: c.text, pieces: c.pieces };
+			},
+			tryCondition: (text) => {
+				const c = game.tryCondition(text);
+				return { problem: problem(c.error), holds: c.holds };
+			}
+		};
+	});
+
+	function startWriting(source: Source) {
+		writingAt = { owner: source.owner, fragment: source.fragment };
+		writingVariant = source.variant;
+	}
+
+	/** The fragment under edit, from the file; a new empty one for index -1. */
+	const writerFragment = $derived.by<WriterFragment | null>(() => {
+		const at = writingAt;
+		const p = workspace?.project;
+		if (!at || !p) return null;
+		if (at.fragment < 0) return emptyFragment();
+		return p.fragment(at.owner, at.fragment);
+	});
+
+	function writerTitle(at: WritingAt): string {
+		const [entity, part] = at.owner.split('/');
+		const [kind, id] = entity.split(':');
+		const what = part === 'presence' ? `Presence text of ${id}` : kind === 'room' ? `Room text of ${session?.scene.room_name ?? id}` : `Text of ${entity}`;
+		return at.fragment < 0 ? `${what}: new fragment` : `${what}, fragment ${at.fragment + 1}`;
+	}
+
+	/** Write a change to the file of the fragment. Returns a problem text when the story does not build with it. */
+	async function saveFragment(at: WritingAt, change: (text: string, list: (string | number)[]) => string): Promise<string | null> {
+		const ws = workspace;
+		const where = ws?.project.listOf(at.owner);
+		const file = where && ws?.project.file(where.file);
+		if (!ws || !where || !file) return 'The editor does not know the file of this text.';
+		let text: string;
+		try {
+			text = change(file.text, where.list);
+		} catch (e) {
+			return String(e instanceof Error ? e.message : e);
+		}
+		const problems = await ws.change(where.file, text);
+		if (problems?.length) return problems.map((p) => p.message).join(' ');
+		writingAt = null;
+		return null;
 	}
 	let hidden = $state(false);
 
@@ -330,6 +415,8 @@
 				settingsOpen={showSettings}
 				onsettings={() => (showSettings = true)}
 				onpalette={() => (showPalette = true)}
+				{writing}
+				onwrite={toggleWriting}
 			/>
 		{/snippet}
 		{#snippet effects()}
@@ -353,7 +440,32 @@
 				onexit={(dir) => s.pickExit(dir)}
 				onfocus={(i) => (s.focus = i)}
 				brief={{ room: s.scene.room_name, things: s.scene.things, exits: s.scene.exits }}
-			/>
+				writable={writableEntry}
+				writing={writingAt}
+				onwrite={startWriting}
+				onadd={() => (writingAt = { owner: `room:${s.scene.room}`, fragment: -1 })}
+			>
+				{#snippet writer()}
+					{#if writingAt && writerFragment && writerTools}
+						{@const at = writingAt}
+						{#key `${at.owner}#${at.fragment}`}
+							<FragmentWriter
+								fragment={writerFragment}
+								variant={writingVariant}
+								title={writerTitle(at)}
+								tools={writerTools}
+								fresh={at.fragment < 0}
+								onsave={(f) =>
+									saveFragment(at, (text, list) =>
+										at.fragment < 0 ? insertFragment(text, list, Number.MAX_SAFE_INTEGER, f) : writeFragment(text, list, at.fragment, f)
+									)}
+								oncancel={() => (writingAt = null)}
+								onremove={() => saveFragment(at, (text, list) => removeFragment(text, list, at.fragment))}
+							/>
+						{/key}
+					{/if}
+				{/snippet}
+			</Transcript>
 			{#if !s.scene.ended}
 				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={(text) => s.input(text)} />
 				<VerbBar
@@ -418,6 +530,12 @@
 						time={s.scene.time}
 						phase={s.scene.phase}
 						onfocus={(i) => (s.focus = i)}
+						onedit={writing
+							? (index) => {
+									writingAt = { owner: `room:${s.scene.room}`, fragment: index };
+									writingVariant = 0;
+								}
+							: undefined}
 					/>
 				{/if}
 			</InspectorPanel>

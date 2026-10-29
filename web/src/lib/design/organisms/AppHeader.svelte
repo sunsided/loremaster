@@ -15,9 +15,13 @@
 		onsettings: () => void;
 		/** Opens the command palette. When set, the header shows a button for it. */
 		onpalette?: () => void;
+		/** True in write mode. */
+		writing?: boolean;
+		/** Turns write mode on or off. When set, the header shows a "Write" toggle. */
+		onwrite?: () => void;
 	}
 
-	let { title, views = [], current = '', now = [], settingsOpen = false, onview, onsettings, onpalette }: Props = $props();
+	let { title, views = [], current = '', now = [], settingsOpen = false, onview, onsettings, onpalette, writing = false, onwrite }: Props = $props();
 </script>
 
 <header class="app-header">
@@ -44,6 +48,11 @@
 		{#if now.length}
 			<span class="now-label">now</span>
 			{#each now as fact, i (i)}<Tag>{fact}</Tag>{/each}
+		{/if}
+		{#if onwrite}
+			<Button size="compact" variant={writing ? 'primary' : 'secondary'} pressed={writing} aria-keyshortcuts="W" onclick={onwrite}
+				>Write <kbd>W</kbd></Button
+			>
 		{/if}
 		{#if onpalette}
 			<Button size="compact" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K" onclick={onpalette}

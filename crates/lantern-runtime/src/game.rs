@@ -1,6 +1,6 @@
 use crate::eval::{Eval, to_fact_value};
 use crate::parser::{ParseScope, parse};
-use crate::text::{self, article};
+use crate::text::{self, SourcePiece, article};
 use crate::world::{CEffect, CFragment};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
 use dramaturge_model::{Fact, FactId, FactScope};
@@ -176,6 +176,39 @@ pub enum AuthorCommand {
         room: String,
         values: Vec<(String, String)>,
     },
+}
+
+/// The result of a check of text that the author is typing.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MarkupCheck {
+    /// The first error, with its byte range in the text.
+    pub error: Option<TextError>,
+    /// The rendered text in the current state. Empty for a condition.
+    pub text: String,
+    /// The source in pieces, with branches that do not hold now marked as not active.
+    pub pieces: Vec<SourcePiece>,
+    /// For a condition: whether it holds now.
+    pub holds: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextError {
+    pub start: usize,
+    pub end: usize,
+    pub message: String,
+}
+
+impl MarkupCheck {
+    fn failed(e: lantern_lang::LangError) -> Self {
+        Self {
+            error: Some(TextError {
+                start: e.span.start,
+                end: e.span.end,
+                message: e.message,
+            }),
+            ..Self::default()
+        }
+    }
 }
 
 /// A variable or thing property with its value now, for the command palette.
@@ -387,6 +420,38 @@ impl Game {
     /// Direct access to the state, for tools that build a state. Use `set_value` for facts.
     pub(crate) fn state_mut(&mut self) -> &mut State {
         &mut self.state
+    }
+
+    /// Check fragment text that the author is typing, and render it in the current state.
+    pub fn try_markup(&self, src: &str) -> MarkupCheck {
+        match lantern_lang::compile_markup(src, &self.world.scope) {
+            Ok(segments) => {
+                let ev = self.eval();
+                let mut pieces = Vec::new();
+                text::outline(&ev, &segments, true, &mut pieces);
+                MarkupCheck {
+                    error: None,
+                    text: text::render(&ev, &segments),
+                    pieces,
+                    holds: None,
+                }
+            }
+            Err(e) => MarkupCheck::failed(e),
+        }
+    }
+
+    /// Check a condition that the author is typing, and tell whether it holds now.
+    pub fn try_condition(&self, src: &str) -> MarkupCheck {
+        if src.trim().is_empty() {
+            return MarkupCheck::default();
+        }
+        match lantern_lang::compile_condition(src, &self.world.scope) {
+            Ok(c) => MarkupCheck {
+                holds: Some(self.eval().holds(&c)),
+                ..MarkupCheck::default()
+            },
+            Err(e) => MarkupCheck::failed(e),
+        }
     }
 
     /// The room description as it would show now, without changing the game.

@@ -296,3 +296,13 @@ export interface Exploration {
 	stuck: number;
 	stuck_path: string[];
 }
+
+/** The check of text that the author types. Offsets are UTF-16. */
+export interface MarkupCheck {
+	error: { start: number; end: number; message: string } | null;
+	/** The rendered text in the current state. Empty for a condition. */
+	text: string;
+	pieces: SourcePiece[];
+	/** For a condition: whether it holds now. */
+	holds: boolean | null;
+}

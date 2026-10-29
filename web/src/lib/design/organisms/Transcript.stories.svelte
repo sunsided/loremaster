@@ -4,6 +4,8 @@
 	import { fn } from 'storybook/test';
 	import { authorTurn, doorTurn, drawerTurn, endTurn, entries, exits, openingTurn, things } from '../fixtures.ts';
 	import Transcript from './Transcript.svelte';
+	import FragmentWriter from './FragmentWriter.svelte';
+	import { shoreFragment, writerTools } from '../fixtures.ts';
 
 	const { Story } = defineMeta({
 		title: 'Organisms/Transcript',
@@ -45,7 +47,9 @@ Two kinds of text are not story prose, and they look different:
 
 New text can show with a line reveal and a glitch. The glitch shows not more than one time in 2 s. With \`reduceMotion\` or with effects off, new text shows immediately.
 
-The transcript scrolls to the newest text. Put it in a container with a fixed height.`
+The transcript scrolls to the newest text. Put it in a container with a fixed height.
+
+**Write mode.** When \`writable\` is the id of an entry, each fragment of its room text is a button that opens the writer (\`onwrite\` with the source of the fragment). Links in that text are plain text: a click edits, it does not play. "+ Add room text" (\`onadd\`) adds a fragment. While the author edits a fragment (\`writing\`), its text is struck through and the \`writer\` snippet shows after its paragraph. A turn whose room text an edit wrote again has the note "Written again after an edit of the story."`
 				}
 			}
 		}
@@ -67,4 +71,16 @@ The transcript scrolls to the newest text. Put it in a container with a fixed he
 	args={{ entries: [{ id: 0, turn: openingTurn }, { id: 1, turn: drawerTurn }], room: 'cottage', brief: { room: "Keeper's Cottage", things, exits: [exits[0]] } }}
 	{template}
 />
+<Story name="Write mode" args={{ entries: [{ id: 0, turn: openingTurn }], writable: 0, onwrite: fn(), onadd: fn() }} {template} />
+<Story name="Write mode, editing" args={{ entries: [{ id: 0, turn: openingTurn, rewritten: true }], writable: 0, writing: { owner: 'room:shore', fragment: 0 } }}>
+	{#snippet template(args)}
+		<div style="height: 620px; display: flex; flex-direction: column">
+			<Transcript {...args}>
+				{#snippet writer()}
+					<FragmentWriter fragment={shoreFragment} title="Room text of The Shore, fragment 1" tools={writerTools} onsave={async () => null} oncancel={() => {}} />
+				{/snippet}
+			</Transcript>
+		</div>
+	{/snippet}
+</Story>
 <Story name="Ending" args={{ entries: [{ id: 0, turn: openingTurn }, { id: 1, turn: endTurn }] }} {template} />

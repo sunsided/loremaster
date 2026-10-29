@@ -261,11 +261,13 @@ name = "lantern-wasm"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "lantern-lang",
  "lantern-model",
  "lantern-project",
  "lantern-runtime",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "wasm-bindgen",
 ]
 

@@ -19,6 +19,8 @@ pub struct World {
     pub(crate) frames: BTreeMap<Id, CFrame>,
     room_index: BTreeMap<Id, usize>,
     thing_index: BTreeMap<Id, usize>,
+    /// The names that conditions and markup can use, for checks in the editor.
+    pub(crate) scope: Scope,
 }
 
 #[derive(Debug, Clone)]
@@ -252,6 +254,7 @@ impl World {
             })
             .collect::<Result<_, CompileError>>()?;
         let frames = c.frames("story", &story.frames)?;
+        let scope = c.scope.clone();
         let mut verbs = standard_verbs();
         verbs.extend(story.verbs.iter().cloned());
         let room_index = story
@@ -267,6 +270,7 @@ impl World {
             .map(|(i, t)| (t.id.clone(), i))
             .collect();
         Ok(Self {
+            scope,
             story,
             verbs,
             intro,

@@ -2,7 +2,7 @@
 // same as the runtime output.
 
 import type { Exploration, ExitInfo, RoomMatrix, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
-import type { StoryStep, TranscriptEntry } from './types.ts';
+import type { MarkupToken, StoryStep, TranscriptEntry, WriterFragment, WriterTools } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
 	text,
@@ -369,3 +369,60 @@ export const cantinaMatrix: RoomMatrix = {
 
 /** The full texts that the whole-game run saw in the cantina. */
 export const cantinaSeen: string[] = cantinaMatrix.cells.filter((c) => !c.warnings.length).map((c) => c.text);
+
+// A small tokenizer and checker in JavaScript, for stories. The app uses the runtime in WebAssembly.
+function fakeTokens(text: string, condition: boolean): MarkupToken[] {
+	const out: MarkupToken[] = [];
+	const names = (from: number, src: string) => {
+		for (const m of src.matchAll(/[A-Za-z_][\w.]*|==|!=|>=|<=|\d+/g)) {
+			const kind = /^\d/.test(m[0]) ? 'literal' : /^[=!<>]/.test(m[0]) || ['and', 'or', 'not'].includes(m[0]) ? 'operator' : 'name';
+			out.push({ from: from + m.index, to: from + m.index + m[0].length, kind });
+		}
+	};
+	if (condition) {
+		names(0, text);
+		return out;
+	}
+	for (const m of text.matchAll(/\{([^{}]*)\}?/g)) {
+		const start = m.index;
+		out.push({ from: start, to: start + 1, kind: 'brace' });
+		const inner = m[1];
+		const sep = inner.search(/[:?]/);
+		names(start + 1, sep < 0 ? inner : inner.slice(0, sep));
+		if (sep >= 0) out.push({ from: start + 1 + sep, to: start + 2 + sep, kind: 'separator' });
+		const bar = inner.indexOf('|');
+		if (bar >= 0) out.push({ from: start + 1 + bar, to: start + 2 + bar, kind: 'separator' });
+		if (m[0].endsWith('}')) out.push({ from: start + m[0].length - 1, to: start + m[0].length, kind: 'brace' });
+	}
+	for (const m of text.matchAll(/\*[^*]+\*/g)) out.push({ from: m.index, to: m.index + m[0].length, kind: 'emphasis' });
+	return out.sort((a, b) => a.from - b.from);
+}
+
+export const writerTools: WriterTools = {
+	tokenize: fakeTokens,
+	tryMarkup: (text) => {
+		const open = text.lastIndexOf('{');
+		if (open > text.lastIndexOf('}')) return { problem: { from: open, to: text.length, message: '`{` is never closed' }, text: '', pieces: [] };
+		const rendered = text.replace(/\{night:\s*([^|}]*)\|\s*([^}]*)\}/g, '$2').replace(/\{first:([^}]*)\}/g, '$1').replace(/\{([^}]*)\}/g, '$1');
+		return { problem: null, text: rendered, pieces: [{ role: 'text', text: rendered, active: true }] };
+	},
+	tryCondition: (text) => (text.trim() ? { problem: null, holds: !text.includes('night') } : { problem: null, holds: null })
+};
+
+export const shoreFragment: WriterFragment = {
+	variants: [
+		'Shingle crunches underfoot. To the north a whitewashed cottage huddles against the wind{first: , its windows dark}. East, the lighthouse rises {night: black against the stars | pale against the {time.phase} sky}.'
+	],
+	when: null,
+	mode: 'always',
+	layer: 'base',
+	replaces: false
+};
+
+export const waveFragment: WriterFragment = {
+	variants: ['Waves hiss on the stones.', 'Somewhere out at sea a bell buoy clangs.'],
+	when: 'time.phase == night',
+	mode: 'shuffle',
+	layer: 'ambient',
+	replaces: false
+};

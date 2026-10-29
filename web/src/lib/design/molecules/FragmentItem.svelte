@@ -18,9 +18,11 @@
 		/** True when the fragment is highlighted. */
 		active?: boolean;
 		onactivate?: (on: boolean) => void;
+		/** Open the writer for this fragment. When set, the item has an "Edit" button. */
+		onedit?: () => void;
 	}
 
-	let { number, text, variants, meta, shown, why, active = false, onactivate }: Props = $props();
+	let { number, text, variants, meta, shown, why, active = false, onactivate, onedit }: Props = $props();
 </script>
 
 <!--
@@ -51,6 +53,7 @@
 		<span class="meta"
 			>{meta}{#if !shown && why}{' · '}<span class="why">{why}</span>{/if}</span
 		>
+		{#if onedit}<button type="button" class="edit" onclick={onedit}>Edit<span class="visually-hidden"> fragment {number}</span></button>{/if}
 	</div>
 </li>
 
@@ -68,6 +71,23 @@
 	}
 	.active {
 		border-color: var(--color-warning);
+	}
+	.edit {
+		min-height: var(--size-target-compact);
+		margin-top: var(--space-2);
+		padding: 0 var(--space-4);
+		border: var(--size-border) solid var(--color-border-control);
+		background: none;
+		color: var(--color-text-accent);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+	}
+	.edit:hover {
+		border-color: var(--color-accent);
+	}
+	.edit:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
 	}
 	.or {
 		color: var(--color-text-muted);
