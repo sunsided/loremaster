@@ -16,6 +16,8 @@ The app works at all widths from 320px up to 32:9 ultrawide screens. The design 
 6. From 2200px with an aspect ratio of 21:9 or more (`--bp-ultrawide`), the map shows on the left of the player. Use both conditions, so a wide 16:9 screen does not get the map.
 7. Wider than `--width-content-max`, the content stays at that width, in the center. The outer colour fills the sides.
 8. The type size of story text changes with the viewport width (`--font-size-prose`).
+9. On wide screens only the regions scroll, not the page. Give each scroll region `position: relative`. If you do not, screen-reader text with `position: absolute` goes outside the region and makes the page scroll.
+10. Give a grid that fills the height a row of `minmax(0, 1fr)`. If you do not, the row grows with its content.
 
 ## Layout steps
 

@@ -137,6 +137,7 @@
 	}
 	/* Standalone use, for example the map column on ultrawide screens. */
 	.map-panel.framed {
+		position: relative; /* Keeps screen-reader text inside the scroll area. */
 		box-sizing: border-box;
 		min-height: 0;
 		padding: var(--space-7);

@@ -112,6 +112,7 @@
 
 <style>
 	.scroller {
+		position: relative; /* Keeps screen-reader text inside the scroll area. */
 		flex: 1 1 auto;
 		min-height: 0;
 		overflow-y: auto;

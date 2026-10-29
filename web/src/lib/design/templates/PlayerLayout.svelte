@@ -75,6 +75,9 @@
 	.body {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(320px, var(--width-panel));
+		/* One row, as high as the space under the header. Without this the row grows with the
+		   tallest panel and the whole page scrolls. */
+		grid-template-rows: minmax(0, 1fr);
 		flex: 1 1 auto;
 		min-height: 0;
 	}

@@ -42,6 +42,9 @@
 		padding: var(--space-4) var(--space-7) 0;
 	}
 	.panel {
+		/* Contains absolutely positioned screen-reader text, so it scrolls with the panel and does not
+		   make the page taller. */
+		position: relative;
 		flex: 1 1 auto;
 		min-height: 0;
 		overflow-y: auto;
