@@ -1,0 +1,13 @@
+name: Lighthouse Stairwell
+tags: [dark]
+position: [1, 0]
+description:
+  - "Iron stairs spiral up the inside of the tower, cold to the touch and gritty with sand. Every footstep rings."
+  - layer: ambient
+    mode: cycle
+    variants:
+      - "Far above, something creaks."
+      - "The tower hums faintly in the wind."
+exits:
+  - { direction: west, to: shore, door: lighthouse_door }
+  - { direction: up, to: lantern_room, traversal: "You climb, and climb, and climb. Ninety-one steps; you count them." }

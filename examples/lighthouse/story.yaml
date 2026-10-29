@@ -1,0 +1,21 @@
+title: The Lighthouse
+author: lantern example
+start: shore
+seed: 7
+
+intro:
+  - "The ferry left you on the shingle an hour ago. Old Hal has not lit the lighthouse in three nights, and the *Marigold* is due in after dark."
+
+clock:
+  start: "20:30"
+  minutes_per_turn: 5
+  phases:
+    - { name: night, from: "00:00" }
+    - { name: dawn, from: "05:00" }
+    - { name: day, from: "07:00" }
+    - { name: dusk, from: "19:00" }
+    - { name: night, from: "21:00" }
+
+vars:
+  - { id: beacon_lit, type: bool, initial: false }
+  - { id: drawer_searched, type: bool, initial: false }

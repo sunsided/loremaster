@@ -1,0 +1,9 @@
+name: Lantern Room
+position: [1, -1]
+description:
+  - "A glass room at the top of the world. The great lens sits in its brass cradle, a beehive of prisms {beacon_lit ? throwing light in every direction | dull and cold}."
+  - layer: ambient
+    when: night
+    text: "Beyond the glass there is only dark water, and the one small light of the *Marigold*."
+exits:
+  - { direction: down, to: stairwell }

@@ -1,0 +1,21 @@
+# Rust build artifacts
+/target/
+
+# Generated WASM package
+/web/src/lib/engine/pkg/
+
+# Web
+node_modules/
+/web/.svelte-kit/
+/web/build/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

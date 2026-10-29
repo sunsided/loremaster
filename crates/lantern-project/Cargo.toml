@@ -1,0 +1,21 @@
+[package]
+name = "lantern-project"
+description = "On-disk project format for lantern stories and the compiler to a story bundle."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+lantern-lang.workspace = true
+lantern-model.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+assert2.workspace = true
+
+[lints]
+workspace = true

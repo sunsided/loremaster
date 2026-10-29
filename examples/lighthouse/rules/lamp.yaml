@@ -1,0 +1,13 @@
+- id: lamp_needs_matches
+  on: { verb: [turn_on, oil_lamp] }
+  when: not matches.carried
+  instead: true
+  then:
+    - say: "You have nothing to light it with."
+
+- id: no_flame_for_lens
+  on: { verb: [turn_on, lens] }
+  when: not (oil_lamp.carried and oil_lamp.lit)
+  instead: true
+  then:
+    - say: "You need a flame to light the wick."

@@ -1,0 +1,7 @@
+- id: find_iron_key
+  on: { verb: [open, drawer] }
+  when: not drawer_searched
+  then:
+    - set: { drawer_searched: true }
+    - move: { iron_key: cottage }
+    - say: "Under a fold of oilcloth lies an iron key."

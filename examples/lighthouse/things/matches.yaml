@@ -1,0 +1,8 @@
+name: box of matches
+aliases: [matches, box]
+location: { room: cottage }
+portable: true
+description:
+  - "Swan Vestas. Six left."
+presence:
+  - "A box of matches lies on the table."

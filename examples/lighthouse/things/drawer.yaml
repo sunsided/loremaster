@@ -1,0 +1,7 @@
+name: drawer
+aliases: [dresser]
+location: { room: cottage }
+listed: false
+props: { open: false }
+description:
+  - "A deep drawer in an old pine dresser. It is {drawer.open ? open | closed}."

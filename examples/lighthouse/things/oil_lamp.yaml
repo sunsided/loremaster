@@ -1,0 +1,9 @@
+name: oil lamp
+aliases: [lamp, lantern]
+location: { room: cottage }
+portable: true
+props: { lit: false }
+description:
+  - "A storm lantern with a cracked chimney, half full of oil. It is {oil_lamp.lit ? burning steadily | unlit}."
+presence:
+  - "An oil lamp sits on the table{oil_lamp.lit ?, burning | }."

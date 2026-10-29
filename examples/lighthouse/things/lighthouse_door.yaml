@@ -1,0 +1,8 @@
+name: lighthouse door
+aliases: [door, iron door]
+location: { room: shore }
+listed: false
+key: iron_key
+props: { open: false, locked: true }
+description:
+  - "Riveted iron, streaked with rust. {lighthouse_door.locked ? A heavy lock holds it fast. | It stands unlocked.}"

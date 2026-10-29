@@ -1,0 +1,39 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/lantern-cli",
+    "crates/lantern-lang",
+    "crates/lantern-model",
+    "crates/lantern-project",
+    "crates/lantern-runtime",
+    "crates/lantern-wasm",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "EUPL-1.2 OR MIT OR Apache-2.0"
+authors = ["Markus Mayer"]
+publish = false
+
+[workspace.dependencies]
+lantern-lang = { path = "crates/lantern-lang" }
+lantern-model = { path = "crates/lantern-model" }
+lantern-project = { path = "crates/lantern-project" }
+lantern-runtime = { path = "crates/lantern-runtime" }
+dramaturge-model = "0.1.0"
+dramaturge-runtime = "0.1.0"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+serde-saphyr = "2"
+thiserror = "2"
+assert2 = "0.4"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+[profile.release.package.lantern-wasm]
+opt-level = "s"

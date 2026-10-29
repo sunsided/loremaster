@@ -1,0 +1,12 @@
+name: Keeper's Cottage
+position: [0, -1]
+description:
+  - "One room, smelling of tar and pipe smoke. A narrow bed, a table with a single chair, and a dresser with a deep drawer{drawer.open ?, hanging open | }."
+  - layer: ambient
+    when: night
+    text: "Through the salt-crusted window the sea has gone black."
+  - when: first_visit
+    mode: once
+    text: "Hal's oilskin still hangs by the door. Wherever he went, he went without it."
+exits:
+  - { direction: south, to: shore, door: cottage_door }

@@ -1,0 +1,83 @@
+version: "3"
+
+vars:
+  CARGO: cargo
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list-all
+
+  fmt:
+    desc: Apply Rust formatting
+    cmds:
+      - "{{.CARGO}} fmt"
+
+  fmt:check:
+    desc: Check Rust formatting
+    cmds:
+      - "{{.CARGO}} fmt -- --check"
+
+  lint:
+    desc: Check clippy lints for all targets
+    cmds:
+      - "{{.CARGO}} clippy --all-targets -- -D warnings"
+
+  test:
+    desc: Run all Rust tests
+    cmds:
+      - "{{.CARGO}} test"
+
+  play:
+    desc: Play the lighthouse example in the terminal
+    aliases:
+      - example
+    cmds:
+      - "{{.CARGO}} run -q -p lantern-cli -- play examples/lighthouse"
+
+  check:story:
+    desc: Check the lighthouse example for problems
+    cmds:
+      - "{{.CARGO}} run -q -p lantern-cli -- check examples/lighthouse"
+
+  wasm:
+    desc: Build the WASM package into the web app
+    sources:
+      - crates/**/*.rs
+      - crates/**/Cargo.toml
+    generates:
+      - web/src/lib/engine/pkg/lantern_wasm_bg.wasm
+    cmds:
+      - wasm-pack build crates/lantern-wasm --target web --out-dir ../../web/src/lib/engine/pkg --out-name lantern_wasm --no-pack
+
+  web:install:
+    desc: Install web dependencies
+    dir: web
+    cmds:
+      - pnpm install
+
+  web:dev:
+    desc: Build WASM and start the web dev server
+    aliases:
+      - dev
+    deps:
+      - wasm
+    dir: web
+    cmds:
+      - pnpm dev
+
+  web:build:
+    desc: Build the static web app
+    deps:
+      - wasm
+    dir: web
+    cmds:
+      - pnpm build
+
+  verify:
+    desc: Formatting, clippy and tests
+    deps:
+      - fmt:check
+      - lint
+      - test

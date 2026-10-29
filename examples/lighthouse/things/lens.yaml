@@ -1,0 +1,7 @@
+name: great lens
+aliases: [lens, beacon, light]
+location: { room: lantern_room }
+listed: false
+props: { lit: false }
+description:
+  - "Hundreds of glass prisms, stacked like the rings of a hive. At its heart a wick sits in a reservoir of oil, waiting for a flame."

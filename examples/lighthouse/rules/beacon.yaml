@@ -1,0 +1,19 @@
+- id: light_the_beacon
+  on: { verb: [turn_on, lens] }
+  when: oil_lamp.carried and oil_lamp.lit
+  instead: true
+  then:
+    - set: { beacon_lit: true, lens.lit: true }
+    - say: "You touch the lamp's flame to the wick. It catches, steadies, and then the lens takes it and throws it out across the water, a great slow wheel of light."
+    - end: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, and comes home. | Hours early, the beam goes round and round in the {time.phase} light. By dark, the *Marigold* will see it.}"
+
+- id: dusk_falls
+  on: { time: "21:00" }
+  then:
+    - say: "The last of the light drains out of the sky."
+
+- id: first_climb
+  on: { enter: lantern_room }
+  once: true
+  then:
+    - say: "You are out of breath, and the wind leans on the glass."

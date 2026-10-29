@@ -1,0 +1,21 @@
+name: The Shore
+tags: [outdoors]
+position: [0, 0]
+description:
+  - "Shingle crunches underfoot. To the north a whitewashed cottage huddles against the wind{first: , its windows dark}. East, the lighthouse rises {night: black against the stars | pale against the {time.phase} sky}."
+  - layer: ambient
+    when: time.phase == dusk
+    text: "The sun is a red coal sinking into the sea."
+  - layer: ambient
+    when: time.phase == night
+    mode: shuffle
+    variants:
+      - "Waves hiss on the stones."
+      - "Somewhere out at sea a bell buoy clangs."
+      - "The wind drops, then gusts again, cold off the water."
+  - layer: event
+    when: night and not beacon_lit
+    text: "Far out, a single masthead light rocks on the swell. The *Marigold*, feeling her way in."
+exits:
+  - { direction: north, to: cottage, door: cottage_door }
+  - { direction: east, to: stairwell, door: lighthouse_door }

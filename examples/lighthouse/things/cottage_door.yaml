@@ -1,0 +1,7 @@
+name: cottage door
+aliases: [door, cottage door]
+location: { room: shore }
+listed: false
+props: { open: false }
+description:
+  - "Weathered planks, a latch worn smooth by years of thumbs. It is {cottage_door.open ? open | shut}."
