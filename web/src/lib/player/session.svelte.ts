@@ -55,9 +55,10 @@ export class Session {
 		this.#push(game.start());
 	}
 
+	/** The verb bar: Walk to and Look around first, then the verbs that take things. */
 	get barVerbs(): VerbInfo[] {
-		const walk = this.verbs.find((v) => v.id === 'go');
-		return [...(walk ? [walk] : []), ...this.verbs.filter((v) => v.bar)];
+		const first = ['go', 'look'].flatMap((id) => this.verbs.filter((v) => v.id === id));
+		return [...first, ...this.verbs.filter((v) => v.bar && !first.includes(v))];
 	}
 
 	#push(turn: Turn) {
@@ -115,6 +116,11 @@ export class Session {
 
 	/** A verb on the verb bar was clicked: write it into the prompt, or clear the prompt if it is there already. */
 	pickVerb(verb: VerbInfo) {
+		// A verb without things, such as "Look around", runs at once.
+		if (verb.slots === 'none') {
+			this.input(this.#phrase(verb));
+			return;
+		}
 		const onlyVerb = this.preview.verb === verb.id && this.preview.objects.length === 0;
 		this.draft = onlyVerb ? '' : `${this.#phrase(verb)} `;
 	}

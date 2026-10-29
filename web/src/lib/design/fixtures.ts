@@ -109,6 +109,7 @@ export const entries: TranscriptEntry[] = [
 
 export const verbs: VerbInfo[] = [
 	{ id: 'go', label: 'Walk to', slots: 'one', preposition: null, bar: false },
+	{ id: 'look', label: 'Look around', slots: 'none', preposition: null, bar: true },
 	{ id: 'examine', label: 'Look at', slots: 'one', preposition: null, bar: true },
 	{ id: 'take', label: 'Pick up', slots: 'one', preposition: null, bar: true },
 	{ id: 'use', label: 'Use', slots: 'two', preposition: 'on', bar: true },

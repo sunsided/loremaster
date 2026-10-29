@@ -120,11 +120,11 @@ pub fn standard_verbs() -> Vec<VerbDef> {
         ),
         verb(
             "look",
-            "Look",
+            "Look around",
             &["look", "l", "look around"],
             zero,
             None,
-            false,
+            true,
         ),
         verb(
             "inventory",

@@ -66,3 +66,10 @@ export interface PaletteItem {
 	keywords?: string;
 	run: () => void;
 }
+
+/** Where the player is and what is in reach, for the room brief in the transcript. */
+export interface RoomBrief {
+	room: string;
+	things: import('#lib/engine/types.ts').ThingInfo[];
+	exits: import('#lib/engine/types.ts').ExitInfo[];
+}

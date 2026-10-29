@@ -2,7 +2,7 @@
 	import type { Block, Run } from '#lib/engine/types.ts';
 	import FragmentMarker from '../atoms/FragmentMarker.svelte';
 	import ProseLink from '../atoms/ProseLink.svelte';
-	import type { EffectsLevel, TranscriptEntry } from '../types.ts';
+	import type { EffectsLevel, RoomBrief, TranscriptEntry } from '../types.ts';
 
 	interface Props {
 		entries: TranscriptEntry[];
@@ -17,6 +17,8 @@
 		onthing: (id: string, name: string) => void;
 		onexit: (direction: string) => void;
 		onfocus?: (index: number | null) => void;
+		/** Where the player is and what is in reach, for the room brief under the newest turn. */
+		brief?: RoomBrief | null;
 	}
 
 	let {
@@ -28,8 +30,15 @@
 		reduceMotion = true,
 		onthing,
 		onexit,
-		onfocus
+		onfocus,
+		brief = null
 	}: Props = $props();
+
+	/** Show the brief only when the newest turn did not print the room and the game goes on. */
+	const showBrief = $derived.by(() => {
+		const last = entries.at(-1)?.turn;
+		return !!last && !last.ended && !last.blocks.some((b) => b.kind === 'title');
+	});
 
 	let scroller: HTMLDivElement | undefined = $state();
 	let lastGlitch = 0;
@@ -95,8 +104,8 @@
 
 <!-- The log scrolls, so it must be focusable: keyboard users scroll it with the arrow keys. -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="scroller" bind:this={scroller} role="log" aria-label="Story transcript" tabindex="0">
-	<div class="transcript">
+<div class="scroller" bind:this={scroller} role="region" aria-label="Story" tabindex="0">
+	<div class="transcript" role="log" aria-label="Story transcript">
 		{#each entries as entry (entry.id)}
 			{@const fresh = entry.id === latest}
 			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh}>
@@ -113,6 +122,23 @@
 			</div>
 		{/each}
 	</div>
+	{#if showBrief && brief}
+		<!--
+			The room brief: where the player is and what they can act on. It is not part of the log,
+			so it is not read again after each turn. It follows the newest turn when that turn did not
+			print the room.
+		-->
+		<p class="brief" aria-label="Room brief">
+			<span class="brief-room">{brief.room}</span>{#if brief.things.length}{' · here: '}{#each brief.things as t, i (t.id)}{#if i > 0}{', '}{/if}<ProseLink
+						inspect="thing:{t.id}"
+						onclick={() => onthing(t.id, t.name)}>{t.name}</ProseLink
+					>{/each}{/if}{#if brief.exits.length}{' · exits: '}{#each brief.exits as e, i (e.direction)}{#if i > 0}{', '}{/if}<ProseLink
+						kind="exit"
+						inspect="exit:{e.direction}"
+						onclick={() => onexit(e.direction)}>{e.direction}</ProseLink
+					>{/each}{/if}
+		</p>
+	{/if}
 </div>
 
 <style>
@@ -187,7 +213,23 @@
 		outline-offset: 2px;
 		color: var(--color-text-strong);
 	}
+	.brief {
+		max-width: var(--measure-prose);
+		margin: var(--space-6) 0 var(--space-2);
+		padding-top: var(--space-4);
+		border-top: var(--size-border) dashed var(--color-border-subtle);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+		line-height: var(--line-height-body);
+		color: var(--color-text-muted);
+	}
+	.brief-room {
+		color: var(--color-text-accent);
+		font-weight: var(--font-weight-strong);
+	}
+	/* Labels for screen readers only. user-select: none keeps them out of copied text. */
 	.visually-hidden {
+		user-select: none;
 		position: absolute;
 		width: 1px;
 		height: 1px;

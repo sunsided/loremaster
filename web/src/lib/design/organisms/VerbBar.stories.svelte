@@ -32,6 +32,7 @@ To use it:
 2. Click a thing in the story text or in the "here" or "carrying" row.
 
 A click on a thing with no verb looks at the thing.
+A verb without things, such as "Look around", runs at once.
 
 The verb bar and the command prompt use the same text. When the player types, the runtime reads the partial command:
 - The verb that the text names is pressed. "look " selects "Look at".

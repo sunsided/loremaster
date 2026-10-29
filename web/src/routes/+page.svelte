@@ -244,6 +244,7 @@
 				onthing={(id, name) => s.pickThing(id, name)}
 				onexit={(dir) => s.pickExit(dir)}
 				onfocus={(i) => (s.focus = i)}
+				brief={{ room: s.scene.room_name, things: s.scene.things, exits: s.scene.exits }}
 			/>
 			{#if !s.scene.ended}
 				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={(text) => s.input(text)} />
