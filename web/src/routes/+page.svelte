@@ -283,7 +283,10 @@
 		const game = s.game;
 		const problem = (e: { start: number; end: number; message: string } | null) =>
 			e ? { from: e.start, to: e.end, message: e.message } : null;
+		s.entries.length; // The values change with each turn.
 		return {
+			symbols: game.symbols(),
+			textMatrix: (text, when) => game.textMatrix(text, when),
 			tokenize: (text, condition) => game.tokens(text, condition) as ReturnType<WriterTools['tokenize']>,
 			tryMarkup: (text) => {
 				const c = game.tryMarkup(text);

@@ -28,7 +28,7 @@ pub use game::{
     MapLink, MapRoom, MapView, MarkupCheck, PartView, PhaseView, RoomParts, RuleView, Scene,
     TextError, ThingInfo, VarView, VerbInfo,
 };
-pub use matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix, room_matrix};
+pub use matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix, room_matrix, text_matrix};
 pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
 pub use parser::{Command, Preview};
 pub use state::{FragmentProgress, State};

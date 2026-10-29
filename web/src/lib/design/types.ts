@@ -105,8 +105,24 @@ export interface WriterFragment {
 	replaces: boolean;
 }
 
+/** A name that conditions and markup can use, for completion and hover. */
+export interface EditorSymbol {
+	name: string;
+	/** `variable`, `property`, `name`, `derived`, `phase` or `markup`. */
+	kind: string;
+	detail: string;
+	/** The value now, as text. */
+	value: string | null;
+	/** The values to compare with, for example the values of an enum. */
+	values: string[];
+}
+
 /** What the writer needs from the runtime. */
 export interface WriterTools {
+	/** The names for completion and hover. */
+	symbols: EditorSymbol[];
+	/** The text in each combination of the values that it depends on. */
+	textMatrix?: (text: string, when: string | null) => import('#lib/engine/types.ts').RoomMatrix | null;
 	tokenize: (text: string, condition: boolean) => MarkupToken[];
 	/** Check fragment text and render it in the current state. */
 	tryMarkup: (text: string) => { problem: TextProblem | null; text: string; pieces: import('#lib/engine/types.ts').SourcePiece[] };

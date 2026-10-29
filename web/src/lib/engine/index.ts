@@ -164,6 +164,16 @@ export class Game {
 		return this.#engine.tryCondition(text);
 	}
 
+	/** Every name that conditions and markup can use, with its value now. */
+	symbols(): { name: string; kind: string; detail: string; value: string | null; values: string[] }[] {
+		return this.#engine.symbols();
+	}
+
+	/** One fragment text in all combinations of the values that it depends on. Null when it has a problem. */
+	textMatrix(text: string, when: string | null): RoomMatrix | null {
+		return this.#engine.textMatrix(text, when ?? undefined);
+	}
+
 	/** The save state, as JSON-compatible data. */
 	save(): unknown {
 		return this.#engine.save();

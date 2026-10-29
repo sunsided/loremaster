@@ -448,3 +448,79 @@ fn key_named(name: &str) -> Key {
         },
     }
 }
+
+/// One fragment text in all combinations of the values that it depends on, in the current room.
+/// For the "Other values" list of the writer. A combination in which the condition does not hold
+/// has an empty text. None when the text or the condition has a problem.
+pub fn text_matrix(game: &Game, src: &str, when: Option<&str>) -> Option<RoomMatrix> {
+    let world = game.world();
+    let segments = lantern_lang::compile_markup(src, &world.scope).ok()?;
+    let condition = match when.map(str::trim).filter(|w| !w.is_empty()) {
+        Some(w) => Some(lantern_lang::compile_condition(w, &world.scope).ok()?),
+        None => None,
+    };
+    let mut found = Found::default();
+    found.segments(&segments);
+    if let Some(c) = &condition {
+        found.condition(c);
+    }
+    let keys: Vec<Key> = found
+        .keys
+        .keys()
+        .chain(found.texts.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let dimensions: Vec<Dimension> = keys
+        .iter()
+        .map(|k| Dimension {
+            name: k.name(),
+            values: values_for(game, k, &found),
+        })
+        .collect();
+    let combinations = dimensions
+        .iter()
+        .map(|d| d.values.len().max(1))
+        .product::<usize>();
+    let room_id = game.state().room.clone();
+    let mut cells = Vec::new();
+    for index in 0..combinations.min(MAX_CELLS) {
+        let mut rest = index;
+        let mut values = Vec::new();
+        let mut g = game.clone();
+        for (k, d) in keys.iter().zip(&dimensions) {
+            let v = &d.values[rest % d.values.len()];
+            rest /= d.values.len();
+            apply(&mut g, &room_id, k, v);
+            values.push(v.clone());
+        }
+        let shows = condition.as_ref().is_none_or(|c| g.eval().holds(c));
+        let text = if shows {
+            g.try_markup(src).text
+        } else {
+            String::new()
+        };
+        let mut warnings = warnings(&g, &room_id, &text);
+        warnings.retain(|w| !w.contains("presence") && !w.contains("replacing"));
+        for w in &mut warnings {
+            if w == "no room text" {
+                *w = "no text".to_string();
+            }
+        }
+        if !shows {
+            warnings = vec!["the condition does not hold".to_string()];
+        }
+        cells.push(MatrixCell {
+            values,
+            text,
+            warnings,
+        });
+    }
+    Some(RoomMatrix {
+        room: room_id.to_string(),
+        dimensions,
+        cells,
+        combinations,
+    })
+}

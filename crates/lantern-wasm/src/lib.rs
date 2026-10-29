@@ -249,6 +249,20 @@ impl Engine {
         to_js(&utf16_error(text, self.game.try_condition(text)))
     }
 
+    /// Every name that conditions and markup can use, with its value now.
+    pub fn symbols(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.symbols())
+    }
+
+    /// One fragment text in all combinations of the values that it depends on.
+    #[wasm_bindgen(js_name = textMatrix)]
+    pub fn text_matrix(&self, text: &str, when: Option<String>) -> Result<JsValue, JsValue> {
+        match lantern_runtime::text_matrix(&self.game, text, when.as_deref()) {
+            Some(m) => to_js(&m),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
     /// The room description as it would show now, without changing the game.
     pub fn describe(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.describe_preview())

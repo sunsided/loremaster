@@ -13,7 +13,8 @@
 			value: 'East, the lighthouse rises {night: black against the stars | pale against the {time.phase} sky}. *Marigold*.',
 			tokenize: (t: string) => writerTools.tokenize(t, false),
 			onsubmit: fn(),
-			oncancel: fn()
+			oncancel: fn(),
+			symbols: writerTools.symbols
 		},
 		parameters: {
 			docs: {

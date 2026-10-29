@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { EditorState, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
-	import { Decoration, EditorView, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view';
+	import { Decoration, EditorView, hoverTooltip, keymap, placeholder as placeholderExt, type DecorationSet } from '@codemirror/view';
+	import { autocompletion, completionKeymap, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete';
 	import { defaultKeymap, history, historyKeymap, insertNewline } from '@codemirror/commands';
-	import type { MarkupToken, TextProblem } from '../types.ts';
+	import type { EditorSymbol, MarkupToken, TextProblem } from '../types.ts';
 
 	interface Props {
 		/** The text. Bind it to read the changes. */
@@ -25,6 +26,8 @@
 		autofocus?: boolean;
 		/** The id of an element that describes the editor, for example the problem text. */
 		describedby?: string;
+		/** Names for completion (Ctrl+Space, or as you type) and for hover. */
+		symbols?: EditorSymbol[];
 	}
 
 	let {
@@ -37,8 +40,84 @@
 		onsubmit,
 		oncancel,
 		autofocus = false,
-		describedby
+		describedby,
+		symbols = []
 	}: Props = $props();
+
+	/** True when the position is inside `{…}` markup. A condition editor is always "inside". */
+	function inMarkup(text: string, pos: number): boolean {
+		if (singleLine) return true;
+		let depth = 0;
+		for (let i = 0; i < pos; i++) {
+			if (text[i] === '{' && text[i + 1] === '{') i++;
+			else if (text[i] === '}' && text[i + 1] === '}') i++;
+			else if (text[i] === '{') depth++;
+			else if (text[i] === '}') depth = Math.max(0, depth - 1);
+		}
+		return depth > 0;
+	}
+
+	function complete(context: CompletionContext): CompletionResult | null {
+		const text = context.state.doc.toString();
+		if (!inMarkup(text, context.pos)) return null;
+		const before = text.slice(0, context.pos);
+		// After `name ==` or `name !=`: the values of that name.
+		const cmp = /([\w.]+)\s*(?:==|!=)\s*(\w*)$/.exec(before);
+		if (cmp) {
+			const sym = symbols.find((s) => s.name === cmp[1]);
+			if (sym?.values.length)
+				return {
+					from: context.pos - cmp[2].length,
+					options: sym.values.map((v) => ({ label: v, type: 'enum', detail: sym.value === v ? 'now' : undefined }))
+				};
+		}
+		const word = context.matchBefore(/[\w.]*/);
+		if (!word || (word.from === word.to && !context.explicit)) return null;
+		// Text names and `first` belong in markup, not in a condition.
+		const usable = symbols.filter((s) => !singleLine || (s.kind !== 'name' && s.kind !== 'markup'));
+		return {
+			from: word.from,
+			options: usable.map((s) => ({
+				label: s.name,
+				type: s.kind === 'variable' || s.kind === 'property' ? 'variable' : s.kind === 'name' ? 'text' : 'keyword',
+				detail: s.value != null && s.value !== '' ? `= ${s.value}` : undefined,
+				info: s.detail
+			})),
+			validFor: /^[\w.]*$/
+		};
+	}
+
+	const hover = hoverTooltip((view, pos) => {
+		const line = view.state.doc.lineAt(pos);
+		const text = line.text;
+		let from = pos - line.from;
+		let to = from;
+		while (from > 0 && /[\w.]/.test(text[from - 1])) from--;
+		while (to < text.length && /[\w.]/.test(text[to])) to++;
+		const name = text.slice(from, to).replace(/\.$/, '');
+		const sym = symbols.find((s) => s.name === name);
+		if (!sym) return null;
+		return {
+			pos: line.from + from,
+			end: line.from + to,
+			above: true,
+			create() {
+				const dom = document.createElement('div');
+				dom.className = 'symbol-tip';
+				const head = document.createElement('strong');
+				head.textContent = sym.name;
+				const detail = document.createElement('div');
+				detail.textContent = sym.detail;
+				dom.append(head, detail);
+				if (sym.value != null && sym.value !== '') {
+					const now = document.createElement('div');
+					now.textContent = `now: ${sym.value}`;
+					dom.append(now);
+				}
+				return { dom };
+			}
+		};
+	});
 
 	let host: HTMLDivElement | undefined = $state();
 	let view: EditorView | undefined;
@@ -82,7 +161,10 @@
 		return [
 			history(),
 			field,
+			autocompletion({ override: [complete], icons: false }),
+			hover,
 			keymap.of([
+				...completionKeymap,
 				{ key: 'Enter', run: submit, shift: singleLine ? submit : insertNewline },
 				{ key: 'Mod-Enter', run: submit },
 				{
@@ -184,6 +266,34 @@
 	}
 	.editor :global(.cm-cursor) {
 		border-left-color: var(--color-text-accent);
+	}
+	.editor :global(.cm-tooltip) {
+		border: var(--size-border) solid var(--color-border-control);
+		background: var(--color-surface-raised);
+		color: var(--color-text);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+	}
+	.editor :global(.cm-tooltip-autocomplete ul li[aria-selected]) {
+		background: var(--color-accent);
+		color: var(--color-text-on-accent);
+	}
+	.editor :global(.cm-completionDetail) {
+		margin-left: var(--space-3);
+		font-style: normal;
+		color: inherit;
+		opacity: 0.8;
+	}
+	.editor :global(.cm-completionInfo) {
+		max-width: 32ch;
+		padding: var(--space-2) var(--space-3);
+	}
+	.editor :global(.symbol-tip) {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+		max-width: 36ch;
+		padding: var(--space-2) var(--space-3);
 	}
 	.editor :global(.tok-brace),
 	.editor :global(.tok-separator),

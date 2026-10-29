@@ -399,6 +399,23 @@ function fakeTokens(text: string, condition: boolean): MarkupToken[] {
 }
 
 export const writerTools: WriterTools = {
+	symbols: [
+		{ name: 'oil_lamp.lit', kind: 'property', detail: 'property of oil_lamp, a flag', value: 'false', values: [] },
+		{ name: 'oil_lamp.the', kind: 'name', detail: 'the name with "the" of oil_lamp, for text', value: 'the oil lamp', values: [] },
+		{ name: 'time.phase', kind: 'derived', detail: 'the phase of the day', value: 'dusk', values: ['night', 'dawn', 'day', 'dusk'] },
+		{ name: 'night', kind: 'phase', detail: 'true when time.phase is night', value: 'false', values: [] },
+		{ name: 'first', kind: 'markup', detail: 'in markup: {first: …} shows only on the first visit', value: null, values: [] }
+	],
+	textMatrix: (text) => ({
+		room: 'shore',
+		dimensions: [{ name: 'time.phase', values: ['night', 'dawn', 'day', 'dusk'] }],
+		combinations: 4,
+		cells: ['night', 'dawn', 'day', 'dusk'].map((p) => ({
+			values: [p],
+			text: text.replace(/\{night:\s*([^|}]*)\|\s*([^}]*)\}/g, p === 'night' ? '$1' : '$2').replace(/\{time\.phase\}/g, p).replace(/[{}]/g, ''),
+			warnings: []
+		}))
+	}),
 	tokenize: fakeTokens,
 	tryMarkup: (text) => {
 		const open = text.lastIndexOf('{');

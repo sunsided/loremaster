@@ -162,6 +162,13 @@ More actions in write mode:
 - In the "Assembly" tab, "Edit" opens the writer for a fragment that does not show now.
 - "Remove this fragment" removes the fragment from the file.
 
+Help while you type:
+
+- Completion: in markup (inside `{…}`) and in the condition, the editor suggests names with their values now. After `==` it suggests the values, for example the phases of the day. Push Ctrl+Space to open the list.
+- Hover: put the pointer on a name to see what it is and its value now.
+- Quick fix: for an unknown name, "Use …" puts in the name that the editor finds, for example `oil_lamp.lit` for `lamp.lit`.
+- "Other values" shows how the text reads in each combination of the values that it depends on, and in which combinations it does not show.
+
 The editor examines the text while you type. A problem has a wavy line and a message, and you cannot save until you correct it. When a change does not build, the writer stays open with the message, and the game keeps the last good version.
 
 ### Where the changes go

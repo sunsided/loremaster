@@ -178,6 +178,21 @@ pub enum AuthorCommand {
     },
 }
 
+/// A name that conditions and markup can use.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Symbol {
+    /// For example `oil_lamp.lit`, `time.phase`, `oil_lamp.the`.
+    pub name: String,
+    /// `variable`, `property`, `name`, `derived`, `phase` or `markup`.
+    pub kind: String,
+    /// What it is, in a few words.
+    pub detail: String,
+    /// The value now, as text, when it has one.
+    pub value: Option<String>,
+    /// The values to compare with, for example the values of an enum.
+    pub values: Vec<String>,
+}
+
 /// The result of a check of text that the author is typing.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MarkupCheck {
@@ -438,6 +453,173 @@ impl Game {
             }
             Err(e) => MarkupCheck::failed(e),
         }
+    }
+
+    /// Every name that conditions and markup can use, for completion and hover in the editor.
+    pub fn symbols(&self) -> Vec<Symbol> {
+        let scope = &self.world.scope;
+        let story = &self.world.story;
+        let mut out = Vec::new();
+        let mut add = |name: String, kind: &str, detail: String, values: Vec<String>| {
+            out.push(Symbol {
+                name,
+                kind: kind.to_string(),
+                detail,
+                value: None,
+                values,
+            });
+        };
+        let rooms: Vec<String> = scope.rooms.iter().cloned().collect();
+        for (name, ty) in &scope.vars {
+            let values = match ty {
+                lantern_lang::Ty::Enum(v) => v.clone(),
+                lantern_lang::Ty::Bool => vec!["true".into(), "false".into()],
+                _ => Vec::new(),
+            };
+            add(
+                name.clone(),
+                "variable",
+                format!("variable, {}", ty.describe()),
+                values,
+            );
+        }
+        for (thing, props) in &scope.things {
+            for (prop, ty) in props {
+                add(
+                    format!("{thing}.{prop}"),
+                    "property",
+                    format!("property of {thing}, {}", ty.describe()),
+                    Vec::new(),
+                );
+            }
+            for (form, what) in [
+                ("name", "the current name"),
+                ("the", "the name with \"the\""),
+                ("The", "the name with \"The\""),
+                ("a", "the name with \"a\" or \"an\""),
+                ("A", "the name with \"A\" or \"An\""),
+            ] {
+                add(
+                    format!("{thing}.{form}"),
+                    "name",
+                    format!("{what} of {thing}, for text"),
+                    Vec::new(),
+                );
+            }
+            for (derived, what) in [
+                ("carried", "true when the player carries it"),
+                ("present", "true when it is carried or in the current room"),
+                ("interactions", "how many commands named it"),
+                ("talked", "how many times the player talked to it"),
+            ] {
+                add(
+                    format!("{thing}.{derived}"),
+                    "derived",
+                    what.to_string(),
+                    Vec::new(),
+                );
+            }
+            let mut places = rooms.clone();
+            places.extend(["carried".to_string(), "nowhere".to_string()]);
+            add(
+                format!("{thing}.location"),
+                "derived",
+                "a room id, carried or nowhere".into(),
+                places,
+            );
+        }
+        for room in &rooms {
+            add(
+                format!("{room}.visits"),
+                "derived",
+                "how many times the player entered it".into(),
+                Vec::new(),
+            );
+            add(
+                format!("{room}.visited"),
+                "derived",
+                "true after the first visit".into(),
+                Vec::new(),
+            );
+        }
+        add(
+            "time.phase".into(),
+            "derived",
+            "the phase of the day".into(),
+            scope.phases.clone(),
+        );
+        add(
+            "time.hour".into(),
+            "derived",
+            "the hour, 0 to 23".into(),
+            Vec::new(),
+        );
+        add(
+            "time.day".into(),
+            "derived",
+            "the day, from 1".into(),
+            Vec::new(),
+        );
+        add(
+            "turns".into(),
+            "derived",
+            "the number of turns".into(),
+            Vec::new(),
+        );
+        add(
+            "here".into(),
+            "derived",
+            "the id of the current room".into(),
+            rooms.clone(),
+        );
+        add(
+            "first_visit".into(),
+            "derived",
+            "true on the first visit to the current room".into(),
+            Vec::new(),
+        );
+        for (name, what) in [
+            (
+                "action.repeat",
+                "times in a row the player gave this command",
+            ),
+            (
+                "action.count",
+                "times the player used this verb in this room",
+            ),
+            (
+                "action.total",
+                "times the player used this verb in the game",
+            ),
+            ("action.verb", "the id of the current verb"),
+        ] {
+            add(name.into(), "derived", what.into(), Vec::new());
+        }
+        for phase in &scope.phases {
+            add(
+                phase.clone(),
+                "phase",
+                format!("true when time.phase is {phase}"),
+                Vec::new(),
+            );
+        }
+        add(
+            "first".into(),
+            "markup",
+            "in markup: {first: …} shows only on the first visit".into(),
+            Vec::new(),
+        );
+        let _ = story;
+        // The value now: render the name as an insert, or test it as a condition.
+        for sym in &mut out {
+            let insert = self.try_markup(&format!("{{{}}}", sym.name));
+            sym.value = if insert.error.is_none() {
+                Some(insert.text)
+            } else {
+                self.try_condition(&sym.name).holds.map(|b| b.to_string())
+            };
+        }
+        out
     }
 
     /// Check a condition that the author is typing, and tell whether it holds now.

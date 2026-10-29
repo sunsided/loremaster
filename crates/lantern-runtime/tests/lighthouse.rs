@@ -497,3 +497,29 @@ fn an_edited_story_keeps_the_game_state() {
     assert!(next.state().is_carried("oil_lamp"));
     assert!(next.describe_preview().plain_text().contains("A NEW LINE."));
 }
+
+#[test]
+fn the_writer_gets_symbols_checks_and_other_values() {
+    use lantern_runtime::text_matrix;
+    let mut game = lighthouse();
+    game.start();
+    let symbols = game.symbols();
+    let lit = symbols.iter().find(|s| s.name == "oil_lamp.lit").unwrap();
+    assert_eq!(lit.value.as_deref(), Some("false"));
+    let phase = symbols.iter().find(|s| s.name == "time.phase").unwrap();
+    assert_eq!(phase.value.as_deref(), Some("dusk"));
+    assert!(phase.values.contains(&"night".to_string()));
+    let check = game.try_markup("A {oil_lamp.lot ? x : y}");
+    assert!(check.error.unwrap().message.contains("did you mean"));
+    let m = text_matrix(
+        &game,
+        "The sun {night: sets | rises}.",
+        Some("not beacon_lit"),
+    )
+    .unwrap();
+    let texts: std::collections::BTreeSet<&str> = m.cells.iter().map(|c| c.text.as_str()).collect();
+    assert!(
+        texts.contains("The sun sets.") && texts.contains("The sun rises.") && texts.contains(""),
+        "{texts:?}"
+    );
+}

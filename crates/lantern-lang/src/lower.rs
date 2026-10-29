@@ -188,10 +188,25 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
                 "talked" => derived(Derived::Talked(id), Ty::Int),
                 _ => match scope.things[*thing].get(*prop) {
                     Some(ty) => Ok((Operand::Fact(format!("{thing}.{prop}")), ty.clone())),
-                    None => Err(LangError::new(
-                        format!("`{thing}` has no property `{prop}`"),
-                        span.clone(),
-                    )),
+                    None => {
+                        let props = &scope.things[*thing];
+                        let known = [
+                            "name", "the", "The", "a", "A", "carried", "present", "location",
+                        ];
+                        let hint = props
+                            .keys()
+                            .map(String::as_str)
+                            .chain(known)
+                            .map(|p| (p, crate::scope::edit_distance(p, prop)))
+                            .filter(|(_, d)| *d <= 2)
+                            .min_by_key(|(_, d)| *d)
+                            .map(|(p, _)| format!("; did you mean `{thing}.{p}`?"))
+                            .unwrap_or_default();
+                        Err(LangError::new(
+                            format!("`{thing}` has no property `{prop}`{hint}"),
+                            span.clone(),
+                        ))
+                    }
                 },
             }
         }
