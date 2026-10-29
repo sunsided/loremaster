@@ -102,6 +102,9 @@
 		{#each map.rooms as r (r.id)}
 			<g class="room" class:current={r.current} class:unvisited={!r.visited}>
 				<rect x={cx(r) - BOX_W / 2} y={cy(r) - BOX_H / 2} width={BOX_W} height={BOX_H} />
+				{#if r.current}
+					<rect class="tint" x={cx(r) - BOX_W / 2} y={cy(r) - BOX_H / 2} width={BOX_W} height={BOX_H} />
+				{/if}
 				<text x={cx(r)} y={cy(r) + 4} text-anchor="middle">{r.name}</text>
 			</g>
 		{/each}
@@ -131,6 +134,8 @@
 
 <style>
 	.map-panel {
+		/* The background behind the map. Room boxes use it, so lines do not show through. */
+		--map-bg: var(--color-surface-raised);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);
@@ -142,7 +147,9 @@
 		min-height: 0;
 		padding: var(--space-7);
 		overflow-y: auto;
-		background: var(--color-surface-raised);
+		/* Next to the game text, the map steps back: darker than the player, quiet colours. */
+		--map-bg: var(--color-surface-outer);
+		background: var(--map-bg);
 	}
 	.where {
 		margin: 0;
@@ -156,7 +163,7 @@
 	}
 	.link {
 		stroke: var(--color-border-control);
-		stroke-width: 1.5;
+		stroke-width: 1;
 	}
 	.hidden-link {
 		stroke-dasharray: 4 5;
@@ -169,26 +176,27 @@
 		font-size: var(--font-size-xs);
 	}
 	.room rect {
-		fill: var(--color-surface);
+		fill: var(--map-bg);
 		stroke: var(--color-border-control);
 		stroke-width: 1;
 	}
 	.room text {
-		fill: var(--color-text);
+		fill: var(--color-text-muted);
 	}
 	.room.unvisited rect {
 		stroke-dasharray: 3 4;
-		fill: var(--color-surface-raised);
 	}
-	.room.unvisited text {
-		fill: var(--color-text-muted);
-	}
+	/* The current room: an accent edge and a faint tint, not a solid block. */
 	.room.current rect {
-		fill: var(--color-accent);
 		stroke: var(--color-accent);
+		stroke-width: 1.5;
+	}
+	/* A second rectangle over the opaque one, so the links under the room do not show through the tint. */
+	.room .tint {
+		fill: var(--color-accent-tint);
 	}
 	.room.current text {
-		fill: var(--color-text-on-accent);
+		fill: var(--color-text-accent);
 		font-weight: var(--font-weight-strong);
 	}
 	.legend {
@@ -210,11 +218,8 @@
 		border: var(--size-border) solid var(--color-border-control);
 	}
 	.current-swatch {
-		background: var(--color-accent);
+		background: var(--color-accent-tint);
 		border-color: var(--color-accent);
-	}
-	.visited-swatch {
-		background: var(--color-surface);
 	}
 	.unvisited-swatch {
 		border-style: dashed;

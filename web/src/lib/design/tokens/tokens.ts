@@ -18,6 +18,7 @@ export const colorTokens: TokenInfo[] = [
 	{ name: '--color-text-warning', use: 'Fragment numbers and reasons why text is hidden.' },
 	{ name: '--color-text-on-accent', use: 'Text on an accent background.' },
 	{ name: '--color-accent', use: 'Selected controls and the text cursor.' },
+	{ name: '--color-accent-tint', use: 'A faint accent fill, for a selected item that must not draw the eye.' },
 	{ name: '--color-warning', use: 'Edges of highlighted fragments.' },
 	{ name: '--color-border-subtle', use: 'Dividers. Decoration only.' },
 	{ name: '--color-border-control', use: 'Edge of a control. Contrast 3:1 or more.' },

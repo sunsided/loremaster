@@ -69,6 +69,9 @@
 	--bp-stack: 900px;
 	--bp-ultrawide: 2200px;
 
+	/* Derived colours. They follow the theme, because each theme sets the colours they mix. */
+	--color-accent-tint: color-mix(in srgb, var(--color-accent) 14%, transparent);
+
 	/* Shape */
 	--radius-control: 0;
 
