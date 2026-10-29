@@ -107,6 +107,11 @@ impl Engine {
         to_js(&self.game.room_parts())
     }
 
+    /// All rules with their state now, for the rules view.
+    pub fn rules(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.rules())
+    }
+
     /// All rooms and exits, for the map panel.
     pub fn map(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.map())

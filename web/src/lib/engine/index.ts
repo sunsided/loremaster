@@ -5,6 +5,7 @@ import type {
 	FragmentView,
 	MapView,
 	RoomParts,
+	RuleView,
 	Scene,
 	SourceFile,
 	Turn,
@@ -72,6 +73,10 @@ export class Game {
 
 	roomParts(): RoomParts {
 		return this.#engine.roomParts();
+	}
+
+	rules(): RuleView[] {
+		return this.#engine.rules();
 	}
 
 	map(): MapView {

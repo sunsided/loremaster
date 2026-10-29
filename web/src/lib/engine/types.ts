@@ -158,3 +158,16 @@ export interface RoomParts {
 	objects: PartView[];
 	exits: PartView[];
 }
+
+export interface RuleView {
+	id: string;
+	/** The event, in words. */
+	when: string;
+	condition: string | null;
+	condition_holds: boolean;
+	/** Each effect, in words. */
+	then: string[];
+	once: boolean;
+	instead: boolean;
+	fired: boolean;
+}

@@ -1,8 +1,8 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { ExitInfo, FragmentView, MapView, RoomParts, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
-import type { TranscriptEntry } from './types.ts';
+import type { ExitInfo, FragmentView, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { StoryStep, TranscriptEntry } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
 	text,
@@ -206,3 +206,51 @@ export const parts: RoomParts = {
 		{ id: 'east', label: 'east to Lighthouse Stairwell', text: 'east', detail: 'door: lighthouse door, locked', shown: true, why: null }
 	]
 };
+
+export const rules: RuleView[] = [
+	{
+		id: 'find_iron_key',
+		when: 'the player uses "open drawer"',
+		condition: 'not drawer_searched',
+		condition_holds: false,
+		then: ['set drawer_searched = true', 'move iron key to cottage', 'say "Under a fold of oilcloth lies an iron key."'],
+		once: false,
+		instead: false,
+		fired: true
+	},
+	{
+		id: 'lamp_needs_matches',
+		when: 'the player uses "turn on oil lamp"',
+		condition: 'not matches.carried',
+		condition_holds: true,
+		then: ['say "You have nothing to light it with."'],
+		once: false,
+		instead: true,
+		fired: false
+	},
+	{
+		id: 'dusk_falls',
+		when: 'the clock reaches 21:00',
+		condition: null,
+		condition_holds: true,
+		then: ['say "The last of the light drains out of the sky."'],
+		once: false,
+		instead: false,
+		fired: false
+	}
+];
+
+export const history: StoryStep[] = [
+	{ turn: 0, time: '20:30', phase: 'dusk', room: 'The Shore', command: '', rules: [], changes: [], ended: false },
+	{ turn: 1, time: '20:35', phase: 'dusk', room: "Keeper's Cottage", command: 'n', rules: [], changes: ['cottage_door.open = true'], ended: false },
+	{
+		turn: 2,
+		time: '20:40',
+		phase: 'dusk',
+		room: "Keeper's Cottage",
+		command: 'open drawer',
+		rules: ['find_iron_key'],
+		changes: ['drawer.open = true', 'drawer_searched = true', 'iron_key -> cottage'],
+		ended: false
+	}
+];

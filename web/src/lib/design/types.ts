@@ -30,3 +30,18 @@ export interface View {
 	/** A view that is not available yet. */
 	disabled?: boolean;
 }
+
+/** One turn of a playthrough, for the story timeline. */
+export interface StoryStep {
+	turn: number;
+	time: string;
+	phase: string;
+	room: string;
+	/** The command as the player gave it. Empty for the opening. */
+	command: string;
+	/** Ids of the rules that fired. */
+	rules: string[];
+	/** State changes, for example "drawer.open = true". */
+	changes: string[];
+	ended: boolean;
+}

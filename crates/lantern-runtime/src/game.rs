@@ -130,6 +130,24 @@ pub struct RoomParts {
     pub exits: Vec<PartView>,
 }
 
+/// A rule as When / If / Then, with its state now, for the rules view.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuleView {
+    pub id: String,
+    /// The event, in words, for example "the player enters lantern_room".
+    pub when: String,
+    /// The condition as written.
+    pub condition: Option<String>,
+    /// True when the condition holds now (or there is none).
+    pub condition_holds: bool,
+    /// Each effect, in words.
+    pub then: Vec<String>,
+    pub once: bool,
+    pub instead: bool,
+    /// True when the rule fired at least one time in this game.
+    pub fired: bool,
+}
+
 const MAX_RULE_DEPTH: u8 = 8;
 
 impl Game {
@@ -647,6 +665,95 @@ impl Game {
         RoomParts { objects, exits }
     }
 
+    /// All rules with their state now. Does not change any state.
+    pub fn rules(&self) -> Vec<RuleView> {
+        let ev = self.eval();
+        let story = &self.world.story;
+        let thing_or_room = |id: &Id| {
+            story
+                .thing(id.as_str())
+                .map(|t| t.name.clone())
+                .or_else(|| story.room(id.as_str()).map(|r| r.name.clone()))
+                .unwrap_or_else(|| id.to_string())
+        };
+        story
+            .rules
+            .iter()
+            .enumerate()
+            .map(|(i, r)| {
+                let when = match &r.on {
+                    EventPattern::Start => "the game starts".to_string(),
+                    EventPattern::Turn => "a turn passes".to_string(),
+                    EventPattern::Enter(room) => {
+                        format!("the player enters {}", thing_or_room(room))
+                    }
+                    EventPattern::Leave(room) => {
+                        format!("the player leaves {}", thing_or_room(room))
+                    }
+                    EventPattern::Time(t) => format!("the clock reaches {t}"),
+                    EventPattern::Verb(parts) => {
+                        let verb = parts
+                            .first()
+                            .and_then(|v| self.world.verb(v.as_str()))
+                            .map_or_else(
+                                || parts.first().map(Id::to_string).unwrap_or_default(),
+                                |v| v.label.to_lowercase(),
+                            );
+                        let objects: Vec<String> =
+                            parts.iter().skip(1).map(thing_or_room).collect();
+                        if objects.is_empty() {
+                            format!("the player uses \"{verb}\"")
+                        } else {
+                            format!("the player uses \"{verb} {}\"", objects.join(" with "))
+                        }
+                    }
+                };
+                let then = r
+                    .then
+                    .iter()
+                    .map(|e| match e {
+                        lantern_model::Effect::Set(m) => format!(
+                            "set {}",
+                            m.iter()
+                                .map(|(k, v)| format!("{k} = {v}"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                        lantern_model::Effect::Add(m) => format!(
+                            "add {}",
+                            m.iter()
+                                .map(|(k, v)| format!("{v} to {k}"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                        lantern_model::Effect::Say(t) => format!("say \"{t}\""),
+                        lantern_model::Effect::Move(m) => format!(
+                            "move {}",
+                            m.iter()
+                                .map(|(t, to)| format!("{} to {to}", thing_or_room(t)))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                        lantern_model::Effect::Goto(room) => {
+                            format!("move the player to {}", thing_or_room(room))
+                        }
+                        lantern_model::Effect::End(t) => format!("end the game: \"{t}\""),
+                    })
+                    .collect();
+                RuleView {
+                    id: r.id.to_string(),
+                    when,
+                    condition: r.when.clone(),
+                    condition_holds: ev.holds_opt(&self.world.rules[i].when),
+                    then,
+                    once: r.once,
+                    instead: r.instead,
+                    fired: self.state.fired.contains(&r.id),
+                }
+            })
+            .collect()
+    }
+
     pub fn verbs(&self) -> Vec<VerbInfo> {
         self.world
             .verbs
@@ -1008,6 +1115,10 @@ impl Game {
                     say(turn, format!("The {name} won't budge."));
                 } else {
                     self.move_thing(&t.id, Location::Carried);
+                    turn.log.push(LogEntry {
+                        kind: "move".into(),
+                        text: format!("{} -> carried", t.id),
+                    });
                     say(turn, "Taken.".into());
                 }
             }
@@ -1017,6 +1128,10 @@ impl Game {
                     say(turn, format!("You don't have the {name}."));
                 } else {
                     let here = Location::Room(self.state.room.clone());
+                    turn.log.push(LogEntry {
+                        kind: "move".into(),
+                        text: format!("{} -> {}", t.id, self.state.room),
+                    });
                     self.move_thing(&t.id, here);
                     say(turn, "Dropped.".into());
                 }

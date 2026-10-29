@@ -18,7 +18,7 @@
 
 The panel has one section for each layer, in assembly order: base, ambient, event, objects, characters, exits.
 Each fragment shows its source text, its mode and its condition. A hidden fragment also shows the reason.
-The runtime makes the objects and exits layers from the things and exits of the room. These layers show a hint, then each thing or exit with its state (PartItem).
+The runtime makes the objects and exits layers from the things and exits of the room. These layers are in a dashed box with the tag \"generated\", so they look different from the written fragments. They show a hint, then each thing or exit with its state (PartItem).
 
 Hover on a fragment highlights the same text in the transcript.
 The panel does not change the game state.`

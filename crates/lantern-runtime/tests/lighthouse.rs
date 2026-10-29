@@ -151,3 +151,21 @@ fn room_parts_list_things_and_exits() {
         Some("door: cottage door, open")
     );
 }
+
+#[test]
+fn rules_report_events_and_state() {
+    let mut game = lighthouse();
+    game.start();
+    game.input("n");
+    game.input("open drawer");
+    let rules = game.rules();
+    let key = rules.iter().find(|r| r.id == "find_iron_key").unwrap();
+    assert_eq!(key.when, "the player uses \"open drawer\"");
+    assert!(key.fired);
+    assert!(!key.condition_holds, "drawer_searched is now true");
+    assert!(
+        key.then.iter().any(|t| t == "move iron key to cottage"),
+        "{:?}",
+        key.then
+    );
+}

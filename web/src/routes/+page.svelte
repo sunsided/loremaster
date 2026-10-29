@@ -16,19 +16,23 @@
 	import Transcript from '#lib/design/organisms/Transcript.svelte';
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
+	import PageLayout from '#lib/design/templates/PageLayout.svelte';
+	import RulesView from '#lib/design/organisms/RulesView.svelte';
+	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
 	import type { View } from '#lib/design/types.ts';
 
 	let session: Session | undefined = $state();
 	let problems: Diagnostic[] = $state([]);
 	let failure = $state('');
 	let showSettings = $state(false);
+	let view = $state('play');
 	let hidden = $state(false);
 
 	const views: View[] = [
 		{ id: 'play', label: 'Play and write' },
-		{ id: 'map', label: 'Map', disabled: true },
-		{ id: 'story', label: 'Story', disabled: true },
-		{ id: 'rules', label: 'Rules', disabled: true }
+		{ id: 'map', label: 'Map' },
+		{ id: 'story', label: 'Story' },
+		{ id: 'rules', label: 'Rules' }
 	];
 
 	onMount(() => {
@@ -55,19 +59,40 @@
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
 </svelte:head>
 
-{#if session}
+{#snippet appHeader(s: Session)}
+	<AppHeader
+		title={s.game.title}
+		{views}
+		current={view}
+		now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name]}
+		settingsOpen={showSettings}
+		onview={(id) => (view = id)}
+		onsettings={() => (showSettings = true)}
+	/>
+{/snippet}
+
+{#if session && view === 'map'}
+	{@const s = session}
+	<PageLayout maxWidth="var(--width-dialog)">
+		{#snippet header()}{@render appHeader(s)}{/snippet}
+		<MapPanel map={s.map} />
+	</PageLayout>
+{:else if session && view === 'story'}
+	{@const s = session}
+	<PageLayout>
+		{#snippet header()}{@render appHeader(s)}{/snippet}
+		<StoryTimeline steps={s.history} />
+	</PageLayout>
+{:else if session && view === 'rules'}
+	{@const s = session}
+	<PageLayout>
+		{#snippet header()}{@render appHeader(s)}{/snippet}
+		<RulesView rules={s.rules} />
+	</PageLayout>
+{:else if session}
 	{@const s = session}
 	<PlayerLayout {fxClass} {glow}>
-		{#snippet header()}
-			<AppHeader
-				title={s.game.title}
-				{views}
-				current="play"
-				now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name]}
-				settingsOpen={showSettings}
-				onsettings={() => (showSettings = true)}
-			/>
-		{/snippet}
+		{#snippet header()}{@render appHeader(s)}{/snippet}
 		{#snippet effects()}
 			<ScreenEffects theme={settings.theme} effects={settings.effects} />
 		{/snippet}

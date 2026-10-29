@@ -4,10 +4,12 @@ import {
 	type FragmentView,
 	type MapView,
 	type RoomParts,
+	type RuleView,
 	type Scene,
 	type Turn,
 	type VerbInfo
 } from '#lib/engine/index.ts';
+import type { StoryStep } from '#lib/design/types.ts';
 
 export interface Entry {
 	id: number;
@@ -28,6 +30,9 @@ export class Session {
 	assembly = $state<FragmentView[]>([]);
 	map = $state<MapView>({ rooms: [], links: [] });
 	parts = $state<RoomParts>({ objects: [], exits: [] });
+	rules = $state<RuleView[]>([]);
+	/** The playthrough so far, one step per turn. */
+	history = $state<StoryStep[]>([]);
 	verbs: VerbInfo[];
 	pending = $state<Pending | null>(null);
 	/** Fragment highlighted in both the transcript and the assembly panel. */
@@ -51,6 +56,18 @@ export class Session {
 		this.assembly = this.game.assembly();
 		this.map = this.game.map();
 		this.parts = this.game.roomParts();
+		this.rules = this.game.rules();
+		const command = turn.blocks.find((b) => b.kind === 'command');
+		this.history.push({
+			turn: this.scene.turns,
+			time: this.scene.time,
+			phase: this.scene.phase,
+			room: this.scene.room_name,
+			command: command ? command.runs.map((r) => r.text).join('') : '',
+			rules: turn.log.filter((l) => l.kind === 'rule').map((l) => l.text),
+			changes: turn.log.filter((l) => l.kind !== 'rule').map((l) => l.text),
+			ended: turn.ended
+		});
 	}
 
 	input(text: string) {
@@ -99,6 +116,7 @@ export class Session {
 	restart() {
 		this.game.reset();
 		this.entries = [];
+		this.history = [];
 		this.pending = null;
 		this.#push(this.game.start());
 	}
