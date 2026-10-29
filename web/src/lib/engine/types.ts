@@ -81,6 +81,15 @@ export interface VerbInfo {
 	bar: boolean;
 }
 
+export interface SourcePiece {
+	role: 'text' | 'syntax' | 'insert';
+	text: string;
+	/** False when the piece is in an inline branch whose condition does not hold now. */
+	active: boolean;
+	/** For an insert: the value it shows now. */
+	value?: string;
+}
+
 export interface FragmentView {
 	index: number;
 	layer: Layer;
@@ -88,6 +97,8 @@ export interface FragmentView {
 	condition: string | null;
 	replaces: boolean;
 	text: string;
+	/** The source of each variant in pieces. */
+	variants: SourcePiece[][];
 	shown: boolean;
 	why: string | null;
 }

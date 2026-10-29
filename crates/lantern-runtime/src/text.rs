@@ -3,6 +3,7 @@ use crate::world::CFragment;
 use crate::{Run, Source, rng};
 use lantern_lang::Segment;
 use lantern_model::FragmentMode;
+use serde::{Deserialize, Serialize};
 
 /// Render compiled markup to text.
 pub(crate) fn render(ev: &Eval, segments: &[Segment]) -> String {
@@ -15,7 +16,7 @@ fn render_into(ev: &Eval, segments: &[Segment], out: &mut String) {
     for seg in segments {
         match seg {
             Segment::Text(t) => out.push_str(t),
-            Segment::Insert(op) => out.push_str(&ev.operand_text(op)),
+            Segment::Insert { operand, .. } => out.push_str(&ev.operand_text(operand)),
             Segment::Choice {
                 condition,
                 then,
@@ -25,6 +26,85 @@ fn render_into(ev: &Eval, segments: &[Segment], out: &mut String) {
                 let branch = if ev.holds(condition) { then } else { otherwise };
                 render_into(ev, branch, out);
             }
+        }
+    }
+}
+
+/// Fragment source text split into pieces, each marked as active or not in
+/// the current state. The editor uses it to strike through inline branches
+/// that do not apply.
+pub(crate) fn outline(ev: &Eval, segments: &[Segment], active: bool, out: &mut Vec<SourcePiece>) {
+    for seg in segments {
+        match seg {
+            Segment::Text(t) => out.push(SourcePiece::new(SourceRole::Text, t.clone(), active)),
+            Segment::Insert { operand, source } => {
+                let mut piece = SourcePiece::new(SourceRole::Insert, source.clone(), active);
+                piece.value = Some(ev.operand_text(operand));
+                out.push(piece);
+            }
+            Segment::Choice {
+                condition,
+                then,
+                otherwise,
+                syntax,
+                ..
+            } => {
+                let holds = ev.holds(condition);
+                out.push(SourcePiece::new(
+                    SourceRole::Syntax,
+                    format!("{} ", syntax.open),
+                    active,
+                ));
+                outline(ev, then, active && holds, out);
+                if let Some(sep) = &syntax.separator {
+                    out.push(SourcePiece::new(
+                        SourceRole::Syntax,
+                        format!(" {sep} "),
+                        active,
+                    ));
+                    outline(ev, otherwise, active && !holds, out);
+                }
+                out.push(SourcePiece::new(
+                    SourceRole::Syntax,
+                    syntax.close.clone(),
+                    active,
+                ));
+            }
+        }
+    }
+}
+
+/// What a piece of fragment source is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceRole {
+    /// Story text.
+    Text,
+    /// Markup: braces, conditions and separators.
+    Syntax,
+    /// A value insert such as `{time.phase}`.
+    Insert,
+}
+
+/// One piece of fragment source, for the assembly panel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourcePiece {
+    pub role: SourceRole,
+    pub text: String,
+    /// False when the piece is in an inline branch whose condition does not hold now.
+    pub active: bool,
+    /// For an insert: the value it shows now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+}
+
+impl SourcePiece {
+    fn new(role: SourceRole, text: String, active: bool) -> Self {
+        Self {
+            role,
+            text,
+            active,
+            value: None,
         }
     }
 }

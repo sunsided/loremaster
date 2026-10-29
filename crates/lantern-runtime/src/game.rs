@@ -66,6 +66,8 @@ pub struct FragmentView {
     pub replaces: bool,
     /// The fragment's source text; variants joined with ` / `.
     pub text: String,
+    /// The source of each variant in pieces, with inline branches marked as active or not.
+    pub variants: Vec<Vec<crate::SourcePiece>>,
     pub shown: bool,
     /// Why it is hidden right now.
     pub why: Option<String>,
@@ -450,6 +452,15 @@ impl Game {
                     condition: src.when.clone(),
                     replaces: src.replaces,
                     text: src.variants.join(" / "),
+                    variants: f
+                        .variants
+                        .iter()
+                        .map(|segs| {
+                            let mut pieces = Vec::new();
+                            text::outline(&ev, segs, true, &mut pieces);
+                            pieces
+                        })
+                        .collect(),
                     shown: is_shown,
                     why,
                 }

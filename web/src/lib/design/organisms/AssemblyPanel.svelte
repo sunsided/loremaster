@@ -58,6 +58,7 @@
 						<FragmentItem
 							number={f.index + 1}
 							text={f.text}
+							variants={f.variants}
 							meta={meta(f)}
 							shown={f.shown}
 							why={f.why}

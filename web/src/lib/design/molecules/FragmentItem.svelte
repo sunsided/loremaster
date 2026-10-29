@@ -1,9 +1,14 @@
 <script lang="ts">
+	import type { SourcePiece } from '#lib/engine/types.ts';
+	import FragmentSource from './FragmentSource.svelte';
+
 	interface Props {
 		/** The fragment number, starting at 1. */
 		number: number;
 		/** The source text of the fragment, with its markup. */
 		text: string;
+		/** The source of each variant in pieces. When set, inline branches show as active or struck through. */
+		variants?: SourcePiece[][];
 		/** Mode, condition and other facts, for example "always · when night". */
 		meta: string;
 		/** True when the player sees this fragment now. */
@@ -15,12 +20,13 @@
 		onactivate?: (on: boolean) => void;
 	}
 
-	let { number, text, meta, shown, why, active = false, onactivate }: Props = $props();
+	let { number, text, variants, meta, shown, why, active = false, onactivate }: Props = $props();
 </script>
 
 <!--
 	One fragment in the assembly panel. A shown fragment has its number.
 	A hidden fragment has a dash, struck-through text and the reason.
+	Inside a shown fragment, inline branches that do not apply now are struck through.
 	The state is also in text for screen readers, not in colour only.
 -->
 <li
@@ -33,7 +39,15 @@
 	<span class="number" aria-hidden="true">{shown ? number : '–'}</span>
 	<div>
 		<span class="visually-hidden">Fragment {number}, {shown ? 'shown' : 'hidden'}:</span>
-		<span class="text">{text}</span>
+		{#if variants?.length}
+			<span class="text">
+				{#each variants as pieces, v (v)}
+					{#if v > 0}<span class="or" aria-hidden="true">{' / '}</span><span class="visually-hidden">, or: </span>{/if}<FragmentSource {pieces} />
+				{/each}
+			</span>
+		{:else}
+			<span class="text">{text}</span>
+		{/if}
 		<span class="meta"
 			>{meta}{#if !shown && why}{' · '}<span class="why">{why}</span>{/if}</span
 		>
@@ -54,6 +68,9 @@
 	}
 	.active {
 		border-color: var(--color-warning);
+	}
+	.or {
+		color: var(--color-text-muted);
 	}
 	.number {
 		color: var(--color-text-warning);

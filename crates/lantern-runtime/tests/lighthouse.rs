@@ -86,3 +86,24 @@ fn the_map_has_every_room_and_one_link_per_pair_of_exits() {
     );
     assert!(map.rooms.iter().any(|r| r.id == "cottage" && !r.visited));
 }
+
+#[test]
+fn inline_branches_are_marked_active_or_not() {
+    use lantern_runtime::SourceRole;
+    let mut game = lighthouse();
+    game.start();
+    let text_of = |game: &Game, active: bool| -> Vec<String> {
+        game.assembly()[0].variants[0]
+            .iter()
+            .filter(|p| p.role == SourceRole::Text && p.active == active)
+            .map(|p| p.text.clone())
+            .collect()
+    };
+    // First visit, at dusk: `{first: ...}` applies, `{night: ...}` takes the second branch.
+    assert!(text_of(&game, true).contains(&", its windows dark".to_string()));
+    assert!(text_of(&game, false).contains(&"black against the stars".to_string()));
+    // Second visit: `{first: ...}` no longer applies.
+    game.input("n");
+    game.input("s");
+    assert!(text_of(&game, false).contains(&", its windows dark".to_string()));
+}

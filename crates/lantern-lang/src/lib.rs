@@ -21,5 +21,5 @@ pub use derived::{CmpOp, Derived, Operand};
 pub use error::{LangError, Span};
 pub use expr::{Expr, parse_expr};
 pub use lower::compile_condition;
-pub use markup::{Segment, compile_markup};
+pub use markup::{ChoiceSyntax, Segment, compile_markup};
 pub use scope::{Scope, Ty};

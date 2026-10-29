@@ -1,7 +1,7 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { ExitInfo, FragmentView, MapView, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { ExitInfo, FragmentView, MapView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
 import type { TranscriptEntry } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
@@ -115,6 +115,26 @@ export const exits: ExitInfo[] = [
 	{ direction: 'east', to: 'stairwell', to_name: 'Lighthouse Stairwell' }
 ];
 
+const t = (text: string, active = true): SourcePiece => ({ role: 'text', text, active });
+const x = (text: string): SourcePiece => ({ role: 'syntax', text, active: true });
+
+/** The shore base text on a second visit at dusk: `{first: ...}` and the night branch do not apply. */
+export const shoreBasePieces: SourcePiece[] = [
+	t('Shingle crunches underfoot. To the north a whitewashed cottage huddles against the wind'),
+	x('{first: '),
+	t(', its windows dark', false),
+	x('}'),
+	t('. East, the lighthouse rises '),
+	x('{night: '),
+	t('black against the stars', false),
+	x(' | '),
+	t('pale against the '),
+	{ role: 'insert', text: '{time.phase}', active: true, value: 'dusk' },
+	t(' sky'),
+	x('}'),
+	t('.')
+];
+
 export const fragments: FragmentView[] = [
 	{
 		index: 0,
@@ -123,6 +143,7 @@ export const fragments: FragmentView[] = [
 		condition: null,
 		replaces: false,
 		text: 'Shingle crunches underfoot. To the north a whitewashed cottage huddles against the wind{first: , its windows dark}. East, the lighthouse rises {night: black against the stars | pale against the {time.phase} sky}.',
+		variants: [shoreBasePieces],
 		shown: true,
 		why: null
 	},
@@ -133,6 +154,7 @@ export const fragments: FragmentView[] = [
 		condition: 'time.phase == dusk',
 		replaces: false,
 		text: 'The sun is a red coal sinking into the sea.',
+		variants: [[t('The sun is a red coal sinking into the sea.')]],
 		shown: true,
 		why: null
 	},
@@ -143,6 +165,7 @@ export const fragments: FragmentView[] = [
 		condition: 'time.phase == night',
 		replaces: false,
 		text: 'Waves hiss on the stones. / Somewhere out at sea a bell buoy clangs.',
+		variants: [[t('Waves hiss on the stones.')], [t('Somewhere out at sea a bell buoy clangs.')]],
 		shown: false,
 		why: 'time.phase == night is false'
 	},
@@ -153,6 +176,7 @@ export const fragments: FragmentView[] = [
 		condition: 'night and not beacon_lit',
 		replaces: false,
 		text: 'Far out, a single masthead light rocks on the swell.',
+		variants: [[t('Far out, a single masthead light rocks on the swell.')]],
 		shown: false,
 		why: 'night and not beacon_lit is false'
 	}

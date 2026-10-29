@@ -2,6 +2,7 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import type { ComponentProps } from 'svelte';
 	import { fn } from 'storybook/test';
+	import { shoreBasePieces } from '../fixtures.ts';
 	import FragmentItem from './FragmentItem.svelte';
 
 	const { Story } = defineMeta({
@@ -22,6 +23,7 @@
 					component: `A fragment item shows one fragment in the assembly panel: its number, its source text and its facts.
 
 A **shown** fragment has its number. A **hidden** fragment has a dash, struck-through text and the reason why it is hidden.
+When \`variants\` is set, the item shows the source with FragmentSource: inline branches that do not apply now are struck through.
 The state is also in text for screen readers ("Fragment 3, hidden"). The design does not use colour as the only signal.
 
 The item is a list item. Put it in a \`ul\`.`
@@ -40,3 +42,8 @@ The item is a list item. Put it in a \`ul\`.`
 <Story name="Shown" {template} />
 <Story name="Hidden" args={{ number: 3, shown: false, meta: 'shuffle · when time.phase == night', text: 'Waves hiss on the stones.', why: 'time.phase == night is false' }} {template} />
 <Story name="Active" args={{ active: true }} {template} />
+<Story
+	name="With inline branches"
+	args={{ number: 1, text: '', variants: [shoreBasePieces], meta: 'always' }}
+	{template}
+/>

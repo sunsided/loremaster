@@ -13,9 +13,27 @@ pub enum Segment {
         source: String,
         then: Vec<Segment>,
         otherwise: Vec<Segment>,
+        /// The markup around the branches as written, for the editor.
+        syntax: ChoiceSyntax,
     },
     /// `{weather}`, `{lamp.name}`.
-    Insert(Operand),
+    Insert {
+        operand: Operand,
+        /// The markup as written, for example `{time.phase}`.
+        source: String,
+    },
+}
+
+/// The written markup of a choice, so the editor can show the source with
+/// each branch marked as active or not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChoiceSyntax {
+    /// The opening brace, the condition and its separator, for example `{night:`.
+    pub open: String,
+    /// The separator between the branches, for example `|`. None when there is no second branch.
+    pub separator: Option<String>,
+    /// The closing brace.
+    pub close: String,
 }
 
 /// Compile fragment text with inline markup.
@@ -101,15 +119,23 @@ fn compile_inner(inner: &str, base: usize, scope: &Scope) -> Result<Segment, Lan
     let Some((sep, kind)) = find_top(inner, &['?', ':']) else {
         let expr = parse_expr(inner).map_err(|e| e.offset(base))?;
         let (operand, _) = resolve(&expr, scope).map_err(|e| e.offset(base))?;
-        return Ok(Segment::Insert(operand));
+        return Ok(Segment::Insert {
+            operand,
+            source: format!("{{{inner}}}"),
+        });
     };
     let head = &inner[..sep];
     let rest = &inner[sep + 1..];
     let rest_base = base + sep + 1;
     let else_seps: &[char] = if kind == '?' { &['|', ':'] } else { &['|'] };
-    let (then_src, else_src, else_base) = match find_top(rest, else_seps) {
-        Some((j, _)) => (&rest[..j], &rest[j + 1..], rest_base + j + 1),
-        None => (rest, "", rest_base + rest.len()),
+    let (then_src, else_src, else_base, separator) = match find_top(rest, else_seps) {
+        Some((j, c)) => (
+            &rest[..j],
+            &rest[j + 1..],
+            rest_base + j + 1,
+            Some(c.to_string()),
+        ),
+        None => (rest, "", rest_base + rest.len(), None),
     };
     let condition = head_condition(head, base, scope)?;
     Ok(Segment::Choice {
@@ -117,6 +143,11 @@ fn compile_inner(inner: &str, base: usize, scope: &Scope) -> Result<Segment, Lan
         source: head.trim().to_string(),
         then: branch(then_src, rest_base, scope)?,
         otherwise: branch(else_src, else_base, scope)?,
+        syntax: ChoiceSyntax {
+            open: format!("{{{}{kind}", head.trim()),
+            separator,
+            close: "}".to_string(),
+        },
     })
 }
 
@@ -162,8 +193,10 @@ mod tests {
         )
         .unwrap();
         check!(segs.len() == 5);
-        assert!(let Segment::Choice { then, otherwise, source, .. } = &segs[1]);
+        assert!(let Segment::Choice { then, otherwise, source, syntax, .. } = &segs[1]);
         check!(source == "night");
+        check!(syntax.open == "{night:");
+        check!(syntax.separator.as_deref() == Some("|"));
         check!(then == &vec![Segment::Text("moonlit".into())]);
         check!(otherwise == &vec![Segment::Text("sunlit".into())]);
         assert!(let Segment::Choice { then, otherwise, .. } = &segs[3]);
@@ -179,7 +212,13 @@ mod tests {
         )
         .unwrap();
         check!(matches!(&segs[1], Segment::Choice { .. }));
-        check!(segs[3] == Segment::Insert(Operand::ThingName("lamp".into())));
+        check!(
+            segs[3]
+                == Segment::Insert {
+                    operand: Operand::ThingName("lamp".into()),
+                    source: "{lamp.name}".into()
+                }
+        );
         check!(segs[4] == Segment::Text(". {ok}".into()));
     }
 

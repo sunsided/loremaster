@@ -26,4 +26,5 @@ pub use game::{
 pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
 pub use parser::Command;
 pub use state::{FragmentProgress, State};
+pub use text::{SourcePiece, SourceRole};
 pub use world::{CompileError, World};
