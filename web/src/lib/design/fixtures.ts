@@ -216,7 +216,9 @@ export const rules: RuleView[] = [
 		then: ['set drawer_searched = true', 'move iron key to cottage', 'say "Under a fold of oilcloth lies an iron key."'],
 		once: false,
 		instead: false,
-		fired: true
+		fired: true,
+		trigger: 'verb',
+		relevant: 'fired in the last turn'
 	},
 	{
 		id: 'lamp_needs_matches',
@@ -226,7 +228,9 @@ export const rules: RuleView[] = [
 		then: ['say "You have nothing to light it with."'],
 		once: false,
 		instead: true,
-		fired: false
+		fired: false,
+		trigger: 'verb',
+		relevant: 'uses things in reach'
 	},
 	{
 		id: 'dusk_falls',
@@ -236,7 +240,21 @@ export const rules: RuleView[] = [
 		then: ['say "The last of the light drains out of the sky."'],
 		once: false,
 		instead: false,
-		fired: false
+		fired: false,
+		trigger: 'time',
+		relevant: 'fires in 30 minutes'
+	},
+	{
+		id: 'first_climb',
+		when: 'the player enters Lantern Room',
+		condition: null,
+		condition_holds: true,
+		then: ['say "You are out of breath, and the wind leans on the glass."'],
+		once: true,
+		instead: false,
+		fired: false,
+		trigger: 'enter',
+		relevant: null
 	}
 ];
 

@@ -18,7 +18,6 @@
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
 	import InspectorPanel from '#lib/design/organisms/InspectorPanel.svelte';
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
-	import { tick } from 'svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
 	import type { PaletteItem, TabItem } from '#lib/design/types.ts';
@@ -30,12 +29,12 @@
 	let prompt: HTMLInputElement | undefined = $state();
 	let showPalette = $state(false);
 
-	async function showRule(id: string) {
+	/** A rule for the Rules tab to show and focus. */
+	let revealRule = $state<string | null>(null);
+
+	function showRule(id: string) {
 		inspector = 'rules';
-		await tick();
-		const card = document.getElementById(`rule-card-${id}`);
-		card?.scrollIntoView({ block: 'center' });
-		card?.focus();
+		revealRule = id;
 	}
 
 	function backToPrompt() {
@@ -261,7 +260,7 @@
 				{:else if inspector === 'story'}
 					<StoryTimeline steps={s.history} />
 				{:else if inspector === 'rules'}
-					<RulesView rules={s.rules} />
+					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
 				{:else}
 					<AssemblyPanel
 						room={s.scene.room}

@@ -226,3 +226,32 @@ fn author_commands_change_state_directly() {
         Some("00:00")
     );
 }
+
+#[test]
+fn rules_say_why_they_matter_here() {
+    let mut game = lighthouse();
+    game.start();
+    let rel = |game: &Game, id: &str| {
+        game.rules()
+            .into_iter()
+            .find(|r| r.id == id)
+            .unwrap()
+            .relevant
+    };
+    // On the shore at 20:30, dusk falls at 21:00.
+    assert_eq!(
+        rel(&game, "dusk_falls").as_deref(),
+        Some("fires in 30 minutes")
+    );
+    assert_eq!(rel(&game, "find_iron_key"), None);
+    game.input("n");
+    assert_eq!(
+        rel(&game, "find_iron_key").as_deref(),
+        Some("uses things in reach")
+    );
+    game.input("open drawer");
+    assert_eq!(
+        rel(&game, "find_iron_key").as_deref(),
+        Some("fired in the last turn")
+    );
+}

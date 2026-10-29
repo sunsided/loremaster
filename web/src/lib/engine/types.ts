@@ -170,6 +170,10 @@ export interface RuleView {
 	once: boolean;
 	instead: boolean;
 	fired: boolean;
+	/** The kind of event: start, turn, enter, leave, time or verb. */
+	trigger: 'start' | 'turn' | 'enter' | 'leave' | 'time' | 'verb';
+	/** Why the rule matters here and now, or null. */
+	relevant: string | null;
 }
 
 /** What a command that is still being typed refers to. */

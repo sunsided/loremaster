@@ -18,6 +18,8 @@ pub struct Game {
     /// The room fragments in the last description the player saw, so the
     /// assembly panel matches the screen even after once-only text is used up.
     last_shown: Option<(Id, Vec<usize>)>,
+    /// Rules that fired in the last turn, for the rules view.
+    last_fired: Vec<Id>,
 }
 
 /// A verb for the verb bar.
@@ -146,6 +148,11 @@ pub struct RuleView {
     pub instead: bool,
     /// True when the rule fired at least one time in this game.
     pub fired: bool,
+    /// The kind of event: start, turn, enter, leave, time or verb.
+    pub trigger: String,
+    /// Why the rule matters here and now, or None. For example "fires when the
+    /// player enters this room" or "fired in the last turn".
+    pub relevant: Option<String>,
 }
 
 /// A command for the author, not the player: it changes the game state
@@ -231,6 +238,7 @@ impl Game {
             state,
             facts,
             last_shown: None,
+            last_fired: Vec::new(),
         }
     }
 
@@ -880,8 +888,19 @@ impl Game {
                         lantern_model::Effect::End(t) => format!("end the game: \"{t}\""),
                     })
                     .collect();
+                let trigger = match &r.on {
+                    EventPattern::Start => "start",
+                    EventPattern::Turn => "turn",
+                    EventPattern::Enter(_) => "enter",
+                    EventPattern::Leave(_) => "leave",
+                    EventPattern::Time(_) => "time",
+                    EventPattern::Verb(_) => "verb",
+                };
+                let relevant = self.relevance(r);
                 RuleView {
                     id: r.id.to_string(),
+                    trigger: trigger.to_string(),
+                    relevant,
                     when,
                     condition: r.when.clone(),
                     condition_holds: ev.holds_opt(&self.world.rules[i].when),
@@ -892,6 +911,47 @@ impl Game {
                 }
             })
             .collect()
+    }
+
+    /// Why a rule matters at the player's position and time now, if it does.
+    fn relevance(&self, rule: &lantern_model::Rule) -> Option<String> {
+        if self.last_fired.contains(&rule.id) {
+            return Some("fired in the last turn".into());
+        }
+        if rule.once && self.state.fired.contains(&rule.id) {
+            return None;
+        }
+        let here = &self.state.room;
+        match &rule.on {
+            EventPattern::Enter(r) | EventPattern::Leave(r) if r == here => {
+                Some("about this room".into())
+            }
+            EventPattern::Enter(r) => {
+                let next_door = self
+                    .room_def()
+                    .is_some_and(|room| room.exits.iter().any(|e| &e.to == r));
+                next_door.then(|| "fires in a room next to this one".into())
+            }
+            EventPattern::Verb(parts) => {
+                let scope = self.in_scope();
+                let things = &parts[1..];
+                if things.is_empty() {
+                    Some("works with any thing".into())
+                } else if things.iter().all(|t| scope.contains(t)) {
+                    Some("uses things in reach".into())
+                } else {
+                    None
+                }
+            }
+            EventPattern::Time(t) => {
+                let now = self.state.minutes % TimeOfDay::MINUTES_PER_DAY;
+                let at = u32::from(t.0);
+                let ahead = (at + TimeOfDay::MINUTES_PER_DAY - now) % TimeOfDay::MINUTES_PER_DAY;
+                (ahead <= 60).then(|| format!("fires in {ahead} minutes"))
+            }
+            EventPattern::Turn => Some("checks every turn".into()),
+            EventPattern::Leave(_) | EventPattern::Start => None,
+        }
     }
 
     pub fn verbs(&self) -> Vec<VerbInfo> {
@@ -1126,7 +1186,13 @@ impl Game {
         );
     }
 
-    fn finish(&self, mut turn: Turn) -> Turn {
+    fn finish(&mut self, mut turn: Turn) -> Turn {
+        self.last_fired = turn
+            .log
+            .iter()
+            .filter(|l| l.kind == "rule")
+            .map(|l| Id::new(l.text.as_str()))
+            .collect();
         turn.ended = self.state.ended;
         self.link_things(&mut turn.blocks);
         turn
