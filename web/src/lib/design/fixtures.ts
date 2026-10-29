@@ -1,7 +1,7 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { Exploration, ExitInfo, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { Exploration, ExitInfo, RoomMatrix, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
 import type { StoryStep, TranscriptEntry } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
@@ -331,10 +331,41 @@ export const exploration: Exploration = {
 			variants: [
 				{ text: 'Shingle crunches underfoot. … pale against the dusk sky. The sun is a red coal sinking into the sea.', states: 40, path: [], facts: ['lighthouse_door.locked = true'] },
 				{ text: 'Shingle crunches underfoot. … black against the stars. Waves hiss on the stones.', states: 120, path: ['go north', 'go south', 'wait', 'wait'], facts: ['cottage_door.open = true', 'lighthouse_door.locked = true'] }
-			]
+			],
+			seen: []
 		},
-		{ id: 'vault', name: 'The Vault', reached: false, variants: [] }
+		{ id: 'vault', name: 'The Vault', reached: false, variants: [], seen: [] }
 	],
 	never_shown: ['room:vault#1: Cold stone and the smell of old coins.'],
 	never_fired: ['open_vault']
 };
+
+// The cantina of the cantina example: the presence text of Blackbeard depends on what the player knows.
+const bar = 'Low beams, smoke, a bar polished by elbows.';
+const turns = ' Every head turns when you come in, then turns away again.';
+const looms = 'A shadow looms in the corner of the cantina.';
+const staring = 'The grim-looking man is still staring at you from the corner.';
+const sitting = 'Blackbeard is still sitting in the corner, nodding at you as you enter.';
+
+export const cantinaMatrix: RoomMatrix = {
+	room: 'cantina',
+	dimensions: [
+		{ name: 'knows_blackbeard_name', values: ['false', 'true'] },
+		{ name: 'first_visit', values: ['true', 'false'] },
+		{ name: 'blackbeard.talked', values: ['0', '1'] }
+	],
+	combinations: 8,
+	cells: [
+		{ values: ['false', 'true', '0'], text: `${bar}${turns}\n${looms}`, warnings: [] },
+		{ values: ['true', 'true', '0'], text: `${bar}${turns}\nBlackbeard looms in the corner of the cantina. ${sitting}`, warnings: ['2 presence texts of blackbeard show'] },
+		{ values: ['false', 'false', '0'], text: `${bar}\n${looms}`, warnings: [] },
+		{ values: ['true', 'false', '0'], text: `${bar}\nBlackbeard looms in the corner of the cantina. ${sitting}`, warnings: ['2 presence texts of blackbeard show'] },
+		{ values: ['false', 'true', '1'], text: `${bar}${turns}\n${staring}`, warnings: [] },
+		{ values: ['true', 'true', '1'], text: `${bar}${turns}\n${sitting}`, warnings: [] },
+		{ values: ['false', 'false', '1'], text: `${bar}\n${staring}`, warnings: [] },
+		{ values: ['true', 'false', '1'], text: `${bar}\n${sitting}`, warnings: [] }
+	]
+};
+
+/** The full texts that the whole-game run saw in the cantina. */
+export const cantinaSeen: string[] = cantinaMatrix.cells.filter((c) => !c.warnings.length).map((c) => c.text);

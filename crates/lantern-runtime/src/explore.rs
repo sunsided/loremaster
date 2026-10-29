@@ -44,6 +44,8 @@ pub struct RoomCoverage {
     pub name: String,
     pub reached: bool,
     pub variants: Vec<TextVariant>,
+    /// Every full room text the explorer saw, with the things in the room. The room matrix uses it to mark reachable combinations.
+    pub seen: Vec<String>,
 }
 
 /// An ending the explorer reached.
@@ -228,18 +230,23 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     let mut shown: BTreeSet<(String, usize)> = BTreeSet::new();
     let mut fired: BTreeSet<String> = BTreeSet::new();
     let mut variants: BTreeMap<String, BTreeMap<String, TextVariant>> = BTreeMap::new();
+    let mut full_texts: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut endings: BTreeMap<String, EndingFound> = BTreeMap::new();
     let mut queue: VecDeque<usize> = VecDeque::new();
     let mut truncated = false;
 
     sources(&opening, &mut shown);
-    let record = |game: &Game,
-                  path: &[String],
-                  variants: &mut BTreeMap<String, BTreeMap<String, TextVariant>>,
-                  shown: &mut BTreeSet<(String, usize)>| {
+    let mut record = |game: &Game,
+                      path: &[String],
+                      variants: &mut BTreeMap<String, BTreeMap<String, TextVariant>>,
+                      shown: &mut BTreeSet<(String, usize)>| {
         let preview = game.describe_preview();
         sources(&preview, shown);
         let text = description(&preview);
+        full_texts
+            .entry(game.state().room.to_string())
+            .or_default()
+            .insert(crate::matrix::room_text(&preview).0);
         let entry = variants
             .entry(game.state().room.to_string())
             .or_default()
@@ -355,6 +362,11 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                 name: r.name.clone(),
                 reached: !list.is_empty(),
                 variants: list,
+                seen: full_texts
+                    .remove(r.id.as_str())
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect(),
             }
         })
         .collect();

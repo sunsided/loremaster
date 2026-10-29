@@ -1,11 +1,21 @@
 <script lang="ts">
-	import type { Exploration } from '#lib/engine/types.ts';
+	import type { Exploration, RoomMatrix } from '#lib/engine/types.ts';
 	import Button from '../atoms/Button.svelte';
 	import Heading from '../atoms/Heading.svelte';
 	import HelpNote from '../molecules/HelpNote.svelte';
+	import RadioGroup from '../molecules/RadioGroup.svelte';
 	import SectionRule from '../molecules/SectionRule.svelte';
+	import RoomMatrixView from './RoomMatrixView.svelte';
 
 	interface Props {
+		/** `room`: all combinations of the current room. `game`: all states that the player can reach from the start. */
+		mode?: 'room' | 'game';
+		/** The room matrix of the current room. */
+		matrix?: RoomMatrix | null;
+		/** The name of the current room. */
+		roomName?: string;
+		/** Put the game into one combination of the room matrix. */
+		ontry?: (values: [string, string][]) => void;
 		/** The last result, or null before the first run. */
 		result?: Exploration | null;
 		/** True while the explorer runs. */
@@ -15,7 +25,22 @@
 		onreplay: (path: string[]) => void;
 	}
 
-	let { result = null, running = false, onrun, onreplay }: Props = $props();
+	let {
+		mode = $bindable('room'),
+		matrix = null,
+		roomName = '',
+		ontry = () => {},
+		result = null,
+		running = false,
+		onrun,
+		onreplay
+	}: Props = $props();
+
+	const modes = [
+		{ value: 'room' as const, label: 'This room' },
+		{ value: 'game' as const, label: 'Whole game' }
+	];
+	const seen = $derived(result?.rooms.find((r) => r.id === matrix?.room)?.seen ?? null);
 
 	const unreached = $derived(result?.rooms.filter((r) => !r.reached) ?? []);
 
@@ -41,13 +66,26 @@
 	<div class="head">
 		<Heading level={2} id="explore-title">Explore</Heading>
 		<HelpNote id="explore" topic="Explore">
-			The explorer plays all ways through the story from the start, within a budget. It tries the actions that move the
-			story forward. Use it to see how complicated text reads in each state, and to find text that never shows.
+			"This room" shows the text of the current room in each combination of the values that the text depends on, also
+			combinations that the player can not reach. Use it to find a text that reads badly in one condition. "Whole game"
+			plays all ways through the story from the start, within a budget, and finds text that never shows.
 		</HelpNote>
 	</div>
-	<div><Button variant="primary" onclick={onrun} disabled={running}>{running ? 'Exploring…' : result ? 'Explore again' : 'Explore all states'}</Button></div>
+	<RadioGroup legend="What to explore" name="explore-mode" look="pills" options={modes} bind:value={mode} />
 
-	{#if result}
+	{#if mode === 'room'}
+		{#if matrix}
+			<RoomMatrixView {matrix} {roomName} {seen} {ontry} />
+		{/if}
+	{:else}
+		<div>
+			<Button variant="primary" onclick={onrun} disabled={running}
+				>{running ? 'Exploring…' : result ? 'Explore again' : 'Explore all states'}</Button
+			>
+		</div>
+	{/if}
+
+	{#if mode === 'game' && result}
 		<p class="summary" role="status">
 			{result.states} states.
 			{unreached.length ? `${unreached.length} rooms not reached.` : 'Every room reached.'}

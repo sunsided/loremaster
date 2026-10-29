@@ -2,6 +2,7 @@ import init, { Engine as WasmEngine } from './pkg/lantern-wasm.js';
 import type {
 	AuthorCommand,
 	Exploration,
+	RoomMatrix,
 	FrameUse,
 	Inspect,
 	PhaseView,
@@ -77,6 +78,11 @@ export class Game {
 	/** Walk all reachable states from the start of the story. This can take a moment. */
 	explore(maxStates = 2000, maxDepth = 40): Exploration {
 		return this.#engine.explore(maxStates, maxDepth);
+	}
+
+	/** The text of a room in every combination of the values that the text depends on. */
+	roomMatrix(room: string): RoomMatrix | null {
+		return this.#engine.roomMatrix(room);
 	}
 
 	vars(): VarView[] {

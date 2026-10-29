@@ -14,6 +14,7 @@
 mod eval;
 mod explore;
 mod game;
+mod matrix;
 mod output;
 mod parser;
 mod rng;
@@ -27,6 +28,7 @@ pub use game::{
     MapLink, MapRoom, MapView, PartView, PhaseView, RoomParts, RuleView, Scene, ThingInfo, VarView,
     VerbInfo,
 };
+pub use matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix, room_matrix};
 pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
 pub use parser::{Command, Preview};
 pub use state::{FragmentProgress, State};

@@ -170,6 +170,12 @@ pub enum AuthorCommand {
     Time { time: String },
     /// Put a thing in the player's hands.
     Give { thing: String },
+    /// Put the game into one combination of the room matrix: go to the room and set each named value.
+    /// The names and values are the ones of [`crate::RoomMatrix`].
+    Situation {
+        room: String,
+        values: Vec<(String, String)>,
+    },
 }
 
 /// A variable or thing property with its value now, for the command palette.
@@ -305,7 +311,7 @@ impl Game {
         &self.world
     }
 
-    fn eval(&self) -> Eval<'_> {
+    pub(crate) fn eval(&self) -> Eval<'_> {
         Eval {
             world: &self.world,
             state: &self.state,
@@ -327,6 +333,17 @@ impl Game {
     /// What a command that is still being typed refers to, for the verb bar.
     pub fn preview(&self, text: &str) -> crate::Preview {
         crate::parser::preview(&self.world.verbs, &self.parse_scope(), text)
+    }
+
+    /// Set a variable or property without a turn, for tools that build a state.
+    pub(crate) fn set_value(&mut self, name: &str, value: Value) {
+        let mut scratch = Turn::default();
+        self.set_fact(&mut scratch, name, value);
+    }
+
+    /// Direct access to the state, for tools that build a state. Use `set_value` for facts.
+    pub(crate) fn state_mut(&mut self) -> &mut State {
+        &mut self.state
     }
 
     /// The room description as it would show now, without changing the game.
@@ -1012,6 +1029,15 @@ impl Game {
                 note(&mut turn, format!("give {}", t.name));
                 let id = t.id.clone();
                 self.move_thing(&id, Location::Carried);
+            }
+            AuthorCommand::Situation { room, values } => {
+                if !crate::matrix::apply_cell(self, &room, &values) {
+                    turn.say(BlockKind::Response, format!("There is no room `{room}`."));
+                    return turn;
+                }
+                let list: Vec<String> = values.iter().map(|(n, v)| format!("{n} = {v}")).collect();
+                note(&mut turn, format!("try {room}: {}", list.join(", ")));
+                self.describe_room(&mut turn);
             }
         }
         self.finish(turn)

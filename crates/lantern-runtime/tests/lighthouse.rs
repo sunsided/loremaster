@@ -400,3 +400,78 @@ fn the_explorer_reaches_the_ending_and_reports_coverage() {
         result.states, result.never_shown, result.never_fired
     );
 }
+
+#[test]
+fn the_room_matrix_renders_every_combination_of_the_room() {
+    use lantern_runtime::{AuthorCommand, room_matrix};
+    let mut game = lighthouse();
+    game.start();
+    let matrix = room_matrix(&game, "shore").unwrap();
+    let names: Vec<&str> = matrix.dimensions.iter().map(|d| d.name.as_str()).collect();
+    println!("{names:?} -> {} combinations", matrix.combinations);
+    assert!(names.contains(&"time.phase"), "{names:?}");
+    assert!(names.contains(&"first_visit"), "{names:?}");
+    assert_eq!(
+        matrix.cells.len(),
+        matrix.combinations.min(lantern_runtime::MAX_CELLS)
+    );
+    let texts: std::collections::BTreeSet<&str> =
+        matrix.cells.iter().map(|c| c.text.as_str()).collect();
+    assert!(texts.len() >= 2, "the text changes with the state");
+    assert!(
+        game.state().room.as_str() == "shore",
+        "the game itself does not change"
+    );
+
+    // "Try this" puts the game into one combination.
+    let cell = &matrix.cells[matrix.cells.len() - 1];
+    let values: Vec<(String, String)> = matrix
+        .dimensions
+        .iter()
+        .zip(&cell.values)
+        .map(|(d, v)| (d.name.clone(), v.clone()))
+        .collect();
+    let turn = game.author(AuthorCommand::Situation {
+        room: "shore".into(),
+        values,
+    });
+    let prose = turn.plain_text();
+    let first_line = cell.text.lines().next().unwrap();
+    assert!(prose.contains(first_line), "{prose}\n---\n{}", cell.text);
+}
+
+#[test]
+fn the_room_matrix_follows_name_stages_and_characters() {
+    use lantern_runtime::room_matrix;
+    let mut game = example("cantina");
+    game.start();
+    let matrix = room_matrix(&game, "cantina").unwrap();
+    let names: Vec<&str> = matrix.dimensions.iter().map(|d| d.name.as_str()).collect();
+    println!("{names:?} -> {} combinations", matrix.combinations);
+    assert!(names.contains(&"blackbeard.talked"), "{names:?}");
+    assert!(names.contains(&"knows_blackbeard_name"), "{names:?}");
+    assert!(
+        matrix
+            .cells
+            .iter()
+            .any(|c| c.text.contains("A shadow looms"))
+    );
+    assert!(
+        matrix
+            .cells
+            .iter()
+            .any(|c| c.text.contains("Blackbeard is still"))
+    );
+    // The player knows the name but never talked to him: both presence texts show.
+    let odd = matrix
+        .cells
+        .iter()
+        .find(|c| c.values == ["true", "true", "0"])
+        .unwrap();
+    assert_eq!(odd.warnings, vec!["2 presence texts of blackbeard show"]);
+    // The whole-game explorer never sees that combination: the player learns the name only by talking.
+    let explored = lantern_runtime::explore(&game, lantern_runtime::Budget::default());
+    let room = explored.rooms.iter().find(|r| r.id == "cantina").unwrap();
+    assert!(!room.seen.contains(&odd.text), "{:#?}", room.seen);
+    assert!(matrix.cells.iter().any(|c| room.seen.contains(&c.text)));
+}

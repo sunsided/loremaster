@@ -164,6 +164,15 @@ impl Engine {
         ))
     }
 
+    /// The text of a room in every combination of the values that the text depends on.
+    #[wasm_bindgen(js_name = roomMatrix)]
+    pub fn room_matrix(&self, room: &str) -> Result<JsValue, JsValue> {
+        match lantern_runtime::room_matrix(&self.game, room) {
+            Some(m) => to_js(&m),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
     /// All rules with their state now, for the rules view.
     pub fn rules(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.rules())

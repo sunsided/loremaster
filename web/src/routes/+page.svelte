@@ -214,6 +214,13 @@
 
 	let exploration = $state<Exploration | null>(null);
 	let exploring = $state(false);
+	let exploreMode = $state<'room' | 'game'>('room');
+	/** The room matrix of the current room. It follows the state, so it shows only while the tab is open. */
+	const matrix = $derived(
+		session && inspector === 'explore' && exploreMode === 'room'
+			? (session.scene, session.game.roomMatrix(session.scene.room))
+			: null
+	);
 
 	function runExplorer() {
 		const s = session;
@@ -334,6 +341,13 @@
 					<StoryTimeline steps={s.history} />
 				{:else if inspector === 'explore'}
 					<ExplorerView
+						bind:mode={exploreMode}
+						{matrix}
+						roomName={s.scene.room_name}
+						ontry={(values) => {
+							s.author({ type: 'situation', room: s.scene.room, values });
+							prompt?.focus();
+						}}
 						result={exploration}
 						running={exploring}
 						onrun={runExplorer}

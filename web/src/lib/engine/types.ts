@@ -198,7 +198,8 @@ export type AuthorCommand =
 	| { type: 'goto'; room: string }
 	| { type: 'set'; name: string; value: Value }
 	| { type: 'time'; time: string }
-	| { type: 'give'; thing: string };
+	| { type: 'give'; thing: string }
+	| { type: 'situation'; room: string; values: [string, string][] };
 
 export interface VarView {
 	name: string;
@@ -257,6 +258,31 @@ export interface RoomCoverage {
 	name: string;
 	reached: boolean;
 	variants: TextVariant[];
+	/** Every full room text that the explorer saw, with the things in the room. */
+	seen: string[];
+}
+
+/** One value that the room text depends on, and the values worth trying. */
+export interface Dimension {
+	name: string;
+	values: string[];
+}
+
+/** The room text for one combination of values. */
+export interface MatrixCell {
+	/** One value for each dimension, in the order of the dimensions. */
+	values: string[];
+	text: string;
+	warnings: string[];
+}
+
+/** The text of a room in all combinations of the values that the text depends on. */
+export interface RoomMatrix {
+	room: string;
+	dimensions: Dimension[];
+	cells: MatrixCell[];
+	/** All combinations. When this is more than the cells, the matrix shows only the first ones. */
+	combinations: number;
 }
 
 /** The result of the state explorer. */

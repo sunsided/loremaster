@@ -103,11 +103,37 @@ names:
 - Set `proper: true` for a proper name. A proper name gets no article.
 - The author tooltip shows all stages and the current stage.
 
+## Examine one room in all conditions
+
+The room matrix shows the text of one room in each combination of the values that the text depends on. It also shows combinations that the player can not reach. Use it to find a text that reads badly in one condition.
+
+1. In the web app, go to the room.
+2. Open the "Explore" tab of the inspector. "This room" is the default mode.
+
+The runtime finds the values in these locations:
+
+- The conditions of the room fragments.
+- The inline markup of the room fragments.
+- The presence texts and the name stages of the things in the room.
+
+For a number, the runtime tries the values next to each limit in a condition. For example, `talked > 0` gives 0 and 1. The matrix renders not more than 256 combinations.
+
+The view shows each different text one time, with the combinations that give it. It marks these possible problems:
+
+- No room text.
+- Two spaces in a row, a space before punctuation, or a brace in the text.
+- Two replacing fragments of one layer that apply at the same time.
+- Two or more presence texts of one thing that show at the same time.
+
+After a "Whole game" run, each text has a mark: "seen in the whole-game run" or "not seen in the whole-game run". A text that the run did not see can be unreachable, or it can be outside the budget of the run.
+
+"Try this" puts the game into one combination. It moves the player to the room and sets each value. It does not play a turn.
+
 ## Examine all states
 
 The state explorer plays all ways through the story from the start. It stops at 2000 states or 40 commands.
 
-1. In the web app, open the "Explore" tab of the inspector and select "Explore all states".
+1. In the web app, open the "Explore" tab of the inspector, select "Whole game", then select "Explore all states".
 2. Or, run `task explore` or `cargo run -p lantern-cli -- explore <folder>` in a terminal.
 
 The explorer shows:
