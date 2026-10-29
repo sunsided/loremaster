@@ -1,0 +1,170 @@
+/* Theme tokens. The palettes come from the chosen visual direction D. */
+:root,
+[data-theme='phosphor'] {
+	--outer: #070a08;
+	--bg: #0b0f0c;
+	--panel: #0e1410;
+	--line: #1f2b22;
+	--text: #c8f5d0;
+	--strong: #e3ffe9;
+	--muted: #86b091;
+	--accent: #39ff88;
+	--on-accent: #06210f;
+	--warn: #ffb000;
+	--warn-text: #ffcb52;
+	--chip: #0f1a12;
+	--chip-line: #1f3a28;
+	--ui: 'IBM Plex Mono', ui-monospace, monospace;
+	--prose: 'IBM Plex Mono', ui-monospace, monospace;
+	--radius: 22px;
+	--screen-inset: inset 0 0 80px rgba(0, 0, 0, 0.75), 0 0 0 1px #1f2b22;
+	--glow-full: 0 0 6px rgba(57, 255, 136, 0.38);
+	--glow-soft: 0 0 3px rgba(57, 255, 136, 0.22);
+	--grain-opacity: 0.09;
+	--grain-blend: screen;
+	--scan-full: 0.28;
+	--scan-soft: 0.14;
+	color-scheme: dark;
+}
+
+[data-theme='paper'] {
+	--outer: #e9e2d4;
+	--bg: #f4efe6;
+	--panel: #fbf8f2;
+	--line: #ddd3c2;
+	--text: #2a2620;
+	--strong: #1e1b16;
+	--muted: #6b6358;
+	--accent: #2f4b8a;
+	--on-accent: #ffffff;
+	--warn: #b3412e;
+	--warn-text: #8a3320;
+	--chip: #fffdf8;
+	--chip-line: #cbbfa9;
+	--ui: Inter, system-ui, sans-serif;
+	--prose: Literata, Georgia, serif;
+	--radius: 6px;
+	--screen-inset: 0 1px 0 #d8ccb6, 0 12px 30px rgba(60, 40, 20, 0.12);
+	--glow-full: 0 0 0.6px rgba(42, 38, 32, 0.6);
+	--glow-soft: none;
+	--grain-opacity: 0.07;
+	--grain-blend: multiply;
+	--scan-full: 0;
+	--scan-soft: 0;
+	color-scheme: light;
+}
+
+[data-theme='night'] {
+	--outer: #0f1115;
+	--bg: #14161b;
+	--panel: #181b21;
+	--line: #2d3240;
+	--text: #e6e8ee;
+	--strong: #ffffff;
+	--muted: #9aa1b2;
+	--accent: #5ec4b6;
+	--on-accent: #0b1f1c;
+	--warn: #f2b544;
+	--warn-text: #f7d58c;
+	--chip: #1e222b;
+	--chip-line: #343a4a;
+	--ui: Inter, system-ui, sans-serif;
+	--prose: Newsreader, Georgia, serif;
+	--radius: 10px;
+	--screen-inset: 0 0 0 1px #2d3240;
+	--glow-full: none;
+	--glow-soft: none;
+	--grain-opacity: 0.06;
+	--grain-blend: screen;
+	--scan-full: 0;
+	--scan-soft: 0;
+	color-scheme: dark;
+}
+
+html,
+body {
+	margin: 0;
+	background: var(--outer);
+	color: var(--text);
+	font-family: var(--ui);
+	font-size: 13px;
+}
+
+button,
+input,
+textarea,
+select {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	cursor: pointer;
+}
+
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+/* ---- Effects (E1/E2) --------------------------------------------------
+   Effects cover the player pane only. Grain renders once and only
+   translates; glow is a text-shadow; glitch only on new text and at most
+   once per 2 s (enforced in script). Reduced motion keeps textures and
+   removes every animation. */
+
+@keyframes fx-grain-shift {
+	0% { transform: translate(0, 0); }
+	20% { transform: translate(-4%, 3%); }
+	40% { transform: translate(3%, -2%); }
+	60% { transform: translate(-2%, -4%); }
+	80% { transform: translate(4%, 2%); }
+	100% { transform: translate(0, 0); }
+}
+@keyframes fx-flicker {
+	0%, 95%, 100% { opacity: 1; }
+	96% { opacity: 0.93; }
+	97% { opacity: 0.99; }
+	98% { opacity: 0.95; }
+}
+@keyframes fx-glitch {
+	0% { transform: translateX(0); clip-path: inset(0 0 0 0); text-shadow: none; }
+	15% { transform: translateX(-3px); clip-path: inset(12% 0 58% 0); text-shadow: 2px 0 rgba(255, 70, 110, 0.6), -2px 0 rgba(70, 200, 255, 0.6); }
+	30% { transform: translateX(2px); clip-path: inset(62% 0 6% 0); }
+	45% { transform: translateX(-1px); clip-path: inset(28% 0 44% 0); }
+	60% { transform: translateX(0); clip-path: inset(0 0 0 0); text-shadow: 1px 0 rgba(255, 70, 110, 0.35), -1px 0 rgba(70, 200, 255, 0.35); }
+	100% { transform: none; clip-path: inset(0 0 0 0); text-shadow: none; }
+}
+@keyframes fx-fringe {
+	0% { text-shadow: 1px 0 rgba(255, 70, 110, 0.45), -1px 0 rgba(70, 200, 255, 0.45); }
+	100% { text-shadow: none; }
+}
+@keyframes fx-reveal {
+	from { clip-path: inset(0 100% 0 0); }
+	to { clip-path: inset(0 0 0 0); }
+}
+
+.fx-full .fx-grain-layer { animation: fx-grain-shift 0.6s steps(1) infinite; }
+.fx-full .fx-screen { animation: fx-flicker 9s linear infinite; }
+.fx-full .fx-glitch { animation: fx-glitch 240ms steps(5) 1; }
+.fx-subtle .fx-glitch { animation: fx-fringe 320ms ease-out 1; }
+.fx-full .fx-line { animation: fx-reveal 700ms steps(36) both; }
+.fx-subtle .fx-line { animation: fx-reveal 260ms steps(12) both; }
+.fx-off .fx-overlay { display: none; }
+.fx-paused * { animation-play-state: paused !important; }
+
+.fx-reduce .fx-grain-layer,
+.fx-reduce .fx-screen,
+.fx-reduce .fx-glitch,
+.fx-reduce .fx-line {
+	animation: none !important;
+}

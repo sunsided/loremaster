@@ -20,7 +20,7 @@ mod state;
 mod text;
 mod world;
 
-pub use game::{ExitInfo, Game, Scene, ThingInfo, VerbInfo};
+pub use game::{ExitInfo, FragmentView, Game, Scene, ThingInfo, VerbInfo};
 pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
 pub use parser::Command;
 pub use state::{FragmentProgress, State};

@@ -56,6 +56,21 @@ pub struct Scene {
     pub ended: bool,
 }
 
+/// One fragment of the current room, for the assembly panel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FragmentView {
+    pub index: usize,
+    pub layer: lantern_model::Layer,
+    pub mode: lantern_model::FragmentMode,
+    pub condition: Option<String>,
+    pub replaces: bool,
+    /// The fragment's source text; variants joined with ` / `.
+    pub text: String,
+    pub shown: bool,
+    /// Why it is hidden right now.
+    pub why: Option<String>,
+}
+
 const MAX_RULE_DEPTH: u8 = 8;
 
 impl Game {
@@ -356,6 +371,58 @@ impl Game {
                 .collect(),
             ended: self.state.ended,
         }
+    }
+
+    /// How the current room's description is assembled right now: every
+    /// fragment, whether it shows, and why not. Does not change any state.
+    pub fn assembly(&self) -> Vec<FragmentView> {
+        let Some(ri) = self.world.room_idx(self.state.room.as_str()) else {
+            return Vec::new();
+        };
+        let room = &self.world.story.rooms[ri];
+        let fragments = &self.world.rooms[ri].description;
+        let ev = self.eval();
+        let first = self.state.visits_to(room.id.as_str()) <= 1;
+        let shown = text::visible(&ev, fragments, first);
+        let dark = self.is_dark();
+        room.description
+            .iter()
+            .zip(fragments.iter())
+            .enumerate()
+            .map(|(i, (src, f))| {
+                let is_shown = !dark && shown.contains(&i);
+                let seen = self.state.progress.get(&f.key).map_or(0, |p| p.shown);
+                let why = if is_shown {
+                    None
+                } else if dark {
+                    Some("the room is dark".to_string())
+                } else if f.mode == lantern_model::FragmentMode::FirstVisit && !first {
+                    Some("first visit only".to_string())
+                } else if f.mode == lantern_model::FragmentMode::Once && seen > 0 {
+                    Some("already shown once".to_string())
+                } else if !ev.holds_opt(&f.when) {
+                    Some(format!(
+                        "{} is false",
+                        f.when_src.as_deref().unwrap_or("condition")
+                    ))
+                } else {
+                    let by = shown.iter().find(|&&j| {
+                        j > i && fragments[j].replaces && fragments[j].layer == f.layer
+                    });
+                    Some(by.map_or("hidden".to_string(), |j| format!("replaced by {}", j + 1)))
+                };
+                FragmentView {
+                    index: i,
+                    layer: f.layer,
+                    mode: f.mode,
+                    condition: src.when.clone(),
+                    replaces: src.replaces,
+                    text: src.variants.join(" / "),
+                    shown: is_shown,
+                    why,
+                }
+            })
+            .collect()
     }
 
     pub fn verbs(&self) -> Vec<VerbInfo> {
