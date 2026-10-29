@@ -5,14 +5,16 @@
 		/** `thing`: an object in the story. `exit`: a way out of the room. */
 		kind?: 'thing' | 'exit';
 		onclick: () => void;
+		/** What an author tooltip shows facts about, for example `thing:oil_lamp` or `exit:north`. */
+		inspect?: string;
 		children: Snippet;
 	}
 
-	let { kind = 'thing', onclick, children }: Props = $props();
+	let { kind = 'thing', onclick, inspect, children }: Props = $props();
 </script>
 
 <!-- A word in the story text that the player can click. It is a real button, so the keyboard can reach it. -->
-<button class="prose-link {kind}" {onclick}>{@render children()}</button>
+<button class="prose-link {kind}" {onclick} data-inspect={inspect}>{@render children()}</button>
 
 <style>
 	.prose-link {

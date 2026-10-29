@@ -211,3 +211,14 @@ export interface PhaseView {
 	name: string;
 	from: string;
 }
+
+/** Facts about a thing or an exit, for an author tooltip. */
+export interface Inspect {
+	kind: 'thing' | 'exit';
+	id: string;
+	title: string;
+	/** Label and value pairs, in display order. */
+	facts: [string, string][];
+	/** Ids of related rules. */
+	rules: string[];
+}

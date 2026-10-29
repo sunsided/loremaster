@@ -255,3 +255,29 @@ fn rules_say_why_they_matter_here() {
         Some("fired in the last turn")
     );
 }
+
+#[test]
+fn inspect_gives_author_facts() {
+    let mut game = lighthouse();
+    game.start();
+    let door = game.inspect_thing("lighthouse_door").unwrap();
+    let fact = |i: &lantern_runtime::Inspect, k: &str| {
+        i.facts.iter().find(|(l, _)| l == k).map(|(_, v)| v.clone())
+    };
+    assert_eq!(fact(&door, "locked").as_deref(), Some("true"));
+    assert_eq!(
+        fact(&door, "door of").as_deref(),
+        Some("shore east, stairwell west")
+    );
+    let lamp = game.inspect_thing("oil_lamp").unwrap();
+    assert!(
+        lamp.rules.contains(&"lamp_needs_matches".to_string()),
+        "{:?}",
+        lamp.rules
+    );
+    let east = game.inspect_exit("east").unwrap();
+    assert_eq!(
+        fact(&east, "door").as_deref(),
+        Some("lighthouse_door, locked")
+    );
+}

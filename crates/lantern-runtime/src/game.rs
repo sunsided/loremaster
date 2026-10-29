@@ -186,6 +186,20 @@ pub struct PhaseView {
     pub from: String,
 }
 
+/// What the author sees about a thing or an exit in a tooltip.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Inspect {
+    /// `thing` or `exit`.
+    pub kind: String,
+    /// The thing id, or the exit direction.
+    pub id: String,
+    pub title: String,
+    /// Label and value pairs, in display order.
+    pub facts: Vec<(String, String)>,
+    /// Ids of rules that name this thing or the room of this exit.
+    pub rules: Vec<String>,
+}
+
 const MAX_RULE_DEPTH: u8 = 8;
 
 impl Game {
@@ -782,6 +796,144 @@ impl Game {
             }
         }
         self.finish(turn)
+    }
+
+    /// Facts about a thing, for an author tooltip. Does not change any state.
+    pub fn inspect_thing(&self, id: &str) -> Option<Inspect> {
+        let t = self.world.story.thing(id)?;
+        let mut facts: Vec<(String, String)> = vec![("id".into(), t.id.to_string())];
+        if !t.aliases.is_empty() {
+            facts.push(("also called".into(), t.aliases.join(", ")));
+        }
+        let location = match self.state.location_of(id) {
+            Some(Location::Room(r)) => self
+                .world
+                .story
+                .room(r.as_str())
+                .map_or(r.to_string(), |room| format!("{} ({r})", room.name)),
+            Some(Location::Carried) => "carried by the player".into(),
+            _ => "nowhere".into(),
+        };
+        facts.push(("location".into(), location));
+        let mut kind = vec![if t.portable { "portable" } else { "fixed" }];
+        if !t.listed {
+            kind.push("not listed");
+        }
+        facts.push(("kind".into(), kind.join(", ")));
+        if let Some(key) = &t.key {
+            facts.push(("key".into(), key.to_string()));
+        }
+        for prop in t.props.keys() {
+            let name = format!("{id}.{prop}");
+            if let Some(v) = self.state.facts.get(&name) {
+                facts.push((prop.clone(), v.to_string()));
+            }
+        }
+        let doors: Vec<String> = self
+            .world
+            .story
+            .rooms
+            .iter()
+            .flat_map(|r| {
+                r.exits
+                    .iter()
+                    .filter(|e| e.door.as_ref().is_some_and(|d| d.as_str() == id))
+                    .map(move |e| format!("{} {}", r.id, e.direction.name()))
+            })
+            .collect();
+        if !doors.is_empty() {
+            facts.push(("door of".into(), doors.join(", ")));
+        }
+        let mentions = |text: &str| text.contains(id);
+        let rules = self
+            .world
+            .story
+            .rules
+            .iter()
+            .filter(|r| {
+                matches!(&r.on, EventPattern::Verb(p) if p.iter().any(|x| x.as_str() == id))
+                    || r.when.as_deref().is_some_and(mentions)
+                    || r.then.iter().any(|e| mentions(&format!("{e:?}")))
+            })
+            .map(|r| r.id.to_string())
+            .collect();
+        Some(Inspect {
+            kind: "thing".into(),
+            id: id.to_string(),
+            title: t.name.clone(),
+            facts,
+            rules,
+        })
+    }
+
+    /// Facts about an exit of the current room, for an author tooltip.
+    pub fn inspect_exit(&self, direction: &str) -> Option<Inspect> {
+        let ri = self.world.room_idx(self.state.room.as_str())?;
+        let room = &self.world.story.rooms[ri];
+        let (ei, exit) = room
+            .exits
+            .iter()
+            .enumerate()
+            .find(|(_, e)| e.direction.name() == direction)?;
+        let ev = self.eval();
+        let compiled = &self.world.rooms[ri].exits[ei];
+        let to = self
+            .world
+            .story
+            .room(exit.to.as_str())
+            .map_or(exit.to.to_string(), |r| format!("{} ({})", r.name, r.id));
+        let mut facts = vec![("leads to".to_string(), to)];
+        if let Some(door) = &exit.door {
+            let state = if self.state.flag(&format!("{door}.locked")) {
+                "locked"
+            } else if self.state.flag(&format!("{door}.open")) {
+                "open"
+            } else {
+                "closed"
+            };
+            facts.push(("door".into(), format!("{door}, {state}")));
+        }
+        if let Some(src) = &exit.visible {
+            let now = if ev.holds_opt(&compiled.visible) {
+                "true now"
+            } else {
+                "false now"
+            };
+            facts.push(("visible when".into(), format!("{src} ({now})")));
+        }
+        if let Some(src) = &exit.passable {
+            let now = if ev.holds_opt(&compiled.passable) {
+                "true now"
+            } else {
+                "false now"
+            };
+            facts.push(("passable when".into(), format!("{src} ({now})")));
+        }
+        let back = self
+            .world
+            .story
+            .room(exit.to.as_str())
+            .is_some_and(|t| t.exits.iter().any(|e| e.to == room.id));
+        facts.push((
+            "way back".into(),
+            if back { "yes" } else { "no, one way" }.into(),
+        ));
+        let target = exit.to.clone();
+        let rules = self
+            .world
+            .story
+            .rules
+            .iter()
+            .filter(|r| matches!(&r.on, EventPattern::Enter(x) | EventPattern::Leave(x) if *x == target))
+            .map(|r| r.id.to_string())
+            .collect();
+        Some(Inspect {
+            kind: "exit".into(),
+            id: direction.to_string(),
+            title: format!("Exit {direction}"),
+            facts,
+            rules,
+        })
     }
 
     /// All story variables and thing properties with their values now.

@@ -1,6 +1,7 @@
 import init, { Engine as WasmEngine } from './pkg/lantern-wasm.js';
 import type {
 	AuthorCommand,
+	Inspect,
 	PhaseView,
 	VarView,
 	Command,
@@ -61,6 +62,10 @@ export class Game {
 
 	author(command: AuthorCommand): Turn {
 		return this.#engine.author(command);
+	}
+
+	inspect(kind: 'thing' | 'exit', id: string): Inspect | null {
+		return this.#engine.inspect(kind, id);
 	}
 
 	vars(): VarView[] {

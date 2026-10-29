@@ -21,7 +21,7 @@
 <div class="action-list" role="group" aria-labelledby="{id}-label">
 	<span id="{id}-label" class="label">{label}</span>
 	{#each items as item (item.id)}
-		<Button size="compact" variant="quiet" marked={marked.includes(item.id)} onclick={() => onpick(item)}
+		<Button size="compact" variant="quiet" marked={marked.includes(item.id)} data-inspect={item.inspect} onclick={() => onpick(item)}
 			>{item.label}{#if item.detail}<span class="detail">({item.detail})</span>{/if}{#if marked.includes(item.id)}<span
 					class="visually-hidden">, in the command</span
 				>{/if}</Button

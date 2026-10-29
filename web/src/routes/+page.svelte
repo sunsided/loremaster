@@ -18,6 +18,7 @@
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
 	import InspectorPanel from '#lib/design/organisms/InspectorPanel.svelte';
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
+	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
 	import type { PaletteItem, TabItem } from '#lib/design/types.ts';
@@ -116,6 +117,12 @@
 			group: 'Look',
 			label: settings.sources ? 'Hide fragment numbers' : 'Show fragment numbers',
 			run: () => (settings.sources = !settings.sources)
+		});
+		items.push({
+			id: 'tooltips',
+			group: 'Look',
+			label: settings.tooltips ? 'Hide author tooltips' : 'Show author tooltips',
+			run: () => (settings.tooltips = !settings.tooltips)
 		});
 		items.push({ id: 'settings', group: 'Look', label: 'Open look and motion settings', run: () => (showSettings = true) });
 		items.push({ id: 'restart', group: 'Game', label: 'Restart the game', run: () => s.restart() });
@@ -275,6 +282,7 @@
 			</InspectorPanel>
 		{/snippet}
 	</PlayerLayout>
+	<AuthorTooltip inspect={(kind, id) => s.game.inspect(kind, id)} enabled={settings.tooltips} />
 	<CommandPalette bind:open={showPalette} items={paletteItems} fallback={playFallback} />
 	<SettingsDialog
 		bind:open={showSettings}
@@ -282,6 +290,7 @@
 		bind:effects={settings.effects}
 		bind:motion={settings.motion}
 		bind:sources={settings.sources}
+		bind:tooltips={settings.tooltips}
 		systemReduce={settings.systemReduce}
 	/>
 {:else}

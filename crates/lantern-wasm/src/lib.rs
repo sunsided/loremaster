@@ -119,6 +119,20 @@ impl Engine {
         to_js(&self.game.author(command))
     }
 
+    /// Facts about a thing (`kind` "thing", `id` its id) or an exit of the current room
+    /// (`kind` "exit", `id` its direction), for an author tooltip. Null when there is none.
+    pub fn inspect(&self, kind: &str, id: &str) -> Result<JsValue, JsValue> {
+        let found = match kind {
+            "thing" => self.game.inspect_thing(id),
+            "exit" => self.game.inspect_exit(id),
+            _ => None,
+        };
+        match found {
+            Some(i) => to_js(&i),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
     /// All variables and thing properties with their values.
     pub fn vars(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.vars())

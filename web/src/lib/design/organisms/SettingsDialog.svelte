@@ -11,6 +11,8 @@
 		effects?: EffectsLevel;
 		motion?: MotionPreference;
 		sources?: boolean;
+		/** Show author tooltips on things and exits. */
+		tooltips?: boolean;
 		/** True when the operating system asks for reduced motion. */
 		systemReduce?: boolean;
 	}
@@ -21,6 +23,7 @@
 		effects = $bindable('full'),
 		motion = $bindable('system'),
 		sources = $bindable(true),
+		tooltips = $bindable(true),
 		systemReduce = false
 	}: Props = $props();
 
@@ -65,6 +68,7 @@
 		</p>
 	</div>
 	<Checkbox bind:checked={sources}>Show fragment numbers in the transcript</Checkbox>
+	<Checkbox bind:checked={tooltips}>Show author tooltips on things and exits</Checkbox>
 </dialog>
 
 <style>

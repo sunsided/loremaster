@@ -12,6 +12,8 @@ export interface ActionItem {
 	label: string;
 	/** Text after the label in a lighter colour, for example a direction. */
 	detail?: string;
+	/** What an author tooltip shows facts about, for example `thing:oil_lamp`. */
+	inspect?: string;
 }
 
 /** In order of preference: phosphor is the default, then night, then paper. */

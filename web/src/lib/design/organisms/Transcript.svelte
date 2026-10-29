@@ -83,9 +83,11 @@
 				onactivate={(on) => onfocus?.(on ? n - 1 : null)}
 			/>{/if}{#if run.link?.kind === 'thing'}{@const id = run.link.id}<ProseLink
 				kind="thing"
+				inspect="thing:{id}"
 				onclick={() => onthing(id, run.text)}>{run.text}</ProseLink
 			>{:else if run.link?.kind === 'exit'}{@const dir = run.link.id}<ProseLink
 				kind="exit"
+				inspect="exit:{dir}"
 				onclick={() => onexit(dir)}>{run.text}</ProseLink
 			>{:else}<span class:focused={focus !== null && run.source?.fragment === focus && isRoomRun(run)}
 				>{#each pieces(run.text) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</span

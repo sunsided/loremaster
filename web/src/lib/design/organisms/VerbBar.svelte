@@ -43,7 +43,7 @@
 	}: Props = $props();
 
 	const selectedVerb = $derived(verbs.find((v) => v.id === selected));
-	const toItem = (t: ThingInfo) => ({ id: t.id, label: t.name });
+	const toItem = (t: ThingInfo) => ({ id: t.id, label: t.name, inspect: `thing:${t.id}` });
 </script>
 
 <!--
@@ -62,7 +62,7 @@
 			<ActionList
 				label="to"
 				empty="nowhere"
-				items={exits.map((e) => ({ id: e.direction, label: e.to_name, detail: e.direction }))}
+				items={exits.map((e) => ({ id: e.direction, label: e.to_name, detail: e.direction, inspect: `exit:${e.direction}` }))}
 				marked={markedExit ? [markedExit] : []}
 				onpick={(item) => onexit(item.id)}
 			/>
