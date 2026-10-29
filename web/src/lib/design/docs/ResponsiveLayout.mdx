@@ -1,0 +1,22 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Foundations/Responsive layout" />
+
+# Responsive layout
+
+The app works at all widths from 320px. The design is for a laptop first, but the player must work on a phone.
+
+## Rules
+
+1. Use flex or grid with `flex-wrap` or `auto-fill`. Do not set a fixed width on a region.
+2. Use `min-width: 0` on flex children that contain text, so long words do not push the layout.
+3. Limit story text to `--measure-prose` (70 characters).
+4. Use `dvh` units for the full page height, so the mobile browser bar does not cut the page.
+5. Below 900px (`--bp-stack`), the side panel goes under the player and the page scrolls. CSS cannot read a token in a media query, so write `900px` and refer to the token in a comment.
+6. The type size of story text changes with the viewport width (`--font-size-prose`).
+
+## Examine an element
+
+1. Open the story.
+2. Select a small viewport in the toolbar.
+3. Make sure that nothing overflows to the side and that all controls stay usable.

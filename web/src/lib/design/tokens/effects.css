@@ -1,0 +1,63 @@
+/*
+ * Screen effects (E1 and E2).
+ *
+ * Rules:
+ * - Effects apply to the player screen only. They do not apply to editor panels.
+ * - The grain renders one time. The animation moves the layer only.
+ * - The glow is a text-shadow. It is not a filter.
+ * - The glitch shows only on new text, not more than one time in 2 s (the script makes sure of this).
+ * - Nothing flashes more than 3 times in 1 s.
+ * - .fx-reduce stops all animation. Textures stay, because they do not move.
+ * - .fx-paused stops animation while the tab is hidden.
+ */
+
+@keyframes fx-grain-shift {
+	0% { transform: translate(0, 0); }
+	20% { transform: translate(-4%, 3%); }
+	40% { transform: translate(3%, -2%); }
+	60% { transform: translate(-2%, -4%); }
+	80% { transform: translate(4%, 2%); }
+	100% { transform: translate(0, 0); }
+}
+
+@keyframes fx-flicker {
+	0%, 95%, 100% { opacity: 1; }
+	96% { opacity: 0.93; }
+	97% { opacity: 0.99; }
+	98% { opacity: 0.95; }
+}
+
+@keyframes fx-glitch {
+	0% { transform: translateX(0); clip-path: inset(0 0 0 0); text-shadow: none; }
+	15% { transform: translateX(-3px); clip-path: inset(12% 0 58% 0); text-shadow: 2px 0 rgb(255 70 110 / 60%), -2px 0 rgb(70 200 255 / 60%); }
+	30% { transform: translateX(2px); clip-path: inset(62% 0 6% 0); }
+	45% { transform: translateX(-1px); clip-path: inset(28% 0 44% 0); }
+	60% { transform: translateX(0); clip-path: inset(0 0 0 0); text-shadow: 1px 0 rgb(255 70 110 / 35%), -1px 0 rgb(70 200 255 / 35%); }
+	100% { transform: none; clip-path: inset(0 0 0 0); text-shadow: none; }
+}
+
+@keyframes fx-fringe {
+	0% { text-shadow: 1px 0 rgb(255 70 110 / 45%), -1px 0 rgb(70 200 255 / 45%); }
+	100% { text-shadow: none; }
+}
+
+@keyframes fx-reveal {
+	from { clip-path: inset(0 100% 0 0); }
+	to { clip-path: inset(0 0 0 0); }
+}
+
+.fx-full .fx-grain-layer { animation: fx-grain-shift 0.6s steps(1) infinite; }
+.fx-full .fx-screen { animation: fx-flicker 9s linear infinite; }
+.fx-full .fx-glitch { animation: fx-glitch var(--duration-glitch) steps(5) 1; }
+.fx-subtle .fx-glitch { animation: fx-fringe 320ms var(--easing-standard) 1; }
+.fx-full .fx-line { animation: fx-reveal var(--duration-slow) steps(36) both; }
+.fx-subtle .fx-line { animation: fx-reveal var(--duration-base) steps(12) both; }
+.fx-off .fx-overlay { display: none; }
+.fx-paused * { animation-play-state: paused !important; }
+
+.fx-reduce .fx-grain-layer,
+.fx-reduce .fx-screen,
+.fx-reduce .fx-glitch,
+.fx-reduce .fx-line {
+	animation: none !important;
+}

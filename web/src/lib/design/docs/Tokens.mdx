@@ -1,0 +1,75 @@
+import { Meta, ColorPalette, ColorItem } from '@storybook/addon-docs/blocks';
+import { colorTokens, spaceTokens, typeTokens, sizeTokens, motionTokens } from '../tokens/tokens.ts';
+
+<Meta title="Foundations/Design tokens" />
+
+# Design tokens
+
+Design tokens are named values for colour, type, space, size and motion. The source is `src/lib/design/tokens/tokens.css`.
+
+Components use only tokens. Do not use a raw colour, size or duration in a component. If no token fits, add a token first.
+
+## Two tiers
+
+1. **Scale tokens** are the same in all themes: space, type size, size, motion and layers.
+2. **Semantic tokens** have a meaning, for example "body text" or "edge of a control". Each theme sets them. Use the semantic token, not the colour that it has now.
+
+## Colour
+
+Change the theme in the toolbar to see the colours of each theme.
+
+Contrast rules (WCAG 2.2 AA):
+
+- All text tokens have a contrast of 4.5:1 or more against `--color-surface` and `--color-surface-raised`.
+- `--color-border-control` and `--color-focus` have a contrast of 3:1 or more. Use them for the edge of a control.
+- `--color-border-subtle` is for decoration only. Do not use it as the only edge of a control.
+
+<ColorPalette>
+	{colorTokens.map((t) => (
+		<ColorItem key={t.name} title={t.name} subtitle={t.use} colors={{ [t.name]: `var(${t.name})` }} />
+	))}
+</ColorPalette>
+
+## Type
+
+<table>
+	<thead><tr><th>Token</th><th>Use</th><th>Sample</th></tr></thead>
+	<tbody>
+		{typeTokens.map((t) => (
+			<tr key={t.name}><td><code>{t.name}</code></td><td>{t.use}</td><td style={{ fontSize: `var(${t.name})` }}>The lighthouse rises</td></tr>
+		))}
+	</tbody>
+</table>
+
+The interface font is `--font-ui`. The story font is `--font-prose`. Each theme sets both.
+
+## Space
+
+<table>
+	<thead><tr><th>Token</th><th>Use</th><th>Size</th></tr></thead>
+	<tbody>
+		{spaceTokens.map((t) => (
+			<tr key={t.name}><td><code>{t.name}</code></td><td>{t.use}</td><td><div style={{ width: `var(${t.name})`, height: '12px', background: 'var(--color-accent)' }} /></td></tr>
+		))}
+	</tbody>
+</table>
+
+## Size
+
+<table>
+	<thead><tr><th>Token</th><th>Use</th></tr></thead>
+	<tbody>
+		{sizeTokens.map((t) => (<tr key={t.name}><td><code>{t.name}</code></td><td>{t.use}</td></tr>))}
+	</tbody>
+</table>
+
+## Motion
+
+<table>
+	<thead><tr><th>Token</th><th>Use</th></tr></thead>
+	<tbody>
+		{motionTokens.map((t) => (<tr key={t.name}><td><code>{t.name}</code></td><td>{t.use}</td></tr>))}
+	</tbody>
+</table>
+
+When the user asks for reduced motion, the `.fx-reduce` class stops all animation. Do not add an animation that `.fx-reduce` does not stop.

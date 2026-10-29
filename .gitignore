@@ -22,3 +22,9 @@ Thumbs.db
 
 # Browser automation output
 .playwright-mcp/
+
+# Storybook
+/web/storybook-static/
+
+# go-task state
+.task/

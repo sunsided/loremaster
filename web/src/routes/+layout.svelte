@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '../app.css';
+	import '#lib/design/tokens/index.css';
 	import { settings } from '#lib/settings.svelte.ts';
 
 	let { children } = $props();

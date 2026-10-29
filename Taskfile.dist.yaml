@@ -86,6 +86,24 @@ tasks:
       - wasm:watch
       - web:serve
 
+  storybook:
+    desc: Start Storybook for the design system on port 6006
+    dir: web
+    cmds:
+      - pnpm storybook
+
+  storybook:build:
+    desc: Build a static Storybook into web/storybook-static
+    dir: web
+    cmds:
+      - pnpm build-storybook
+
+  web:check:
+    desc: Type-check and lint the Svelte code and the stories
+    dir: web
+    cmds:
+      - pnpm check
+
   web:build:
     desc: Build the static web app
     deps:

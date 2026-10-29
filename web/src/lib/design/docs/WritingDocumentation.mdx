@@ -1,0 +1,36 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Foundations/Writing documentation" />
+
+# Writing documentation
+
+All documentation of this project uses ASD-STE100 Simplified Technical English (STE). This includes READMEs, component descriptions, story text, design notes and comments that explain a rule.
+
+STE makes text clear for all readers, also for readers who do not speak English as a first language.
+
+## Main rules
+
+1. Write short sentences. A procedural sentence has 20 words or fewer. A descriptive sentence has 25 words or fewer.
+2. Write one instruction in each sentence. Start the instruction with a verb: "Select a verb."
+3. Use the active voice. Write "The runtime makes the text", not "The text is made by the runtime".
+4. Use the simple tenses: present, past and future. Do not use "-ing" forms as verbs.
+5. Use one word for one meaning. Do not use synonyms for variety. For example, always write "fragment" for a piece of text with a condition.
+6. Use approved words: "use", not "utilize"; "make sure", not "ensure"; "start", not "commence".
+7. Write paragraphs of six sentences or fewer. Put one topic in each paragraph.
+8. Use a numbered list for steps that the reader must do in order. Use a bulleted list for items without an order.
+9. Put a warning or a caution before the step that it applies to.
+10. Do not use "should". Write "must" for a rule and "can" for a possibility.
+
+## Technical names
+
+Technical names are permitted. Examples are property names (`aria-pressed`), file names and token names. Put them in code format.
+
+## Example
+
+Not STE:
+
+> Utilizing the verb bar, players are able to interact with objects by first selecting an appropriate verb, after which clicking any highlighted noun will execute the command.
+
+STE:
+
+> Select a verb on the verb bar. Then click a thing. The game does the command.

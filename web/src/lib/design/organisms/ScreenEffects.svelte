@@ -1,11 +1,21 @@
 <script lang="ts">
-	import { settings } from '#lib/settings.svelte.ts';
+	import type { EffectsLevel, Theme } from '../types.ts';
 
-	const on = $derived(settings.effects !== 'off');
-	const scanAlpha = $derived(settings.effects === 'full' ? 'var(--scan-full)' : 'var(--scan-soft)');
+	interface Props {
+		theme: Theme;
+		effects: EffectsLevel;
+	}
+
+	let { theme, effects }: Props = $props();
+	const on = $derived(effects !== 'off');
+	const scanAlpha = $derived(effects === 'full' ? 'var(--fx-scan-full)' : 'var(--fx-scan-soft)');
 </script>
 
-<!-- Texture layers over the player. They never take pointer events. -->
+<!--
+	Texture layers over the player screen. They are decoration only: they are
+	hidden from screen readers and do not get pointer events.
+	Place this component as the first child of an element with position: relative.
+-->
 {#if on}
 	<svg class="fx-overlay fx-grain-layer grain" aria-hidden="true">
 		<filter id="fx-noise">
@@ -14,7 +24,7 @@
 		</filter>
 		<rect width="100%" height="100%" filter="url(#fx-noise)" />
 	</svg>
-	{#if settings.theme === 'paper'}
+	{#if theme === 'paper'}
 		<svg class="fx-overlay paper" aria-hidden="true">
 			<filter id="fx-paper">
 				<feTurbulence type="fractalNoise" baseFrequency="0.035 0.55" numOctaves="4" result="fibre" />
@@ -25,7 +35,7 @@
 			<rect width="100%" height="100%" filter="url(#fx-paper)" />
 		</svg>
 	{/if}
-	{#if settings.theme === 'phosphor'}
+	{#if theme === 'phosphor'}
 		<div class="fx-overlay scan" aria-hidden="true" style:--alpha={scanAlpha}></div>
 		<div class="fx-overlay vignette" aria-hidden="true"></div>
 	{/if}
@@ -41,30 +51,30 @@
 		top: -10%;
 		width: 120%;
 		height: 120%;
-		z-index: 2;
-		opacity: var(--grain-opacity);
-		mix-blend-mode: var(--grain-blend);
+		z-index: var(--z-texture);
+		opacity: var(--fx-grain-opacity);
+		mix-blend-mode: var(--fx-grain-blend);
 	}
 	.paper {
 		inset: 0;
 		width: 100%;
 		height: 100%;
-		z-index: 2;
+		z-index: var(--z-texture);
 		opacity: 0.38;
 		mix-blend-mode: multiply;
 	}
 	.scan {
 		inset: 0;
-		z-index: 3;
+		z-index: var(--z-scanlines);
 		background-image: repeating-linear-gradient(
 			to bottom,
-			rgb(0 0 0 / calc(var(--alpha) * 100%)) 0 1px,
+			rgb(0 0 0 / var(--alpha)) 0 1px,
 			transparent 1px 3px
 		);
 	}
 	.vignette {
 		inset: 0;
-		z-index: 4;
-		background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.42) 100%);
+		z-index: var(--z-vignette);
+		background: radial-gradient(ellipse at center, transparent 58%, rgb(0 0 0 / 42%) 100%);
 	}
 </style>

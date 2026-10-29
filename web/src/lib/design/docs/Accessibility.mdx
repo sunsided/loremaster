@@ -1,0 +1,54 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Foundations/Accessibility" />
+
+# Accessibility
+
+The target is WCAG 2.2 level AA. Each element must meet it from the first version.
+
+## Rules
+
+### Structure
+
+1. Use the correct HTML element. Use `button` for an action, `a` for a page, `input` with a `label` for data.
+2. Do not put a click on a `div` or a `span`.
+3. Give each region a landmark: `header`, `nav`, `main`, `aside`.
+4. Use headings in order. Do not skip a level.
+5. The first element of a page is a skip link to the main control.
+
+### Keyboard
+
+1. Each control must work with the keyboard.
+2. The focus ring is always visible. It uses `--color-focus`.
+3. A modal dialog keeps focus inside. Escape closes it. Focus then goes back to the control that opened it. Use the native `dialog` element with `showModal()`.
+
+### Colour and contrast
+
+1. Use only the colour tokens. They have the correct contrast in all themes.
+2. Do not use colour as the only signal. Add text or a shape, for example a dash and struck-through text for a hidden fragment.
+
+### Size
+
+1. Primary controls are 44px high or more (`--size-target`).
+2. Secondary controls are 32px high or more (`--size-target-compact`). WCAG 2.2 AA requires 24px or more.
+
+### Screen readers
+
+1. Each input has a label. If the design hides the label, use `hideLabel` or VisuallyHidden.
+2. Hide decoration with `aria-hidden="true"`.
+3. Use a live region for text that changes without a page change. The transcript is a `log`. The verb sentence is `aria-live="polite"`.
+4. Toggle buttons use `aria-pressed`. Buttons that open a dialog use `aria-haspopup="dialog"` and `aria-expanded`.
+
+### Motion
+
+1. Follow `prefers-reduced-motion`. The user can also select "Always reduce motion".
+2. Reduced motion stops all animation. Textures stay, because they do not move.
+3. Nothing flashes more than 3 times in 1 s. The glitch shows not more than one time in 2 s.
+4. Animation stops when the tab is hidden.
+
+## Test
+
+1. Open each story in each theme. The accessibility panel must show no violations. The project sets violations to errors.
+2. Use only the keyboard to do the main task of the element.
+3. Use a screen reader for new organisms.
+4. Set the browser zoom to 200%. Make sure that no text is cut and nothing overflows.

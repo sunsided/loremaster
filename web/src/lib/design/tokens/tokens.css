@@ -1,0 +1,181 @@
+/*
+ * Design tokens.
+ *
+ * Components use only these custom properties. Do not use raw colours,
+ * sizes or durations in a component.
+ *
+ * Two tiers:
+ * 1. Scale tokens (space, type, size, motion). They are the same in all themes.
+ * 2. Semantic tokens (colour, font family, surface shape, effects). Each theme
+ *    sets them under [data-theme].
+ *
+ * Contrast (WCAG 2.2, against --color-surface and --color-surface-raised):
+ * - --color-text, --color-text-strong, --color-text-muted, --color-text-accent,
+ *   --color-text-warning: 4.5:1 or more.
+ * - --color-border-control, --color-focus: 3:1 or more.
+ * - --color-border-subtle is decoration only. Do not use it as the only edge of a control.
+ *
+ * Breakpoint: the layout stacks below 900px (--bp-stack). CSS cannot read a
+ * custom property in a media query, so components write 900px and refer to this token.
+ */
+
+:root {
+	/* Space */
+	--space-0: 0;
+	--space-1: 2px;
+	--space-2: 4px;
+	--space-3: 6px;
+	--space-4: 8px;
+	--space-5: 12px;
+	--space-6: 16px;
+	--space-7: 20px;
+	--space-8: 24px;
+	--space-9: 32px;
+	--space-10: 48px;
+
+	/* Type size */
+	--font-size-xs: 11px;
+	--font-size-sm: 12px;
+	--font-size-md: 13px;
+	--font-size-lg: 15px;
+	--font-size-xl: 17px;
+	--font-size-heading: 18px;
+	--font-size-prose: clamp(15px, 0.9rem + 0.3vw, 17px);
+
+	--font-weight-regular: 400;
+	--font-weight-strong: 600;
+
+	--line-height-tight: 1.3;
+	--line-height-body: 1.5;
+	--line-height-prose: 1.65;
+	--letter-spacing-caps: 0.06em;
+
+	/* Size */
+	--size-target: 44px; /* Primary controls. */
+	--size-target-compact: 32px; /* Secondary controls. WCAG 2.2 AA minimum is 24px. */
+	--size-border: 1px;
+	--size-border-strong: 2px;
+	--size-focus-ring: 2px;
+	--measure-prose: 70ch;
+	--width-panel: 480px;
+	--width-dialog: 560px;
+	--bp-stack: 900px;
+
+	/* Shape */
+	--radius-control: 0;
+
+	/* Motion. Reduced motion sets every animation to none (see effects.css). */
+	--duration-fast: 120ms;
+	--duration-base: 260ms;
+	--duration-slow: 700ms;
+	--duration-line-step: 520ms;
+	--duration-glitch: 240ms;
+	--easing-standard: ease-out;
+
+	/* Layers */
+	--z-content: 1;
+	--z-texture: 2;
+	--z-scanlines: 3;
+	--z-vignette: 4;
+	--z-dialog: 20;
+}
+
+/* ---- Theme: phosphor (default) ---- */
+:root,
+[data-theme='phosphor'] {
+	--color-surface-outer: #070a08;
+	--color-surface: #0b0f0c;
+	--color-surface-raised: #0e1410;
+	--color-surface-control: #0f1a12;
+	--color-text: #c8f5d0;
+	--color-text-strong: #e3ffe9;
+	--color-text-muted: #86b091;
+	--color-text-accent: #39ff88;
+	--color-text-warning: #ffcb52;
+	--color-text-on-accent: #06210f;
+	--color-accent: #39ff88;
+	--color-warning: #ffb000;
+	--color-border-subtle: #1f2b22;
+	--color-border-control: #3a7a50;
+	--color-focus: #39ff88;
+
+	--font-ui: 'IBM Plex Mono', ui-monospace, monospace;
+	--font-prose: 'IBM Plex Mono', ui-monospace, monospace;
+	--radius-screen: 22px;
+	--shadow-screen: inset 0 0 80px rgb(0 0 0 / 75%), 0 0 0 1px #1f2b22;
+	--shadow-overlay: 0 16px 40px rgb(0 0 0 / 45%);
+
+	--fx-glow-full: 0 0 6px rgb(57 255 136 / 38%);
+	--fx-glow-soft: 0 0 3px rgb(57 255 136 / 22%);
+	--fx-grain-opacity: 0.09;
+	--fx-grain-blend: screen;
+	--fx-scan-full: 28%;
+	--fx-scan-soft: 14%;
+	color-scheme: dark;
+}
+
+/* ---- Theme: paper ---- */
+[data-theme='paper'] {
+	--color-surface-outer: #e9e2d4;
+	--color-surface: #f4efe6;
+	--color-surface-raised: #fbf8f2;
+	--color-surface-control: #fffdf8;
+	--color-text: #2a2620;
+	--color-text-strong: #1e1b16;
+	--color-text-muted: #6b6358;
+	--color-text-accent: #2f4b8a;
+	--color-text-warning: #8a3320;
+	--color-text-on-accent: #ffffff;
+	--color-accent: #2f4b8a;
+	--color-warning: #b3412e;
+	--color-border-subtle: #ddd3c2;
+	--color-border-control: #8c7f6a;
+	--color-focus: #2f4b8a;
+
+	--font-ui: Inter, system-ui, sans-serif;
+	--font-prose: Literata, Georgia, serif;
+	--radius-screen: 6px;
+	--shadow-screen: 0 1px 0 #d8ccb6, 0 12px 30px rgb(60 40 20 / 12%);
+	--shadow-overlay: 0 16px 40px rgb(60 40 20 / 18%);
+
+	--fx-glow-full: 0 0 0.6px rgb(42 38 32 / 60%);
+	--fx-glow-soft: none;
+	--fx-grain-opacity: 0.07;
+	--fx-grain-blend: multiply;
+	--fx-scan-full: 0%;
+	--fx-scan-soft: 0%;
+	color-scheme: light;
+}
+
+/* ---- Theme: night ---- */
+[data-theme='night'] {
+	--color-surface-outer: #0f1115;
+	--color-surface: #14161b;
+	--color-surface-raised: #181b21;
+	--color-surface-control: #1e222b;
+	--color-text: #e6e8ee;
+	--color-text-strong: #ffffff;
+	--color-text-muted: #9aa1b2;
+	--color-text-accent: #5ec4b6;
+	--color-text-warning: #f7d58c;
+	--color-text-on-accent: #0b1f1c;
+	--color-accent: #5ec4b6;
+	--color-warning: #f2b544;
+	--color-border-subtle: #2d3240;
+	--color-border-control: #6a7388;
+	--color-focus: #5ec4b6;
+
+	--font-ui: Inter, system-ui, sans-serif;
+	--font-prose: Newsreader, Georgia, serif;
+	--radius-screen: 10px;
+	--shadow-screen: 0 0 0 1px #2d3240;
+	--shadow-overlay: 0 16px 40px rgb(0 0 0 / 45%);
+
+	--fx-glow-full: none;
+	--fx-glow-soft: none;
+	--fx-grain-opacity: 0.06;
+	--fx-grain-blend: screen;
+	--fx-scan-full: 0%;
+	--fx-scan-soft: 0%;
+	color-scheme: dark;
+}

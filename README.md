@@ -1,35 +1,62 @@
 # lantern
 
-A world editor for text adventures, where every piece of text is a function of world state. Rust core (built on [dramaturge](https://github.com/sunsided/dramaturge)), SvelteKit front end, parser and SCUMM-style verb-bar play over one runtime.
+lantern is a world editor for text adventures. In lantern, each text in the game comes from the world state. The author can see which text shows, when it shows and why.
+
+The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge). The editor is a SvelteKit app. The player can play with typed commands or with a SCUMM-style verb bar. Both use the same runtime.
 
 ## Layout
 
-| Path | What |
+| Path | Contents |
 | --- | --- |
-| `crates/lantern-model` | World types: rooms, exits, things, fragments, rules, clock, verbs |
-| `crates/lantern-lang` | Condition expressions and inline markup, lowered to dramaturge conditions |
-| `crates/lantern-project` | Project folder format (one YAML file per entity) and checker |
-| `crates/lantern-runtime` | Pure, deterministic runtime: state, text assembly, rules, parser |
-| `crates/lantern-wasm` | WASM bindings used by the web app |
-| `crates/lantern-cli` | `lantern play` / `lantern check` |
-| `examples/lighthouse` | A small story used by tests, the CLI and the web app |
-| `web/` | SvelteKit app: player with verb bar, assembly panel, themes and effects |
+| `crates/lantern-model` | World types: rooms, exits, things, fragments, rules, clock and verbs. |
+| `crates/lantern-lang` | The condition language and the inline markup. They compile to dramaturge conditions. |
+| `crates/lantern-project` | The project folder format (one YAML file for each entity) and the checker. |
+| `crates/lantern-runtime` | The runtime: state, text assembly, rules and parser. It has no input or output of its own. |
+| `crates/lantern-wasm` | The WebAssembly bindings for the web app. Trunk builds them. |
+| `crates/lantern-cli` | The terminal player: `lantern play` and `lantern check`. |
+| `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
+| `web/` | The SvelteKit app and the design system with its Storybook. |
 
-## Running
+## Commands
 
-```sh
-task play        # play the example in the terminal
-task web:install # once
-task dev         # trunk watch (Rust -> WASM) plus the Vite dev server
-task verify      # fmt, clippy, tests
-```
+Install [go-task](https://taskfile.dev), Trunk, Node.js and pnpm before you start.
 
-Without go-task: `cargo run -p lantern-cli -- play examples/lighthouse`. For the web app, run `trunk watch` in `crates/lantern-wasm` and `pnpm dev` in `web/` side by side.
+| Command | What it does |
+| --- | --- |
+| `task play` | Plays the example in the terminal. |
+| `task web:install` | Installs the web dependencies. Do this one time. |
+| `task dev` | Builds the WebAssembly package, then runs `trunk watch` and the Vite dev server. |
+| `task storybook` | Starts Storybook on port 6006. |
+| `task web:check` | Type-checks the Svelte code and the stories. |
+| `task verify` | Examines the format, runs clippy and runs the Rust tests. |
 
-### How Trunk and SvelteKit fit together
+If you do not use go-task:
 
-Trunk owns the Rust side: `crates/lantern-wasm/Trunk.toml` builds the crate with wasm-bindgen (`web` target, TypeScript declarations, wasm-opt in release) and writes `lantern-wasm.js`, `lantern-wasm_bg.wasm` and `.d.ts` into `web/src/lib/engine/pkg/` without content hashes. `trunk watch` rebuilds when any crate changes. SvelteKit and Vite own the UI and import that package like any module, so a Rust change reaches the browser as a normal Vite reload.
+1. Play in the terminal with `cargo run -p lantern-cli -- play examples/lighthouse`.
+2. For the web app, run `trunk watch` in `crates/lantern-wasm`.
+3. At the same time, run `pnpm dev` in `web/`.
+
+## How Trunk and SvelteKit work together
+
+Trunk builds the Rust part. The file `crates/lantern-wasm/Trunk.toml` tells Trunk to build the crate with wasm-bindgen and TypeScript declarations. Trunk writes the output to `web/src/lib/engine/pkg/` without content hashes. `trunk watch` builds again when a crate changes.
+
+SvelteKit and Vite make the user interface. They import the package as a normal module. Thus a change in Rust gets to the browser as a normal Vite reload.
+
+## Design system
+
+The web app uses design tokens and atomic design. Storybook shows and documents each element. Start with the "Introduction" page in Storybook.
+
+These rules apply to all web work:
+
+- Use only design tokens for colour, type, space, size and motion.
+- Make each element accessible from the start. The target is WCAG 2.2 AA.
+- Make each element work at all widths from 320px.
+- Write a story with documentation for each element.
+
+## Documentation
+
+Write all documentation in ASD-STE100 Simplified Technical English. The "Foundations/Writing documentation" page in Storybook gives the rules.
 
 ## License
 
-EUPL-1.2, see [LICENSE](LICENSE).
+EUPL-1.2. Read [LICENSE](LICENSE).

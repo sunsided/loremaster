@@ -1,8 +1,6 @@
 // Per-viewer display settings, remembered in localStorage when it is available.
 
-export type Theme = 'phosphor' | 'paper' | 'night';
-export type Effects = 'full' | 'subtle' | 'off';
-export type Motion = 'system' | 'reduce';
+import type { EffectsLevel as Effects, MotionPreference as Motion, Theme } from '#lib/design/types.ts';
 
 const KEY = 'lantern.settings';
 

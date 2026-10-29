@@ -1,0 +1,47 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Introduction" />
+
+# lantern design system
+
+This Storybook shows all design elements of the lantern web app. Use it to see, test and document each element.
+
+## Structure
+
+The design system uses atomic design. Each level uses only the levels under it.
+
+| Level | Folder | Contents |
+| --- | --- | --- |
+| Foundations | `src/lib/design/tokens` | Design tokens: colour, type, space, size, motion. |
+| Atoms | `src/lib/design/atoms` | The smallest elements, for example Button and TextInput. |
+| Molecules | `src/lib/design/molecules` | Small groups of atoms, for example RadioGroup and CommandPrompt. |
+| Organisms | `src/lib/design/organisms` | Regions of the page, for example Transcript and VerbBar. |
+| Templates | `src/lib/design/templates` | Page frames, for example PlayerLayout. |
+| Pages | `src/routes` | The app. Pages connect templates to the game engine. |
+
+Atoms, molecules, organisms and templates do not import the game engine. They get data through props and send events through callbacks. Thus each element works in Storybook with sample data from `fixtures.ts`.
+
+## Rules for all elements
+
+1. Use only design tokens for colour, type, space, size and motion. Do not write raw values.
+2. Make each element accessible from the start. Read "Foundations/Accessibility".
+3. Make each element work at all widths from 320px. Read "Foundations/Responsive layout".
+4. Write one story file for each element. Read "Foundations/Writing documentation" before you write.
+5. Make sure that the accessibility panel shows no violations in all three themes.
+
+## Add a new element
+
+1. Find the correct level. If the element uses other elements of the same level, put it one level higher.
+2. Make the `.svelte` file in the folder of that level.
+3. Write the props with a short comment for each prop.
+4. Make a `.stories.svelte` file next to it. Give it the tag `autodocs` and a component description.
+5. Add a story for each state: default, selected, disabled, empty and error, where they apply.
+6. Open the story in each theme. Examine the accessibility panel.
+7. Make the viewport narrow. Make sure that the element does not overflow.
+
+## Commands
+
+Do these commands in the `web` folder:
+
+- `pnpm storybook` starts Storybook on port 6006.
+- `pnpm build-storybook` makes a static Storybook in `storybook-static`.
