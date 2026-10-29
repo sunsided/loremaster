@@ -148,6 +148,37 @@ pub struct RuleView {
     pub fired: bool,
 }
 
+/// A command for the author, not the player: it changes the game state
+/// directly. The command palette and a cheat console use it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum AuthorCommand {
+    /// Move the player to a room. Leave and enter rules do not fire.
+    Goto { room: String },
+    /// Set a story variable or a thing property, for example `lamp.lit`.
+    Set { name: String, value: Value },
+    /// Set the time of day, `HH:MM`. The day stays the same.
+    Time { time: String },
+    /// Put a thing in the player's hands.
+    Give { thing: String },
+}
+
+/// A variable or thing property with its value now, for the command palette.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VarView {
+    pub name: String,
+    pub value: Value,
+    /// For an enum variable: all values. Empty for other types.
+    pub options: Vec<String>,
+}
+
+/// The phases of the day with their start times, for the command palette.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PhaseView {
+    pub name: String,
+    pub from: String,
+}
+
 const MAX_RULE_DEPTH: u8 = 8;
 
 impl Game {
@@ -685,6 +716,93 @@ impl Game {
             .collect();
 
         RoomParts { objects, exits }
+    }
+
+    /// Run an author command. Its result shows in the transcript like a turn,
+    /// marked as an author action, and the turn log records it.
+    pub fn author(&mut self, cmd: AuthorCommand) -> Turn {
+        let mut turn = Turn::default();
+        let note = |turn: &mut Turn, text: String| {
+            turn.log.push(LogEntry {
+                kind: "author".into(),
+                text: text.clone(),
+            });
+            turn.say(BlockKind::Command, format!("(author) {text}"));
+        };
+        match cmd {
+            AuthorCommand::Goto { room } => {
+                let Some(r) = self.world.story.room(&room) else {
+                    turn.say(BlockKind::Response, format!("There is no room `{room}`."));
+                    return turn;
+                };
+                note(&mut turn, format!("go to {}", r.name));
+                self.state.room = r.id.clone();
+                *self
+                    .state
+                    .visits
+                    .entry(self.state.room.clone())
+                    .or_default() += 1;
+                self.describe_room(&mut turn);
+            }
+            AuthorCommand::Set { name, value } => {
+                if !self.state.facts.contains_key(&name) {
+                    turn.say(
+                        BlockKind::Response,
+                        format!("There is no variable `{name}`."),
+                    );
+                    return turn;
+                }
+                note(&mut turn, format!("set {name} = {value}"));
+                self.set_fact(&mut turn, &name, value);
+            }
+            AuthorCommand::Time { time } => match time.parse::<TimeOfDay>() {
+                Ok(t) => {
+                    note(&mut turn, format!("set the time to {t}"));
+                    let day = self.state.minutes - self.state.minutes % TimeOfDay::MINUTES_PER_DAY;
+                    self.state.minutes = day + u32::from(t.0);
+                }
+                Err(e) => turn.say(BlockKind::Response, e),
+            },
+            AuthorCommand::Give { thing } => {
+                let Some(t) = self.world.story.thing(&thing) else {
+                    turn.say(BlockKind::Response, format!("There is no thing `{thing}`."));
+                    return turn;
+                };
+                note(&mut turn, format!("give {}", t.name));
+                let id = t.id.clone();
+                self.move_thing(&id, Location::Carried);
+            }
+        }
+        self.finish(turn)
+    }
+
+    /// All story variables and thing properties with their values now.
+    pub fn vars(&self) -> Vec<VarView> {
+        self.state
+            .facts
+            .iter()
+            .map(|(name, value)| VarView {
+                name: name.clone(),
+                value: value.clone(),
+                options: match self.world.story.var(name).map(|v| &v.ty) {
+                    Some(lantern_model::VarType::Enum(values)) => values.clone(),
+                    _ => Vec::new(),
+                },
+            })
+            .collect()
+    }
+
+    /// The phases of the day, in order of their start time.
+    pub fn phases(&self) -> Vec<PhaseView> {
+        let mut phases: Vec<&lantern_model::Phase> = self.world.story.clock.phases.iter().collect();
+        phases.sort_by_key(|p| p.from);
+        phases
+            .into_iter()
+            .map(|p| PhaseView {
+                name: p.name.clone(),
+                from: p.from.to_string(),
+            })
+            .collect()
     }
 
     /// All rules with their state now. Does not change any state.

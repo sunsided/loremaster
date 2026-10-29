@@ -13,9 +13,11 @@
 		settingsOpen?: boolean;
 		onview?: (id: string) => void;
 		onsettings: () => void;
+		/** Opens the command palette. When set, the header shows a button for it. */
+		onpalette?: () => void;
 	}
 
-	let { title, views = [], current = '', now = [], settingsOpen = false, onview, onsettings }: Props = $props();
+	let { title, views = [], current = '', now = [], settingsOpen = false, onview, onsettings, onpalette }: Props = $props();
 </script>
 
 <header class="app-header">
@@ -42,6 +44,11 @@
 		{#if now.length}
 			<span class="now-label">now</span>
 			{#each now as fact, i (i)}<Tag>{fact}</Tag>{/each}
+		{/if}
+		{#if onpalette}
+			<Button size="compact" aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K" onclick={onpalette}
+				>Commands <kbd>Ctrl K</kbd></Button
+			>
 		{/if}
 		<Button size="compact" aria-haspopup="dialog" aria-expanded={settingsOpen} onclick={onsettings}>Look and motion</Button>
 	</div>
@@ -83,6 +90,13 @@
 		justify-content: flex-end;
 		align-items: center;
 		gap: var(--space-3);
+	}
+	kbd {
+		padding: 0 var(--space-2);
+		border: var(--size-border) solid var(--color-border-subtle);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
 	}
 	.now-label {
 		color: var(--color-text-warning);

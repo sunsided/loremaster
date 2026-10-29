@@ -192,3 +192,37 @@ fn unlisted_things_say_honestly_why() {
         Some("not listed: the room text mentions it")
     );
 }
+
+#[test]
+fn author_commands_change_state_directly() {
+    use lantern_model::Value;
+    use lantern_runtime::AuthorCommand;
+    let mut game = lighthouse();
+    game.start();
+    let turn = game.author(AuthorCommand::Goto {
+        room: "lantern_room".into(),
+    });
+    assert!(turn.plain_text().contains("Lantern Room"));
+    assert_eq!(game.scene().room, "lantern_room");
+    game.author(AuthorCommand::Set {
+        name: "beacon_lit".into(),
+        value: Value::Bool(true),
+    });
+    assert!(
+        game.vars()
+            .iter()
+            .any(|v| v.name == "beacon_lit" && v.value == Value::Bool(true))
+    );
+    game.author(AuthorCommand::Time {
+        time: "22:00".into(),
+    });
+    assert_eq!(game.scene().phase, "night");
+    game.author(AuthorCommand::Give {
+        thing: "oil_lamp".into(),
+    });
+    assert!(game.scene().inventory.iter().any(|t| t.id == "oil_lamp"));
+    assert_eq!(
+        game.phases().first().map(|p| p.from.as_str()),
+        Some("00:00")
+    );
+}

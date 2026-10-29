@@ -12,7 +12,8 @@
 	One rule as three short lines: When (the event), If (the condition), Then (the effects).
 	The state is in text: "fired" or "not fired yet", and "true now" or "false now" for the condition.
 -->
-<article class="rule" class:fired={rule.fired} aria-labelledby="rule-{rule.id}">
+<!-- tabindex="-1" lets other parts of the app, such as the command palette, move focus to the card. -->
+<article class="rule" class:fired={rule.fired} id="rule-card-{rule.id}" tabindex="-1" aria-labelledby="rule-{rule.id}">
 	<header>
 		<h3 id="rule-{rule.id}"><code>{rule.id}</code></h3>
 		<ul class="badges">
@@ -50,6 +51,10 @@
 		padding: var(--space-5) var(--space-6);
 		border: var(--size-border) solid var(--color-border-control);
 		background: var(--color-surface-raised);
+	}
+	.rule:focus {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
 	}
 	.fired {
 		border-left: var(--size-border-strong) solid var(--color-accent);

@@ -1,5 +1,8 @@
 import init, { Engine as WasmEngine } from './pkg/lantern-wasm.js';
 import type {
+	AuthorCommand,
+	PhaseView,
+	VarView,
 	Command,
 	Diagnostic,
 	FragmentView,
@@ -54,6 +57,18 @@ export class Game {
 
 	start(): Turn {
 		return this.#engine.start();
+	}
+
+	author(command: AuthorCommand): Turn {
+		return this.#engine.author(command);
+	}
+
+	vars(): VarView[] {
+		return this.#engine.vars();
+	}
+
+	phases(): PhaseView[] {
+		return this.#engine.phases();
 	}
 
 	preview(text: string): Preview {

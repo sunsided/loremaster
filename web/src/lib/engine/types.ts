@@ -182,3 +182,24 @@ export interface Preview {
 	direction: string | null;
 	complete: boolean;
 }
+
+export type Value = boolean | number | string;
+
+/** A command for the author: it changes the game state directly. */
+export type AuthorCommand =
+	| { type: 'goto'; room: string }
+	| { type: 'set'; name: string; value: Value }
+	| { type: 'time'; time: string }
+	| { type: 'give'; thing: string };
+
+export interface VarView {
+	name: string;
+	value: Value;
+	/** For an enum variable: all values. */
+	options: string[];
+}
+
+export interface PhaseView {
+	name: string;
+	from: string;
+}

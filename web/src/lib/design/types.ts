@@ -50,3 +50,17 @@ export interface TabItem {
 	id: string;
 	label: string;
 }
+
+/** One action in the command palette. */
+export interface PaletteItem {
+	/** Unique in the palette. */
+	id: string;
+	/** The group heading, for example "Rooms" or "Rules". */
+	group: string;
+	label: string;
+	/** Short extra text on the right, for example the current value. */
+	hint?: string;
+	/** More words that the search matches. */
+	keywords?: string;
+	run: () => void;
+}

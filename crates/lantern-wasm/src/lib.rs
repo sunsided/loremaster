@@ -3,7 +3,7 @@
 //! shaped like the runtime's serde types.
 
 use lantern_project::{Diagnostic, Severity, SourceFile, check, load};
-use lantern_runtime::{Command, Game, State, World};
+use lantern_runtime::{AuthorCommand, Command, Game, State, World};
 use serde::Serialize;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -110,6 +110,23 @@ impl Engine {
     #[wasm_bindgen(js_name = roomParts)]
     pub fn room_parts(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.room_parts())
+    }
+
+    /// An author command: `{ type: "goto", room }`, `{ type: "set", name, value }`,
+    /// `{ type: "time", time }` or `{ type: "give", thing }`.
+    pub fn author(&mut self, command: JsValue) -> Result<JsValue, JsValue> {
+        let command: AuthorCommand = from_js(command)?;
+        to_js(&self.game.author(command))
+    }
+
+    /// All variables and thing properties with their values.
+    pub fn vars(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.vars())
+    }
+
+    /// The phases of the day with their start times.
+    pub fn phases(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.phases())
     }
 
     /// All rules with their state now, for the rules view.

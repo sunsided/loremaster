@@ -17,15 +17,133 @@
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
 	import InspectorPanel from '#lib/design/organisms/InspectorPanel.svelte';
+	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
+	import { tick } from 'svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
-	import type { TabItem } from '#lib/design/types.ts';
+	import type { PaletteItem, TabItem } from '#lib/design/types.ts';
 
 	let session: Session | undefined = $state();
 	let problems: Diagnostic[] = $state([]);
 	let failure = $state('');
 	let showSettings = $state(false);
 	let prompt: HTMLInputElement | undefined = $state();
+	let showPalette = $state(false);
+
+	async function showRule(id: string) {
+		inspector = 'rules';
+		await tick();
+		const card = document.getElementById(`rule-card-${id}`);
+		card?.scrollIntoView({ block: 'center' });
+		card?.focus();
+	}
+
+	function backToPrompt() {
+		prompt?.focus();
+	}
+
+	/** Everything the command palette can do, built from the game state now. */
+	const paletteItems = $derived.by<PaletteItem[]>(() => {
+		const s = session;
+		if (!s) return [];
+		const items: PaletteItem[] = [];
+		for (const tab of inspectorTabs) {
+			items.push({ id: `tab-${tab.id}`, group: 'Inspector', label: `Show ${tab.label}`, run: () => (inspector = tab.id) });
+		}
+		for (const room of s.map.rooms) {
+			items.push({
+				id: `room-${room.id}`,
+				group: 'Rooms',
+				label: `Go to ${room.name}`,
+				hint: room.current ? 'you are here' : room.visited ? 'visited' : 'not visited',
+				keywords: room.id,
+				run: () => {
+					s.author({ type: 'goto', room: room.id });
+					backToPrompt();
+				}
+			});
+		}
+		for (const rule of s.rules) {
+			items.push({
+				id: `rule-${rule.id}`,
+				group: 'Rules',
+				label: `Show rule ${rule.id}`,
+				hint: rule.fired ? 'fired' : rule.when,
+				keywords: `${rule.when} ${rule.condition ?? ''} ${rule.then.join(' ')}`,
+				run: () => showRule(rule.id)
+			});
+		}
+		for (const v of s.vars) {
+			if (typeof v.value === 'boolean') {
+				items.push({
+					id: `var-${v.name}`,
+					group: 'States',
+					label: `Set ${v.name} to ${!v.value}`,
+					hint: `now ${v.value}`,
+					keywords: 'toggle flag',
+					run: () => s.author({ type: 'set', name: v.name, value: !v.value })
+				});
+			} else if (v.options.length) {
+				for (const option of v.options.filter((o) => o !== v.value)) {
+					items.push({
+						id: `var-${v.name}-${option}`,
+						group: 'States',
+						label: `Set ${v.name} to ${option}`,
+						hint: `now ${v.value}`,
+						run: () => s.author({ type: 'set', name: v.name, value: option })
+					});
+				}
+			}
+		}
+		for (const phase of s.phases) {
+			items.push({
+				id: `time-${phase.name}-${phase.from}`,
+				group: 'Time',
+				label: `Set the time to ${phase.name} (${phase.from})`,
+				hint: s.scene.phase === phase.name ? 'now' : undefined,
+				keywords: 'clock phase',
+				run: () => s.author({ type: 'time', time: phase.from })
+			});
+		}
+		const themes = ['phosphor', 'night', 'paper'] as const;
+		for (const theme of themes.filter((t) => t !== settings.theme)) {
+			items.push({ id: `theme-${theme}`, group: 'Look', label: `Use the ${theme} theme`, run: () => (settings.theme = theme) });
+		}
+		for (const level of (['full', 'subtle', 'off'] as const).filter((l) => l !== settings.effects)) {
+			items.push({ id: `fx-${level}`, group: 'Look', label: `Effects: ${level}`, run: () => (settings.effects = level) });
+		}
+		items.push({
+			id: 'sources',
+			group: 'Look',
+			label: settings.sources ? 'Hide fragment numbers' : 'Show fragment numbers',
+			run: () => (settings.sources = !settings.sources)
+		});
+		items.push({ id: 'settings', group: 'Look', label: 'Open look and motion settings', run: () => (showSettings = true) });
+		items.push({ id: 'restart', group: 'Game', label: 'Restart the game', run: () => s.restart() });
+		return items;
+	});
+
+	function playFallback(query: string): PaletteItem | null {
+		const s = session;
+		if (!s) return null;
+		return {
+			id: 'play-query',
+			group: 'Play',
+			label: `Do “${query}”`,
+			hint: 'as a typed command',
+			run: () => {
+				s.input(query);
+				backToPrompt();
+			}
+		};
+	}
+
+	function onWindowKeydown(event: KeyboardEvent) {
+		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+			event.preventDefault();
+			if (!showSettings) showPalette = !showPalette;
+		}
+	}
 	let hidden = $state(false);
 
 	// On ultrawide screens the map has its own column, so the inspector does not repeat it.
@@ -69,6 +187,8 @@
 	);
 </script>
 
+<svelte:window onkeydown={onWindowKeydown} />
+
 <svelte:head>
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
 </svelte:head>
@@ -82,6 +202,7 @@
 				now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name]}
 				settingsOpen={showSettings}
 				onsettings={() => (showSettings = true)}
+				onpalette={() => (showPalette = true)}
 			/>
 		{/snippet}
 		{#snippet effects()}
@@ -155,6 +276,7 @@
 			</InspectorPanel>
 		{/snippet}
 	</PlayerLayout>
+	<CommandPalette bind:open={showPalette} items={paletteItems} fallback={playFallback} />
 	<SettingsDialog
 		bind:open={showSettings}
 		bind:theme={settings.theme}

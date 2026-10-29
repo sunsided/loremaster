@@ -1,5 +1,8 @@
 import {
 	Game,
+	type AuthorCommand,
+	type PhaseView,
+	type VarView,
 	type Command,
 	type FragmentView,
 	type MapView,
@@ -26,6 +29,8 @@ export class Session {
 	map = $state<MapView>({ rooms: [], links: [] });
 	parts = $state<RoomParts>({ objects: [], exits: [] });
 	rules = $state<RuleView[]>([]);
+	vars = $state<VarView[]>([]);
+	phases: PhaseView[] = [];
 	/** The playthrough so far, one step per turn. */
 	history = $state<StoryStep[]>([]);
 	verbs: VerbInfo[];
@@ -46,6 +51,7 @@ export class Session {
 	constructor(game: Game) {
 		this.game = game;
 		this.verbs = game.verbs();
+		this.phases = game.phases();
 		this.#push(game.start());
 	}
 
@@ -61,6 +67,7 @@ export class Session {
 		this.map = this.game.map();
 		this.parts = this.game.roomParts();
 		this.rules = this.game.rules();
+		this.vars = this.game.vars();
 		const command = turn.blocks.find((b) => b.kind === 'command');
 		this.history.push({
 			turn: this.scene.turns,
@@ -78,6 +85,11 @@ export class Session {
 		if (!text.trim()) return;
 		this.draft = '';
 		this.#push(this.game.input(text));
+	}
+
+	/** Run an author command, for example from the command palette. */
+	author(command: AuthorCommand) {
+		this.#push(this.game.author(command));
 	}
 
 	act(command: Command) {

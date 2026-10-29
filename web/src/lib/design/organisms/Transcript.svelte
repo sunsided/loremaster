@@ -103,7 +103,9 @@
 						class="block {block.kind}"
 						class:fx-line={fresh && entry.id > 0}
 						style:animation-delay={fresh ? `${revealDelay(bi)}ms` : undefined}
-					>{#if block.kind === 'command'}<span aria-hidden="true">&gt;&nbsp;</span><span class="visually-hidden">You typed:</span>{/if}{@render runs(block)}</p>
+					>{#if block.kind === 'command'}<span aria-hidden="true">&gt;&nbsp;</span><span class="visually-hidden"
+							>{block.runs[0]?.text.startsWith('(author)') ? 'Author action:' : 'You typed:'}</span
+						>{/if}{@render runs(block)}</p>
 				{/each}
 			</div>
 		{/each}

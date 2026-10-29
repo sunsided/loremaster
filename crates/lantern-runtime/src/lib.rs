@@ -21,8 +21,8 @@ mod text;
 mod world;
 
 pub use game::{
-    ExitInfo, FragmentView, Game, MapLink, MapRoom, MapView, PartView, RoomParts, RuleView, Scene,
-    ThingInfo, VerbInfo,
+    AuthorCommand, ExitInfo, FragmentView, Game, MapLink, MapRoom, MapView, PartView, PhaseView,
+    RoomParts, RuleView, Scene, ThingInfo, VarView, VerbInfo,
 };
 pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
 pub use parser::{Command, Preview};
