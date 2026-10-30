@@ -1236,6 +1236,7 @@
 				focus={s.focus}
 				effects={settings.effects}
 				reduceMotion={settings.reduceMotion}
+				reveal={settings.reveal}
 				onthing={(id, name) => s.pickThing(id, name)}
 				onexit={(dir) => s.pickExit(dir)}
 				onfocus={(i) => (s.focus = i)}
@@ -1420,6 +1421,7 @@
 		bind:effects={settings.effects}
 		bind:motion={settings.motion}
 		bind:tooltips={settings.tooltips}
+		bind:reveal={settings.reveal}
 		systemReduce={settings.systemReduce}
 	/>
 {:else}

@@ -20,6 +20,8 @@ export interface ActionItem {
 export type Theme = 'phosphor' | 'night' | 'paper';
 export type EffectsLevel = 'full' | 'subtle' | 'off';
 export type MotionPreference = 'system' | 'reduce';
+/** How new game text appears: `lines` types it line by line, `blocks` wipes each paragraph at once. */
+export type RevealMode = 'lines' | 'blocks';
 
 export interface TranscriptEntry {
 	id: number;

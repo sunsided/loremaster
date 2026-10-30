@@ -3,7 +3,7 @@
 	import Checkbox from '../atoms/Checkbox.svelte';
 	import Heading from '../atoms/Heading.svelte';
 	import RadioGroup from '../molecules/RadioGroup.svelte';
-	import type { EffectsLevel, MotionPreference, RadioOption, Theme } from '../types.ts';
+	import type { EffectsLevel, MotionPreference, RadioOption, RevealMode, Theme } from '../types.ts';
 
 	interface Props {
 		open?: boolean;
@@ -12,6 +12,8 @@
 		motion?: MotionPreference;
 		/** Show author tooltips on things and exits. */
 		tooltips?: boolean;
+		/** How new game text appears. */
+		reveal?: RevealMode;
 		/** True when the operating system asks for reduced motion. */
 		systemReduce?: boolean;
 	}
@@ -22,6 +24,7 @@
 		effects = $bindable('full'),
 		motion = $bindable('system'),
 		tooltips = $bindable(true),
+		reveal = $bindable('lines'),
 		systemReduce = false
 	}: Props = $props();
 
@@ -44,6 +47,10 @@
 		{ value: 'subtle', label: 'Subtle', description: 'Still grain, light scanlines, soft glow, a short colour fringe on new text.' },
 		{ value: 'off', label: 'Off', description: 'Flat colours and plain text. This is the fastest. It is best for screen readers.' }
 	];
+	const reveals: RadioOption<RevealMode>[] = [
+		{ value: 'lines', label: 'Line by line' },
+		{ value: 'blocks', label: 'A paragraph at once' }
+	];
 	const motions = $derived<RadioOption<MotionPreference>[]>([
 		{ value: 'system', label: `Use my system setting (now: ${systemReduce ? 'reduce motion' : 'motion is permitted'})` },
 		{ value: 'reduce', label: 'Always reduce motion' }
@@ -58,6 +65,7 @@
 
 	<RadioGroup legend="Theme" name="theme" look="pills" options={themes} bind:value={theme} />
 	<RadioGroup legend="Visual effects" name="effects" look="cards" options={levels} bind:value={effects} />
+	<RadioGroup legend="New text appears" name="reveal" look="pills" options={reveals} bind:value={reveal} />
 	<div class="motion">
 		<RadioGroup legend="Motion" name="motion" options={motions} bind:value={motion} />
 		<p class="note">

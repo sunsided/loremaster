@@ -18,6 +18,8 @@ The motion setting has two choices:
 - "Use my system setting" follows \`prefers-reduced-motion\` of the operating system.
 - "Always reduce motion" stops all animation in all cases.
 
+"New text appears" sets how the game text shows with effects on: \"Line by line\" types each line after the other, like a terminal; \"A paragraph at once\" wipes each paragraph in one move. With effects off or reduced motion, the text shows at once.
+
 Reduced motion keeps the textures, because they do not move.
 The app keeps these settings in the browser storage of the user.`
 				},
