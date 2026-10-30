@@ -15,11 +15,12 @@
 	}
 
 	let { room, rules = [], ongo, onwrite, onexplore }: Props = $props();
+	const id = $props.id();
 </script>
 
 <!-- One room in the Atlas: where it is, what is in it now, and what you can do there. -->
-<section class="room-card" aria-labelledby="room-card-title">
-	<h2 id="room-card-title">{room.name}</h2>
+<section class="room-card" aria-labelledby="{id}-title">
+	<h2 id="{id}-title">{room.name}</h2>
 	<p class="where">level {room.level}{room.current ? ' · you are here' : ''}</p>
 	<dl>
 		<dt>visited</dt>

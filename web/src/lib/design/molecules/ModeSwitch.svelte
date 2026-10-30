@@ -23,7 +23,9 @@
 		if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
 			event.preventDefault();
 			pick(value === 'play' ? 'write' : 'play');
-			(event.currentTarget as HTMLElement).querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+			// aria-checked updates on the next flush, so find the new button by its index.
+			const buttons = (event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="radio"]');
+			buttons[modes.findIndex((m) => m.value === value)]?.focus();
 		}
 	}
 </script>

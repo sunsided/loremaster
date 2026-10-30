@@ -121,6 +121,7 @@
 		if (entry.id !== previewAt || !preview) return { blocks: entry.turn.blocks, from: Infinity };
 		const blocks = entry.turn.blocks;
 		const start = blocks.findLastIndex((b) => b.kind === 'title');
+		if (start < 0) return { blocks, from: Infinity };
 		let end = start + 1;
 		while (end < blocks.length && ['prose', 'objects', 'exits'].includes(blocks[end].kind)) end++;
 		return { blocks: [...blocks.slice(0, start), ...preview, ...blocks.slice(end)], from: start, to: start + preview.length } as {

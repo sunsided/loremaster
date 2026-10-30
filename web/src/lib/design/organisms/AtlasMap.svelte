@@ -140,8 +140,8 @@
 			.filter(
 				(r) =>
 					r.name.toLowerCase().includes(q) ||
-					r.id.includes(q) ||
-					r.things.some((t) => t.name.toLowerCase().includes(q) || t.id.includes(q))
+					r.id.toLowerCase().includes(q) ||
+					r.things.some((t) => t.name.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))
 			)
 			.slice(0, 8);
 	});

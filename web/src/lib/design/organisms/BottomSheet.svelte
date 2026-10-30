@@ -17,19 +17,30 @@
 	const id = $props.id();
 	const next: Record<Height, Height> = { peek: 'half', half: 'full', full: 'peek' };
 
-	// Drag the grab bar up or down to open or close the sheet.
+	// Drag the grab bar up or down to open or close the sheet. A tap is a click: see `click`.
 	let start: { y: number; h: Height } | null = null;
+	let dragged = false;
 	function down(e: PointerEvent) {
 		start = { y: e.clientY, h: height };
+		dragged = false;
 		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 	}
 	function up(e: PointerEvent) {
 		if (!start) return;
 		const dy = e.clientY - start.y;
-		if (Math.abs(dy) < 8) height = next[start.h];
-		else if (dy < 0) height = start.h === 'peek' ? 'half' : 'full';
-		else height = start.h === 'full' ? 'half' : 'peek';
+		if (Math.abs(dy) >= 8) {
+			dragged = true;
+			height = dy < 0 ? (start.h === 'peek' ? 'half' : 'full') : start.h === 'full' ? 'half' : 'peek';
+		}
 		start = null;
+	}
+	// A tap, Enter, Space and the activation of a screen reader all give a click.
+	function click() {
+		if (dragged) {
+			dragged = false;
+			return;
+		}
+		height = next[height];
 	}
 </script>
 
@@ -46,12 +57,7 @@
 		aria-controls="{id}-body"
 		onpointerdown={down}
 		onpointerup={up}
-		onkeydown={(e) => {
-			if (e.key === 'Enter' || e.key === ' ') {
-				e.preventDefault();
-				height = next[height];
-			}
-		}}
+		onclick={click}
 	>
 		<span class="bar" aria-hidden="true"></span>
 		<span class="line">
