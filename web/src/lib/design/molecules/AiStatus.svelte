@@ -11,6 +11,8 @@
 		seconds: number;
 		cost: number | null;
 		proposals: number;
+		/** True when the job can run again for another version, for example the first rooms of a new story. */
+		again?: boolean;
 	}
 
 	interface Props {
@@ -24,10 +26,16 @@
 		onlink?: () => void;
 		/** Open the proposals. */
 		onproposals: () => void;
+		/** Run a job again for another version. The old proposals stay. */
+		onagain?: (id: string) => void;
 	}
 
-	let { jobs, differ = null, onreview, oncancel, onlink, onproposals }: Props = $props();
-	const names: Record<string, string> = { imagine_exit: 'Draft an exit', review_room: 'Review the room' };
+	let { jobs, differ = null, onreview, oncancel, onlink, onproposals, onagain }: Props = $props();
+	const names: Record<string, string> = {
+		imagine_exit: 'Draft an exit',
+		review_room: 'Review the room',
+		seed_story: 'Draft the first rooms'
+	};
 </script>
 
 <!--
@@ -62,6 +70,11 @@
 							: ''}</span
 					>
 					{#if j.status === 'running'}<Button size="compact" variant="quiet" onclick={() => oncancel(j.id)}>Cancel</Button>{/if}
+					{#if j.again && onagain && j.status !== 'running'}
+						<Button size="compact" variant="quiet" onclick={() => onagain(j.id)}
+							>✦ Another take{j.cost !== null ? ` (last: $${j.cost.toFixed(2)})` : ''}</Button
+						>
+					{/if}
 				</li>
 			{/each}
 		</ul>

@@ -12,6 +12,7 @@
 //! | `POST /jobs` | Start a job: `{ "task": "imagine_exit", "args": { "room": "shore", "direction": "down" }, "state": { ... } }`. |
 //! | `GET /jobs`, `GET /jobs/<id>` | The jobs, with status, progress events, result and proposals. |
 //! | `POST /jobs/<id>/cancel` | Stop a running job. |
+//! | `POST /bootstrap` | Start a new story from an idea: `{ "title": "...", "idea": "...", "rooms": 3 }`. Writes the new story, then starts a `seed_story` job. 409 when the folder has a story. |
 //!
 //! A web page on any other site must not use these endpoints. So the server
 //! accepts a request with an `Origin` header only from `localhost` or
@@ -121,6 +122,10 @@ fn handle(server: &mut Server, jobs: &mut Jobs, mut request: Request) {
                 Err(e) => refused(&e),
             }
         }
+        (true, ["bootstrap"]) => match bootstrap(server, jobs, &body) {
+            Ok(id) => ok(json!({ "id": id })).with_status_code(202),
+            Err((status, e)) => error(status, &e),
+        },
         (true, ["jobs"]) => match start_job(server, jobs, &body) {
             Ok(id) => ok(json!({ "id": id })).with_status_code(202),
             Err(e) => error(400, &e),
@@ -157,7 +162,7 @@ fn start_job(server: &mut Server, jobs: &mut Jobs, body: &str) -> Result<String,
     if state.is_some() {
         args["session"] = json!(session);
     }
-    if task == "imagine_exit" && args.get("rejected").is_none() {
+    if matches!(task, "imagine_exit" | "seed_story") && args.get("rejected").is_none() {
         let rejected = server.rejected(20);
         if !rejected.is_empty() {
             args["rejected"] = json!(rejected.join("\n"));
@@ -180,6 +185,34 @@ fn start_job(server: &mut Server, jobs: &mut Jobs, body: &str) -> Result<String,
             server.end_session(&session);
         }
     })
+}
+
+/// `POST /bootstrap`: write a new story with the title, then start `seed_story` with the idea.
+fn bootstrap(server: &mut Server, jobs: &mut Jobs, body: &str) -> Result<String, (u16, String)> {
+    let req: Value =
+        serde_json::from_str(body).map_err(|e| (400, format!("The body is not JSON: {e}")))?;
+    let text = |k: &str| {
+        req.get(k)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    };
+    let idea = text("idea").ok_or((400, "The body needs `idea`.".to_string()))?;
+    server
+        .bootstrap(text("title").unwrap_or("Untitled"))
+        .map_err(|e| match e {
+            Refusal::Conflict(m) => (409, m),
+            other => (500, other.to_string()),
+        })?;
+    let mut args = json!({ "idea": idea });
+    if let Some(rooms) = req.get("rooms").and_then(Value::as_u64) {
+        args["rooms"] = json!(rooms.to_string());
+    }
+    let mut job = json!({ "task": "seed_story", "args": args });
+    if let Some(model) = text("model") {
+        job["model"] = json!(model);
+    }
+    start_job(server, jobs, &job.to_string()).map_err(|e| (400, e))
 }
 
 /// A boolean field of a JSON body; false when the body or the field is missing.

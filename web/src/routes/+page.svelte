@@ -70,14 +70,18 @@
 	}
 
 	/** Make a new story from the dialog and open it. */
-	function createStory({ title }: { title: string; idea: string }) {
+	async function createStory({ title, idea }: { title: string; idea: string }) {
 		const entry = addStory(title, Object.keys(examples));
 		mine = myStories();
-		openStory(entry.name);
+		await openStory(entry.name);
+		if (!idea) return;
+		// The server writes the same new story, then drafts the first rooms. The proposal shows when it is ready.
+		const problem = await ai.bootstrap(title, idea);
+		if (problem) failure = problem;
 	}
 
 	/** Load a story and start a new session with it. */
-	function openStory(name: string) {
+	async function openStory(name: string) {
 		storyName = name;
 		try {
 			localStorage.setItem(STORY_KEY, name);
@@ -87,10 +91,11 @@
 		failure = '';
 		exploration = null;
 		workspace = undefined;
-		bundledFiles(name)
-			.then((files) => Workspace.open(name, files))
-			.then((ws) => (workspace = ws))
-			.catch((e) => (failure = String(e)));
+		try {
+			workspace = await Workspace.open(name, await bundledFiles(name));
+		} catch (e) {
+			failure = String(e);
+		}
 	}
 	const problems = $derived(workspace?.problems ?? []);
 	// In development, the workspace is on `window.lantern` for experiments in the browser console.
@@ -146,6 +151,10 @@
 
 	// AI proposals from `lantern serve`, when it runs.
 	const ai = new AiLink();
+	// Why the new story dialog cannot draft with AI now; null when it can.
+	const newStoryAi = $derived(
+		ai.reachable ? null : 'To draft with AI, start `lantern serve --bootstrap` and keep this page open.'
+	);
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
@@ -216,9 +225,19 @@
 			status: j.status,
 			seconds: Math.max(0, Math.round((now - (j.started ?? now)) / 1000)),
 			cost: j.cost_usd,
-			proposals: j.proposals.length
+			proposals: j.proposals.length,
+			// A new story's draft can run again while its proposal is open, before the story changes.
+			again: j.task === 'seed_story' && j.proposals.some((p) => ai.proposals.some((v) => v.id === p))
 		}))
 	);
+	/** Another version of the first rooms: the same idea, one more job. The open proposal stays. */
+	async function seedAgain(id: string) {
+		const job = ai.jobs.find((j) => j.id === id);
+		const idea = job?.args.idea;
+		if (!session || typeof idea !== 'string') return;
+		const problem = await ai.bootstrap(session.game.title, idea);
+		if (problem) failure = problem;
+	}
 	const runningJob = $derived(aiJobs.find((j) => j.status === 'running'));
 
 	/** The ghost lines of the proposals that change the text of the current room. */
@@ -250,7 +269,13 @@
 		if (!view || !ws || proposalBusy.has(id)) return;
 		proposalBusy.add(id);
 		try {
+			const seed = action === 'accept' && ai.isSeed(id);
 			const problem = action === 'accept' ? await ai.accept(view, ws) : await ai.reject(view, note);
+			// The first rooms of a new story: play it from the start, with its new intro.
+			if (seed && !problem) {
+				await ws.restart();
+				closeAtlas();
+			}
 			proposalProblems = { ...proposalProblems, [id]: problem ?? '' };
 			if (!problem) delete proposalProblems[id];
 		} finally {
@@ -852,6 +877,7 @@
 			oncancel={(id) => ai.cancelJob(id)}
 			onlink={canLinkFolder() ? () => fileAction(() => workspace!.linkFolder()) : undefined}
 			onproposals={() => openAtlas('proposals')}
+			onagain={seedAgain}
 		/>
 	{/if}
 {/snippet}
@@ -1230,7 +1256,7 @@
 			if (file && workspace) fileAction(() => workspace!.importZip(file));
 		}}
 	/>
-	<NewStoryDialog bind:open={showNewStory} aiUnavailable="The AI draft comes in a later step." oncreate={createStory} />
+	<NewStoryDialog bind:open={showNewStory} aiUnavailable={newStoryAi} oncreate={createStory} />
 	<SettingsDialog
 		bind:open={showSettings}
 		bind:theme={settings.theme}

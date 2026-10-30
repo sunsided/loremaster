@@ -24,6 +24,7 @@ A new story has two files: `story.yaml` and the start room `rooms/start.yaml`. T
 
 - In the terminal: `cargo run -p lantern-cli -- new <folder> --title "The Drowned Bell"`. The folder must not contain a `story.yaml`.
 - In the editor: open the project menu or the command palette (Ctrl+K), then select "New story…". Type the title and push Enter. The browser keeps the story as a working copy. "Open my story …" in the same menu opens it again.
+- With AI: type an idea too. The AI writes the first 2 or 3 rooms as a proposal. Read "Start a new story with AI" in `docs/ai-tools.md`.
 
 ## Fragments
 

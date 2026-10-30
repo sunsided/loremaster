@@ -190,6 +190,38 @@ export class AiLink {
 		}
 	}
 
+	/**
+	 * Start a new story on the server from an idea: `POST /bootstrap`. The server writes the new story with
+	 * this title, the same files as the editor's new story, and starts a `seed_story` job.
+	 * Returns a problem text, for example when the server's folder has a story already.
+	 */
+	async bootstrap(title: string, idea: string): Promise<string | null> {
+		try {
+			const res = await fetch(`${SERVE}/bootstrap`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ title, idea })
+			});
+			if (res.status === 409)
+				return 'The AI server has a story already. Start `lantern serve --bootstrap` for a new story, then try again.';
+			if (!res.ok) return `${res.status} ${await res.text()}`;
+			const { id } = (await res.json()) as { id: string };
+			this.#started.set(id, Date.now());
+			const args = { idea };
+			this.jobs = [...this.jobs, { id, task: 'seed_story', args, status: 'running', events: [], result: null, proposals: [], cost_usd: null, model: null, started: Date.now() }];
+			if (this.#timer) clearTimeout(this.#timer);
+			this.#timer = setTimeout(() => this.#poll(), 1500);
+			return null;
+		} catch (e) {
+			return String(e);
+		}
+	}
+
+	/** True for a proposal that a `seed_story` job made: the first rooms of a new story. */
+	isSeed(id: string): boolean {
+		return this.jobs.some((j) => j.task === 'seed_story' && j.proposals.includes(id));
+	}
+
 	async cancelJob(id: string) {
 		try {
 			await this.#post(`/jobs/${id}/cancel`, {});
@@ -214,13 +246,17 @@ export class AiLink {
 	async accept(view: ProposalView, workspace: Workspace): Promise<string | null> {
 		if (!view.ok) return 'The proposal has problems. Fix or reject it.';
 		try {
-			return await this.#accept(view, workspace);
+			return await this.#accept(view, workspace, this.isSeed(view.id));
 		} catch (e) {
 			return `The editor could not apply the proposal: ${e instanceof Error ? e.message : String(e)}`;
 		}
 	}
 
-	async #accept(view: ProposalView, workspace: Workspace): Promise<string | null> {
+	/**
+	 * With `serverWrites`, the server writes the files into its own folder too, so that the next jobs see
+	 * the new rooms. The seed of a new story does this: the server's folder is the editor's story.
+	 */
+	async #accept(view: ProposalView, workspace: Workspace, serverWrites = false): Promise<string | null> {
 		const changes: { path: string; text: string }[] = [];
 		for (const f of view.files) {
 			const now = workspace.project.file(f.path)?.text ?? null;
@@ -234,7 +270,7 @@ export class AiLink {
 		const problems = await workspace.changeMany(changes);
 		if (problems?.length) return problems.map((p) => p.message).join(' ');
 		try {
-			await this.#post(`/proposals/${view.id}/accept`, { applied: true });
+			await this.#post(`/proposals/${view.id}/accept`, serverWrites ? {} : { applied: true });
 		} catch {
 			// The change is in the files; the server drops the proposal at its next look, or the author rejects it there.
 		}
