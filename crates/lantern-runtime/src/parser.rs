@@ -16,7 +16,22 @@ pub(crate) struct ParseScope {
     pub things: Vec<(Id, Vec<String>)>,
     /// Exit direction name and the name of the room it leads to.
     pub exits: Vec<(String, String)>,
+    /// The direction of a visible exit to the room the player came from, for `back`.
+    pub back: Option<String>,
 }
+
+/// The words for "the way I came", when no exit has that name.
+const BACK: [&str; 3] = ["back", "go back", "return"];
+
+/// For "back": the way to the room before. `Some(None)` when the phrase means back but no exit leads there.
+fn back(scope: &ParseScope, phrase: &str) -> Option<Option<String>> {
+    if !BACK.contains(&phrase) || scope.exits.iter().any(|(dir, _)| dir == phrase) {
+        return None;
+    }
+    Some(scope.back.clone())
+}
+
+const NO_WAY_BACK: &str = "You can't go back the way you came.";
 
 const ARTICLES: [&str; 6] = ["the", "a", "an", "some", "my", "this"];
 const PREPOSITIONS: [&str; 7] = ["with", "on", "to", "in", "into", "at", "using"];
@@ -29,6 +44,11 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
     }
     let phrase = words.join(" ");
 
+    if let Some(way) = back(scope, &phrase) {
+        return way
+            .map(|direction| Command::Go { direction })
+            .ok_or_else(|| NO_WAY_BACK.to_string());
+    }
     if let Some(dir) = direction(scope, &phrase) {
         return Ok(Command::Go { direction: dir });
     }
@@ -38,6 +58,11 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
 
     if verb.id.as_str() == "go" {
         let target = strip_articles(&rest).join(" ");
+        if let Some(way) = back(scope, &target) {
+            return way
+                .map(|direction| Command::Go { direction })
+                .ok_or_else(|| NO_WAY_BACK.to_string());
+        }
         return direction(scope, &target)
             .map(|direction| Command::Go { direction })
             .ok_or_else(|| "You can't go that way.".to_string());
@@ -233,6 +258,12 @@ pub(crate) fn preview(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Pre
         return out;
     }
     let phrase = words.join(" ");
+    if let Some(Some(dir)) = back(scope, &phrase) {
+        out.verb = Some(Id::new("go"));
+        out.direction = Some(dir);
+        out.complete = true;
+        return out;
+    }
     if let Some(dir) = direction(scope, &phrase).filter(|_| Direction::from_word(&phrase).is_some())
     {
         out.verb = Some(Id::new("go"));
@@ -323,6 +354,7 @@ mod tests {
                 ("door".into(), vec!["oak door".into(), "door".into()]),
             ],
             exits: vec![("north".into(), "Keeper's Cottage".into())],
+            back: None,
         }
     }
 

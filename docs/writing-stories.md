@@ -134,6 +134,8 @@ exits:
 | `blocked` | Markup. The game shows it when the player cannot go through. |
 | `traversal` | Markup. The game shows it when the player goes through. |
 
+The player can type `back`, `go back` or `return` to go back to the room before. The game looks for a visible exit of the current room that leads to that room, and uses it with its door, `passable` and `traversal`. You do not have to write anything for this. When no exit leads back, for example after a one-way drop, the game says "You can't go back the way you came." An exit with the direction `back` replaces this.
+
 ### Message exits
 
 An exit without `to` is a message exit. It goes to no room. When the player goes in its direction, the game shows `blocked`, and the player stays in the room. The move uses a turn, as a move that fails.
