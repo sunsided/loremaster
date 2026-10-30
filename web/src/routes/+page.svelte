@@ -19,7 +19,6 @@
 	import CommandPrompt from '#lib/design/molecules/CommandPrompt.svelte';
 	import StatusLine from '#lib/design/organisms/StatusLine.svelte';
 	import AppHeader from '#lib/design/organisms/AppHeader.svelte';
-	import AssemblyPanel from '#lib/design/organisms/AssemblyPanel.svelte';
 	import MapPanel from '#lib/design/organisms/MapPanel.svelte';
 	import ScreenEffects from '#lib/design/organisms/ScreenEffects.svelte';
 	import SettingsDialog from '#lib/design/organisms/SettingsDialog.svelte';
@@ -510,7 +509,6 @@
 	let inspector = $state('here');
 	const inspectorTabs = $derived<TabItem[]>([
 		{ id: 'here', label: 'Here' },
-		{ id: 'assembly', label: 'Assembly' },
 		...(ultrawide ? [] : [{ id: 'map', label: 'Map' }]),
 		{ id: 'story', label: 'Story' },
 		{ id: 'rules', label: 'Rules' },
@@ -526,6 +524,24 @@
 			? (session.scene, session.game.roomMatrix(session.scene.room))
 			: null
 	);
+
+	/** The notes of the margin in write mode: each room fragment with its layer, condition and state. */
+	const marginInfo = $derived.by(() => {
+		const s = session;
+		if (!s) return null;
+		const detail = (f: (typeof s.assembly)[number]) => {
+			const parts: string[] = [f.mode.replace('_', ' ')];
+			if (f.condition) parts.push(`when ${f.condition}`);
+			if (f.replaces) parts.push('replaces');
+			return parts.join(' · ');
+		};
+		return {
+			owner: `room:${s.scene.room}`,
+			fragments: s.assembly.map((f) => ({ index: f.index, layer: f.layer, detail: detail(f), shown: f.shown, why: f.why, text: f.text })),
+			things: s.parts.objects.length,
+			exits: s.parts.exits.length
+		};
+	});
 
 	// The Here panel.
 	/** The rooms next to the current room on its level, for the small map. */
@@ -704,6 +720,7 @@
 				onwrite={startWriting}
 				onadd={() => (writingAt = { owner: `room:${s.scene.room}`, fragment: -1 })}
 				preview={previewTurn?.blocks ?? null}
+				margin={writing ? marginInfo : null}
 				respond={respondable?.label ?? null}
 				onrespond={() => respondable && openPanel({ responding: respondable })}
 			>
@@ -846,23 +863,6 @@
 					/>
 				{:else if inspector === 'rules'}
 					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
-				{:else}
-					<AssemblyPanel
-						room={s.scene.room}
-						fragments={s.assembly}
-						parts={s.parts}
-						frame={s.frame}
-						focus={s.focus}
-						time={s.scene.time}
-						phase={s.scene.phase}
-						onfocus={(i) => (s.focus = i)}
-						onedit={writing
-							? (index) => {
-									writingAt = { owner: `room:${s.scene.room}`, fragment: index };
-									writingVariant = 0;
-								}
-							: undefined}
-					/>
 				{/if}
 			</div>
 			{/if}

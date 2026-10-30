@@ -227,7 +227,7 @@ Select words in the game text or in the writer. A small toolbar shows (or push C
 More actions in write mode:
 
 - "+ Add room text" adds a fragment to the current room.
-- In the assembly view ("Show Assembly" with Ctrl+K), "Edit" opens the writer for a fragment that does not show now.
+- In write mode, each fragment of the room text is on its own line, with a note in the margin: its layer, its mode and its condition. "+ N hidden here" shows the fragments that do not show now, struck through, with the reason in the margin. Select one to edit it.
 - "Remove this fragment" removes the fragment from the file.
 
 Help while you type:

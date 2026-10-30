@@ -3,7 +3,7 @@
 	import type { Block, Run, Source } from '#lib/engine/types.ts';
 	import FragmentMarker from '../atoms/FragmentMarker.svelte';
 	import ProseLink from '../atoms/ProseLink.svelte';
-	import type { EffectsLevel, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
+	import type { EffectsLevel, MarginInfo, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
 
 	interface Props {
 		entries: TranscriptEntry[];
@@ -32,6 +32,11 @@
 		onwrite?: (source: Source) => void;
 		/** Open the writer for a new room fragment. */
 		onadd?: () => void;
+		/**
+		 * Write mode: notes next to each fragment of the room text (layer, condition, why it is hidden), and the
+		 * fragments that do not show now. Each fragment gets its own line, with its note in the margin.
+		 */
+		margin?: MarginInfo | null;
 		/** A preview of the room text in other values. It shows in place of the newest room text, marked. */
 		preview?: Block[] | null;
 		/** In write mode: the last command, when it got the default response. It offers "Write a response". */
@@ -58,8 +63,40 @@
 		onadd,
 		respond = null,
 		onrespond,
-		preview = null
+		preview = null,
+		margin = null
 	}: Props = $props();
+
+	/** Show the room fragments that do not show now, in place. */
+	let hiddenOpen = $state(false);
+	const hiddenFragments = $derived(margin?.fragments.filter((f) => !f.shown) ?? []);
+	const uid = $props.id();
+
+	/** The lines of a block in the margin view: one for each fragment; generated text (exits, "There is …") stays together. */
+	function marginGroups(block: Block): { source?: Source; runs: Run[] }[] {
+		if (block.kind === 'exits') return [{ runs: block.runs }];
+		const out: { source?: Source; runs: Run[] }[] = [];
+		for (const g of groups(block.runs)) {
+			const last = out.at(-1);
+			if (!g.source && last && !last.source) last.runs.push(...g.runs);
+			else out.push({ source: g.source, runs: [...g.runs] });
+		}
+		// Spaces between fragments are not a line of their own.
+		return out.filter((g) => g.source || g.runs.some((r) => r.text.trim()));
+	}
+
+	/** The margin note for a fragment: a tag and a detail. */
+	function noteFor(source: Source | undefined): { tag: string; detail: string; generated?: boolean } | null {
+		if (!source) return null;
+		if (margin && source.owner === margin.owner) {
+			const f = margin.fragments.find((x) => x.index === source.fragment);
+			return f ? { tag: f.layer, detail: f.detail } : { tag: source.layer, detail: '' };
+		}
+		const [entity, part] = source.owner.split('/');
+		if (part === 'presence') return { tag: 'presence', detail: entity.replace('thing:', '') };
+		if (part === 'frames') return { tag: 'frame', detail: source.owner.split('/').slice(2).join(' · ') };
+		return { tag: source.layer, detail: entity };
+	}
 
 	/** The newest turn that shows a room: a preview replaces its room text. */
 	const previewAt = $derived(preview ? (entries.findLast((e) => e.turn.blocks.some((b) => b.kind === 'title'))?.id ?? -1) : -1);
@@ -208,6 +245,62 @@
 							>{:else}{p.text}{/if}{/each}{/each}</button
 			>{:else}{#each g.runs as run, i (i)}{run.text}{/each}{/if}{/each}{/snippet}
 
+<!--
+	Write mode with the margin: each fragment on its own line, and its note in the margin next to it.
+	The note describes the fragment for screen readers too (aria-describedby).
+-->
+{#snippet marginBlock(block: Block, bi: number)}{@const gs = marginGroups(block)}
+	{#each gs as g, gi (gi)}
+		{@const note = noteFor(g.source) ?? (block.kind === 'exits' ? { tag: 'exits', detail: `generated from ${margin?.exits ?? 0} exits`, generated: true } : block.kind === 'objects' ? { tag: 'objects', detail: `generated from ${margin?.things ?? 0} things`, generated: true } : null)}
+		{@const noteId = `${uid}-n${bi}-${gi}`}
+		<div class="mrow">
+			<p class="block {block.kind} mtext">
+				{#if same(g.source, writing) && editor}{@render editor()}{:else if g.source && editable(block.kind)}{@const src = g.source}<button
+						type="button"
+						class="writable"
+						aria-describedby={note ? noteId : undefined}
+						onclick={() => onwrite?.(src)}
+						><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#each pieces(run.text) as p, j (j)}{#if p.em}<em
+										>{p.text}</em
+									>{:else}{p.text}{/if}{/each}{/each}</button
+					>{:else}{@render runs({ kind: block.kind, runs: g.runs })}{/if}
+			</p>
+			{#if note}
+				<p class="mnote" class:generated={note.generated} id={noteId}>
+					<span class="tag">{note.tag}</span>{note.detail}
+				</p>
+			{/if}
+		</div>
+	{/each}
+	{#if block.kind === 'prose' && hiddenFragments.length}
+		<div class="mrow">
+			<p class="mtext">
+				<button type="button" class="hidden-chip" aria-expanded={hiddenOpen} onclick={() => (hiddenOpen = !hiddenOpen)}
+					>{hiddenOpen ? '−' : '+'} {hiddenFragments.length} hidden here</button
+				>
+			</p>
+		</div>
+		{#if hiddenOpen}
+			{#each hiddenFragments as f (f.index)}
+				{@const noteId = `${uid}-h${f.index}`}
+				<div class="mrow hidden-row">
+					<p class="block prose mtext">
+						{#if writing && margin && writing.owner === margin.owner && writing.fragment === f.index && editor}{@render editor()}{:else}<button
+								type="button"
+								class="writable struck"
+								aria-describedby={noteId}
+								onclick={() =>
+									onwrite?.({ owner: margin!.owner, fragment: f.index, layer: f.layer as Source['layer'], variant: 0 })}
+								><span class="visually-hidden">Edit, does not show now: </span>{f.text}</button
+							>{/if}
+					</p>
+					<p class="mnote warn" id={noteId}><span class="tag">{f.layer}</span>{f.why ?? 'hidden'}</p>
+				</div>
+			{/each}
+		{/if}
+	{/if}
+{/snippet}
+
 <!-- The log scrolls, so it must be focusable: keyboard users scroll it with the arrow keys. -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="scroller" bind:this={scroller} role="region" aria-label="Story" tabindex="0">
@@ -218,11 +311,13 @@
 			{@const writerAt = writeHere && writing ? writerAfter(entry.turn.blocks) : -1}
 			{@const addAt = writeHere && !writing && onadd ? lastRoomText(entry.turn.blocks) : -1}
 			{@const shown = shownBlocks(entry)}
-			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere}>
+			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere} class:margined={writeHere && !!margin}>
 				{#if shown.from !== Infinity}<p class="visually-hidden">Preview of the room text in other values. The game did not move.</p>{/if}
 				{#each shown.blocks as block, bi (bi)}
 					{@const inPlace = !!editor && writeHere && editable(block.kind) && block.runs.some((r) => same(r.source, writing))}
-					{#if inPlace}
+					{#if writeHere && margin && (editable(block.kind) || block.kind === 'exits')}
+						{@render marginBlock(block, bi)}
+					{:else if inPlace}
 						<!-- The fragment under edit: the prose view in place, between the text before and after it. -->
 						<div class="block {block.kind} editing">
 							<span>{@render writableRuns(block, 'before')}</span>
@@ -242,7 +337,7 @@
 								block
 							)}{:else}{@render runs(block)}{/if}</p>
 					{/if}
-					{#if bi === writerAt && editor && writing && !entry.turn.blocks.some((b) => b.runs.some((r) => same(r.source, writing)))}
+					{#if bi === writerAt && editor && writing && !entry.turn.blocks.some((b) => b.runs.some((r) => same(r.source, writing))) && !(margin && hiddenOpen && writing.owner === margin.owner && hiddenFragments.some((f) => f.index === writing?.fragment))}
 						<!-- A new fragment, or one that does not show now: the prose view after the room text. -->
 						<div class="block prose editing">{@render editor()}</div>
 					{/if}
@@ -287,6 +382,9 @@
 		flex: 1 1 auto;
 		min-height: 0;
 		overflow-y: auto;
+	}
+	.scroller {
+		container-type: inline-size;
 	}
 	.transcript {
 		max-width: var(--measure-prose);
@@ -387,6 +485,78 @@
 	.writable:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-focus);
 		outline-offset: 1px;
+	}
+	/* Write mode with the margin: the turn is wider than the prose, for the notes on the right. */
+	.transcript:has(.margined) {
+		max-width: calc(var(--measure-prose) + var(--width-margin) + var(--space-7));
+	}
+	.transcript:has(.margined) > .turn:not(.margined) {
+		max-width: var(--measure-prose);
+	}
+	.mrow {
+		display: grid;
+		grid-template-columns: minmax(0, var(--measure-prose)) var(--width-margin);
+		gap: 0 var(--space-7);
+		align-items: start;
+	}
+	.mtext {
+		min-width: 0;
+	}
+	.mtext .writable {
+		display: inline;
+	}
+	.mnote {
+		margin: var(--space-2) 0 0;
+		padding-left: var(--space-4);
+		border-left: var(--size-border) solid var(--color-border-subtle);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+		line-height: var(--line-height-body);
+		color: var(--color-text-muted);
+		text-shadow: none;
+	}
+	.mnote .tag {
+		display: inline-block;
+		margin-right: var(--space-2);
+		padding: 0 var(--space-2);
+		border: var(--size-border) solid var(--color-border-control);
+		color: var(--color-text-strong);
+		text-transform: uppercase;
+		letter-spacing: var(--letter-spacing-caps);
+	}
+	.mnote.generated .tag {
+		border-style: dashed;
+		color: var(--color-text-muted);
+	}
+	.mnote.warn {
+		color: var(--color-text-warning);
+	}
+	.hidden-chip {
+		min-height: var(--size-target-compact);
+		padding: 0 var(--space-3);
+		border: var(--size-border) dashed var(--color-border-control);
+		background: none;
+		color: var(--color-text-muted);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+	}
+	.hidden-chip:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
+	}
+	.writable.struck {
+		color: var(--color-text-muted);
+		text-decoration: line-through;
+		text-decoration-color: var(--color-border-control);
+	}
+	/* Narrow: the note goes under its fragment. */
+	@container (max-width: 760px) {
+		.mrow {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.mnote {
+			margin: 0 0 var(--space-3);
+		}
 	}
 	/* A preview of the room text: a line on the left in the warning colour, like the PREVIEW mark. */
 	.previewed {

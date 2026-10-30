@@ -49,7 +49,11 @@ New text can show with a line reveal and a glitch. The glitch shows not more tha
 
 The transcript scrolls to the newest text. Put it in a container with a fixed height.
 
-**Write mode.** When \`writable\` is the id of an entry, each fragment of its room text is a button that opens the writer (\`onwrite\` with the source of the fragment). Links in that text are plain text: a click edits, it does not play. "+ Add room text" (\`onadd\`) adds a fragment. While the author edits a fragment (\`writing\`), its text is struck through and the \`writer\` snippet shows after its paragraph. A turn whose room text an edit wrote again has the note "Written again after an edit of the story."`
+**Write mode.** When \`writable\` is the id of an entry, each fragment of its room text is a button that opens the writer (\`onwrite\` with the source of the fragment). Links in that text are plain text: a click edits, it does not play. "+ Add room text" (\`onadd\`) adds a fragment. While the author edits a fragment (\`writing\`), its text is struck through and the \`writer\` snippet shows after its paragraph. A turn whose room text an edit wrote again has the note "Written again after an edit of the story."
+
+**The margin.** With \`margin\` (in the app: in write mode), each fragment of the editable room text is on its own line, with a note in the margin: its layer as a tag, then its mode and condition. Presence texts and frame texts have a tag too; generated lines ("There is …", the exits) have a dashed tag. The note is the description of the fragment button (\`aria-describedby\`), so a screen reader reads it with the text. "+ N hidden here" shows the fragments that do not show now, struck through, with the reason in the margin; a click opens one for editing. Below 760px of width the notes go under their lines.
+
+**Preview.** With \`preview\`, the newest room text shows the preview blocks in its place, with a line in the warning colour on the left. Screen readers hear "Preview of the room text in other values. The game did not move."`
 				}
 			}
 		}
@@ -83,4 +87,24 @@ The transcript scrolls to the newest text. Put it in a container with a fixed he
 		</div>
 	{/snippet}
 </Story>
+<Story
+	name="Write mode with the margin"
+	args={{
+		entries: [{ id: 0, turn: openingTurn }],
+		writable: 0,
+		onwrite: fn(),
+		onadd: fn(),
+		margin: {
+			owner: 'room:shore',
+			things: 2,
+			exits: 2,
+			fragments: [
+				{ index: 0, layer: 'base', detail: 'always', shown: true, why: null, text: '' },
+				{ index: 1, layer: 'ambient', detail: 'always · when time.phase == dusk', shown: true, why: null, text: '' },
+				{ index: 2, layer: 'ambient', detail: 'shuffle · when time.phase == night', shown: false, why: 'time.phase == night is false', text: 'Waves hiss on the stones.' }
+			]
+		}
+	}}
+	{template}
+/>
 <Story name="Ending" args={{ entries: [{ id: 0, turn: openingTurn }, { id: 1, turn: endTurn }] }} {template} />

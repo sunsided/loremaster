@@ -66,6 +66,7 @@
 	--width-map: 640px;
 	--width-player-max: 1280px;
 	--width-content-max: 2400px; /* Map + player + panel at their maximum. Wider screens center the content. */
+	--width-margin: 14rem; /* The notes next to the text in write mode. */
 	--bp-stack: 900px;
 	--bp-ultrawide: 2200px;
 

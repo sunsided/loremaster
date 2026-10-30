@@ -147,3 +147,26 @@ export interface MenuItem {
 	/** Items with a group start a new section with this heading. */
 	group?: string;
 }
+
+/** One room fragment, for the margin notes in write mode. */
+export interface MarginFragment {
+	index: number;
+	layer: string;
+	/** Mode, condition and the like, for example "always · when time.phase == dusk". */
+	detail: string;
+	shown: boolean;
+	/** Why the fragment does not show now. */
+	why: string | null;
+	/** The source text, for a hidden fragment. */
+	text: string;
+}
+
+/** What the margin explains about the room text in write mode. */
+export interface MarginInfo {
+	/** The owner of the room fragments, for example `room:shore`. */
+	owner: string;
+	fragments: MarginFragment[];
+	/** The number of things and of exits that the generated layers come from. */
+	things: number;
+	exits: number;
+}
