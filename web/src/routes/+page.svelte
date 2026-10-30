@@ -854,7 +854,7 @@
 			if (f.condition) parts.push(`when ${f.condition}`);
 			if (f.replaces) parts.push('replaces');
 			// Author notes on the fragment: a count, and the threads that it is a beat of.
-			const notes = allNotes.filter((n) => n.entity === owner && n.at.startsWith(`description[${f.index}].notes`));
+			const notes = allNotes.filter((n) => n.entity === owner && n.at.startsWith(`description[${f.index}].notes[`));
 			if (notes.length) parts.push(`✎ ${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`);
 			for (const n of notes) if (n.note.thread) parts.push(`${n.note.role ?? 'beat'} of ${n.note.thread}`);
 			return parts.join(' · ');
