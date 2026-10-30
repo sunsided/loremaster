@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
-	import { AiLink, parseFindings, type ProposalView } from '#lib/project/proposals.svelte.ts';
+	import { AiLink, localPage, parseFindings, type ProposalView } from '#lib/project/proposals.svelte.ts';
 	import ProposalCard from '#lib/design/molecules/ProposalCard.svelte';
 	import AiStatus from '#lib/design/molecules/AiStatus.svelte';
 	import { canLinkFolder } from '#lib/project/store.ts';
@@ -168,7 +168,7 @@
 	}
 
 	// AI proposals from `lantern serve`, when it runs.
-	const ai = new AiLink();
+	const ai = new AiLink(() => settings.serveLink);
 	// Why the new story dialog cannot draft with AI now; null when it can.
 	const newStoryAi = $derived(
 		ai.reachable ? null : 'To draft with AI, start `lantern serve --bootstrap` and keep this page open.'
@@ -1744,6 +1744,8 @@
 		bind:tooltips={settings.tooltips}
 		bind:reveal={settings.reveal}
 		systemReduce={settings.systemReduce}
+		hostedOrigin={localPage() ? null : location.origin}
+		bind:serveLink={settings.serveLink}
 	/>
 {:else}
 	<main class="message">

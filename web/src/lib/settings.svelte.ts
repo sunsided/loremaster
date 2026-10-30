@@ -10,9 +10,10 @@ interface Stored {
 	motion: Motion;
 	tooltips: boolean;
 	reveal: RevealMode;
+	serveLink: boolean;
 }
 
-const defaults: Stored = { theme: 'phosphor', effects: 'full', motion: 'system', tooltips: true, reveal: 'lines' };
+const defaults: Stored = { theme: 'phosphor', effects: 'full', motion: 'system', tooltips: true, reveal: 'lines', serveLink: false };
 
 function read(): Stored {
 	try {
@@ -31,6 +32,8 @@ class Settings {
 	tooltips = $state(defaults.tooltips);
 	/** How new game text appears: line by line, or a paragraph at once. */
 	reveal = $state<RevealMode>(defaults.reveal);
+	/** On a hosted page: look for `lantern serve` on this computer. Off by default, because the browser asks for permission. */
+	serveLink = $state(defaults.serveLink);
 	/** The operating system asks for reduced motion. */
 	systemReduce = $state(false);
 
@@ -43,6 +46,7 @@ class Settings {
 		this.motion = s.motion;
 		this.tooltips = s.tooltips;
 		this.reveal = s.reveal === 'blocks' ? 'blocks' : 'lines';
+		this.serveLink = s.serveLink === true;
 		if (typeof window !== 'undefined' && window.matchMedia) {
 			const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
 			this.systemReduce = mq.matches;
@@ -55,7 +59,8 @@ class Settings {
 					effects: this.effects,
 					motion: this.motion,
 					tooltips: this.tooltips,
-					reveal: this.reveal
+					reveal: this.reveal,
+					serveLink: this.serveLink
 				};
 				try {
 					localStorage.setItem(KEY, JSON.stringify(value));

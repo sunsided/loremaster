@@ -21,6 +21,23 @@ cargo build --release -p lantern-cli
 target/release/lantern serve examples/lighthouse
 ```
 
+### The editor in the binary
+
+Build the binary with the feature `embed-ui`. Then `lantern serve` also serves the web editor at `http://127.0.0.1:4710/` and opens it in the browser.
+
+```sh
+task build:local
+target/release/lantern serve examples/lighthouse
+```
+
+| Option | What it does |
+| --- | --- |
+| `--port N` | Use port N. The default is 4710. |
+| `--no-open` | Do not open the browser. |
+| `--allow-origin URL` | Let a hosted editor use this server, for example `--allow-origin https://sunsided.github.io`. You can give the option more than one time. |
+
+The editor finds the server itself. A page from `localhost` or `127.0.0.1` asks its own address first, then port 4710. A hosted page asks only when you select "Use AI from lantern serve on this computer" in the settings. The browser can ask you for permission first.
+
 ## Connect Claude Code
 
 1. Build the CLI (see above).
@@ -234,6 +251,9 @@ To play a proposal before you accept it, use `session_start` with `proposal`.
 | `GET /jobs` | Gives all jobs. |
 | `GET /jobs/<id>` | Gives one job, with its status, events, result and proposals. |
 | `POST /jobs/<id>/cancel` | Stops a running job. |
+| `GET /health` | Gives `{ "lantern": "<version>", "ui": true }`. The editor uses it to find the server. |
 | `POST /bootstrap` | Starts a new story from an idea. The body is `{ "title": "...", "idea": "...", "rooms": 3 }`; `title`, `rooms` and `model` are optional. The server writes the new story (the same files as `lantern new`), then starts a `seed_story` job. The reply is `{ "id": "j1" }` with status 202. When the folder has a story, the reply has status 409. |
 
-The server accepts requests only from `127.0.0.1`. A request from a browser must come from a page on `localhost`, `127.0.0.1` or `[::1]`. A `POST` must have `Content-Type: application/json`.
+Each endpoint is also at `/api/...`, for example `GET /api/proposals`. The editor uses these paths.
+
+The server accepts requests only from `127.0.0.1`. A request from a browser must come from a page on `localhost`, `127.0.0.1` or `[::1]`, or from an origin in `--allow-origin`. A `POST` must have `Content-Type: application/json`.

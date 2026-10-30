@@ -6,8 +6,32 @@ import type { ReviewFinding } from '#lib/design/types.ts';
 import { keepLines } from './yaml-edit.ts';
 import type { Workspace } from './workspace.svelte.ts';
 
-/** The address of `lantern serve`. */
+/** Where `lantern serve` listens by default. */
 export const SERVE = 'http://127.0.0.1:4710';
+
+/** True when the page comes from this computer: the dev server, or `lantern serve` with the editor in it. */
+export function localPage(): boolean {
+	return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+}
+
+/**
+ * The API address of `lantern serve`, or null when no server answers. A local page asks its own origin
+ * first, then the default address. A hosted page asks only when `linkHosted` is true, because the
+ * browser asks the user for permission to connect to the local network.
+ */
+export async function findServer(linkHosted: boolean): Promise<string | null> {
+	const bases = localPage() ? [location.origin, SERVE] : linkHosted ? [SERVE] : [];
+	for (const base of new Set(bases)) {
+		try {
+			const res = await fetch(`${base}/api/health`);
+			// The dev server answers each path with the app page, so check the body too.
+			if (res.ok && typeof (await res.json()).lantern === 'string') return `${base}/api`;
+		} catch {
+			// Try the next address.
+		}
+	}
+	return null;
+}
 
 export interface ProposalFragment {
 	id: string | null;
@@ -107,10 +131,18 @@ export class AiLink {
 	jobs = $state<JobView[]>([]);
 	/** The last comparison of the files of the server and of the editor, or null before the first one. */
 	sync = $state<SyncState | null>(null);
+	/** The API address of the server, or null before it answers. */
+	#base: string | null = null;
+	#linkHosted: () => boolean;
 	#timer: ReturnType<typeof setTimeout> | null = null;
 	#started = new Map<string, number>();
 	#stopped = true;
 	#polling = false;
+
+	/** `linkHosted` tells whether a hosted page may look for `lantern serve` on this computer. */
+	constructor(linkHosted: () => boolean = () => false) {
+		this.#linkHosted = linkHosted;
+	}
 
 	/** Read the proposals now, then again after a pause: often while the server answers, rarely when it does not. */
 	start() {
@@ -131,11 +163,15 @@ export class AiLink {
 		if (this.#timer) clearTimeout(this.#timer);
 		this.#timer = null;
 		try {
-			const res = await fetch(`${SERVE}/proposals`);
+			this.#base ??= await findServer(this.#linkHosted());
+			if (this.#base === null) throw new Error('no server');
+			const res = await fetch(`${this.#base}/proposals`);
 			if (!res.ok) throw new Error(String(res.status));
 			this.proposals = (await res.json()) as ProposalView[];
 			this.reachable = true;
 		} catch {
+			// Look for the server again at the next poll: it can come back on another address.
+			this.#base = null;
 			this.reachable = false;
 			this.proposals = [];
 			this.jobs = [];
@@ -143,7 +179,7 @@ export class AiLink {
 		if (this.reachable) {
 			// A failed jobs read keeps the proposals and the last known jobs.
 			try {
-				const jobs = await fetch(`${SERVE}/jobs`);
+				const jobs = await fetch(`${this.#base}/jobs`);
 				if (jobs.ok)
 					this.jobs = ((await jobs.json()) as JobView[]).map((j) => ({ ...j, started: this.#started.get(j.id) ?? Date.now() }));
 			} catch {
@@ -158,7 +194,7 @@ export class AiLink {
 
 	/** Call one MCP tool of the server and give its text result. */
 	async #tool(name: string, args: Record<string, unknown>): Promise<string> {
-		const res = await fetch(`${SERVE}/mcp`, {
+		const res = await fetch(`${this.#base}/mcp`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
@@ -195,7 +231,7 @@ export class AiLink {
 	/** Start a job, for example `imagine_exit` with `{ room, direction }`. `state` is the save state of the editor. */
 	async startJob(task: string, args: Record<string, unknown>, state?: unknown): Promise<string | null> {
 		try {
-			const res = await fetch(`${SERVE}/jobs`, {
+			const res = await fetch(`${this.#base}/jobs`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ task, args, ...(state ? { state } : {}) })
@@ -219,7 +255,7 @@ export class AiLink {
 	 */
 	async bootstrap(title: string, idea: string): Promise<string | null> {
 		try {
-			const res = await fetch(`${SERVE}/bootstrap`, {
+			const res = await fetch(`${this.#base}/bootstrap`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ title, idea })
@@ -253,7 +289,7 @@ export class AiLink {
 	}
 
 	async #post(path: string, body: unknown) {
-		const res = await fetch(`${SERVE}${path}`, {
+		const res = await fetch(`${this.#base}${path}`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)

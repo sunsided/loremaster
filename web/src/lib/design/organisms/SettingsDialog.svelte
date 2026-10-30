@@ -16,6 +16,10 @@
 		reveal?: RevealMode;
 		/** True when the operating system asks for reduced motion. */
 		systemReduce?: boolean;
+		/** On a hosted page, its origin: the dialog then offers the link to `lantern serve`. Null on a local page. */
+		hostedOrigin?: string | null;
+		/** Look for `lantern serve` on this computer. */
+		serveLink?: boolean;
 	}
 
 	let {
@@ -25,7 +29,9 @@
 		motion = $bindable('system'),
 		tooltips = $bindable(true),
 		reveal = $bindable('lines'),
-		systemReduce = false
+		systemReduce = false,
+		hostedOrigin = null,
+		serveLink = $bindable(false)
 	}: Props = $props();
 
 	let dialog: HTMLDialogElement | undefined = $state();
@@ -66,7 +72,7 @@
 	<RadioGroup legend="Theme" name="theme" look="pills" options={themes} bind:value={theme} />
 	<RadioGroup legend="Visual effects" name="effects" look="cards" options={levels} bind:value={effects} />
 	<RadioGroup legend="New text appears" name="reveal" look="pills" options={reveals} bind:value={reveal} />
-	<div class="motion">
+	<div class="group">
 		<RadioGroup legend="Motion" name="motion" options={motions} bind:value={motion} />
 		<p class="note">
 			Reduced motion keeps all textures, because textures do not move. It stops all animation and shows new
@@ -74,6 +80,15 @@
 		</p>
 	</div>
 	<Checkbox bind:checked={tooltips}>Show author tooltips on things and exits</Checkbox>
+	{#if hostedOrigin}
+		<div class="group">
+			<Checkbox bind:checked={serveLink}>Use AI from lantern serve on this computer</Checkbox>
+			<p class="note">
+				Start <code>lantern serve &lt;folder&gt; --allow-origin {hostedOrigin}</code>. The browser can ask for
+				permission to connect to your computer.
+			</p>
+		</div>
+	{/if}
 </dialog>
 
 <style>
@@ -101,7 +116,7 @@
 		align-items: center;
 		gap: var(--space-5);
 	}
-	.motion {
+	.group {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);

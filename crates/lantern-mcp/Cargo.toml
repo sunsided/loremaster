@@ -13,6 +13,11 @@ lantern-tools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tiny_http.workspace = true
+include_dir = { workspace = true, optional = true }
+
+[features]
+# Embed the built web app (web/build) and serve it at `/`. Run `task web:build` first.
+embed-ui = ["dep:include_dir"]
 
 [lints]
 workspace = true

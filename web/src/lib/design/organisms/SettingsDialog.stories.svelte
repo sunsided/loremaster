@@ -21,7 +21,9 @@ The motion setting has two choices:
 "New text appears" sets how the game text shows with effects on: \"Line by line\" types each line after the other, like a terminal; \"A paragraph at once\" wipes each paragraph in one move. With effects off or reduced motion, the text shows at once.
 
 Reduced motion keeps the textures, because they do not move.
-The app keeps these settings in the browser storage of the user.`
+The app keeps these settings in the browser storage of the user.
+
+On a hosted page (\`hostedOrigin\` is set), the dialog also offers the link to \`lantern serve\` on the computer of the user. It is off by default, because the browser asks for permission to connect to the local network.`
 				},
 				story: { inline: false, iframeHeight: 640 }
 			}
@@ -34,10 +36,18 @@ The app keeps these settings in the browser storage of the user.`
 	let theme = $state<'phosphor' | 'night' | 'paper'>('phosphor');
 	let effects = $state<'full' | 'subtle' | 'off'>('full');
 	let motion = $state<'system' | 'reduce'>('system');
+	let hostedOpen = $state(false);
+	let serveLink = $state(false);
 </script>
 
 <Story name="Open from a button" asChild>
 	<Button aria-haspopup="dialog" aria-expanded={open} onclick={() => (open = true)}>Look and motion</Button>
 	<p>Theme: {theme} · effects: {effects} · motion: {motion}</p>
 	<SettingsDialog bind:open bind:theme bind:effects bind:motion />
+</Story>
+
+<Story name="On a hosted page" asChild>
+	<Button aria-haspopup="dialog" aria-expanded={hostedOpen} onclick={() => (hostedOpen = true)}>Look and motion</Button>
+	<p>Link to lantern serve: {serveLink ? 'on' : 'off'}</p>
+	<SettingsDialog bind:open={hostedOpen} hostedOrigin="https://sunsided.github.io" bind:serveLink />
 </Story>
