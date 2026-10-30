@@ -2,7 +2,7 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import type { ComponentProps } from 'svelte';
 	import { fn } from 'storybook/test';
-	import { authorTurn, doorTurn, drawerTurn, endTurn, entries, findings, exits, openingTurn, things } from '../fixtures.ts';
+	import { authorTurn, talkTurns, doorTurn, drawerTurn, endTurn, entries, findings, exits, openingTurn, things } from '../fixtures.ts';
 	import Transcript from './Transcript.svelte';
 	import FragmentWriter from './FragmentWriter.svelte';
 	import { shoreFragment, writerTools } from '../fixtures.ts';
@@ -38,6 +38,8 @@ Each echoed command starts with "You typed:" for screen readers.
 The **room brief** is one line under the newest turn: the room, the things here and the exits, all clickable. It shows only when the newest turn did not print the room, for example after "pick up iron key". Thus the text never ends without something to act on. The brief is not part of the log, so screen readers do not read it again after each turn, and it does not stay in the history.
 
 Screen-reader labels, such as "You typed:", are not part of copied text.
+
+In a **talk**, the transcript shows only what is said: the answer that the player chose (with a line on the left, and "You say:" for screen readers), then the line of the other character. The answers to choose from are in the verb bar. The log region announces the new line. For a layout without the verb bar, set \`choicesInText\`: then the numbered answers show under the newest line.
 
 When \`showSources\` is on (in the app: in write mode), text from an action frame has a small "frame" mark before it. The mark has a title that names the frame, for example "story frame for look, before".
 
@@ -129,4 +131,6 @@ The transcript scrolls to the newest text. Put it in a container with a fixed he
 	}}
 	{template}
 />
+<Story name="In a talk" args={{ entries: talkTurns.map((turn, id) => ({ id, turn })), room: 'cantina' }} {template} />
+<Story name="In a talk, answers in the text" args={{ entries: talkTurns.map((turn, id) => ({ id, turn })), room: 'cantina', choicesInText: true }} {template} />
 <Story name="Ending" args={{ entries: [{ id: 0, turn: openingTurn }, { id: 1, turn: endTurn }] }} {template} />

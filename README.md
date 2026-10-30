@@ -10,7 +10,7 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 
 ![Write mode: the same room. Each text fragment shows its layer and its condition in the margin, and the room desk shows the file, notes and rules.](docs/images/write.png)
 
-![A talk in the cantina example. The player asked Blackbeard "Who are you?", and he gave his name. The numbered answers show in the story text and in the verb bar, with "Leave". The verbs and things are dim during the talk. The side panel shows the node of the dialogue, its changes and the trust of the player.](docs/images/talk.png)
+![A talk in the cantina example. The player asked Blackbeard "Who are you?", and he gave his name. The story text shows what is said. The answers are numbered buttons in the verb bar, with "Leave". The verbs and things are dim during the talk. The side panel shows the node of the dialogue, its changes and the trust of the player.](docs/images/talk.png)
 
 ![The Atlas map of Zork I, imported from its ZIL source: 110 rooms on six floors, with the rooms of the current floor and the details of the selected room.](docs/images/atlas.png)
 

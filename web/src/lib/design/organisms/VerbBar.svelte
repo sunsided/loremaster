@@ -60,6 +60,20 @@
 
 	const talking = $derived(talkingTo !== null);
 
+	let talkSection: HTMLElement | undefined = $state();
+	let wasTalking = false;
+	// The answers are the only way on during a talk. When a talk starts, the focus goes to the first answer.
+	// After a choice the old buttons go away; when the focus was on one of them, it goes to the new first answer.
+	$effect(() => {
+		const list = choices;
+		const starts = talking && !wasTalking;
+		wasTalking = talking;
+		if (!talking || !list.length || !talkSection) return;
+		const active = document.activeElement;
+		const lost = !active || active === document.body || talkSection.contains(active);
+		if (starts || lost) queueMicrotask(() => talkSection?.querySelector<HTMLButtonElement>('.choice')?.focus());
+	});
+
 	const selectedVerb = $derived(verbs.find((v) => v.id === selected));
 	const toItem = (t: ThingInfo) => ({ id: t.id, label: t.name, inspect: `thing:${t.id}` });
 </script>
@@ -72,7 +86,7 @@
 <div class="verb-bar" class:talking>
 	{#if talking}
 		<!-- A talk stays open until the player leaves. The answers replace the verbs; the verbs and things dim and do not take focus. -->
-		<section class="talk" aria-label="Talking to {talkingTo}">
+		<section class="talk" aria-label="Talking to {talkingTo}" bind:this={talkSection}>
 			<p class="talk-head">Talking to <strong>{talkingTo}</strong></p>
 			<ol class="choices">
 				{#each choices as c (c.index)}
