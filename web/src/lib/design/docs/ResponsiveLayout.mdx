@@ -12,7 +12,7 @@ The app works at all widths from 320px up to 32:9 ultrawide screens. The design 
 2. Use `min-width: 0` on flex children that contain text, so long words do not push the layout.
 3. Limit story text to `--measure-prose` (70 characters).
 4. Use `dvh` units for the full page height, so the mobile browser bar does not cut the page.
-5. Below 900px (`--bp-stack`), the side panel goes under the player and the page scrolls. CSS cannot read a token in a media query, so write `900px` and refer to the token in a comment.
+5. Below 900px (`--bp-stack`), the side panel becomes a bottom sheet (BottomSheet) that peeks with one line. CSS cannot read a token in a media query, so write `900px` and refer to the token in a comment.
 6. From 2200px with an aspect ratio of 21:9 or more (`--bp-ultrawide`), the map shows on the left of the player. Use both conditions, so a wide 16:9 screen does not get the map.
 7. Wider than `--width-content-max`, the content stays at that width, in the center. The outer colour fills the sides.
 8. The type size of story text changes with the viewport width (`--font-size-prose`).
@@ -23,9 +23,10 @@ The app works at all widths from 320px up to 32:9 ultrawide screens. The design 
 
 | Width | Layout |
 | --- | --- |
-| Less than 900px | One column: player, then the assembly panel. The page scrolls. |
-| 900px or more | Player and assembly panel, side by side. |
-| 2200px or more, and 21:9 or wider | Map, player and assembly panel. |
+| Less than 900px | One column: the player. The Here panel is a bottom sheet. In write mode the fragment panel is under the paragraph, and the margin notes go under their lines. |
+| 900px or more | Player and Here panel, side by side. In write mode the fragment panel takes the place of the Here panel, and the margin notes are next to the text. |
+| 2200px or more, and 21:9 or wider | Map, player and Here panel. |
+| Any width, Atlas open (Ctrl+M) | The Atlas takes the place of the player: tabs, then the view (on the map: floors, map, room card). |
 | More than 2400px | The same as above, in the center of the screen. |
 
 ## Examine an element

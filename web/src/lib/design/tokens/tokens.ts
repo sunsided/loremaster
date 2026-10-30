@@ -19,6 +19,10 @@ export const colorTokens: TokenInfo[] = [
 	{ name: '--color-text-on-accent', use: 'Text on an accent background.' },
 	{ name: '--color-accent', use: 'Selected controls and the text cursor.' },
 	{ name: '--color-accent-tint', use: 'A faint accent fill, for a selected item that must not draw the eye.' },
+	{ name: '--color-status-bg', use: 'Background of the status line (inverse video): the accent of the theme.' },
+	{ name: '--color-status-text', use: 'Text on the status line.' },
+	{ name: '--color-ghost', use: 'AI proposals: ghost text and proposal cards. A cooler tone than the accent.' },
+	{ name: '--color-ghost-tint', use: 'A faint ghost fill behind ghost text.' },
 	{ name: '--color-warning', use: 'Edges of highlighted fragments.' },
 	{ name: '--color-border-subtle', use: 'Dividers. Decoration only.' },
 	{ name: '--color-border-control', use: 'Edge of a control. Contrast 3:1 or more.' },
@@ -46,7 +50,8 @@ export const sizeTokens: TokenInfo[] = [
 	{ name: '--size-target', use: 'Minimum height of a primary control (44px).' },
 	{ name: '--size-target-compact', use: 'Minimum height of a secondary control (32px).' },
 	{ name: '--measure-prose', use: 'Maximum line length of story text.' },
-	{ name: '--width-panel', use: 'Maximum width of the assembly panel.' },
+	{ name: '--width-panel', use: 'Maximum width of the side panel (Here panel, fragment panel).' },
+	{ name: '--width-margin', use: 'Width of the margin notes next to the text in write mode.' },
 	{ name: '--width-dialog', use: 'Maximum width of a dialog.' },
 	{ name: '--width-map', use: 'Maximum width of the map on ultrawide screens.' },
 	{ name: '--width-player-max', use: 'Maximum width of the player on ultrawide screens.' },
@@ -58,5 +63,6 @@ export const motionTokens: TokenInfo[] = [
 	{ name: '--duration-base', use: 'Line reveal with subtle effects.' },
 	{ name: '--duration-slow', use: 'Line reveal with full effects.' },
 	{ name: '--duration-line-step', use: 'Delay between two revealed lines.' },
-	{ name: '--duration-glitch', use: 'Length of the glitch on new text.' }
+	{ name: '--duration-glitch', use: 'Length of the glitch on new text.' },
+	{ name: '--motion-sheet', use: 'Height change of the bottom sheet on phones (off with reduced motion).' }
 ];
