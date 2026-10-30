@@ -173,6 +173,10 @@ export interface MapRoom {
 	level: number;
 	visited: boolean;
 	current: boolean;
+	/** Editor only: the AI proposal that adds the room. */
+	proposed?: string;
+	/** Editor only: the AI proposal that removes the room. */
+	removed?: string;
 }
 
 export interface MapLink {
@@ -181,11 +185,28 @@ export interface MapLink {
 	direction: string;
 	visible: boolean;
 	one_way: boolean;
+	/** Editor only: the AI proposal that adds the link. */
+	proposed?: string;
+	/** Editor only: the AI proposal that removes the link. */
+	removed?: string;
+}
+
+/** An exit that leads nowhere and only prints a message. */
+export interface MapEnd {
+	room: string;
+	direction: string;
+	visible: boolean;
+	/** Editor only: the AI proposal that adds the exit. */
+	proposed?: string;
+	/** Editor only: the AI proposal that removes the exit. */
+	removed?: string;
 }
 
 export interface MapView {
 	rooms: MapRoom[];
 	links: MapLink[];
+	/** The message exits. */
+	ends?: MapEnd[];
 }
 
 export interface PartView {
@@ -373,4 +394,8 @@ export interface AtlasRoom {
 	exits: [string, string][];
 	/** The number of room fragments. */
 	fragments: number;
+	/** Editor only: the AI proposal that adds the room. */
+	proposed?: string;
+	/** Editor only: the AI proposal that removes the room. */
+	removed?: string;
 }

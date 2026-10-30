@@ -2,6 +2,7 @@
 	import type { AtlasRoom, MapView } from '#lib/engine/types.ts';
 	import Button from '../atoms/Button.svelte';
 	import MapPanel from './MapPanel.svelte';
+	import { endLine } from '../map-geometry.ts';
 
 	interface Props {
 		map: MapView;
@@ -34,6 +35,7 @@
 	const floorRooms = $derived(shownFloor === 'all' ? map.rooms : map.rooms.filter((r) => r.level === shownFloor));
 	const ids = $derived(new Set(floorRooms.map((r) => r.id)));
 	const floorLinks = $derived(map.links.filter((l) => ids.has(l.from) && ids.has(l.to)));
+	const floorEnds = $derived((map.ends ?? []).filter((e) => ids.has(e.room)));
 
 	// The view: a scale and the map point in the top left corner.
 	let scale = $state(1);
@@ -89,13 +91,16 @@
 	let drag: { x: number; y: number; ox: number; oy: number; moved: boolean } | null = null;
 	function down(e: PointerEvent) {
 		drag = { x: e.clientX, y: e.clientY, ox, oy, moved: false };
-		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 	}
 	function move(e: PointerEvent) {
 		if (!drag) return;
 		const dx = e.clientX - drag.x;
 		const dy = e.clientY - drag.y;
-		if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+		// Capture the pointer only once it drags: a capture at pointerdown sends the click to the canvas, not to the room.
+		if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 3) {
+			drag.moved = true;
+			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+		}
 		ox = drag.ox - dx / scale;
 		oy = drag.oy - dy / scale;
 	}
@@ -220,7 +225,9 @@
 					<tbody>
 						{#each sorted as r (r.id)}
 							<tr class:current={r.current} class:selected={r.id === selected}>
-								<th scope="row"><button type="button" class="room-link" onclick={() => pick(r.id)}>{r.name}</button>{r.current ? ' (you)' : ''}</th>
+								<th scope="row"><button type="button" class="room-link" onclick={() => pick(r.id)}>{r.proposed ? '✦ ' : ''}{r.name}</button
+									>{r.current ? ' (you)' : ''}{r.proposed ? ', proposed by AI' : ''}{r.removed ? ', an AI proposal removes it' : ''}</th
+								>
 								<td>{r.level}</td>
 								<td>{r.visited ? 'yes' : 'no'}</td>
 								<td>{r.exits.map(([d]) => d).join(', ')}</td>
@@ -255,16 +262,44 @@
 							{@const a = roomById(link.from)}
 							{@const b = roomById(link.to)}
 							{#if a && b}
-								<line x1={px(a.x)} y1={py(a.y)} x2={px(b.x)} y2={py(b.y)} class="link" class:hidden-link={!link.visible} />
+								<line
+									x1={px(a.x)}
+									y1={py(a.y)}
+									x2={px(b.x)}
+									y2={py(b.y)}
+									class="link"
+									class:hidden-link={!link.visible}
+									class:proposed={!!link.proposed}
+									class:removed={!!link.removed}
+								/>
+							{/if}
+						{/each}
+						{#each floorEnds as e (e.room + '>' + e.direction)}
+							{@const r = roomById(e.room)}
+							{#if r}
+								{@const l = endLine(px(r.x), py(r.y), BOX_W, BOX_H, e.direction)}
+								<g class="end" class:hidden-link={!e.visible} class:proposed={!!e.proposed} class:removed={!!e.removed}>
+									<line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} />
+									<path d={l.bar} />
+								</g>
 							{/if}
 						{/each}
 						{#each floorRooms as r (r.id)}
 							{@const up = map.links.some((l) => (l.from === r.id && l.direction === 'up') || (l.to === r.id && l.direction === 'down'))}
 							{@const downStair = map.links.some((l) => (l.from === r.id && l.direction === 'down') || (l.to === r.id && l.direction === 'up'))}
 							<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-							<g class="room" class:current={r.current} class:selected={r.id === selected} class:unvisited={!r.visited} onclick={() => pick(r.id)}>
+							<g
+								class="room"
+								class:current={r.current}
+								class:selected={r.id === selected}
+								class:unvisited={!r.visited}
+								class:proposed={!!r.proposed}
+								class:removed={!!r.removed}
+								onclick={() => pick(r.id)}
+							>
 								<rect x={px(r.x) - BOX_W / 2} y={py(r.y) - BOX_H / 2} width={BOX_W} height={BOX_H} />
-								<text x={px(r.x)} y={py(r.y) + 4} text-anchor="middle">{short(r.name)}<title>{r.name}</title></text>
+								<text x={px(r.x)} y={py(r.y) + 4} text-anchor="middle">{r.proposed ? '✦ ' : ''}{short(r.name)}<title>{r.name}</title></text>
+								{#if r.removed}<line class="strike" x1={px(r.x) - BOX_W / 2} y1={py(r.y)} x2={px(r.x) + BOX_W / 2} y2={py(r.y)} />{/if}
 								{#if up || downStair}
 									<text x={px(r.x) + BOX_W / 2 - 6} y={py(r.y) - BOX_H / 2 + 13} text-anchor="end" class="stairs"
 										>{up ? '▲' : ''}{downStair ? '▼' : ''}</text
@@ -447,6 +482,36 @@
 	}
 	.room.current text {
 		fill: var(--color-text-accent);
+	}
+	.end line,
+	.end path {
+		stroke: var(--color-border-control);
+		stroke-width: 1.5;
+	}
+	/* AI proposals: the ghost colour and a long dash; the name has a ✦, so the colour is not the only cue. */
+	.link.proposed,
+	.end.proposed line,
+	.end.proposed path,
+	.room.proposed rect {
+		stroke: var(--color-ghost);
+		stroke-width: 1.5;
+		stroke-dasharray: 6 4;
+	}
+	.room.proposed text {
+		fill: var(--color-ghost);
+		font-style: italic;
+	}
+	/* What a proposal removes: the warning colour and a line through it. */
+	.link.removed,
+	.end.removed line,
+	.end.removed path,
+	.room.removed rect,
+	.room .strike {
+		stroke: var(--color-warning);
+	}
+	.room.removed text {
+		fill: var(--color-text-warning);
+		text-decoration: line-through;
 	}
 	.room.selected rect {
 		fill: var(--color-accent-tint);
