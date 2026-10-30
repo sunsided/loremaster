@@ -48,6 +48,27 @@ pub struct State {
     /// How many times the player talked to each thing.
     #[serde(default)]
     pub talked: BTreeMap<Id, u32>,
+    /// The conversation in progress, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub talk: Option<Talk>,
+    /// The player's relation to things, keyed `thing.axis`. Only values that
+    /// a dialogue changed; the rest are 0. dramaturge holds the same values.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub relations: BTreeMap<String, i32>,
+    /// The memories that things keep, from dialogues. dramaturge holds them too.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub memories: BTreeMap<Id, BTreeSet<String>>,
+}
+
+/// Where a conversation is: the dialogue and its current node, by key, so
+/// that a save survives edits of the dialogue.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Talk {
+    pub dialogue: Id,
+    pub node: String,
+    /// The nodes before the current one, for `go: back`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub back: Vec<String>,
 }
 
 impl State {

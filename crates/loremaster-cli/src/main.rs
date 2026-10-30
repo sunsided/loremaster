@@ -335,8 +335,22 @@ fn print_turn(turn: &Turn, style: bool) {
         let text = emphasis(&block.plain_text(), style);
         match block.kind {
             BlockKind::Title => println!("{}", bold(&text, style)),
+            BlockKind::Said => println!("{}", wrap(&format!("> {text}"), 78)),
             _ => println!("{}", wrap(&text, 78)),
         }
+    }
+    if !turn.choices.is_empty() {
+        println!();
+        for c in &turn.choices {
+            println!(
+                "{}",
+                wrap(
+                    &format!("{}. {}", c.index + 1, emphasis(&c.text, style)),
+                    78
+                )
+            );
+        }
+        println!("(Type a number, or \"leave\".)");
     }
 }
 

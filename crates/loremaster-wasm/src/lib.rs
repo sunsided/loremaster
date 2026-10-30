@@ -147,6 +147,35 @@ impl Engine {
         to_js(&self.game.act(command))
     }
 
+    /// Choose an answer in the talk in progress, by its index in `choices`.
+    pub fn choose(&mut self, index: usize) -> Result<JsValue, JsValue> {
+        to_js(&self.game.act(Command::Choose { index }))
+    }
+
+    /// Leave the talk in progress.
+    pub fn leave(&mut self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.act(Command::Leave))
+    }
+
+    /// The answers the player can choose now: `[{ index, text }]`. Empty outside a talk.
+    pub fn choices(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.choices())
+    }
+
+    /// The talk in progress for the inspector, with hidden options, or null.
+    #[wasm_bindgen(js_name = talkView)]
+    pub fn talk_view(&self) -> Result<JsValue, JsValue> {
+        match self.game.talk_view() {
+            Some(v) => to_js(&v),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
+    /// Every dialogue as an outline of nodes, options and their targets.
+    pub fn dialogues(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.world.dialogue_outlines())
+    }
+
     pub fn scene(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.scene())
     }

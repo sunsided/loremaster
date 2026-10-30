@@ -1,5 +1,5 @@
 use loremaster_project::{check, load, read_dir};
-use loremaster_runtime::{Game, World};
+use loremaster_runtime::{BlockKind, Game, World};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -341,21 +341,14 @@ fn names_change_with_what_the_player_knows() {
             .plain_text()
             .contains("You see no blackbeard here.")
     );
-    assert!(
-        game.input("talk to shadow")
-            .plain_text()
-            .contains("grim-looking")
-    );
-    assert!(
-        game.input("look")
-            .plain_text()
-            .contains("The grim-looking man is still staring")
-    );
-    assert!(
-        game.input("talk to man")
-            .plain_text()
-            .contains("They call me Blackbeard")
-    );
+    let meet = game.input("talk to shadow");
+    assert!(meet.plain_text().contains("grim-looking"));
+    assert_eq!(meet.talk.as_ref().unwrap().node, "meet");
+    assert_eq!(meet.choices.len(), 3);
+    let names = game.input("1");
+    assert_eq!(names.blocks[0].kind, BlockKind::Said);
+    assert!(names.plain_text().contains("They call me Blackbeard"));
+    game.input("leave");
     game.input("out");
     let back = game.input("in").plain_text();
     assert!(
@@ -373,6 +366,148 @@ fn names_change_with_what_the_player_knows() {
     assert!(
         save.contains("\"talked\""),
         "counters are in the save state"
+    );
+}
+
+/// The cantina, with the player at Blackbeard's table.
+fn at_the_table() -> Game {
+    let mut game = example("cantina");
+    game.start();
+    game.input("in");
+    game
+}
+
+#[test]
+fn a_talk_stays_open_until_the_player_leaves() {
+    let mut game = at_the_table();
+    game.input("talk to shadow");
+    let turns = game.state().turns;
+    let refused = game.input("look");
+    assert!(
+        refused
+            .plain_text()
+            .contains("You are talking to the grim-looking man. Choose an answer, or leave."),
+        "{}",
+        refused.plain_text()
+    );
+    assert_eq!(refused.choices.len(), 3, "the choices show again");
+    assert_eq!(game.state().turns, turns, "a refused command takes no time");
+    assert!(game.input("north").talk.is_some());
+    game.input("who");
+    assert_eq!(game.state().turns, turns + 1, "a choice takes one turn");
+    assert!(game.state().flag("knows_blackbeard_name"));
+    let left = game.input("bye");
+    assert!(left.talk.is_none());
+    assert!(left.choices.is_empty());
+    assert!(game.input("look").plain_text().contains("Low beams"));
+}
+
+#[test]
+fn trust_decides_what_blackbeard_tells() {
+    // Straight to the ship: he does not trust a stranger.
+    let mut game = at_the_table();
+    game.input("talk to shadow");
+    let wary = game.input("2").plain_text();
+    assert!(wary.contains("Why should I tell a stranger?"), "{wary}");
+    assert!(game.choices().iter().all(|c| c.text != "\"Thank you.\""));
+    // He names himself, which raises trust; then he tells.
+    game.input("1");
+    assert_eq!(game.state().relations["blackbeard.trust"], 1);
+    let told = game.input("1").plain_text();
+    assert!(told.contains("South, past the breakwater"), "{told}");
+    // "Thank you" moves the player out through a world effect.
+    let thanks = game
+        .choices()
+        .iter()
+        .find(|c| c.text == "\"Thank you.\"")
+        .unwrap()
+        .index;
+    let out = game.act(loremaster_runtime::Command::Choose { index: thanks });
+    assert!(
+        out.plain_text().contains("Harbour Street"),
+        "{}",
+        out.plain_text()
+    );
+    assert_eq!(game.state().room.as_str(), "street");
+    assert!(
+        out.talk.is_none(),
+        "the talk ends when the player is taken away"
+    );
+    assert_eq!(game.state().relations["blackbeard.trust"], 2);
+}
+
+#[test]
+fn blackbeard_remembers_the_question() {
+    let mut game = at_the_table();
+    game.input("talk to shadow");
+    game.input("2");
+    assert!(
+        game.state().memories["blackbeard"].contains("asked_marigold"),
+        "{:?}",
+        game.state().memories
+    );
+    game.input("leave");
+    let again = game.input("talk to man");
+    assert_eq!(again.talk.as_ref().unwrap().node, "again");
+    assert!(
+        again.plain_text().contains("Still after that ship?"),
+        "{}",
+        again.plain_text()
+    );
+}
+
+#[test]
+fn a_saved_talk_goes_on_after_a_restore() {
+    let mut game = at_the_table();
+    game.input("talk to shadow");
+    game.input("1");
+    let save = serde_json::to_string(game.state()).unwrap();
+    let state: loremaster_runtime::State = serde_json::from_str(&save).unwrap();
+    let world = game.world().clone();
+    let mut restored = Game::restore(std::sync::Arc::new(world), state);
+    assert_eq!(restored.talk().unwrap().node, "names");
+    assert_eq!(restored.choices(), game.choices());
+    let told = restored.input("1").plain_text();
+    assert!(
+        told.contains("South, past the breakwater"),
+        "trust survives: {told}"
+    );
+}
+
+#[test]
+fn back_returns_to_the_node_before() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/cantina");
+    let mut files = read_dir(&root).unwrap();
+    for f in &mut files {
+        if f.path == "dialogues/blackbeard.yaml" {
+            f.text = f.text.replace(
+                "      - say: '\"Never mind.\"'\n        go: end",
+                "      - say: '\"Never mind.\"'\n        go: back",
+            );
+        }
+    }
+    let world = std::sync::Arc::new(World::compile(load(files).unwrap().story).unwrap());
+    let mut game = Game::new(world);
+    game.start();
+    game.input("in");
+    game.input("talk to shadow");
+    game.input("2");
+    let back = game.input("never");
+    assert_eq!(back.talk.as_ref().unwrap().node, "meet");
+    assert!(back.plain_text().contains("Sit, if you like."));
+}
+
+#[test]
+fn the_explorer_walks_through_talks() {
+    let game = at_the_table();
+    let explored = loremaster_runtime::explore(&game, loremaster_runtime::Budget::default());
+    let room = explored.rooms.iter().find(|r| r.id == "cantina").unwrap();
+    assert!(
+        room.seen
+            .iter()
+            .any(|t| t.contains("Blackbeard is still sitting")),
+        "the explorer learns the name by talking: {:#?}",
+        room.seen
     );
 }
 

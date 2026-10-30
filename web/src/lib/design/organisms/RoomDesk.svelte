@@ -33,6 +33,10 @@
 		/** The beats of threads in this room. */
 		threads?: ThreadChip[];
 		onthread: (id: string) => void;
+		/** The dialogues of the things in the room (usually DialogueOutline). Leave it out when no thing here talks. */
+		dialogue?: Snippet;
+		/** A short fact for the dialogue title, for example "Blackbeard · 4 nodes". */
+		dialogueMeta?: string;
 		/** The AI help for this room, while the AI server runs (usually AiHere). */
 		ai?: Snippet;
 		rules: RuleView[];
@@ -62,6 +66,8 @@
 		notesMeta,
 		threads = [],
 		onthread,
+		dialogue,
+		dialogueMeta,
 		ai,
 		rules,
 		ruleCount,
@@ -99,7 +105,8 @@
 
 <!--
 	The room desk: the side panel in write mode. It holds what the author can change in the current room:
-	the values that the room text depends on, the notes and the thread beats, the AI help, and the rules.
+	the values that the room text depends on, the notes and the thread beats, the dialogues of the things here,
+	the AI help, and the rules.
 	Things that are about the whole story are in the Atlas. Things about one line of text are in the margin.
 	On a phone the sections are tabs, because a long list of folded sections is hard to use with a thumb.
 -->
@@ -167,6 +174,12 @@
 					</ul>
 				{/if}
 				{@render notes()}
+			</PanelSection>
+		{/if}
+
+		{#if dialogue && show('room')}
+			<PanelSection id="desk-dialogue" title="Dialogue" meta={dialogueMeta}>
+				{@render dialogue()}
 			</PanelSection>
 		{/if}
 

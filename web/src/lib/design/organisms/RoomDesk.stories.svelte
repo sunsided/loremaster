@@ -1,8 +1,9 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import { fn } from 'storybook/test';
-	import { map, rules } from '../fixtures.ts';
+	import { blackbeardOutline, map, rules } from '../fixtures.ts';
 	import RoomDesk from './RoomDesk.svelte';
+	import DialogueOutline from './DialogueOutline.svelte';
 	import NotesList from './NotesList.svelte';
 	import AiHere from '../molecules/AiHere.svelte';
 
@@ -32,9 +33,10 @@
 1. **The head**: the room name, its file and its level. Under it, one line from the last explorer run: "reachable" or "not reached", and the number of lines that never show. If the explorer did not run yet, "Explore ↗" runs it. The line does not start a new run by itself.
 2. **Depends on**: the switches with the preview (StateSwitches), as in the Here panel.
 3. **Notes and threads**: the beats of threads in this room as chips, then the notes and TODOs (the \`notes\` snippet, usually NotesList). A chip opens Atlas › Threads. "no payoff yet" is a warning: an open thread has a setup here and no payoff.
-4. **✦ AI here**: the AI help for this room (the \`ai\` snippet, usually AiHere). It shows only while the AI server runs.
-5. **Rules here**: the rules that matter here and now.
-6. **Around you**: the small map, last. Set \`map\` to null when the big map shows on the left.
+4. **Dialogue**: the dialogues of the things in the room (the \`dialogue\` snippet, usually one DialogueOutline for each thing). It shows only when a thing here has a dialogue.
+5. **✦ AI here**: the AI help for this room (the \`ai\` snippet, usually AiHere). It shows only while the AI server runs.
+6. **Rules here**: the rules that matter here and now.
+7. **Around you**: the small map, last. Set \`map\` to null when the big map shows on the left.
 
 With \`tabs\`, for the bottom sheet on a phone, the sections are three tabs: Room, Notes and AI. The arrow keys move between the tabs.
 
@@ -47,6 +49,9 @@ The desk is a region with the name "Room desk: " and the room name.`
 
 {#snippet notesList()}
 	<NotesList {notes} ontoggle={fn()} onadd={fn()} onremove={fn()} />
+{/snippet}
+{#snippet dialogue()}
+	<DialogueOutline outline={blackbeardOutline} name="Blackbeard" file="dialogues/blackbeard.yaml" />
 {/snippet}
 {#snippet aiHere()}
 	<AiHere onreview={fn()} onproposals={fn()} findings={2} proposals={1} />
@@ -108,6 +113,27 @@ The desk is a region with the name "Room desk: " and the room name.`
 		onthread={fn()}
 		rules={[]}
 		ruleCount={rules.length}
+		onrule={fn()}
+		onopen={fn()}
+	/>
+</Story>
+<Story name="With a dialogue" asChild>
+	<RoomDesk
+		room="The Cantina"
+		file="rooms/cantina.yaml"
+		reach={{ reached: true, states: 64, truncated: false, neverShown: [] }}
+		onexplore={fn()}
+		switches={[{ name: 'knows_blackbeard_name', value: 'false', options: ['false', 'true'] }]}
+		texts={3}
+		onpreview={fn()}
+		onreset={fn()}
+		onapply={fn()}
+		notes={notesList}
+		onthread={fn()}
+		{dialogue}
+		dialogueMeta="Blackbeard · 4 nodes"
+		rules={[]}
+		ruleCount={0}
 		onrule={fn()}
 		onopen={fn()}
 	/>

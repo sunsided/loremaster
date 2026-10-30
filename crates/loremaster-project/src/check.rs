@@ -232,6 +232,7 @@ impl Checker<'_> {
         }
 
         self.threads();
+        self.dialogues();
 
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
@@ -264,35 +265,105 @@ impl Checker<'_> {
             if let Some(when) = &rule.when {
                 self.condition(&file, "when", when);
             }
-            for (i, effect) in rule.then.iter().enumerate() {
-                let at = format!("then[{i}]");
-                match effect {
-                    Effect::Say(text) | Effect::End(text) => self.markup(&file, &at, text),
-                    Effect::Goto(room) => self.room_ref(&file, &at, room.as_str()),
-                    Effect::Move(moves) => {
-                        for (thing, to) in moves {
-                            self.thing_ref(&file, &at, thing.as_str());
-                            if to.as_str() != "carried" && to.as_str() != "nowhere" {
-                                self.room_ref(&file, &at, to.as_str());
-                            }
+            self.effects(&file, "then", &rule.then);
+        }
+    }
+
+    /// Dialogues: references, conditions and markup, then the structure of
+    /// the graph through dramaturge's validator.
+    fn dialogues(&mut self) {
+        use dramaturge_authoring::{GraphValidator, ValidationSeverity};
+        let story = self.story().clone();
+        let mut symbols = self.scope.symbols.clone();
+        let mut with = BTreeSet::new();
+        for d in &story.dialogues {
+            let file = self.file_of(&format!("dialogue:{}", d.id));
+            if self.story().thing(d.with.as_str()).is_some() && !with.insert(d.with.clone()) {
+                self.warning(
+                    &file,
+                    "with",
+                    format!("`{}` has two dialogues; the talk uses the first", d.with),
+                );
+            }
+            for n in &d.nodes {
+                for (at, o) in std::iter::once((format!("nodes.{}", n.key), &n.outcomes)).chain(
+                    n.options
+                        .iter()
+                        .enumerate()
+                        .map(|(i, o)| (format!("nodes.{}.options[{i}]", n.key), &o.outcomes)),
+                ) {
+                    self.effects(&file, &format!("{at}.then"), &o.then);
+                    for (name, value) in &o.set {
+                        if !self.settable(name, value) {
+                            self.error(&file, &at, format!("cannot set `{name}` to `{value}`"));
                         }
                     }
-                    Effect::Set(values) => {
-                        for (name, value) in values {
-                            if !self.settable(name, value) {
-                                self.error(&file, &at, format!("cannot set `{name}` to `{value}`"));
-                            }
+                }
+            }
+            let compiled = match loremaster_lang::compile_dialogue(d, &self.scope, &mut symbols) {
+                Ok(c) => c,
+                Err(e) => {
+                    self.lang_error(&file, &e.at, &e.source, e.error);
+                    continue;
+                }
+            };
+            let prefix = format!("{}/", d.id);
+            let node_at = |id| {
+                symbols
+                    .node_key(id)
+                    .and_then(|k: &str| k.strip_prefix(&prefix))
+                    .map(|k| format!("nodes.{k}"))
+                    .unwrap_or_default()
+            };
+            for issue in GraphValidator::new().validate_with_symbols(&compiled.graph, &symbols) {
+                // dramaturge reports issues as text only; these are by design here:
+                // talks loop back, start nodes other than the first are entered
+                // by their `when`, and facts are set by rules too.
+                let start = issue
+                    .node_id
+                    .is_some_and(|id| compiled.starts.contains(&id));
+                if issue.severity == ValidationSeverity::Info
+                    || issue.message.contains("is part of a cycle")
+                    || (start && issue.message.contains("is unreachable"))
+                {
+                    continue;
+                }
+                let at = issue.node_id.map(node_at).unwrap_or_default();
+                let message = issue.message.replace(&prefix, "");
+                match issue.severity {
+                    ValidationSeverity::Error => self.error(&file, &at, message),
+                    _ => self.warning(&file, &at, message),
+                }
+            }
+        }
+    }
+
+    /// The effects of a rule or of a dialogue's `then`.
+    fn effects(&mut self, file: &str, at: &str, effects: &[Effect]) {
+        for (i, effect) in effects.iter().enumerate() {
+            let at = format!("{at}[{i}]");
+            match effect {
+                Effect::Say(text) | Effect::End(text) => self.markup(file, &at, text),
+                Effect::Goto(room) => self.room_ref(file, &at, room.as_str()),
+                Effect::Move(moves) => {
+                    for (thing, to) in moves {
+                        self.thing_ref(file, &at, thing.as_str());
+                        if to.as_str() != "carried" && to.as_str() != "nowhere" {
+                            self.room_ref(file, &at, to.as_str());
                         }
                     }
-                    Effect::Add(values) => {
-                        for name in values.keys() {
-                            if !matches!(self.ty_of(name), Some(loremaster_lang::Ty::Int)) {
-                                self.error(
-                                    &file,
-                                    &at,
-                                    format!("`{name}` is not a number variable"),
-                                );
-                            }
+                }
+                Effect::Set(values) => {
+                    for (name, value) in values {
+                        if !self.settable(name, value) {
+                            self.error(file, &at, format!("cannot set `{name}` to `{value}`"));
+                        }
+                    }
+                }
+                Effect::Add(values) => {
+                    for name in values.keys() {
+                        if !matches!(self.ty_of(name), Some(loremaster_lang::Ty::Int)) {
+                            self.error(file, &at, format!("`{name}` is not a number variable"));
                         }
                     }
                 }

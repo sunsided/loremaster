@@ -8,6 +8,7 @@ authors.workspace = true
 publish.workspace = true
 
 [dependencies]
+dramaturge-authoring.workspace = true
 loremaster-lang.workspace = true
 loremaster-model.workspace = true
 serde.workspace = true

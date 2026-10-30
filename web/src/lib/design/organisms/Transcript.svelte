@@ -56,6 +56,11 @@
 		proposalProblems?: Record<string, string>;
 		/** A preview of the room text in other values. It shows in place of the newest room text, marked. */
 		preview?: Block[] | null;
+		/**
+		 * Write mode during a talk: the editor for the line and the answers. It shows in place of the newest line
+		 * and the list of answers.
+		 */
+		talkwriter?: Snippet;
 		/** In write mode: the last command, when it got the default response. It offers "Write a response". */
 		respond?: string | null;
 		onrespond?: () => void;
@@ -81,6 +86,7 @@
 		onadd,
 		respond = null,
 		onrespond,
+		talkwriter,
 		preview = null,
 		margin = null,
 		ghosts = [],
@@ -424,6 +430,7 @@
 						style:animation-delay={fresh && reveal === 'blocks' ? `${revealDelay(bi)}ms` : undefined}
 					>{#if block.kind === 'command'}<span aria-hidden="true">&gt;&nbsp;</span><span class="visually-hidden"
 							>You typed:</span
+						>{:else if block.kind === 'said'}<span class="visually-hidden">You say:</span
 						>{:else if block.kind === 'author'}<span class="badge">author</span><span class="visually-hidden">:</span
 						>{:else if block.kind === 'note'}<span class="visually-hidden">Parser note:</span>{/if}{#if writeHere && editable(block.kind)}{@render writableRuns(
 								block
@@ -439,6 +446,16 @@
 						<p class="add"><button type="button" class="add-button" onclick={onadd}>+ Add room text</button></p>
 					{/if}
 				{/each}
+				{#if entry.id === latest && entry.turn.talk && talkwriter}
+					{@render talkwriter()}
+				{:else if entry.id === latest && entry.turn.choices?.length}
+					<!-- The answers, numbered as the player types them. The verb bar has the buttons. -->
+					<ol class="choices" aria-label="Answers">
+						{#each entry.turn.choices as c (c.index)}
+							<li><span class="choice-number" aria-hidden="true">{c.index + 1}.</span><span>{#each pieces(c.text) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</span></li>
+						{/each}
+					</ol>
+				{/if}
 				{#if entry.rewritten}<p class="rewritten">Written again after an edit of the story.</p>{/if}
 				{#if respond && onrespond && !writing && entry.id === latest}
 					<p class="add">
@@ -510,6 +527,32 @@
 	}
 	.narration {
 		color: var(--color-text-strong);
+	}
+	/* A talk: the player's answer is set in, like a quote; the other character's line reads as prose. */
+	.said {
+		margin-top: var(--space-6);
+		padding-left: var(--space-5);
+		border-left: var(--size-border-strong) solid var(--color-accent);
+		color: var(--color-text-accent);
+	}
+	.speech {
+		color: var(--color-text-strong);
+	}
+	.choices {
+		margin: var(--space-4) 0 0;
+		padding: 0;
+		list-style: none;
+	}
+	.choices li {
+		display: flex;
+		gap: var(--space-3);
+		color: var(--color-text);
+	}
+	.choice-number {
+		flex: none;
+		min-width: 1.5em;
+		color: var(--color-text-accent);
+		font-family: var(--font-ui);
 	}
 	.end {
 		margin-top: var(--space-7);

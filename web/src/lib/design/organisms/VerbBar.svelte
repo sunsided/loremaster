@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ExitInfo, ThingInfo, VerbInfo } from '#lib/engine/types.ts';
+	import type { Choice, ExitInfo, ThingInfo, VerbInfo } from '#lib/engine/types.ts';
 	import Button from '../atoms/Button.svelte';
 	import ActionList from '../molecules/ActionList.svelte';
 
@@ -27,6 +27,12 @@
 		oncancel?: () => void;
 		/** Show the help line when no verb is selected. The app shows it until the first command. */
 		hint?: boolean;
+		/** During a talk: the name of the character. The verbs and things dim, and the choices show. */
+		talkingTo?: string | null;
+		/** During a talk: the answers that the player can choose. */
+		choices?: Choice[];
+		onchoose?: (index: number) => void;
+		onleave?: () => void;
 	}
 
 	let {
@@ -45,8 +51,14 @@
 		onexit,
 		onrun,
 		oncancel,
-		hint = true
+		hint = true,
+		talkingTo = null,
+		choices = [],
+		onchoose,
+		onleave
 	}: Props = $props();
+
+	const talking = $derived(talkingTo !== null);
 
 	const selectedVerb = $derived(verbs.find((v) => v.id === selected));
 	const toItem = (t: ThingInfo) => ({ id: t.id, label: t.name, inspect: `thing:${t.id}` });
@@ -57,8 +69,24 @@
 	on the right. The selected verb is in inverse video. The player selects a verb, then clicks a thing.
 	A click on a thing with no verb looks at it.
 -->
-<div class="verb-bar">
-	<div class="verbs" role="group" aria-label="Verbs">
+<div class="verb-bar" class:talking>
+	{#if talking}
+		<!-- A talk stays open until the player leaves. The answers replace the verbs; the verbs and things dim and do not take focus. -->
+		<section class="talk" aria-label="Talking to {talkingTo}">
+			<p class="talk-head">Talking to <strong>{talkingTo}</strong></p>
+			<ol class="choices">
+				{#each choices as c (c.index)}
+					<li>
+						<button type="button" class="choice" aria-keyshortcuts={c.index < 9 ? String(c.index + 1) : undefined} onclick={() => onchoose?.(c.index)}
+							><span class="number" aria-hidden="true">{c.index + 1}</span><span>{#each c.text.split('*') as p, j (j)}{#if j % 2 === 1}<em>{p}</em>{:else}{p}{/if}{/each}</span></button
+						>
+					</li>
+				{/each}
+			</ol>
+			<Button size="compact" variant="quiet" onclick={() => onleave?.()}>Leave <span class="key" aria-hidden="true">Esc</span></Button>
+		</section>
+	{/if}
+	<div class="verbs" role="group" aria-label="Verbs" inert={talking}>
 		{#each verbs as verb (verb.id)}
 			<button
 				type="button"
@@ -70,7 +98,7 @@
 		{/each}
 	</div>
 
-	<div class="reach">
+	<div class="reach" inert={talking}>
 		{#if selected === 'go'}
 			<ActionList
 				label="to"
@@ -86,7 +114,9 @@
 	</div>
 
 	<div class="sentence" aria-live="polite">
-		{#if selectedVerb}
+		{#if talking}
+			<span class="hint">Type a number or the first word of an answer. Escape or “bye” leaves.</span>
+		{:else if selectedVerb}
 			<span class="text">{sentence}</span>
 			{#if canRunPartial}
 				<Button size="compact" variant="quiet" onclick={() => onrun?.()}>just {selectedVerb.label.toLowerCase()} it</Button>
@@ -109,6 +139,77 @@
 		padding-top: var(--space-5);
 		border-top: var(--size-border) solid var(--color-border-subtle);
 		font-family: var(--font-ui);
+	}
+	.verb-bar.talking {
+		grid-template-areas:
+			'talk talk'
+			'verbs reach'
+			'sentence sentence';
+	}
+	.talking .verbs,
+	.talking .reach {
+		opacity: var(--opacity-dim);
+	}
+	.talk {
+		grid-area: talk;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-3);
+		min-width: 0;
+	}
+	.talk-head {
+		margin: 0;
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
+	}
+	.talk-head strong {
+		color: var(--color-text-accent);
+	}
+	.choices {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		width: 100%;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.choice {
+		display: flex;
+		gap: var(--space-3);
+		align-items: baseline;
+		width: 100%;
+		min-height: var(--size-target-compact);
+		padding: var(--space-2) var(--space-3);
+		border: var(--size-border) solid var(--color-border-control);
+		background: none;
+		color: var(--color-text-strong);
+		font-family: var(--font-prose);
+		font-size: var(--font-size-prose);
+		line-height: var(--line-height-body);
+		text-align: left;
+	}
+	.choice:hover {
+		border-color: var(--color-accent);
+		background: var(--color-accent-tint);
+	}
+	.choice:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 1px;
+	}
+	.number {
+		flex: none;
+		min-width: 1.5em;
+		color: var(--color-text-accent);
+		font-family: var(--font-ui);
+		font-weight: var(--font-weight-strong);
+	}
+	.key {
+		margin-left: var(--space-2);
+		padding: 0 var(--space-2);
+		border: var(--size-border) solid var(--color-border-subtle);
+		font-size: var(--font-size-xs);
 	}
 	.verbs {
 		grid-area: verbs;
@@ -177,6 +278,13 @@
 		.verb-bar {
 			grid-template-columns: minmax(0, 1fr);
 			grid-template-areas:
+				'verbs'
+				'reach'
+				'sentence';
+		}
+		.verb-bar.talking {
+			grid-template-areas:
+				'talk'
 				'verbs'
 				'reach'
 				'sentence';

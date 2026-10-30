@@ -9,6 +9,9 @@ use loremaster_model::{EventPattern, Id, Location, TimeOfDay, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod talk;
+pub use talk::{TalkOptionView, TalkView};
+
 /// A game in progress.
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -348,6 +351,9 @@ impl Game {
             action_counts: Default::default(),
             interactions: Default::default(),
             talked: Default::default(),
+            talk: None,
+            relations: Default::default(),
+            memories: Default::default(),
         };
         for v in &story.vars {
             state.facts.insert(v.id.to_string(), v.initial.clone());
@@ -402,6 +408,16 @@ impl Game {
             state.room = world.story.start.clone();
         }
         state.visits.retain(|r, _| has_room(r));
+        let talk_ok = state.talk.as_ref().is_some_and(|t| {
+            world
+                .story
+                .dialogues
+                .iter()
+                .any(|d| d.id == t.dialogue && d.node(&t.node).is_some())
+        });
+        if !talk_ok {
+            state.talk = None;
+        }
         Self::restore(world, state)
     }
 
@@ -417,14 +433,16 @@ impl Game {
                 },
             );
         }
-        Self {
+        let mut game = Self {
             world,
             state,
             facts,
             last_shown: None,
             last_fired: Vec::new(),
             last_frame: None,
-        }
+        };
+        game.restore_dialog_state();
+        game
     }
 
     pub fn state(&self) -> &State {
@@ -735,6 +753,11 @@ impl Game {
     pub fn input(&mut self, text: &str) -> Turn {
         self.last_frame = None;
         let mut turn = Turn::default();
+        // In a talk, the chosen answer shows instead of the typed text.
+        if self.state.talk.is_some() && !self.state.ended {
+            self.talk_input(&mut turn, text);
+            return self.finish(turn);
+        }
         turn.say(BlockKind::Command, text.trim());
         if self.state.ended {
             turn.say(BlockKind::Response, "The story has ended.");
@@ -751,7 +774,9 @@ impl Game {
     pub fn act(&mut self, cmd: Command) -> Turn {
         self.last_frame = None;
         let mut turn = Turn::default();
-        turn.say(BlockKind::Command, self.describe_command(&cmd));
+        if !matches!(cmd, Command::Choose { .. }) {
+            turn.say(BlockKind::Command, self.describe_command(&cmd));
+        }
         if self.state.ended {
             turn.say(BlockKind::Response, "The story has ended.");
             return turn;
@@ -763,6 +788,8 @@ impl Game {
     fn describe_command(&self, cmd: &Command) -> String {
         match cmd {
             Command::Go { direction } => format!("go {direction}"),
+            Command::Choose { index } => (index + 1).to_string(),
+            Command::Leave => "leave".into(),
             Command::Verb { verb, objects } => {
                 let def = self.world.verb(verb.as_str());
                 let word = def.map_or(verb.to_string(), |v| v.label.to_lowercase());
@@ -812,7 +839,18 @@ impl Game {
     }
 
     fn perform(&mut self, turn: &mut Turn, cmd: Command) {
+        // A talk stays open until the player leaves: other commands do not run.
+        match (&cmd, self.state.talk.is_some()) {
+            (Command::Choose { index }, true) => return self.choose(turn, *index),
+            (Command::Leave, true) => return self.leave(turn),
+            (_, true) => return self.refuse(turn),
+            (Command::Choose { .. } | Command::Leave, false) => {
+                return turn.say(BlockKind::Response, "You are not talking to anyone.");
+            }
+            _ => {}
+        }
         match cmd {
+            Command::Choose { .. } | Command::Leave => {}
             Command::Go { direction } => {
                 let verb = Id::new("go");
                 self.begin_action(&verb, &[], &format!("go {direction}"));
@@ -2033,6 +2071,8 @@ impl Game {
             .map(|l| Id::new(l.text.as_str()))
             .collect();
         turn.ended = self.state.ended;
+        turn.talk = self.talk_info();
+        turn.choices = self.choices();
         self.link_things(&mut turn.blocks);
         turn
     }
@@ -2293,7 +2333,12 @@ impl Game {
                 }
                 _ => say(turn, "Nothing happens.".into()),
             },
-            "talk" => say(turn, format!("{the_cap} has nothing to say.")),
+            "talk" => {
+                let started = first.is_some_and(|o| self.start_talk(turn, o));
+                if !started {
+                    say(turn, format!("{the_cap} has nothing to say."));
+                }
+            }
             "give" => say(turn, "Nobody seems interested.".into()),
             "push" | "pull" => say(turn, format!("You {verb} {the}. Nothing happens.")),
             "go" => {}

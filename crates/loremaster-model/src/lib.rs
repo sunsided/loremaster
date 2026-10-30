@@ -7,6 +7,7 @@
 //! bundle stays readable and survives changes to the expression language.
 
 mod clock;
+mod dialogue;
 mod fragment;
 mod frame;
 mod id;
@@ -19,6 +20,7 @@ mod value;
 mod verb;
 
 pub use clock::{ClockConfig, Phase, TimeOfDay};
+pub use dialogue::{Dialogue, DialogueNode, DialogueOption, Outcomes};
 pub use fragment::{Fragment, FragmentMode, Layer};
 pub use frame::{Frame, Frames};
 pub use id::Id;

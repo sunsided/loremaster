@@ -29,6 +29,11 @@ impl CustomHandler<DialogWorldState> for DerivedValues<'_, '_> {
 }
 
 impl Eval<'_> {
+    /// A `Custom` condition, as dramaturge hands it over.
+    pub fn custom(&self, key: &str, args: &[FactValue]) -> bool {
+        DerivedValues(self).condition(key, args, self.facts)
+    }
+
     pub fn holds(&self, c: &Condition) -> bool {
         DefaultConditionEvaluator::with_custom(DerivedValues(self)).evaluate(c, self.facts)
     }
@@ -164,6 +169,23 @@ impl Eval<'_> {
                 other => format!("{other:?}"),
             },
             Operand::ThingName(id, form) => self.thing_name(id.as_str(), *form),
+            Operand::Relation(thing, axis) => self.relation(thing.as_str(), axis).to_string(),
+        }
+    }
+
+    /// The player's relation to a thing on an axis, 0 when no dialogue changed it.
+    pub fn relation(&self, thing: &str, axis: &str) -> i32 {
+        let scope = &self.world.scope;
+        match scope.entity(thing) {
+            Some(target) => self
+                .facts
+                .get_relationship(
+                    scope.player(),
+                    target,
+                    &dramaturge_model::RelationshipAxisId::new(axis),
+                )
+                .unwrap_or(0),
+            None => 0,
         }
     }
 }

@@ -13,6 +13,7 @@ A story is a folder of YAML files. Each entity has its own file.
 | `things/*.yaml` | One thing or character in each file. |
 | `rules/*.yaml` | One rule, or a list of rules, in each file. |
 | `threads/*.yaml` | One long-range thread in each file. Read [Author notes and threads](#author-notes-and-threads). |
+| `dialogues/*.yaml` | One talk with a thing in each file. Read [Dialogues](#dialogues). |
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
@@ -111,6 +112,70 @@ names:
 - The parser accepts the names of the current stage and of all stages before it. It does not accept a name that the player has not learned yet.
 - Set `proper: true` for a proper name. A proper name gets no article.
 - The author tooltip shows all stages and the current stage.
+
+## Dialogues
+
+A dialogue is a talk with a thing, for example a character. Put it in `dialogues/<id>.yaml`. The player starts it with "Talk to" and the thing.
+
+```yaml
+# story.yaml: the relations that dialogues can change
+relations: [trust]
+```
+
+```yaml
+# dialogues/blackbeard.yaml
+with: blackbeard
+start: [again, meet]
+nodes:
+  meet:
+    say: 'The figure looks up. "Sit, if you like."'
+    options:
+      - say: '"Who are you?"'
+        go: names
+      - say: '"Not tonight."'
+        go: end
+  names:
+    say: '"They call me Blackbeard."'
+    set: { knows_blackbeard_name: true }
+    relation: { trust: 1 }
+    options:
+      - say: '"Where did the *Marigold* go?"'
+        when: blackbeard.trust >= 1
+        remember: [asked_marigold]
+        go: back
+  again:
+    when: blackbeard.talked > 1
+    say: '"Back again."'
+    options:
+      - { say: '"Goodbye."', go: end }
+```
+
+- `with` is the id of the thing.
+- `start` is a list of node keys. The talk starts at the first node whose `when` holds.
+- A node is one line of the thing (`say`). Its `options` are the answers of the player.
+- An option has a `say` (the line of the player, and the text of the choice), an optional `when`, and `go`. `go` is a node key, `end` or `back` (the node before). Without `go`, the option ends the talk.
+- A node or an option can change the state when it applies:
+  - `set` and `add`: as in a rule.
+  - `relation`: add to the relation of the player to the thing, for example `{ trust: 1 }`. Declare each relation in `relations` in `story.yaml`.
+  - `remember`: memories that the thing keeps.
+  - `then`: world effects, as in a rule: `move`, `goto`, `say`, `end`.
+- `say` uses inline markup.
+
+Conditions can read the new values:
+
+- `blackbeard.trust` is the relation of the player to the thing. It starts at 0.
+- `remembers(blackbeard, asked_marigold)` is true when the thing keeps the memory.
+
+During a talk:
+
+- The game shows the answers as a numbered list. Type a number, or the first word of an answer. In the web player, click an answer or push its number key.
+- Each answer takes one turn.
+- Other commands do not run. To leave the talk, type `bye` or `leave`, or push Escape.
+- A talk ends when the player chooses an answer that ends it, when a node has no answer that shows, or when an effect takes the player away.
+
+`loremaster check` examines each dialogue: conditions, markup, targets of `go`, and nodes that no start node leads to.
+
+In the editor, the room desk shows the dialogues of the things in the room. During a talk in write mode (Ctrl+E), you can change the line and the answers in the game text.
 
 ## Exits
 

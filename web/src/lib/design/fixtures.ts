@@ -1,7 +1,7 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { AtlasRoom, Exploration, ExitInfo, RoomMatrix, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { AtlasRoom, DialogueOutline, TalkView, Exploration, ExitInfo, RoomMatrix, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
 import type { MarkupToken, ReviewFinding, StoryStep, TranscriptEntry, WriterFragment, WriterTools } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
@@ -528,3 +528,88 @@ export const findings: ReviewFinding[] = [
 	{ key: 'j1#1', severity: 'medium', owner: 'room:shore', fragment: 2, problem: 'The bell buoy line has no sound word.', fix: 'Add "dull" before "clangs".' },
 	{ key: 'j1#2', severity: 'low', owner: 'room:shore', fragment: null, problem: 'The room has no smell.', fix: 'Add salt and weed.' }
 ];
+
+/** The dialogue of Blackbeard in the cantina example, as an outline. */
+export const blackbeardOutline: DialogueOutline = {
+	id: 'blackbeard',
+	with: 'blackbeard',
+	start: ['again', 'meet'],
+	nodes: [
+		{
+			key: 'meet',
+			start: 1,
+			say: 'The figure looks up. It is a man, grim-looking, with eyes like nails. "Sit, if you like."',
+			outcomes: [],
+			unreachable: false,
+			options: [
+				{ say: '"Who are you?"', go: 'names', missing: false, outcomes: [] },
+				{ say: '"I am looking for the *Marigold*."', go: 'marigold', missing: false, outcomes: [] },
+				{ say: '"Not tonight."', go: 'end', missing: false, outcomes: [] }
+			]
+		},
+		{
+			key: 'names',
+			say: '"They call me Blackbeard," he says. "And you\'re looking for a ship."',
+			outcomes: ['set knows_blackbeard_name = true', 'trust +1'],
+			unreachable: false,
+			options: [
+				{ say: '"The *Marigold*. Where did she go?"', go: 'marigold', missing: false, outcomes: [] },
+				{ say: '"Just passing through."', go: 'end', missing: false, outcomes: ['trust -1'] }
+			]
+		},
+		{
+			key: 'marigold',
+			say: '{blackbeard.trust >= 1 ? "South, past the breakwater," he says quietly. | He shrugs. "Why should I tell a stranger?"}',
+			outcomes: ['remember asked_marigold'],
+			unreachable: false,
+			options: [
+				{ say: '"Thank you."', when: 'blackbeard.trust >= 1', go: 'end', missing: false, outcomes: ['trust +1', 'say a line', 'go to street'] },
+				{ say: '"Who are you, anyway?"', when: 'not knows_blackbeard_name', go: 'names', missing: false, outcomes: [] },
+				{ say: '"Never mind."', go: 'end', missing: false, outcomes: [] }
+			]
+		},
+		{
+			key: 'again',
+			start: 0,
+			when: 'blackbeard.talked > 1',
+			say: '{blackbeard.The} looks up from his drink. {remembers(blackbeard, asked_marigold) ? "Still after that ship?" | "Back again."}',
+			outcomes: [],
+			unreachable: false,
+			options: [
+				{ say: '"Who are you?"', when: 'not knows_blackbeard_name', go: 'names', missing: false, outcomes: [] },
+				{ say: '"Tell me about the *Marigold*."', go: 'marigold', missing: false, outcomes: [] },
+				{ say: '"Nothing. Goodbye."', go: 'end', missing: false, outcomes: [] }
+			]
+		}
+	]
+};
+
+/** The same dialogue with mistakes: a misspelled target and a node that no start reaches. */
+export const brokenOutline: DialogueOutline = {
+	...blackbeardOutline,
+	nodes: [
+		{
+			...blackbeardOutline.nodes[0],
+			options: [{ ...blackbeardOutline.nodes[0].options[0], go: 'nmes', missing: true }, ...blackbeardOutline.nodes[0].options.slice(1)]
+		},
+		...blackbeardOutline.nodes.slice(1),
+		{ key: 'rumours', say: '"The harbour master drinks here on Fridays."', outcomes: [], unreachable: true, options: [] }
+	]
+};
+
+/** The talk with Blackbeard after "Who are you?": the line, the outcomes, and one hidden answer. */
+export const blackbeardTalk: TalkView = {
+	dialogue: 'blackbeard',
+	with: 'blackbeard',
+	name: 'Blackbeard',
+	node: 'marigold',
+	say: blackbeardOutline.nodes[2].say,
+	outcomes: ['remember asked_marigold'],
+	options: [
+		{ choice: null, say: '"Thank you."', when: 'blackbeard.trust >= 1', go: 'end', outcomes: ['trust +1', 'say a line', 'go to street'] },
+		{ choice: 0, say: '"Who are you, anyway?"', when: 'not knows_blackbeard_name', go: 'names', outcomes: [] },
+		{ choice: 1, say: '"Never mind."', go: 'end', outcomes: [] }
+	],
+	relations: [['trust', 0]],
+	memories: ['asked_marigold']
+};

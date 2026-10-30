@@ -10,5 +10,8 @@ clock:
   start: "22:00"
   minutes_per_turn: 3
 
+# How the player stands with the people of the town. Dialogues change it.
+relations: [trust]
+
 vars:
   - { id: knows_blackbeard_name, type: bool, initial: false }

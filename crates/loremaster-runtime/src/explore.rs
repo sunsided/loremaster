@@ -100,6 +100,9 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         visited,
         cap(&s.talked),
         cap(&s.interactions),
+        &s.talk,
+        &s.relations,
+        &s.memories,
     ))
     .unwrap_or_default()
 }
@@ -119,6 +122,17 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     let story = &world.story;
     let scope = game.in_scope();
     let mut out: Vec<(String, Command)> = Vec::new();
+    // In a talk, only the answers and leaving run.
+    if game.talk().is_some() {
+        out.extend(game.choices().into_iter().map(|c| {
+            (
+                format!("say {}", c.text),
+                Command::Choose { index: c.index },
+            )
+        }));
+        out.push(("leave".into(), Command::Leave));
+        return out;
+    }
     let verb = |v: &str, objects: Vec<Id>| Command::Verb {
         verb: Id::new(v),
         objects,
@@ -149,6 +163,12 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     // The standard verbs that change state.
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();
+        if story.dialogue_with(id.as_str()).is_some() {
+            out.push((
+                label("talk", std::slice::from_ref(&id)),
+                verb("talk", vec![id.clone()]),
+            ));
+        }
         let carried = matches!(
             game.state().location_of(id.as_str()),
             Some(Location::Carried)

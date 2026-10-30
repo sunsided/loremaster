@@ -8,6 +8,32 @@ pub struct Turn {
     pub ended: bool,
     /// Rules that fired and state they changed, for the debugger.
     pub log: Vec<LogEntry>,
+    /// The talk in progress after this turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub talk: Option<TalkInfo>,
+    /// The answers the player can choose now, during a talk.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<Choice>,
+}
+
+/// Who the player is talking to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TalkInfo {
+    pub dialogue: String,
+    /// The thing id.
+    pub with: String,
+    /// Its current name, for example "Blackbeard".
+    pub name: String,
+    /// The key of the current node.
+    pub node: String,
+}
+
+/// An answer the player can choose.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Choice {
+    /// The number to pass to `choose`, from 0. The player sees it plus 1.
+    pub index: usize,
+    pub text: String,
 }
 
 impl Turn {
@@ -66,6 +92,10 @@ pub enum BlockKind {
     /// A short parser note about an action the game did by itself, for
     /// example "(first opening the cottage door)". Show it apart from the prose.
     Note,
+    /// The player's line in a talk.
+    Said,
+    /// The line of the character the player talks to.
+    Speech,
     /// An author action from the command palette, for example "go to Lantern Room".
     /// It is not part of the game.
     Author,
