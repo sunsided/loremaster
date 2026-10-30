@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TextInput from '../atoms/TextInput.svelte';
+	import VisuallyHidden from '../atoms/VisuallyHidden.svelte';
 	import { complete } from '#lib/player/complete.ts';
 
 	interface Props {
@@ -33,13 +34,15 @@
 
 	// Tab completion. `base` is the typed text while Tab cycles through more than one match.
 	let base: string | null = null;
-	let index = 0;
+	/** The match that Tab chose while it cycles, or -1. */
+	let index = $state(-1);
 	/** The text that the last Tab wrote. Another text (typed, or from a verb click) ends the cycle. */
 	let shown = '';
 	let matches = $state<string[]>([]);
 
 	function keydown(event: KeyboardEvent) {
-		if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
+		// During IME composition, Tab belongs to the input method.
+		if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
 		if (base !== null && value !== shown) typed();
 		if (base !== null) {
 			// Tab again: the next match; Shift+Tab: the one before.
@@ -67,6 +70,7 @@
 
 	function typed() {
 		base = null;
+		index = -1;
 		matches = [];
 	}
 
@@ -96,7 +100,8 @@
 	/>
 </form>
 <p class="matches" id="command-matches" aria-live="polite">
-	{#if matches.length > 1}{matches.join(' · ')}{/if}
+	{#if matches.length > 1}{#if index >= 0}<VisuallyHidden>{matches[index]}, {index + 1} of {matches.length}:</VisuallyHidden
+			>{/if}{#each matches as m, i (m)}{#if i > 0}{' · '}{/if}{#if i === index}<strong>{m}</strong>{:else}{m}{/if}{/each}{/if}
 </p>
 
 <style>
@@ -106,6 +111,9 @@
 		color: var(--color-text-muted);
 		font-family: var(--font-ui);
 		font-size: var(--font-size-sm);
+	}
+	.matches strong {
+		color: var(--color-text-strong);
 	}
 	.prompt {
 		display: flex;
