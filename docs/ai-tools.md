@@ -101,7 +101,7 @@ You can start a story from an idea. The AI writes the first 2 or 3 rooms as one 
 | Where | How |
 | --- | --- |
 | Terminal | `lantern new <folder> --title "The Drowned Bell" --idea "A church bell sank in a storm. At low tide it still rings."` The command writes the new story, runs the job and tells you the proposal id. Then start `lantern serve <folder>` and accept the proposal in the editor. |
-| Editor | Start `lantern serve --bootstrap`. In the editor, select "New story…", type the title and the idea, then select "Create and draft with AI". When the proposal comes, open Atlas › Proposals and select "Accept". The server also writes the files into its folder, and the game starts again from the intro. |
+| Editor | Start `lantern serve --bootstrap`. In the editor, select "New story…", type the title and the idea, then select "Create and draft with AI". When the proposal comes, open Atlas › AI and select "Accept". The server also writes the files into its folder, and the game starts again from the intro. |
 | MCP client | Call the tool `bootstrap_project` with `idea` (and `title`, `rooms` if you want). It writes the new story, then gives the `seed_story` request. The assistant follows the request. |
 
 Bootstrap works only on a folder that has no story, or that has only a new story without changes. Else it refuses, and no file changes.

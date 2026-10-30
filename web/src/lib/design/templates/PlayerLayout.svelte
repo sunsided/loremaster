@@ -99,7 +99,7 @@
 	}
 	.status {
 		position: relative;
-		z-index: var(--z-content);
+		z-index: var(--z-status);
 	}
 	.player {
 		position: relative;

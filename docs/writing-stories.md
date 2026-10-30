@@ -211,7 +211,8 @@ To list all open TODOs with their file and line, run `cargo run -p lantern-cli -
 
 In the editor:
 
-- The Here panel has a "Notes" section. It shows the notes and TODOs of the room and of the things in it. Type a text, then select "+ Note" or "+ TODO". Select the checkbox of a TODO when it is done. "×" removes a note.
+- In write mode, the room desk has a "Notes and threads" section. It shows the notes and TODOs of the room and of the things in it. Type a text, then select "+ Note" or "+ TODO". Select the checkbox of a TODO when it is done. "×" removes a note.
+- Above the notes, chips show the thread beats in this room, for example "setup · The Marigold". "no payoff yet" is a warning: an open thread has a setup here and no payoff. Select a chip to open Atlas › Threads.
 - The status line shows the number of open TODOs. Select it to open Atlas › TODOs, with all open TODOs of the story. Select the place of a TODO to go to its room. Ctrl+K, "Add a TODO, or find the done ones", opens the same tab.
 - In Atlas › TODOs, "Show" selects the open TODOs, the done TODOs or all. A done TODO stays in its file, struck through; clear its checkbox to open it again. "×" removes a TODO from the file. Then it is gone.
 - A TODO that you add in Atlas › TODOs goes into `story.yaml`, for the whole story.
@@ -260,7 +261,7 @@ The example `examples/tower` ("The Spiral") is a tower with three floors of four
 The room matrix shows the text of one room in each combination of the values that the text depends on. It also shows combinations that the player can not reach. Use it to find a text that reads badly in one condition.
 
 1. In the web app, go to the room.
-2. In the Here panel, the section "Depends on" shows the values that the room text depends on. Change a value to preview the room text in place; the game does not move. "Make it so" sets the values in the game. "All texts ↗" opens Atlas › Checks with all the texts. "This room" is its default mode.
+2. In the side panel, the section "Depends on" shows the values that the room text depends on. Change a value to preview the room text in place; the game does not move. "Make it so" sets the values in the game. "All texts ↗" opens Atlas › Checks with all the texts. "This room" is its default mode.
 
 The runtime finds the values in these locations:
 
@@ -353,19 +354,20 @@ The editor makes the ids from the names. For example, "The Beach" becomes `the_b
 
 When `lantern serve` runs for the story (read `docs/ai-tools.md`), the editor reads the open proposals of the AI assistant from it:
 
-- The status line shows "✦ N proposals". Select it to open Atlas › Proposals, with each proposal, its changes and its problems.
+- The status line shows "✦ N proposals", or "✦ drafting… 12 s" while a job runs. Select it to open the AI tray. The tray shows the jobs, their cost and the warning about the files. "All jobs and proposals ↗" opens Atlas › AI, with the jobs and with each proposal, its changes and its problems.
 - In write mode, a proposal that changes the text of the current room shows as ghost text (italics, a dotted line and ✦) under the fragment that it changes, with its card in the margin.
-- A proposal that adds or removes rooms or exits shows on the maps: on the Atlas map, on the map of the Here panel and in the list view. What it adds is dashed in the ghost colour, and a new room has ✦ before its name. What it removes is in the warning colour, and a removed room is struck through. Select a proposed room on the Atlas map: its room card has "Walk in", "Accept" and "Reject".
+- A proposal that adds or removes rooms or exits shows on the maps: on the Atlas map, on the small map of the side panel and in the list view. What it adds is dashed in the ghost colour, and a new room has ✦ before its name. What it removes is in the warning colour, and a removed room is struck through. Select a proposed room on the Atlas map: its room card has "Walk in", "Accept" and "Reject".
 - "Walk in" plays the story with the proposal in a sandbox, from the game state now (or from the proposed room). The status line shows "SANDBOX" with "Accept" and "Leave". Press Escape to leave. The editor does not save the sandbox, and write mode and AI jobs are off in it.
 - "Accept" writes the proposal into the working copy of the editor, then tells the server. A proposal can also delete files; the editor then deletes them from the working copy and from the linked folder. The editor refuses a proposal when a file that it changes is different now. "Reject…" asks why (optional) and tells the server to drop it. The AI reads the note and does not offer the idea again.
 - Keys: when the focus is in a proposal card, A accepts, R rejects and W walks in. Alt+P moves the focus to the next proposal card.
 
-The Here panel has an "✦ AI" section while the server runs:
+In write mode, the room desk has an "✦ AI here" section while the server runs:
 
-- "Review this room" asks the AI to read the room in all its states and to propose fixes. When the review is done, "N findings ↗" opens write mode. Each finding is a note in the margin, next to its fragment, with its severity (HIGH, MEDIUM or LOW), the problem and the fix. A finding about the whole room, or about a fragment that does not show now, is under the room text. Select × to dismiss a finding.
+- "Review this room" asks the AI to read the room in all its states and to propose fixes. While the review runs, the button shows the time. Each finding is a note in the margin, next to its fragment, with its severity (HIGH, MEDIUM or LOW), the problem and the fix. A finding about the whole room, or about a fragment that does not show now, is under the room text. Select × to dismiss a finding.
+- The section shows the number of findings and the number of open proposals for this room.
 - In write mode, a direction without an exit offers "✦ Draft … with AI" next to the form: the AI proposes some exits or things for that direction.
-- The running jobs show with their time, their proposals and their cost, and you can cancel them. The status line shows "✦ drafting… 12 s".
-- The server reads the story folder on disk, and the editor keeps a working copy in the browser. When the two differ, the section and the header warn you. Open the story folder (Chromium browsers), so that both use the same files.
+- The AI tray of the status line shows all jobs with their time, their proposals and their cost. You can cancel a running job there.
+- The server reads the story folder on disk, and the editor keeps a working copy in the browser. When the two differ, the AI tray and the header warn you, and the chip shows ▲. Open the story folder (Chromium browsers), so that both use the same files.
 
 ### Where the changes go
 
