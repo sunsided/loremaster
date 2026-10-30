@@ -1,34 +1,36 @@
 use crate::{State, World};
 use dramaturge_model::{Condition, FactValue};
-use dramaturge_runtime::{ConditionEvaluator, DefaultConditionEvaluator, DialogWorldState};
+use dramaturge_runtime::{
+    ConditionEvaluator, CustomHandler, DefaultConditionEvaluator, DialogWorldState,
+};
 use loremaster_lang::{CmpOp, Derived, NameForm, Operand};
 use loremaster_model::{Location, TimeOfDay, Value};
 
 /// Evaluates conditions against a game: stored facts through dramaturge's
-/// default evaluator, derived values here.
-///
-/// dramaturge's evaluator takes `DialogWorldState` only and answers `Custom`
-/// with `false`, so this walks `All` / `Any` / `Not` itself and hands every
-/// other leaf to dramaturge. (See the dramaturge issue on making evaluation
-/// generic over state; once that lands this becomes a `Custom` handler.)
+/// default evaluator, derived values (`Condition::Custom`) here, through
+/// dramaturge's `CustomHandler` hook. dramaturge walks `All` / `Any` / `Not`,
+/// so a derived value nested in them reaches the handler too.
 pub(crate) struct Eval<'a> {
     pub world: &'a World,
     pub state: &'a State,
     pub facts: &'a DialogWorldState,
 }
 
+/// Answers the derived values of an [`Eval`] for dramaturge.
+struct DerivedValues<'e, 'a>(&'e Eval<'a>);
+
+impl CustomHandler<DialogWorldState> for DerivedValues<'_, '_> {
+    fn condition(&self, key: &str, args: &[FactValue], _: &DialogWorldState) -> bool {
+        match Derived::from_condition(key, args) {
+            Some((d, op, value)) => compare(&self.0.derived(&d), op, &value),
+            None => false,
+        }
+    }
+}
+
 impl Eval<'_> {
     pub fn holds(&self, c: &Condition) -> bool {
-        match c {
-            Condition::All(items) => items.iter().all(|c| self.holds(c)),
-            Condition::Any(items) => items.iter().any(|c| self.holds(c)),
-            Condition::Not(inner) => !self.holds(inner),
-            Condition::Custom { key, args } => match Derived::from_condition(key, args) {
-                Some((d, op, value)) => compare(&self.derived(&d), op, &value),
-                None => false,
-            },
-            leaf => DefaultConditionEvaluator.evaluate(leaf, self.facts),
-        }
+        DefaultConditionEvaluator::with_custom(DerivedValues(self)).evaluate(c, self.facts)
     }
 
     pub fn holds_opt(&self, c: &Option<Condition>) -> bool {

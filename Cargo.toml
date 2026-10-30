@@ -26,8 +26,8 @@ loremaster-project = { path = "crates/loremaster-project" }
 loremaster-runtime = { path = "crates/loremaster-runtime" }
 loremaster-tools = { path = "crates/loremaster-tools" }
 loremaster-mcp = { path = "crates/loremaster-mcp" }
-dramaturge-model = "0.1.0"
-dramaturge-runtime = "0.1.0"
+dramaturge-model = "0.2.0"
+dramaturge-runtime = "0.2.0"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 serde-saphyr = "2"
