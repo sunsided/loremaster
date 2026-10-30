@@ -174,6 +174,19 @@ export interface MarginInfo {
 	exits: number;
 }
 
+/** One finding of an AI review of a room, for a note in the margin. */
+export interface ReviewFinding {
+	/** A key to dismiss it, for example `j3#1`. */
+	key: string;
+	severity: 'high' | 'medium' | 'low';
+	/** The owner of the fragment, for example `room:shore`. */
+	owner: string;
+	/** The fragment index, counting from 0. Null: a finding about the whole room. */
+	fragment: number | null;
+	problem: string;
+	fix: string;
+}
+
 /** One open AI proposal, in short, for a card. */
 export interface ProposalSummary {
 	id: string;

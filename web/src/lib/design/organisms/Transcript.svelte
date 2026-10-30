@@ -4,9 +4,10 @@
 	import FragmentMarker from '../atoms/FragmentMarker.svelte';
 	import ProseLink from '../atoms/ProseLink.svelte';
 	import { lineReveal, revealLines } from '../reveal.ts';
-	import type { EffectsLevel, RevealMode, GhostLine, MarginInfo, ProposalSummary, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
+	import type { EffectsLevel, RevealMode, GhostLine, MarginInfo, ProposalSummary, ReviewFinding, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
 	import GhostText from '../atoms/GhostText.svelte';
 	import ProposalCard from '../molecules/ProposalCard.svelte';
+	import FindingNote from '../molecules/FindingNote.svelte';
 
 	interface Props {
 		entries: TranscriptEntry[];
@@ -48,6 +49,9 @@
 		onproposal?: (id: string, action: 'accept' | 'reject', note?: string) => void;
 		/** Play a proposal in a sandbox before the author accepts it. */
 		onwalk?: (id: string) => void;
+		/** Write mode with the margin: the findings of an AI review, next to their fragments. */
+		findings?: ReviewFinding[];
+		ondismiss?: (key: string) => void;
 		/** A problem from the last proposal action, by proposal id. */
 		proposalProblems?: Record<string, string>;
 		/** A preview of the room text in other values. It shows in place of the newest room text, marked. */
@@ -83,11 +87,20 @@
 		proposals = [],
 		onproposal,
 		onwalk,
+		findings = [],
+		ondismiss,
 		proposalProblems = {}
 	}: Props = $props();
 
 	/** The first ghost line of each proposal gets its card in the margin. */
 	const firstGhost = $derived(new Set(proposals.map((p) => ghosts.find((g) => g.proposal === p.id)).filter(Boolean)));
+
+	/** The findings next to a fragment that shows; the others (the whole room, or a hidden fragment) go under the room text. */
+	const shownIndexes = $derived(new Set(margin?.fragments.filter((f) => f.shown).map((f) => f.index) ?? []));
+	const findingsAt = (owner: string, index: number) => findings.filter((f) => f.owner === owner && f.fragment === index && shownIndexes.has(index));
+	const roomFindings = $derived(
+		findings.filter((f) => !(margin && f.owner === margin.owner && f.fragment !== null && shownIndexes.has(f.fragment)))
+	);
 
 	/** Show the room fragments that do not show now, in place. */
 	let hiddenOpen = $state(false);
@@ -312,10 +325,19 @@
 									>{:else}{p.text}{/if}{/each}{/each}</button
 					>{:else}{@render runs({ kind: block.kind, runs: g.runs })}{/if}
 			</p>
-			{#if note}
-				<p class="mnote" class:generated={note.generated} id={noteId}>
-					<span class="tag">{note.tag}</span>{note.detail}
-				</p>
+			{#if note || (g.source && findings.length)}
+				<div class="mside">
+					{#if note}
+						<p class="mnote" class:generated={note.generated} id={noteId}>
+							<span class="tag">{note.tag}</span>{note.detail}
+						</p>
+					{/if}
+					{#if g.source && margin && g.source.owner === margin.owner}
+						{#each findingsAt(g.source.owner, g.source.fragment) as f (f.key)}
+							<FindingNote finding={f} ondismiss={ondismiss ? () => ondismiss(f.key) : undefined} />
+						{/each}
+					{/if}
+				</div>
 			{/if}
 		</div>
 		{#if margin && g.source && g.source.owner === margin.owner}
@@ -324,6 +346,19 @@
 	{/each}
 	{#if block.kind === 'prose'}
 		{#each ghosts.filter((x) => x.kind === 'added') as gh, k (k)}{@render ghostRow(gh)}{/each}
+	{/if}
+	{#if block.kind === 'prose' && roomFindings.length}
+		<div class="mrow">
+			<p class="mtext review-label">The AI review, about the whole room or a hidden fragment:</p>
+			<div class="mside">
+				{#each roomFindings as f (f.key)}
+					<FindingNote
+						finding={{ ...f, problem: f.fragment === null ? f.problem : `Fragment ${f.fragment + 1}: ${f.problem}` }}
+						ondismiss={ondismiss ? () => ondismiss(f.key) : undefined}
+					/>
+				{/each}
+			</div>
+		</div>
 	{/if}
 	{#if block.kind === 'prose' && hiddenFragments.length}
 		<div class="mrow">
@@ -556,7 +591,8 @@
 		gap: 0 var(--space-7);
 		align-items: start;
 	}
-	.mtext {
+	.mtext,
+	.mside {
 		min-width: 0;
 	}
 	.mtext .writable {
@@ -580,6 +616,11 @@
 		color: var(--color-text-strong);
 		text-transform: uppercase;
 		letter-spacing: var(--letter-spacing-caps);
+	}
+	.review-label {
+		color: var(--color-text-muted);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
 	}
 	.mnote.generated .tag {
 		border-style: dashed;

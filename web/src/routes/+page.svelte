@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
-	import { AiLink, type ProposalView } from '#lib/project/proposals.svelte.ts';
+	import { AiLink, parseFindings, type ProposalView } from '#lib/project/proposals.svelte.ts';
 	import ProposalCard from '#lib/design/molecules/ProposalCard.svelte';
 	import AiStatus from '#lib/design/molecules/AiStatus.svelte';
 	import { canLinkFolder } from '#lib/project/store.ts';
@@ -25,7 +25,7 @@
 	import ThreadTag from '#lib/design/molecules/ThreadTag.svelte';
 	import NotesList from '#lib/design/organisms/NotesList.svelte';
 	import RadioGroup from '#lib/design/molecules/RadioGroup.svelte';
-	import type { NoteItem, ThreadItem } from '#lib/design/types.ts';
+	import type { NoteItem, ReviewFinding, ThreadItem } from '#lib/design/types.ts';
 	import { addNote, pathOf, removeNote, setField, setNoteDone } from '#lib/project/yaml-edit.ts';
 	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
 	import NewStoryDialog from '#lib/design/organisms/NewStoryDialog.svelte';
@@ -479,6 +479,15 @@
 	// The sandbox ends when its proposal goes: accepted, rejected or withdrawn.
 	$effect(() => {
 		if (sandbox && !ai.proposals.some((p) => p.id === sandbox?.proposal)) sandbox = null;
+	});
+
+	// The findings of the last AI review of the current room, as notes in the margin of write mode.
+	let dismissed = $state<Set<string>>(new Set());
+	const reviewFindings = $derived.by<ReviewFinding[]>(() => {
+		const s = session;
+		if (!s || sandbox) return [];
+		const job = ai.jobs.findLast((j) => j.task === 'review_room' && j.status === 'done' && j.args.room === s.scene.room && j.result);
+		return job ? parseFindings(job.id, job.result ?? '').filter((f) => !dismissed.has(f.key)) : [];
 	});
 
 	/** The ghost lines of the proposals that change the text of the current room. */
@@ -1171,6 +1180,10 @@
 			onlink={canLinkFolder() ? () => fileAction(() => workspace!.linkFolder()) : undefined}
 			onproposals={() => openAtlas('proposals')}
 			onagain={seedAgain}
+			findings={reviewFindings.length}
+			onfindings={() => {
+				if (!writing) toggleWriting();
+			}}
 		/>
 	{/if}
 {/snippet}
@@ -1463,6 +1476,8 @@
 				proposals={proposalSummaries.filter((p) => ghostsHere.some((g) => g.proposal === p.id))}
 				onproposal={onProposal}
 				onwalk={walkIn}
+				findings={reviewFindings}
+				ondismiss={(key) => (dismissed = new Set([...dismissed, key]))}
 				{proposalProblems}
 				margin={writing ? marginInfo : null}
 				respond={respondable?.label ?? null}

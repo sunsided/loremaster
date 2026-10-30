@@ -28,9 +28,13 @@
 		onproposals: () => void;
 		/** Run a job again for another version. The old proposals stay. */
 		onagain?: (id: string) => void;
+		/** The number of findings of the last review of this room. */
+		findings?: number;
+		/** Show the findings: write mode, where they are notes in the margin. */
+		onfindings?: () => void;
 	}
 
-	let { jobs, differ = null, onreview, oncancel, onlink, onproposals, onagain }: Props = $props();
+	let { jobs, differ = null, onreview, oncancel, onlink, onproposals, onagain, findings = 0, onfindings }: Props = $props();
 	const names: Record<string, string> = {
 		imagine_exit: 'Draft an exit',
 		review_room: 'Review the room',
@@ -57,6 +61,9 @@
 	<div class="row">
 		<Button size="compact" onclick={onreview}>✦ Review this room</Button>
 		<Button size="compact" variant="quiet" onclick={onproposals}>Proposals ↗</Button>
+		{#if findings && onfindings}<Button size="compact" variant="quiet" onclick={onfindings}
+				>{findings} {findings === 1 ? 'finding' : 'findings'} ↗</Button
+			>{/if}
 	</div>
 	{#if jobs.length}
 		<ul class="jobs">
