@@ -32,6 +32,8 @@
 		onwrite?: (source: Source) => void;
 		/** Open the writer for a new room fragment. */
 		onadd?: () => void;
+		/** A preview of the room text in other values. It shows in place of the newest room text, marked. */
+		preview?: Block[] | null;
 		/** In write mode: the last command, when it got the default response. It offers "Write a response". */
 		respond?: string | null;
 		onrespond?: () => void;
@@ -55,8 +57,25 @@
 		onwrite,
 		onadd,
 		respond = null,
-		onrespond
+		onrespond,
+		preview = null
 	}: Props = $props();
+
+	/** The newest turn that shows a room: a preview replaces its room text. */
+	const previewAt = $derived(preview ? (entries.findLast((e) => e.turn.blocks.some((b) => b.kind === 'title'))?.id ?? -1) : -1);
+
+	/** The blocks of a turn, with the preview in place of the room text, and where the preview starts. */
+	function shownBlocks(entry: TranscriptEntry): { blocks: Block[]; from: number } {
+		if (entry.id !== previewAt || !preview) return { blocks: entry.turn.blocks, from: Infinity };
+		const blocks = entry.turn.blocks;
+		const start = blocks.findLastIndex((b) => b.kind === 'title');
+		let end = start + 1;
+		while (end < blocks.length && ['prose', 'objects', 'exits'].includes(blocks[end].kind)) end++;
+		return { blocks: [...blocks.slice(0, start), ...preview, ...blocks.slice(end)], from: start, to: start + preview.length } as {
+			blocks: Block[];
+			from: number;
+		};
+	}
 
 	const same = (a: Source | undefined, w: WritingAt | null) => !!a && !!w && a.owner === w.owner && a.fragment === w.fragment;
 	const editable = (kind: string) => kind === 'prose' || kind === 'objects';
@@ -198,8 +217,10 @@
 			{@const writeHere = entry.id === writable}
 			{@const writerAt = writeHere && writing ? writerAfter(entry.turn.blocks) : -1}
 			{@const addAt = writeHere && !writing && onadd ? lastRoomText(entry.turn.blocks) : -1}
+			{@const shown = shownBlocks(entry)}
 			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere}>
-				{#each entry.turn.blocks as block, bi (bi)}
+				{#if shown.from !== Infinity}<p class="visually-hidden">Preview of the room text in other values. The game did not move.</p>{/if}
+				{#each shown.blocks as block, bi (bi)}
 					{@const inPlace = !!editor && writeHere && editable(block.kind) && block.runs.some((r) => same(r.source, writing))}
 					{#if inPlace}
 						<!-- The fragment under edit: the prose view in place, between the text before and after it. -->
@@ -211,6 +232,7 @@
 					{:else}
 					<p
 						class="block {block.kind}"
+						class:previewed={bi >= shown.from && bi < shown.from + (preview?.length ?? 0)}
 						class:fx-line={fresh && entry.id > 0 && !writeHere}
 						style:animation-delay={fresh ? `${revealDelay(bi)}ms` : undefined}
 					>{#if block.kind === 'command'}<span aria-hidden="true">&gt;&nbsp;</span><span class="visually-hidden"
@@ -365,6 +387,12 @@
 	.writable:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-focus);
 		outline-offset: 1px;
+	}
+	/* A preview of the room text: a line on the left in the warning colour, like the PREVIEW mark. */
+	.previewed {
+		margin-left: calc(-1 * var(--space-4));
+		padding-left: calc(var(--space-4) - var(--size-border-strong));
+		border-left: var(--size-border-strong) solid var(--color-warning);
 	}
 	.editing > span:empty {
 		display: none;

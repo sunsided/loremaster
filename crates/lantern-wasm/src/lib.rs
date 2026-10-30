@@ -263,6 +263,16 @@ impl Engine {
         }
     }
 
+    /// The room description in another combination of values. It does not change the game.
+    #[wasm_bindgen(js_name = previewSituation)]
+    pub fn preview_situation(&self, room: &str, values: JsValue) -> Result<JsValue, JsValue> {
+        let values: Vec<(String, String)> = from_js(values)?;
+        match self.game.preview_situation(room, &values) {
+            Some(turn) => to_js(&turn),
+            None => Ok(JsValue::NULL),
+        }
+    }
+
     /// The room description as it would show now, without changing the game.
     pub fn describe(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.describe_preview())

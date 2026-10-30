@@ -26,7 +26,7 @@
 	import Transcript from '#lib/design/organisms/Transcript.svelte';
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
-	import InspectorPanel from '#lib/design/organisms/InspectorPanel.svelte';
+	import HerePanel from '#lib/design/organisms/HerePanel.svelte';
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
@@ -506,8 +506,10 @@
 
 	// On ultrawide screens the map has its own column, so the inspector does not repeat it.
 	let ultrawide = $state(false);
-	let inspector = $state('assembly');
+	/** The side panel: the Here panel, or one full view with a way back. */
+	let inspector = $state('here');
 	const inspectorTabs = $derived<TabItem[]>([
+		{ id: 'here', label: 'Here' },
 		{ id: 'assembly', label: 'Assembly' },
 		...(ultrawide ? [] : [{ id: 'map', label: 'Map' }]),
 		{ id: 'story', label: 'Story' },
@@ -525,6 +527,49 @@
 			: null
 	);
 
+	// The Here panel.
+	/** The rooms next to the current room on its level, for the small map. */
+	const hereMap = $derived.by(() => {
+		const s = session;
+		if (!s) return { rooms: [], links: [] };
+		const me = s.map.rooms.find((r) => r.current);
+		if (!me) return s.map;
+		const near = new Set([me.id]);
+		for (const l of s.map.links) {
+			if (l.from === me.id) near.add(l.to);
+			if (l.to === me.id) near.add(l.from);
+		}
+		const rooms = s.map.rooms.filter((r) => near.has(r.id) && r.level === me.level);
+		const ids = new Set(rooms.map((r) => r.id));
+		return { rooms, links: s.map.links.filter((l) => ids.has(l.from) && ids.has(l.to)) };
+	});
+	/** The values that the room text depends on, with the values now. */
+	const hereStates = $derived.by(() => {
+		const s = session;
+		if (!s || inspector !== 'here') return { switches: [], texts: 0 };
+		s.entries.length;
+		const m = s.game.roomMatrix(s.scene.room);
+		if (!m) return { switches: [], texts: 0 };
+		const symbols = new Map(s.game.symbols().map((sym) => [sym.name, sym.value ?? '']));
+		return {
+			switches: m.dimensions.map((d) => ({ name: d.name, options: d.values, value: symbols.get(d.name) ?? d.values[0] })),
+			texts: new Set(m.cells.map((c) => c.text)).size
+		};
+	});
+	/** The values that the room text shows instead of the game: a preview. It never moves the game. */
+	let previewValues = $state<Record<string, string>>({});
+	$effect(() => {
+		// A turn or another room ends the preview.
+		session?.entries.length;
+		session?.scene.room;
+		previewValues = {};
+	});
+	const previewTurn = $derived.by(() => {
+		const s = session;
+		const entries = Object.entries(previewValues);
+		return s && entries.length ? s.game.previewSituation(s.scene.room, entries) : null;
+	});
+
 	function runExplorer() {
 		const s = session;
 		if (!s) return;
@@ -536,7 +581,7 @@
 		}, 30);
 	}
 	$effect(() => {
-		if (ultrawide && inspector === 'map') inspector = 'assembly';
+		if (ultrawide && inspector === 'map') inspector = 'here';
 	});
 
 	onMount(() => {
@@ -631,7 +676,13 @@
 				phase={s.scene.phase}
 				turn={s.scene.turns}
 				turnItems={[{ id: 'restart', label: 'Restart the game', run: () => s.restart() }]}
-			/>
+			>
+				{#snippet marks()}
+					{#if Object.keys(previewValues).length}<span class="preview-mark"
+							>PREVIEW · {Object.values(previewValues).join(', ')}</span
+						>{/if}
+				{/snippet}
+			</StatusLine>
 		{/snippet}
 		{#snippet effects()}
 			<ScreenEffects theme={settings.theme} effects={settings.effects} />
@@ -652,6 +703,7 @@
 				writing={writingAt}
 				onwrite={startWriting}
 				onadd={() => (writingAt = { owner: `room:${s.scene.room}`, fragment: -1 })}
+				preview={previewTurn?.blocks ?? null}
 				respond={respondable?.label ?? null}
 				onrespond={() => respondable && openPanel({ responding: respondable })}
 			>
@@ -737,7 +789,40 @@
 			{#if sideBySide && draft && writingAt && writingAt.fragment >= -1}
 				<div class="side-writer">{@render fragmentWriterView()}</div>
 			{:else}
-			<InspectorPanel tabs={inspectorTabs} bind:selected={inspector}>
+			{#if inspector === 'here'}
+				<HerePanel
+					map={hereMap}
+					switches={hereStates.switches}
+					texts={hereStates.texts}
+					preview={previewValues}
+					rules={s.rules.filter((r) => r.relevant)}
+					ruleCount={s.rules.length}
+					last={s.history.at(-1) ?? null}
+					things={s.scene.things}
+					exits={s.scene.exits}
+					onpreview={(name, value) => {
+						const current = hereStates.switches.find((w) => w.name === name)?.value;
+						const next = { ...previewValues };
+						if (value === current) delete next[name];
+						else next[name] = value;
+						previewValues = next;
+					}}
+					onreset={() => (previewValues = {})}
+					onapply={() => {
+						s.author({ type: 'situation', room: s.scene.room, values: Object.entries(previewValues) });
+						previewValues = {};
+					}}
+					onrule={showRule}
+					onopen={(view) => (inspector = view)}
+					onthing={(id, name) => s.pickThing(id, name)}
+					onexit={(dir) => s.pickExit(dir)}
+				/>
+			{:else}
+			<div class="full-view">
+				<div class="back">
+					<button type="button" class="back-button" onclick={() => (inspector = 'here')}>← Here</button>
+					<span>{inspectorTabs.find((t) => t.id === inspector)?.label}</span>
+				</div>
 				{#if inspector === 'map'}
 					<MapPanel map={s.map} />
 				{:else if inspector === 'story'}
@@ -779,7 +864,8 @@
 							: undefined}
 					/>
 				{/if}
-			</InspectorPanel>
+			</div>
+			{/if}
 			{/if}
 		{/snippet}
 	</PlayerLayout>
@@ -835,6 +921,48 @@
 		padding: var(--space-9);
 	}
 	/* The writer next to the game text, in the place of the inspector. */
+	.full-view {
+		position: relative;
+		box-sizing: border-box;
+		height: 100%;
+		min-height: 0;
+		overflow-y: auto;
+		padding: 0 var(--space-5) var(--space-5);
+	}
+	.back {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		gap: var(--space-4);
+		margin: 0 calc(-1 * var(--space-5)) var(--space-4);
+		padding: var(--space-2) var(--space-5);
+		border-bottom: var(--size-border) solid var(--color-border-subtle);
+		background: var(--color-surface-raised);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+		text-transform: uppercase;
+		letter-spacing: var(--letter-spacing-caps);
+		color: var(--color-text-strong);
+	}
+	.back-button {
+		min-height: var(--size-target-compact);
+		padding: 0 var(--space-3);
+		border: var(--size-border) solid var(--color-border-control);
+		background: none;
+		color: var(--color-text-accent);
+		font: inherit;
+	}
+	.back-button:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
+	}
+	.preview-mark {
+		padding: 0 var(--space-3);
+		background: var(--color-status-text);
+		color: var(--color-status-bg);
+	}
 	.side-writer {
 		position: relative;
 		box-sizing: border-box;

@@ -174,6 +174,11 @@ export class Game {
 		return this.#engine.textMatrix(text, when ?? undefined);
 	}
 
+	/** The room description in other values. It does not change the game. Null for an unknown room. */
+	previewSituation(room: string, values: [string, string][]): Turn | null {
+		return this.#engine.previewSituation(room, values);
+	}
+
 	/** The save state, as JSON-compatible data. */
 	save(): unknown {
 		return this.#engine.save();

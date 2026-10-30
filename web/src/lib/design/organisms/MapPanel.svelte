@@ -8,9 +8,11 @@
 		map: MapView;
 		/** Give the map its own padding, background and scroll. Use it when the map is not in a panel. */
 		framed?: boolean;
+		/** Only the drawing of the current level, without heading, view choice and legend. For a small map in a panel. */
+		compact?: boolean;
 	}
 
-	let { map, framed = false }: Props = $props();
+	let { map, framed = false, compact = false }: Props = $props();
 	const uid = $props.id();
 
 	// Levels: towers and dungeons. With more than one level, the map shows one level in full (stacked)
@@ -181,9 +183,9 @@
 	The SVG is decoration for sighted users. The same facts are in a list for screen readers.
 -->
 <section class="map-panel" class:framed aria-labelledby="{uid}-title">
-	<Heading level={2} id="{uid}-title">Map</Heading>
-	{#if current}<p class="where">You are in {current.name}{multi ? `, on level ${current.level}` : ''}.</p>{/if}
-	{#if multi}
+	{#if compact}<h2 class="visually-hidden" id="{uid}-title">Map</h2>{:else}<Heading level={2} id="{uid}-title">Map</Heading>{/if}
+	{#if current && !compact}<p class="where">You are in {current.name}{multi ? `, on level ${current.level}` : ''}.</p>{/if}
+	{#if multi && !compact}
 		<div class="levels">
 			<RadioGroup legend="Map view" name="{uid}-view" look="pills" options={[{ value: 'stacked', label: 'One level' }, { value: 'unfolded', label: 'All levels, unfolded' }]} bind:value={view} />
 			{#if view === 'stacked'}
@@ -250,7 +252,7 @@
 	</svg>
 	</div>
 
-	<div class="legend" aria-hidden="true">
+	<div class="legend" aria-hidden="true" hidden={compact}>
 		<span><i class="swatch current-swatch"></i>you are here</span>
 		<span><i class="swatch visited-swatch"></i>visited</span>
 		<span><i class="swatch unvisited-swatch"></i>not visited yet</span>
@@ -384,6 +386,9 @@
 	.room.current text {
 		fill: var(--color-text-accent);
 		font-weight: var(--font-weight-strong);
+	}
+	.legend[hidden] {
+		display: none;
 	}
 	.legend {
 		display: flex;

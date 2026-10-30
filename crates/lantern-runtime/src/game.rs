@@ -638,6 +638,13 @@ impl Game {
         }
     }
 
+    /// The room description in another combination of values, without changing the game.
+    /// The names and values are the ones of [`crate::RoomMatrix`]. None for an unknown room.
+    pub fn preview_situation(&self, room: &str, values: &[(String, String)]) -> Option<Turn> {
+        let mut copy = self.clone();
+        crate::matrix::apply_cell(&mut copy, room, values).then(|| copy.describe_preview())
+    }
+
     /// The room description as it would show now, without changing the game.
     pub fn describe_preview(&self) -> Turn {
         let mut copy = self.clone();

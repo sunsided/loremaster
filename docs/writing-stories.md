@@ -163,7 +163,7 @@ The example `examples/tower` ("The Spiral") is a tower with three floors of four
 The room matrix shows the text of one room in each combination of the values that the text depends on. It also shows combinations that the player can not reach. Use it to find a text that reads badly in one condition.
 
 1. In the web app, go to the room.
-2. Open the "Explore" tab of the inspector. "This room" is the default mode.
+2. In the Here panel, the section "Depends on" shows the values that the room text depends on. Change a value to preview the room text in place; the game does not move. "Make it so" sets the values in the game. "All texts ↗" opens the explorer with all the texts. "This room" is its default mode.
 
 The runtime finds the values in these locations:
 
@@ -188,7 +188,7 @@ After a "Whole game" run, each text has a mark: "seen in the whole-game run" or 
 
 The state explorer plays all ways through the story from the start. It stops at 2000 states or 40 commands.
 
-1. In the web app, open the "Explore" tab of the inspector, select "Whole game", then select "Explore all states".
+1. In the web app, open the explorer ("All texts ↗" in the Here panel, or "Show Explore" with Ctrl+K), select "Whole game", then select "Explore all states".
 2. Or, run `task explore` or `cargo run -p lantern-cli -- explore <folder>` in a terminal.
 
 The explorer shows:
@@ -227,7 +227,7 @@ Select words in the game text or in the writer. A small toolbar shows (or push C
 More actions in write mode:
 
 - "+ Add room text" adds a fragment to the current room.
-- In the "Assembly" tab, "Edit" opens the writer for a fragment that does not show now.
+- In the assembly view ("Show Assembly" with Ctrl+K), "Edit" opens the writer for a fragment that does not show now.
 - "Remove this fragment" removes the fragment from the file.
 
 Help while you type:

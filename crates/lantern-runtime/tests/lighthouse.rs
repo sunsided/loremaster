@@ -599,3 +599,18 @@ fn an_exit_needs_a_room_or_a_text() {
     assert!(messages[0].0.ends_with("exits[3]") && messages[0].1.contains("needs `to`"));
     assert!(messages[1].0.ends_with("exits[4].door"));
 }
+
+#[test]
+fn a_preview_does_not_change_the_game() {
+    let mut game = lighthouse();
+    game.start();
+    let turn = game
+        .preview_situation("shore", &[("time.phase".into(), "night".into())])
+        .unwrap();
+    assert!(
+        turn.plain_text().contains("black against the stars"),
+        "{}",
+        turn.plain_text()
+    );
+    assert_eq!(game.scene().phase, "dusk");
+}
