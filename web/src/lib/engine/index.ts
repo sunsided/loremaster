@@ -162,7 +162,8 @@ export class Game {
 
 	/** Check fragment text and render it as it would read in other values. It does not change the game. */
 	tryMarkupIn(room: string, values: [string, string][], text: string): MarkupCheck {
-		return this.#engine.tryMarkupIn(room, values, text);
+		const check = this.#engine.tryMarkupIn(room, values, text) as MarkupCheck | null;
+		return check ?? { error: { start: 0, end: 0, message: `The room ${room} does not exist.` }, text: '', pieces: [], holds: null };
 	}
 
 	/** Check a condition and tell whether it holds now. */

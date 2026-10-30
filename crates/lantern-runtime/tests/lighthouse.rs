@@ -601,6 +601,15 @@ fn an_exit_needs_a_room_or_a_text() {
 }
 
 #[test]
+fn markup_in_an_unknown_room_gives_none() {
+    let mut game = lighthouse();
+    game.start();
+    let values = [("time.phase".to_string(), "night".to_string())];
+    assert!(game.try_markup_situation("nowhere", &values, "x").is_none());
+    assert!(game.try_markup_situation("shore", &values, "x").is_some());
+}
+
+#[test]
 fn a_preview_does_not_change_the_game() {
     let mut game = lighthouse();
     game.start();
