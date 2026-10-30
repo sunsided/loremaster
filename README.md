@@ -33,6 +33,19 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 | `docs/ai-tools.md` | How to connect an AI assistant to a project with MCP, the proposal format, the task prompts, the jobs and the HTTP endpoints. |
 | `web/` | The SvelteKit app and the design system with its Storybook. |
 
+## How loremaster uses dramaturge
+
+loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.2 (`dramaturge-model` and `dramaturge-runtime`) for conditions and for the stored facts. All other parts are loremaster's own.
+
+| Part | dramaturge | loremaster |
+| --- | --- | --- |
+| Conditions | Each `when:` compiles to a dramaturge `Condition` tree: `FactEquals`, `FactAtLeast`, `FactAtMost`, `All`, `Any`, `Not` | `loremaster-lang` parses the condition language and does the compilation |
+| Stored facts | Story variables and thing properties are world facts (`FactScope::World`) in a `DialogWorldState` | The save state keeps the same facts again (`State.facts`), because dramaturge 0.1 had no serialization |
+| Derived values | One `Condition::Custom` with the key `loremaster.derived` | A `CustomHandler` answers the time of day, the room, visits, carried things and the action verb |
+| Evaluation | `DefaultConditionEvaluator` walks `All`, `Any` and `Not` | `crates/loremaster-runtime/src/eval.rs` |
+| Text fragments, rules, verbs, parser, map, clock | Not used | loremaster's own model and runtime |
+| Dialogue, characters, relationships, memories, outcomes | Not used yet | |
+
 ## Commands
 
 Install [go-task](https://taskfile.dev), Trunk, Node.js and pnpm before you start.
