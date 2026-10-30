@@ -1,12 +1,20 @@
-//! An MCP server for one lantern project, over stdio.
+//! An MCP server for one lantern project, over stdio or local HTTP.
 //!
-//! The server speaks JSON-RPC 2.0, one message per line, as the MCP stdio
-//! transport asks. It offers the tools of [`lantern_tools`] and the story
-//! writing guide as a resource. Before each tool call it reads the project
-//! folder again, so edits made in the editor or by hand show at once.
+//! The server speaks JSON-RPC 2.0. Over stdio it reads one message per line,
+//! as the MCP stdio transport asks; [`http`] serves the same messages, plus
+//! the proposal endpoints of the editor. It offers the tools of
+//! [`lantern_tools`] and the story writing guide as a resource. Before each
+//! tool call it reads the project folder again, so edits made in the editor
+//! or by hand show at once.
+//!
+//! Proposals are saved in `.lantern/proposals/<id>.json` in the project
+//! folder, so that every server on the folder sees the same ones. A new
+//! `.lantern/.gitignore` keeps them out of git; delete that line to track them.
+
+pub mod http;
 
 use lantern_project::read_dir;
-use lantern_tools::{Workspace, tools};
+use lantern_tools::{Proposal, Workspace, tools};
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -21,13 +29,16 @@ const INSTRUCTIONS: &str = "\
 lantern is a world editor for text adventures. Every text in the game comes from the world state: \
 rooms, things and rules are YAML files with text fragments, conditions and inline markup.
 
-These tools read, play and verify the project. They do not change files.
+These tools read, play and verify the project. They do not change files: to suggest a change, \
+call `propose` with whole files. A person sees the proposal in the editor and accepts it or not.
 - Call `overview` first. Read the guide resource lantern://guide/writing-stories before you write YAML.
 - Use `get_entity` and `neighbors` to see a room in context; `room_matrix` shows its text in all states.
 - Play with `input`. For your own tests, use a session name other than \"main\" (`session_start`), \
 so that you do not move a session someone else uses.
 - Check a draft with `try_markup`, `try_condition` and `text_matrix` before you suggest it.
-- `check` and `explore` are the ground truth: a suggestion must keep the project free of errors and the ending reachable.";
+- `check` and `explore` are the ground truth: a suggestion must keep the project free of errors and the ending reachable.
+- `propose` checks your change. Fix the problems it reports with a new proposal and withdraw the old one. \
+`session_start` with `proposal` plays your draft.";
 
 /// Serve the project in `root` on stdin and stdout until stdin closes.
 pub fn serve_stdio(root: &Path) -> io::Result<()> {
@@ -56,7 +67,13 @@ pub struct Server {
 impl Server {
     pub fn new(root: PathBuf) -> io::Result<Self> {
         let ws = Workspace::new(read_sorted(&root)?);
-        Ok(Self { root, ws })
+        let mut server = Self { root, ws };
+        server.refresh();
+        Ok(server)
+    }
+
+    pub fn workspace(&self) -> &Workspace {
+        &self.ws
     }
 
     /// Handle one JSON-RPC message. Returns the reply, or nothing for a notification.
@@ -125,7 +142,9 @@ impl Server {
                     .unwrap_or_default();
                 let args = params.get("arguments").cloned().unwrap_or(Value::Null);
                 self.refresh();
-                let (text, is_error) = match self.ws.call(name, args) {
+                let result = self.ws.call(name, args);
+                self.save_proposals();
+                let (text, is_error) = match result {
                     Ok(v) => (v.to_string(), false),
                     Err(e) => (e.0, true),
                 };
@@ -150,17 +169,140 @@ impl Server {
         }
     }
 
-    /// Read the project folder again and reload when a file changed.
-    fn refresh(&mut self) {
+    /// Read the project folder and the saved proposals again, and reload when a file changed.
+    pub fn refresh(&mut self) {
         // stderr is free for logs: stdout carries the protocol.
         match read_sorted(&self.root) {
             Ok(files) if self.ws.is_stale(&files) => self.ws.reload(files),
             Ok(_) => {}
             Err(e) => eprintln!(
-                "lantern mcp: cannot read {}: {e}; the tools use the files read before",
+                "lantern: cannot read {}: {e}; the tools use the files read before",
                 self.root.display()
             ),
         }
+        let saved = self.load_proposals();
+        if saved.iter().ne(self.ws.proposals()) {
+            self.ws.set_proposals(saved);
+        }
+    }
+
+    fn proposals_dir(&self) -> PathBuf {
+        self.root.join(".lantern").join("proposals")
+    }
+
+    /// The proposals in `.lantern/proposals/`, in id order. A file that does not parse is left out.
+    fn load_proposals(&self) -> Vec<Proposal> {
+        let Ok(entries) = std::fs::read_dir(self.proposals_dir()) else {
+            return Vec::new();
+        };
+        let mut out: Vec<Proposal> = entries
+            .filter_map(|e| {
+                let path = e.ok()?.path();
+                if path.extension()? != "json" {
+                    return None;
+                }
+                let text = std::fs::read_to_string(&path).ok()?;
+                match serde_json::from_str(&text) {
+                    Ok(p) => Some(p),
+                    Err(err) => {
+                        eprintln!("lantern: skip {}: {err}", path.display());
+                        None
+                    }
+                }
+            })
+            .collect();
+        out.sort_by(|a: &Proposal, b| a.id.cmp(&b.id));
+        out
+    }
+
+    /// Make `.lantern/proposals/` hold the proposals of the workspace.
+    fn save_proposals(&self) {
+        let saved = self.load_proposals();
+        if saved.iter().eq(self.ws.proposals()) {
+            return;
+        }
+        if let Err(e) = self.write_proposals(&saved) {
+            eprintln!("lantern: cannot save proposals: {e}");
+        }
+    }
+
+    fn write_proposals(&self, saved: &[Proposal]) -> io::Result<()> {
+        let dir = self.proposals_dir();
+        std::fs::create_dir_all(&dir)?;
+        let ignore = self.root.join(".lantern").join(".gitignore");
+        if !ignore.exists() {
+            std::fs::write(
+                &ignore,
+                "# Proposals are suggestions. Delete this line to track them in git.\nproposals/\n",
+            )?;
+        }
+        for p in self.ws.proposals() {
+            if !saved.contains(p) {
+                let text = serde_json::to_string_pretty(p).map_err(io::Error::other)?;
+                std::fs::write(dir.join(format!("{}.json", p.id)), text)?;
+            }
+        }
+        for p in saved {
+            if self.ws.proposal(&p.id).is_none() {
+                std::fs::remove_file(dir.join(format!("{}.json", p.id)))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Write the files of a proposal into the project and remove the proposal.
+    /// Returns the paths written and deleted.
+    pub fn accept(&mut self, id: &str) -> Result<Vec<String>, String> {
+        self.refresh();
+        let p = self
+            .ws
+            .proposal(id)
+            .cloned()
+            .ok_or_else(|| format!("There is no proposal `{id}`."))?;
+        let view = self.ws.view_proposal(id).map_err(|e| e.0)?;
+        if !view.ok {
+            return Err(format!(
+                "Proposal `{id}` has errors. Fix them before you accept it."
+            ));
+        }
+        let mut touched = Vec::new();
+        for f in &p.files {
+            let path = self.root.join(&f.path);
+            if let Some(dir) = path.parent() {
+                std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+            }
+            std::fs::write(&path, &f.text).map_err(|e| format!("{}: {e}", f.path))?;
+            touched.push(f.path.clone());
+        }
+        for d in &p.delete {
+            match std::fs::remove_file(self.root.join(d)) {
+                Ok(()) => touched.push(d.clone()),
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(format!("{d}: {e}")),
+            }
+        }
+        self.ws.remove_proposal(id);
+        self.save_proposals();
+        self.refresh();
+        Ok(touched)
+    }
+
+    /// Remove a proposal without a change to the project. A note says why, for the next request.
+    pub fn reject(&mut self, id: &str, note: Option<&str>) -> Result<(), String> {
+        self.refresh();
+        let p = self
+            .ws
+            .remove_proposal(id)
+            .ok_or_else(|| format!("There is no proposal `{id}`."))?;
+        self.save_proposals();
+        let line = json!({ "id": p.id, "summary": p.summary, "note": note }).to_string();
+        let log = self.root.join(".lantern").join("rejected.jsonl");
+        let written = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log)
+            .and_then(|mut f| writeln!(f, "{line}"));
+        written.map_err(|e| format!("cannot write {}: {e}", log.display()))
     }
 }
 
