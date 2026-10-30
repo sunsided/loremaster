@@ -120,6 +120,43 @@ export interface Diagnostic {
 	column: number | null;
 }
 
+/** An author note. The player never sees it. */
+export interface Note {
+	id: string | null;
+	text: string;
+	/** A task for the authors. */
+	todo: boolean;
+	done: boolean;
+	/** The thread that the note is a beat of. */
+	thread: string | null;
+	role: 'setup' | 'payoff' | 'mention' | null;
+}
+
+/** A note and where it is. */
+export interface NoteRef {
+	/** `story`, `room:shore`, `thing:lamp`, `rule:find_key` or `thread:lost_key`. */
+	entity: string;
+	file: string;
+	/** Where in the entity, for example `notes[0]` or `description[2].notes[1]`. */
+	at: string;
+	fragment_id: string | null;
+	line: number | null;
+	note: Note;
+}
+
+/** A long-range thread with its beats. */
+export interface ThreadView {
+	id: string;
+	name: string;
+	status: 'open' | 'resolved' | 'dropped';
+	summary: string | null;
+	file: string;
+	beats: NoteRef[];
+	setups: number;
+	payoffs: number;
+	open_todos: number;
+}
+
 export interface SourceFile {
 	path: string;
 	text: string;

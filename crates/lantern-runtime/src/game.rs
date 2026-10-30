@@ -1186,14 +1186,20 @@ impl Game {
         let story = &self.world.story;
         let ev = self.eval();
         let mut next_free = 0.0_f32;
+        // Rooms without a position go on a row under the placed rooms; with no placed room, on row 0.
+        let free_row = story
+            .rooms
+            .iter()
+            .filter_map(|r| r.position.map(|[_, y]| y))
+            .reduce(f32::max)
+            .map_or(0.0, |y| y + 1.0);
         let rooms = story
             .rooms
             .iter()
             .map(|r| {
                 let [x, y] = r.position.unwrap_or_else(|| {
-                    // Rooms without a position go on a row under the map.
                     next_free += 1.0;
-                    [next_free - 1.0, 100.0]
+                    [next_free - 1.0, free_row]
                 });
                 MapRoom {
                     id: r.id.to_string(),

@@ -3,6 +3,7 @@
 	import { fn } from 'storybook/test';
 	import { exits, history, map, rules, things } from '../fixtures.ts';
 	import HerePanel from './HerePanel.svelte';
+	import NotesList from './NotesList.svelte';
 
 	const switches = [
 		{ name: 'beacon_lit', value: 'false', options: ['false', 'true'] },
@@ -45,6 +46,8 @@
 
 While the AI server runs, an \"✦ AI\" section comes first (the \`ai\` snippet, usually AiStatus).
 
+A **Notes** section after "Around you" shows the author notes and TODOs of the room and its things (the \`notes\` snippet, usually NotesList), with \`notesMeta\` as its short fact.
+
 The panel is a region with the name "Here and now". Each section has a heading with a button that folds it.`
 				}
 			}
@@ -53,5 +56,20 @@ The panel is a region with the name "Here and now". Each section has a heading w
 </script>
 
 <Story name="Here and now" />
+<Story name="With notes" asChild>
+	<HerePanel {map} {switches} texts={10} {rules} ruleCount={6} last={history[0]} {things} {exits} onpreview={fn()} onreset={fn()} onapply={fn()} onrule={fn()} onopen={fn()} onthing={fn()} onexit={fn()} notesMeta="2 · 1 TODO">
+		{#snippet notes()}
+			<NotesList
+				notes={[
+					{ key: 'a', text: "Hal's boat must feel abandoned, not wrecked.", todo: false, done: false },
+					{ key: 'b', text: 'Decide if the ferryman comes back at dawn.', todo: true, done: false }
+				]}
+				ontoggle={fn()}
+				onadd={fn()}
+				onremove={fn()}
+			/>
+		{/snippet}
+	</HerePanel>
+</Story>
 <Story name="Preview" args={{ preview: { 'time.phase': 'night' } }} />
 <Story name="A room without values" args={{ switches: [], texts: 1, rules: [] }} />

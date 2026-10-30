@@ -1,4 +1,4 @@
-use crate::{ClockConfig, Fragment, Frames, Id, Room, Rule, Thing, Value, VerbDef};
+use crate::{ClockConfig, Fragment, Frames, Id, Note, Room, Rule, Thing, Thread, Value, VerbDef};
 use serde::{Deserialize, Serialize};
 
 /// The type of a story variable.
@@ -48,6 +48,12 @@ pub struct Story {
     /// Seed for shuffled and sticky fragments; fixed so playthroughs replay.
     #[serde(default)]
     pub seed: u64,
+    /// Author notes. The player never sees them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<Note>,
+    /// Long-range threads: promises to the reader, with their beats in notes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub threads: Vec<Thread>,
 }
 
 impl Story {
@@ -57,6 +63,10 @@ impl Story {
 
     pub fn thing(&self, id: &str) -> Option<&Thing> {
         self.things.iter().find(|t| t.id.as_str() == id)
+    }
+
+    pub fn thread(&self, id: &str) -> Option<&Thread> {
+        self.threads.iter().find(|t| t.id.as_str() == id)
     }
 
     pub fn var(&self, id: &str) -> Option<&VarDef> {

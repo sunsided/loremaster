@@ -12,10 +12,19 @@ A story is a folder of YAML files. Each entity has its own file.
 | `rooms/*.yaml` | One room in each file. |
 | `things/*.yaml` | One thing or character in each file. |
 | `rules/*.yaml` | One rule, or a list of rules, in each file. |
+| `threads/*.yaml` | One long-range thread in each file. Read [Author notes and threads](#author-notes-and-threads). |
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
 To examine a story for problems, run `task check:story` or `cargo run -p lantern-cli -- check <folder>`.
+
+## Start a new story
+
+A new story has two files: `story.yaml` and the start room `rooms/start.yaml`. The start room has a placeholder text. Replace it with your text.
+
+- In the terminal: `cargo run -p lantern-cli -- new <folder> --title "The Drowned Bell"`. The folder must not contain a `story.yaml`.
+- In the editor: open the project menu or the command palette (Ctrl+K), then select "New story…". Type the title and push Enter. The browser keeps the story as a working copy. "Open my story …" in the same menu opens it again.
+- With AI: type an idea too. The AI writes the first 2 or 3 rooms as a proposal. Read "Start a new story with AI" in `docs/ai-tools.md`.
 
 ## Fragments
 
@@ -135,6 +144,71 @@ An exit without `to` is a message exit. It goes to no room. When the player goes
 - A message exit does not use `door`, `passable` or `traversal`. The check gives a warning for them.
 - The map, the scene, the verb bar and the room brief do not show message exits, because they go to no room.
 - In write mode, a new exit in the direction of a message exit replaces the message exit.
+
+## Author notes and threads
+
+Notes are text for the authors. The player does not see them. Put the notes in the file of the entity that they are about, in a `notes:` list. You can add notes to `story.yaml`, to rooms, things and rules, and to a fragment in its map form.
+
+```yaml
+# rooms/shore.yaml
+name: The Shore
+notes:
+  - Hal's boat must feel abandoned, not wrecked.
+  - todo: Decide if the ferryman comes back at dawn.
+  - { todo: Name the gull., done: true }
+description:
+  - id: gull
+    text: "A gull watches you from the boat."
+    notes:
+      - { text: First hint at the key., thread: lost_key, role: setup }
+```
+
+| Form | Meaning |
+| --- | --- |
+| A string | A note. |
+| `todo: …` | A TODO. Add `done: true` when it is done. |
+| `text: …` | A note with more fields: `id`, `thread` and `role`. |
+
+A thread is a promise to the reader that goes across the story, for example a hint early in the story that resolves at the end. Each thread has a file in `threads/`:
+
+```yaml
+# threads/lost_key.yaml
+name: The lost key
+status: open          # open, resolved or dropped
+summary: Hal hid the key of the lamp room before he went away. The gull knows.
+tracks: [knows_key]   # optional: the variables or properties that carry the thread
+notes:
+  - todo: Add a second hint on the cliff path.
+```
+
+The beats of a thread are the notes that have `thread: <id>`. `role` tells what the beat does:
+
+| `role` | Meaning |
+| --- | --- |
+| `setup` | The reader learns or sees something that is important later. |
+| `payoff` | The thread resolves here. |
+| `mention` | The thread shows again, so that the reader remembers it. |
+
+The checker tells you about these problems:
+
+- A note names a thread that does not exist. This is an error.
+- An open thread has a setup and no payoff. This is a warning.
+- A thread has a payoff and no setup. This is a warning.
+- A resolved thread has open TODOs. This is a warning.
+
+A dropped thread gives no warnings. Use it to keep an idea that you removed.
+
+To list all open TODOs with their file and line, run `cargo run -p lantern-cli -- check <folder> --todos`.
+
+In the editor:
+
+- The Here panel has a "Notes" section. It shows the notes and TODOs of the room and of the things in it. Type a text, then select "+ Note" or "+ TODO". Select the checkbox of a TODO when it is done. "×" removes a note.
+- The status line shows the number of open TODOs. Select it to open Atlas › TODOs, with all open TODOs of the story. Select the place of a TODO to go to its room. Ctrl+K, "Add a TODO, or find the done ones", opens the same tab.
+- In Atlas › TODOs, "Show" selects the open TODOs, the done TODOs or all. A done TODO stays in its file, struck through; clear its checkbox to open it again. "×" removes a TODO from the file. Then it is gone.
+- A TODO that you add in Atlas › TODOs goes into `story.yaml`, for the whole story.
+- In write mode, the margin note of a fragment shows its notes ("✎ 1 note") and its threads, for example "setup of lost_key".
+
+If a note contains a colon, put it in quotes, for example `- "Premise: a lighthouse without a keeper."`. Without quotes, YAML reads the colon as a map. lantern then keeps the text, but other tools can read it differently.
 
 ## The Atlas
 

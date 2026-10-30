@@ -1,6 +1,8 @@
 use crate::{Diagnostic, Project, Severity};
 use lantern_lang::{LangError, Scope, compile_condition, compile_markup};
-use lantern_model::{Effect, EventPattern, Fragment, Location, Story, standard_verbs};
+use lantern_model::{
+    Effect, EventPattern, Fragment, Location, Story, ThreadStatus, standard_verbs,
+};
 use std::collections::BTreeSet;
 
 /// Check a loaded project: every reference resolves, every condition and
@@ -229,6 +231,8 @@ impl Checker<'_> {
             }
         }
 
+        self.threads();
+
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
             .chain(story.verbs.iter())
@@ -292,6 +296,63 @@ impl Checker<'_> {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Notes name known threads; an open thread that is set up gets paid off.
+    fn threads(&mut self) {
+        let mut seen = BTreeSet::new();
+        let ids: Vec<String> = self
+            .story()
+            .threads
+            .iter()
+            .map(|t| t.id.to_string())
+            .collect();
+        for id in ids {
+            if !seen.insert(id.clone()) {
+                let file = self.file_of(&format!("thread:{id}"));
+                self.error(&file, "id", format!("thread `{id}` is defined twice"));
+            }
+        }
+        for n in crate::notes(self.project) {
+            if let Some(thread) = &n.note.thread
+                && self.story().thread(thread.as_str()).is_none()
+            {
+                self.error(
+                    &n.file,
+                    &format!("{}.thread", n.at),
+                    format!("unknown thread `{thread}`"),
+                );
+            }
+        }
+        for t in crate::threads(self.project) {
+            let at = format!("thread {}", t.id);
+            match t.status {
+                ThreadStatus::Open if t.setups > 0 && t.payoffs == 0 => self.warning(
+                    &t.file,
+                    &at,
+                    format!(
+                        "`{}` is open and has {} setup(s) and no payoff",
+                        t.id, t.setups
+                    ),
+                ),
+                ThreadStatus::Open | ThreadStatus::Resolved if t.payoffs > 0 && t.setups == 0 => {
+                    self.warning(
+                        &t.file,
+                        &at,
+                        format!("`{}` has a payoff and no setup", t.id),
+                    )
+                }
+                ThreadStatus::Resolved if t.open_todos > 0 => self.warning(
+                    &t.file,
+                    &at,
+                    format!(
+                        "`{}` is resolved and has {} open TODO(s)",
+                        t.id, t.open_todos
+                    ),
+                ),
+                _ => {}
             }
         }
     }

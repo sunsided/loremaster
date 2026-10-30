@@ -10,13 +10,20 @@
 	import ProseEditor from '#lib/design/molecules/ProseEditor.svelte';
 	import { FragmentDraft } from '#lib/design/fragment-draft.svelte.ts';
 	import { inMarkup } from '#lib/project/transform.ts';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import CreatePanel from '#lib/design/organisms/CreatePanel.svelte';
 	import { addExit, addResponseRule, directionOf, directions, opposite, roomFile, slug, step, thingFile, type Direction } from '#lib/project/create.ts';
 	import type { CreateRequest } from '#lib/design/types.ts';
 	import type { Source } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
+	import { newStory, notesOf, type NoteRef } from '#lib/engine/index.ts';
+	import NotesList from '#lib/design/organisms/NotesList.svelte';
+	import RadioGroup from '#lib/design/molecules/RadioGroup.svelte';
+	import type { NoteItem } from '#lib/design/types.ts';
+	import { addNote, pathOf, removeNote, setNoteDone } from '#lib/project/yaml-edit.ts';
+	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
+	import NewStoryDialog from '#lib/design/organisms/NewStoryDialog.svelte';
 	import { settings } from '#lib/settings.svelte.ts';
 	import Button from '#lib/design/atoms/Button.svelte';
 	import CommandPrompt from '#lib/design/molecules/CommandPrompt.svelte';
@@ -45,19 +52,43 @@
 	let workspace: Workspace | undefined = $state();
 	const session = $derived(workspace?.session ?? undefined);
 	const STORY_KEY = 'lantern.story';
+	let mine = $state<StoryEntry[]>(myStories());
 	let storyName = $state(readStory());
+	let showNewStory = $state(false);
+	/** True for a story that the author made, false for a bundled example. */
+	const isMine = $derived(!(storyName in examples));
 
 	function readStory(): string {
 		try {
 			const name = localStorage.getItem(STORY_KEY);
-			return name && name in examples ? name : 'lighthouse';
+			return name && (name in examples || mine.some((s) => s.name === name)) ? name : 'lighthouse';
 		} catch {
 			return 'lighthouse';
 		}
 	}
 
-	/** Load an example story and start a new session with it. */
-	function openStory(name: string) {
+	/** The bundled files of a story: the example, or the new-story files of the author's story. */
+	async function bundledFiles(name: string) {
+		if (name in examples) return examples[name];
+		return newStory(mine.find((s) => s.name === name)?.title ?? name);
+	}
+
+	/** Make a new story from the dialog and open it. */
+	async function createStory({ title, idea }: { title: string; idea: string }) {
+		const entry = addStory(title, Object.keys(examples));
+		mine = myStories();
+		await openStory(entry.name);
+		// The start room promises a blinking cursor: keep the promise, the command prompt gets the focus.
+		await tick();
+		prompt?.focus();
+		if (!idea) return;
+		// The server writes the same new story, then drafts the first rooms. The proposal shows when it is ready.
+		const problem = await ai.bootstrap(title, idea);
+		if (problem) failure = problem;
+	}
+
+	/** Load a story and start a new session with it. */
+	async function openStory(name: string) {
 		storyName = name;
 		try {
 			localStorage.setItem(STORY_KEY, name);
@@ -67,9 +98,11 @@
 		failure = '';
 		exploration = null;
 		workspace = undefined;
-		Workspace.open(name, examples[name])
-			.then((ws) => (workspace = ws))
-			.catch((e) => (failure = String(e)));
+		try {
+			workspace = await Workspace.open(name, await bundledFiles(name));
+		} catch (e) {
+			failure = String(e);
+		}
 	}
 	const problems = $derived(workspace?.problems ?? []);
 	// In development, the workspace is on `window.lantern` for experiments in the browser console.
@@ -106,9 +139,9 @@
 			case 'folder-locked':
 				return 'folder needs access';
 			case 'browser':
-				return p.edited ? 'edited, saved in browser' : 'bundled example';
+				return p.edited ? 'edited, saved in browser' : isMine ? 'new story' : 'bundled example';
 			default:
-				return p.edited ? 'edited, not saved' : 'bundled example';
+				return p.edited ? 'edited, not saved' : isMine ? 'new story' : 'bundled example';
 		}
 	});
 	let showSettings = $state(false);
@@ -125,10 +158,116 @@
 
 	// AI proposals from `lantern serve`, when it runs.
 	const ai = new AiLink();
+	// Why the new story dialog cannot draft with AI now; null when it can.
+	const newStoryAi = $derived(
+		ai.reachable ? null : 'To draft with AI, start `lantern serve --bootstrap` and keep this page open.'
+	);
+
+	// Author notes and TODOs, read from the files after each change.
+	let allNotes = $state<NoteRef[]>([]);
+	$effect(() => {
+		const files = workspace?.project.files;
+		if (!files) return;
+		let current = true;
+		notesOf(files).then((n) => {
+			if (current) allNotes = n;
+		});
+		return () => {
+			current = false;
+		};
+	});
+	const allTodos = $derived(allNotes.filter((n) => n.note.todo));
+	const openTodos = $derived(allTodos.filter((n) => !n.note.done));
+	const doneTodos = $derived(allTodos.filter((n) => n.note.done));
+	let todoFilter = $state<'open' | 'done' | 'all'>('open');
+	const noteKey = (n: NoteRef) => `${n.file}#${n.at}`;
+
+	/** Where a note is, in words: the room or thing name, or the fragment. */
+	function noteWhere(n: NoteRef, here: boolean): string | undefined {
+		const s = session;
+		const [kind, id] = n.entity.split(':');
+		const fragment = n.at.includes('.notes') ? n.at.match(/^(.*?)\[(\d+)\]/) : null;
+		const part = fragment ? `${fragment[1] === 'description' ? 'fragment' : fragment[1]} ${Number(fragment[2]) + 1}` : '';
+		if (here && kind === 'room') return part || undefined;
+		const name =
+			kind === 'room'
+				? (s?.map.rooms.find((r) => r.id === id)?.name ?? id)
+				: kind === 'thing'
+					? (s?.scene.things.find((t) => t.id === id)?.name ?? id)
+					: kind === 'thread'
+						? `thread ${id}`
+						: kind === 'rule'
+							? `rule ${id}`
+							: 'the story';
+		return part ? `${name} · ${part}` : name;
+	}
+	const noteItem = (n: NoteRef, here: boolean): NoteItem => ({
+		key: noteKey(n),
+		text: n.note.text,
+		todo: n.note.todo,
+		done: n.note.done,
+		where: noteWhere(n, here),
+		thread: n.note.thread,
+		role: n.note.role
+	});
+
+	/** The notes of the current room and of the things in it. */
+	const hereNotes = $derived.by(() => {
+		const s = session;
+		if (!s) return [];
+		const here = new Set([`room:${s.scene.room}`, ...s.scene.things.map((t) => `thing:${t.id}`)]);
+		return allNotes.filter((n) => here.has(n.entity)).map((n) => noteItem(n, true));
+	});
+	const hereNotesMeta = $derived.by(() => {
+		const todos = hereNotes.filter((n) => n.todo && !n.done).length;
+		return hereNotes.length ? `${hereNotes.length}${todos ? ` · ${todos} TODO` : ''}` : 'none';
+	});
+
+	/** Change the file of a note. A problem shows as the failure line. */
+	async function editNote(file: string, edit: (text: string) => string) {
+		const ws = workspace;
+		const text = ws?.project.file(file)?.text;
+		if (!ws || text === undefined) return;
+		try {
+			const problems = await ws.change(file, edit(text));
+			if (problems?.length) failure = problems.map((p) => p.message).join(' ');
+		} catch (e) {
+			failure = String(e);
+		}
+	}
+	function addRoomNote(note: { text: string; todo: boolean }) {
+		const s = session;
+		const file = s && workspace?.project.origins[`room:${s.scene.room}`];
+		if (file) editNote(file, (t) => addNote(t, ['notes'], note));
+	}
+	/** A note for the whole story, in story.yaml. */
+	function addStoryNote(note: { text: string; todo: boolean }) {
+		editNote(workspace?.project.origins['story'] ?? 'story.yaml', (t) => addNote(t, ['notes'], note));
+	}
+	function toggleNote(key: string, done: boolean) {
+		const n = allNotes.find((x) => noteKey(x) === key);
+		if (n) editNote(n.file, (t) => setNoteDone(t, pathOf(n.at), done));
+	}
+	function deleteNote(key: string) {
+		const n = allNotes.find((x) => noteKey(x) === key);
+		if (n) editNote(n.file, (t) => removeNote(t, pathOf(n.at)));
+	}
+	/** Go to the room of a TODO. */
+	function goToNote(key: string) {
+		const n = allNotes.find((x) => noteKey(x) === key);
+		const s = session;
+		if (!n || !s) return;
+		const [kind, id] = n.entity.split(':');
+		const room = kind === 'room' ? id : kind === 'thing' ? s.game.atlas().find((r) => r.things.some((t) => t.id === id))?.id : undefined;
+		if (room) {
+			if (room !== s.scene.room) s.author({ type: 'goto', room });
+			closeAtlas();
+		}
+	}
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'proposals'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'proposals'>('map');
 	let atlasRoom = $state<string | null>(null);
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
@@ -136,6 +275,7 @@
 		{ id: 'state', label: 'State' },
 		{ id: 'story', label: 'Story' },
 		{ id: 'checks', label: 'Checks' },
+		{ id: 'todos', label: `TODOs ${openTodos.length}` },
 		...(ai.reachable ? [{ id: 'proposals', label: `Proposals ${ai.proposals.length}` }] : [])
 	]);
 	// The Proposals tab goes away when the server stops; show the map in its place.
@@ -195,9 +335,19 @@
 			status: j.status,
 			seconds: Math.max(0, Math.round((now - (j.started ?? now)) / 1000)),
 			cost: j.cost_usd,
-			proposals: j.proposals.length
+			proposals: j.proposals.length,
+			// A new story's draft can run again while its proposal is open, before the story changes.
+			again: j.task === 'seed_story' && j.proposals.some((p) => ai.proposals.some((v) => v.id === p))
 		}))
 	);
+	/** Another version of the first rooms: the same idea, one more job. The open proposal stays. */
+	async function seedAgain(id: string) {
+		const job = ai.jobs.find((j) => j.id === id);
+		const idea = job?.args.idea;
+		if (!session || typeof idea !== 'string') return;
+		const problem = await ai.bootstrap(session.game.title, idea);
+		if (problem) failure = problem;
+	}
 	const runningJob = $derived(aiJobs.find((j) => j.status === 'running'));
 
 	/** The ghost lines of the proposals that change the text of the current room. */
@@ -229,7 +379,13 @@
 		if (!view || !ws || proposalBusy.has(id)) return;
 		proposalBusy.add(id);
 		try {
+			const seed = action === 'accept' && ai.isSeed(id);
 			const problem = action === 'accept' ? await ai.accept(view, ws) : await ai.reject(view, note);
+			// The first rooms of a new story: play it from the start, with its new intro.
+			if (seed && !problem) {
+				await ws.restart();
+				closeAtlas();
+			}
 			proposalProblems = { ...proposalProblems, [id]: problem ?? '' };
 			if (!problem) delete proposalProblems[id];
 		} finally {
@@ -282,7 +438,15 @@
 		items.push({ id: 'files-export', group: 'Files', label: 'Export the story as a zip file', run: () => exportZip(ws) });
 		items.push({ id: 'files-import', group: 'Files', label: 'Import a story from a zip file', run: () => zipInput?.click() });
 		if (p.edited || p.storage === 'folder')
-			items.push({ id: 'files-reset', group: 'Files', label: `Go back to the bundled example “${p.name}”`, run: () => fileAction(() => ws.reset()) });
+			items.push({
+				id: 'files-reset',
+				group: 'Files',
+				label: isMine ? 'Start this story again from one empty room' : `Go back to the bundled example “${p.name}”`,
+				run: () => fileAction(() => ws.reset())
+			});
+		items.push({ id: 'story-new', group: 'Stories', label: 'New story…', run: () => (showNewStory = true) });
+		for (const s of mine.filter((s) => s.name !== storyName))
+			items.push({ id: `story-${s.name}`, group: 'Stories', label: `Open my story “${s.title}”`, run: () => openStory(s.name) });
 		for (const name of Object.keys(examples).filter((n) => n !== storyName))
 			items.push({ id: `story-${name}`, group: 'Examples', label: `Open the example “${name}”`, run: () => openStory(name) });
 		return items;
@@ -293,6 +457,7 @@
 		const s = session;
 		if (!s) return [];
 		const items: PaletteItem[] = [];
+		items.push({ id: 'todo-add', group: 'Notes', label: 'Add a TODO, or find the done ones', keywords: 'note todo task struck', run: () => openAtlas('todos') });
 		items.push({ id: 'atlas', group: 'Atlas', label: atlasOpen ? 'Close the Atlas' : 'Open the Atlas', keywords: 'world map ctrl m', run: () => (atlasOpen ? closeAtlas() : openAtlas()) });
 		for (const tab of atlasTabs) {
 			items.push({ id: `atlas-${tab.id}`, group: 'Atlas', label: `Show ${tab.label} in the Atlas`, keywords: tab.id === 'checks' ? 'explore' : '', run: () => openAtlas(tab.id as typeof atlasTab) });
@@ -683,10 +848,15 @@
 	const marginInfo = $derived.by(() => {
 		const s = session;
 		if (!s) return null;
+		const owner = `room:${s.scene.room}`;
 		const detail = (f: (typeof s.assembly)[number]) => {
 			const parts: string[] = [f.mode.replace('_', ' ')];
 			if (f.condition) parts.push(`when ${f.condition}`);
 			if (f.replaces) parts.push('replaces');
+			// Author notes on the fragment: a count, and the threads that it is a beat of.
+			const notes = allNotes.filter((n) => n.entity === owner && n.at.startsWith(`description[${f.index}].notes[`));
+			if (notes.length) parts.push(`✎ ${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`);
+			for (const n of notes) if (n.note.thread) parts.push(`${n.note.role ?? 'beat'} of ${n.note.thread}`);
 			return parts.join(' · ');
 		};
 		return {
@@ -813,6 +983,10 @@
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
 </svelte:head>
 
+{#snippet notesSection()}
+	<NotesList notes={hereNotes} empty="No notes for this room yet." onadd={addRoomNote} ontoggle={toggleNote} onremove={deleteNote} />
+{/snippet}
+
 {#snippet aiSection()}
 	{#if session}
 		{@const s = session}
@@ -823,6 +997,7 @@
 			oncancel={(id) => ai.cancelJob(id)}
 			onlink={canLinkFolder() ? () => fileAction(() => workspace!.linkFolder()) : undefined}
 			onproposals={() => openAtlas('proposals')}
+			onagain={seedAgain}
 		/>
 	{/if}
 {/snippet}
@@ -909,6 +1084,36 @@
 					/>
 				{:else if atlasTab === 'rules'}
 					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+				{:else if atlasTab === 'todos'}
+					<section class="todos-view" aria-label="TODOs">
+						<RadioGroup
+							legend="Show"
+							name="todo-filter"
+							look="pills"
+							options={[
+								{ value: 'open', label: `Open ${openTodos.length}` },
+								{ value: 'done', label: `Done ${doneTodos.length}` },
+								{ value: 'all', label: 'All' }
+							]}
+							bind:value={todoFilter}
+						/>
+						<NotesList
+							notes={(todoFilter === 'open' ? openTodos : todoFilter === 'done' ? doneTodos : allTodos).map((n) => noteItem(n, false))}
+							empty={todoFilter === 'done'
+								? 'No done TODOs. A done TODO stays in its file, struck through, until you remove it with ×.'
+								: 'No open TODOs.'}
+							todoOnly
+							placeholder="A TODO for the whole story"
+							onadd={addStoryNote}
+							ontoggle={toggleNote}
+							onremove={deleteNote}
+							onselect={goToNote}
+						/>
+						<p class="muted-line">
+							A TODO added here goes into story.yaml. Add a TODO for a room in the Notes section of the Here panel. A done TODO stays,
+							struck through, until you remove it with ×. A removed TODO is gone from the file.
+						</p>
+					</section>
 				{:else if atlasTab === 'proposals'}
 					<section class="proposals-view" aria-label="Proposals">
 						{#each proposalSummaries as p (p.id)}
@@ -1006,6 +1211,9 @@
 				onroom={() => openAtlas('map')}
 			>
 				{#snippet marks()}
+					{#if openTodos.length}<button type="button" class="job-chip" onclick={() => openAtlas('todos')}
+							>{openTodos.length} TODO</button
+						>{/if}
 					{#if runningJob}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
 							>✦ {runningJob.task === 'review_room' ? 'reviewing' : 'drafting'}… {runningJob.seconds} s</button
 						>{:else if ai.reachable && ai.proposals.length}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
@@ -1028,6 +1236,7 @@
 				focus={s.focus}
 				effects={settings.effects}
 				reduceMotion={settings.reduceMotion}
+				reveal={settings.reveal}
 				onthing={(id, name) => s.pickThing(id, name)}
 				onexit={(dir) => s.pickExit(dir)}
 				onfocus={(i) => (s.focus = i)}
@@ -1156,6 +1365,8 @@
 					onthing={(id, name) => s.pickThing(id, name)}
 					onexit={(dir) => s.pickExit(dir)}
 					ai={ai.reachable ? aiSection : undefined}
+					notes={notesSection}
+					notesMeta={hereNotesMeta}
 				/>
 			{:else}
 				<BottomSheet title="Here" summary={sheetSummary}>
@@ -1180,6 +1391,8 @@
 						onthing={(id, name) => s.pickThing(id, name)}
 						onexit={(dir) => s.pickExit(dir)}
 						ai={ai.reachable ? aiSection : undefined}
+					notes={notesSection}
+					notesMeta={hereNotesMeta}
 					/>
 				</BottomSheet>
 			{/if}
@@ -1201,12 +1414,14 @@
 			if (file && workspace) fileAction(() => workspace!.importZip(file));
 		}}
 	/>
+	<NewStoryDialog bind:open={showNewStory} aiUnavailable={newStoryAi} oncreate={createStory} />
 	<SettingsDialog
 		bind:open={showSettings}
 		bind:theme={settings.theme}
 		bind:effects={settings.effects}
 		bind:motion={settings.motion}
 		bind:tooltips={settings.tooltips}
+		bind:reveal={settings.reveal}
 		systemReduce={settings.systemReduce}
 	/>
 {:else}
@@ -1223,7 +1438,9 @@
 				<p>The changed files do not build.</p>
 				<div class="actions">
 					<Button onclick={() => exportZip(ws)}>Export the changed files as a zip</Button>
-					<Button variant="primary" onclick={() => fileAction(() => ws.reset())}>Go back to the bundled example</Button>
+					<Button variant="primary" onclick={() => fileAction(() => ws.reset())}
+						>{isMine ? 'Start this story again from one empty room' : 'Go back to the bundled example'}</Button
+					>
 				</div>
 			{/if}
 		{:else if failure}
@@ -1278,6 +1495,13 @@
 	.job-chip:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-status-text);
 		outline-offset: 2px;
+	}
+	.todos-view {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-5);
+		max-width: 48rem;
+		padding: var(--space-5) var(--space-6);
 	}
 	.proposals-view {
 		display: grid;

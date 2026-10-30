@@ -15,7 +15,10 @@ pub mod http;
 pub mod jobs;
 
 use lantern_project::read_dir;
-use lantern_tools::{Proposal, Workspace, prompt_context, prompts_json, render_prompt, tools};
+use lantern_tools::{
+    Proposal, Workspace, prompt_context, prompts_json, render_prompt, render_prompt_with_context,
+    tools,
+};
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -40,6 +43,45 @@ so that you do not move a session someone else uses.
 - `check` and `explore` are the ground truth: a suggestion must keep the project free of errors and the ending reachable.
 - `propose` checks your change. Fix the problems it reports with a new proposal and withdraw the old one. \
 `session_start` with `proposal` plays your draft.";
+
+/// Run `seed_story` on the new story in `root` and wait for it: the command
+/// line form of the editor's "Create and draft with AI". The agent starts its
+/// own `lantern mcp` on the folder. `on_event` sees each step as it comes.
+pub fn seed_folder(
+    root: &Path,
+    idea: &str,
+    mut on_event: impl FnMut(&jobs::JobEvent),
+) -> Result<jobs::Job, String> {
+    let root = std::fs::canonicalize(root).map_err(|e| e.to_string())?;
+    let mut server = Server::new(root.clone()).map_err(|e| e.to_string())?;
+    let program = std::env::current_exe().map_err(|e| e.to_string())?;
+    let mut jobs = jobs::Jobs::stdio(
+        jobs::Agent::from_env(),
+        &program.to_string_lossy(),
+        &root.to_string_lossy(),
+    );
+    let mut args = json!({ "idea": idea });
+    let rejected = server.rejected(20);
+    if !rejected.is_empty() {
+        args["rejected"] = json!(rejected.join("\n"));
+    }
+    let context = server.prompt_context("seed_story", &args);
+    let prompt =
+        render_prompt_with_context("seed_story", &args, Some(&context)).map_err(|e| e.0)?;
+    let id = jobs.start("seed_story", args, &prompt, None)?;
+    let mut seen = 0;
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let Some(job) = jobs.get(&id) else {
+            return Err("the job went away".into());
+        };
+        job.events[seen..].iter().for_each(&mut on_event);
+        seen = job.events.len();
+        if job.status != jobs::JobStatus::Running {
+            return Ok(job);
+        }
+    }
+}
 
 /// Serve the project in `root` on stdin and stdout until stdin closes.
 pub fn serve_stdio(root: &Path) -> io::Result<()> {
@@ -197,24 +239,40 @@ impl Server {
                 }))
             }
             "ping" => Ok(json!({})),
-            "tools/list" => Ok(json!({
-                "tools": tools().iter().map(|t| json!({
-                    "name": t.name,
-                    "description": t.description,
-                    "inputSchema": t.input_schema,
-                    "annotations": {
-                        "readOnlyHint": t.read_only,
-                        "destructiveHint": false,
-                        "openWorldHint": false,
-                    },
-                })).collect::<Vec<_>>(),
-            })),
+            "tools/list" => {
+                let mut list: Vec<Value> = tools()
+                    .iter()
+                    .map(|t| {
+                        json!({
+                            "name": t.name,
+                            "description": t.description,
+                            "inputSchema": t.input_schema,
+                            "annotations": {
+                                "readOnlyHint": t.read_only,
+                                "destructiveHint": false,
+                                "openWorldHint": false,
+                            },
+                        })
+                    })
+                    .collect();
+                list.push(bootstrap_tool());
+                Ok(json!({ "tools": list }))
+            }
             "tools/call" => {
                 let name = params
                     .get("name")
                     .and_then(Value::as_str)
                     .unwrap_or_default();
                 let args = params.get("arguments").cloned().unwrap_or(Value::Null);
+                if name == BOOTSTRAP_TOOL {
+                    let (text, is_error) = match self.bootstrap_prompt(&args) {
+                        Ok(text) => (text, false),
+                        Err(e) => (e, true),
+                    };
+                    return Ok(
+                        json!({ "content": [{ "type": "text", "text": text }], "isError": is_error }),
+                    );
+                }
                 self.refresh();
                 let result = self.ws.call(name, args);
                 self.save_proposals();
@@ -388,6 +446,53 @@ impl Server {
         Ok(touched)
     }
 
+    /// Write a new story with this title: `story.yaml` and `rooms/start.yaml`.
+    /// Only when the folder holds no story, or only a new story that nobody changed.
+    pub fn bootstrap(&mut self, title: &str) -> Result<Vec<String>, Refusal> {
+        let files = read_sorted(&self.root).map_err(|e| Refusal::Io(e.to_string()))?;
+        if !is_empty_story(&files) {
+            return Err(Refusal::Conflict(
+                "The folder has a story already. Bootstrap works only in an empty folder or on a new story without changes."
+                    .into(),
+            ));
+        }
+        let mut written = Vec::new();
+        for f in lantern_project::scaffold(title) {
+            let path = self.root.join(&f.path);
+            if let Some(dir) = path.parent() {
+                std::fs::create_dir_all(dir).map_err(|e| Refusal::Io(e.to_string()))?;
+            }
+            std::fs::write(&path, &f.text).map_err(|e| Refusal::Io(format!("{}: {e}", f.path)))?;
+            written.push(f.path);
+        }
+        self.refresh();
+        Ok(written)
+    }
+
+    /// The MCP tool `bootstrap_project`: write the new story, then give the
+    /// `seed_story` request with its context, so that the assistant goes on with it.
+    fn bootstrap_prompt(&mut self, args: &Value) -> Result<String, String> {
+        let get = |k: &str| {
+            args.get(k)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+        };
+        let idea = get("idea").ok_or("`bootstrap_project` needs `idea`.")?;
+        self.bootstrap(get("title").unwrap_or("Untitled"))
+            .map_err(|e| e.to_string())?;
+        let mut seed = json!({ "idea": idea });
+        if let Some(rooms) = args.get("rooms").and_then(|r| {
+            r.as_u64()
+                .map(|n| n.to_string())
+                .or(r.as_str().map(str::to_string))
+        }) {
+            seed["rooms"] = json!(rooms);
+        }
+        let context = self.prompt_context("seed_story", &seed);
+        render_prompt_with_context("seed_story", &seed, Some(&context)).map_err(|e| e.0)
+    }
+
     /// Remove a proposal without a change to the project. A note says why, for the next request.
     pub fn reject(&mut self, id: &str, note: Option<&str>) -> Result<(), Refusal> {
         self.refresh();
@@ -405,6 +510,38 @@ impl Server {
             .and_then(|mut f| writeln!(f, "{line}"));
         written.map_err(|e| Refusal::Io(format!("cannot write {}: {e}", log.display())))
     }
+}
+
+const BOOTSTRAP_TOOL: &str = "bootstrap_project";
+
+fn bootstrap_tool() -> Value {
+    json!({
+        "name": BOOTSTRAP_TOOL,
+        "description": "Start a new story from an idea. Use it only on an empty folder, or on a new story that nobody changed. It writes story.yaml and rooms/start.yaml, then gives you the request to expand the idea into connected rooms as one proposal. Follow that request.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "idea": { "type": "string", "description": "The author's idea for the story." },
+                "title": { "type": "string", "description": "The title. Default \"Untitled\": then you give one." },
+                "rooms": { "type": "integer", "minimum": 2, "maximum": 3, "description": "How many rooms. Default 3." }
+            },
+            "required": ["idea"]
+        },
+        "annotations": { "readOnlyHint": false, "destructiveHint": false, "openWorldHint": false },
+    })
+}
+
+/// True when the files are no story, or only a new story without changes (any title).
+fn is_empty_story(files: &[lantern_project::SourceFile]) -> bool {
+    if !files.iter().any(|f| f.path == "story.yaml") {
+        return true;
+    }
+    let Ok(project) = lantern_project::load(files.to_vec()) else {
+        return false;
+    };
+    let mut fresh = lantern_project::scaffold(&project.story.title);
+    fresh.sort_by(|a, b| a.path.cmp(&b.path));
+    fresh == files
 }
 
 /// The project files in a fixed order, so that two reads of an unchanged folder compare equal.
@@ -444,6 +581,62 @@ mod tests {
     fn server() -> Server {
         Server::new(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse"))
             .unwrap()
+    }
+
+    /// A new empty folder in the temporary directory, removed first if it is there.
+    fn empty_folder(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("lantern-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn bootstrap_writes_a_new_story_and_refuses_a_changed_one() {
+        let dir = empty_folder("bootstrap");
+        let mut s = Server::new(dir.clone()).unwrap();
+        assert_eq!(
+            s.bootstrap("First").unwrap(),
+            ["story.yaml", "rooms/start.yaml"]
+        );
+        // An unchanged new story can start again, with another title.
+        s.bootstrap("Second").unwrap();
+        let story = std::fs::read_to_string(dir.join("story.yaml")).unwrap();
+        assert!(story.contains("\"Second\""), "{story}");
+        std::fs::write(dir.join("rooms/start.yaml"), "name: Changed\n").unwrap();
+        assert!(matches!(s.bootstrap("Third"), Err(Refusal::Conflict(_))));
+    }
+
+    #[test]
+    fn the_bootstrap_tool_gives_the_seed_request() {
+        let dir = empty_folder("bootstrap-tool");
+        let mut s = Server::new(dir).unwrap();
+        let list = send(
+            &mut s,
+            json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
+        )
+        .unwrap();
+        let names: Vec<&str> = list["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|t| t["name"].as_str())
+            .collect();
+        assert!(names.contains(&"bootstrap_project"));
+        let reply = send(
+            &mut s,
+            json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                    "params": { "name": "bootstrap_project", "arguments": { "idea": "A bell under the sea.", "rooms": 2 } } }),
+        )
+        .unwrap();
+        let text = reply["result"]["content"][0]["text"].as_str().unwrap();
+        assert_eq!(reply["result"]["isError"], false, "{text}");
+        assert!(text.contains("> A bell under the sea."));
+        assert!(text.contains("first 2 rooms"));
+        assert!(
+            text.contains("cursor blinking"),
+            "the context has the start room"
+        );
     }
 
     fn send(s: &mut Server, msg: Value) -> Option<Value> {

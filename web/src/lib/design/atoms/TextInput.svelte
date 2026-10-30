@@ -36,6 +36,7 @@
 		background: transparent;
 		color: var(--color-text-strong);
 		caret-color: var(--color-accent);
+		caret-shape: var(--caret-shape, auto);
 		font-family: var(--font-ui);
 		font-size: var(--font-size-lg);
 	}

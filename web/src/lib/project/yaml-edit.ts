@@ -225,3 +225,73 @@ function setScalar(node: Scalar, value: string) {
 	node.value = value;
 	if (node.type === Scalar.PLAIN && /^[\s{[&*!|>'"%@`#-]|: | #|\n/.test(value)) node.type = Scalar.QUOTE_DOUBLE;
 }
+
+/** A new author note: a plain note or a TODO. */
+export interface NoteData {
+	text: string;
+	todo: boolean;
+}
+
+/**
+ * The YAML path of a place that the loader names in its own form, for example
+ * `description[2].notes[0]` or `frames.look.before[1].notes[0]`.
+ */
+export function pathOf(at: string): YamlPath {
+	const path: YamlPath = [];
+	for (const part of at.split('.')) {
+		const m = part.match(/^([^[\]]+)((?:\[\d+\])*)$/);
+		if (!m) throw new EditError(`Cannot read the place ${at}.`);
+		path.push(m[1]);
+		for (const i of m[2].matchAll(/\[(\d+)\]/g)) path.push(Number(i[1]));
+	}
+	return path;
+}
+
+/**
+ * Add a note to the end of a `notes` list, for example `['notes']` of a room or
+ * `['description', 2, 'notes']` of one fragment. A fragment that is a plain string becomes a map first.
+ */
+export function addNote(text: string, notes: YamlPath, note: NoteData): string {
+	const doc = parse(text);
+	const owner = notes.slice(0, -1);
+	const index = owner.at(-1);
+	if (typeof index === 'number') asMap(doc, owner.slice(0, -1), index);
+	let seq = doc.getIn(notes, true);
+	if (seq == null) {
+		doc.setIn(notes, doc.createNode([]));
+		seq = doc.getIn(notes, true);
+	}
+	if (!isSeq(seq)) throw new EditError(`No list at ${notes.join('.')}.`);
+	if (seq.items.length === 0) seq.flow = false;
+	seq.items.push(noteNode(note));
+	return serialize(doc);
+}
+
+/** Mark a TODO as done, or as open again. */
+export function setNoteDone(text: string, note: YamlPath, done: boolean): string {
+	const doc = parse(text);
+	const node = doc.getIn(note, true);
+	if (!isMap(node) || !node.has('todo')) throw new EditError(`No TODO at ${note.join('.')}.`);
+	if (done) node.set('done', true);
+	else node.delete('done');
+	return serialize(doc);
+}
+
+/** Remove a note. An empty `notes` list goes too. */
+export function removeNote(text: string, note: YamlPath): string {
+	const doc = parse(text);
+	const list = note.slice(0, -1);
+	const index = note.at(-1);
+	const seq = doc.getIn(list, true);
+	if (!isSeq(seq) || typeof index !== 'number' || index >= seq.items.length) throw new EditError(`No note at ${note.join('.')}.`);
+	seq.items.splice(index, 1);
+	if (seq.items.length === 0) doc.deleteIn(list);
+	return serialize(doc);
+}
+
+function noteNode(note: NoteData) {
+	if (!note.todo) return quoted(note.text);
+	const map = new YAMLMap();
+	map.set('todo', quoted(note.text));
+	return map;
+}

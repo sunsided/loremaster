@@ -13,7 +13,7 @@ The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge
 | `crates/lantern-project` | The project folder format (one YAML file for each entity) and the checker. |
 | `crates/lantern-runtime` | The runtime: state, text assembly, rules and parser. It has no input or output of its own. |
 | `crates/lantern-wasm` | The WebAssembly bindings for the web app. Trunk builds them. |
-| `crates/lantern-cli` | The terminal player: `lantern play` and `lantern check`. Also `lantern mcp` and `lantern serve`. |
+| `crates/lantern-cli` | The terminal player: `lantern play` and `lantern check`. Also `lantern new`, `lantern mcp` and `lantern serve`. |
 | `crates/lantern-tools` | The operations that an AI assistant can do on a project: read, play and verify. It has no input or output of its own. |
 | `crates/lantern-mcp` | The MCP server for one project: `lantern mcp <project-folder>` on stdin and stdout, and `lantern serve <project-folder>` on local HTTP with the proposal and job endpoints for the editor. A job gives a task prompt (`imagine_exit`, `review_room`) to Claude Code. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |

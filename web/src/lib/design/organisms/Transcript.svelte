@@ -3,7 +3,8 @@
 	import type { Block, Run, Source } from '#lib/engine/types.ts';
 	import FragmentMarker from '../atoms/FragmentMarker.svelte';
 	import ProseLink from '../atoms/ProseLink.svelte';
-	import type { EffectsLevel, GhostLine, MarginInfo, ProposalSummary, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
+	import { lineReveal, revealLines } from '../reveal.ts';
+	import type { EffectsLevel, RevealMode, GhostLine, MarginInfo, ProposalSummary, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
 	import GhostText from '../atoms/GhostText.svelte';
 	import ProposalCard from '../molecules/ProposalCard.svelte';
 
@@ -17,6 +18,8 @@
 		focus?: number | null;
 		effects?: EffectsLevel;
 		reduceMotion?: boolean;
+		/** How new text appears with effects on: line by line (`lines`) or a paragraph at once (`blocks`). */
+		reveal?: RevealMode;
 		onthing: (id: string, name: string) => void;
 		onexit: (direction: string) => void;
 		onfocus?: (index: number | null) => void;
@@ -59,6 +62,7 @@
 		focus = null,
 		effects = 'off',
 		reduceMotion = true,
+		reveal = 'lines',
 		onthing,
 		onexit,
 		onfocus,
@@ -356,7 +360,10 @@
 			{@const writerAt = writeHere && writing ? writerAfter(entry.turn.blocks) : -1}
 			{@const addAt = writeHere && !writing && onadd ? lastRoomText(entry.turn.blocks) : -1}
 			{@const shown = shownBlocks(entry)}
-			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere} class:margined={writeHere && !!margin}>
+			<div
+				{@attach revealLines(fresh && reveal === 'lines' && entry.id > 0 ? lineReveal(effects, reduceMotion) : null)}
+				class="turn"
+				class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere} class:margined={writeHere && !!margin}>
 				{#if shown.from !== Infinity}<p class="visually-hidden">Preview of the room text in other values. The game did not move.</p>{/if}
 				{#each shown.blocks as block, bi (bi)}
 					{@const inPlace = !!editor && writeHere && editable(block.kind) && block.runs.some((r) => same(r.source, writing))}
@@ -373,8 +380,9 @@
 					<p
 						class="block {block.kind}"
 						class:previewed={bi >= shown.from && bi < shown.from + (preview?.length ?? 0)}
-						class:fx-line={fresh && entry.id > 0 && !writeHere}
-						style:animation-delay={fresh ? `${revealDelay(bi)}ms` : undefined}
+						class:fx-line={fresh && entry.id > 0 && !writeHere && reveal === 'blocks'}
+						data-reveal={fresh && entry.id > 0 && !writeHere && reveal === 'lines' ? '' : undefined}
+						style:animation-delay={fresh && reveal === 'blocks' ? `${revealDelay(bi)}ms` : undefined}
 					>{#if block.kind === 'command'}<span aria-hidden="true">&gt;&nbsp;</span><span class="visually-hidden"
 							>You typed:</span
 						>{:else if block.kind === 'author'}<span class="badge">author</span><span class="visually-hidden">:</span

@@ -41,6 +41,19 @@ pub fn prompts() -> Vec<PromptDef> {
             ],
         },
         PromptDef {
+            name: "seed_story",
+            description: "Expand the author's idea for a new story into 2 or 3 connected rooms, as one checked proposal with author notes and threads.",
+            arguments: &[
+                ("idea", "The author's idea for the story, free text.", true),
+                ("rooms", "How many rooms: 2 or 3. Default 3.", false),
+                (
+                    "rejected",
+                    "Ideas the author rejected before, one per line.",
+                    false,
+                ),
+            ],
+        },
+        PromptDef {
             name: "review_room",
             description: "Review one room in all its states and in its surroundings. Report findings and propose the clear fixes.",
             arguments: &[
@@ -60,6 +73,20 @@ pub fn prompts() -> Vec<PromptDef> {
 /// give the results with [`render_prompt_with_context`], which saves the
 /// assistant several turns.
 pub fn prompt_context(name: &str, args: &Value) -> Vec<(&'static str, &'static str, Value)> {
+    if name == "seed_story" {
+        return vec![
+            (
+                "The story file",
+                "read_file",
+                json!({ "path": "story.yaml" }),
+            ),
+            (
+                "The start room",
+                "read_file",
+                json!({ "path": "rooms/start.yaml" }),
+            ),
+        ];
+    }
     let room = args.get("room").cloned().unwrap_or(Value::Null);
     // The same session as the prompt text: an empty one is the default.
     let session = args
@@ -159,6 +186,45 @@ pub fn render_prompt_with_context(
                 context = with_context(context),
             ))
         }
+        "seed_story" => {
+            let idea = need("idea")?;
+            let rooms = match get("rooms") {
+                Some("2") => 2,
+                _ => 3,
+            };
+            let look = match context {
+                Some(_) => GIVEN.to_string(),
+                None => "Read `story.yaml` and `rooms/start.yaml` with `read_file`, and the guide resource lantern://guide/writing-stories.".to_string(),
+            };
+            let rejected = match get("rejected") {
+                Some(r) => format!(
+                    "\nThe author rejected these drafts before. Do not offer them again:\n{r}\n"
+                ),
+                None => String::new(),
+            };
+            Ok(format!(
+                "The author starts a new story. The project is the empty start: `story.yaml` and one room `rooms/start.yaml` with a placeholder text. Expand this idea into the first {rooms} rooms of the story:\n\
+                 \n\
+                 > {idea}\n\
+                 \n\
+                 Work fast: the author waits for the reply. Use few tool calls and do not test how the engine works.\n\
+                 \n\
+                 1. {look}\n\
+                 2. Make one proposal with `propose`. It has:\n\
+                 - `story.yaml`: keep the title when it is not \"Untitled\"; else give a title. Write an `intro` of 1 or 2 sentences. Add at most 2 variables, only if the rooms use them.\n\
+                 - `rooms/start.yaml`: replace the placeholder with the first room of the story. Keep the file name and `start: start`, and give the room a real `name`.\n\
+                 - {more} more rooms in `rooms/`. Connect all rooms with exits in both directions, and give each room a map `position` ([x, y], neighbours one step apart). One exit can be locked, hidden or conditional, so that the player has a first small goal.\n\
+                 - At most 2 things in `things/`. The room text names each one with markup, for example `{{brass_key.the}}`. Give such a thing `listed: false`, so that the game does not add a line \"There is … here.\" for it.\n\
+                 - Author notes: the premise as a note in `story.yaml`, one `todo` in each room for a decision that the author must make, and 1 or 2 open threads in `threads/` that the idea suggests, each with a `setup` note on the fragment that plants it. Do not resolve the threads.\n\
+                 3. Match the tone and the period of the idea. Keep the texts short: 2 to 4 sentences for each room.\n\
+                 4. The proposal must have `ok: true`. If it has problems, make a fixed one and withdraw the old one. Do not play it: the author does that.\n\
+                 {rejected}\n\
+                 {terse}Reply with the proposal id, then one line for each room: its name and a pitch of at most 15 words.{context}",
+                more = rooms - 1,
+                terse = TERSE,
+                context = with_context(context),
+            ))
+        }
         "review_room" => {
             let room = need("room")?;
             let look = match context {
@@ -253,6 +319,19 @@ mod tests {
                 .iter()
                 .any(|c| c.1 == "scene" && c.2["session"] == crate::DEFAULT_SESSION)
         );
+    }
+
+    #[test]
+    fn seed_story_has_the_idea_and_the_room_count() {
+        let args = json!({ "idea": "A drowned bell rings at low tide.", "rooms": "2" });
+        let text = render_prompt("seed_story", &args).unwrap();
+        assert!(text.contains("> A drowned bell rings at low tide."));
+        assert!(text.contains("first 2 rooms"));
+        assert!(text.contains("- 1 more rooms"));
+        assert!(text.contains("threads/"));
+        let calls = prompt_context("seed_story", &args);
+        assert!(calls.iter().all(|c| c.1 == "read_file"));
+        assert!(render_prompt("seed_story", &json!({})).is_err());
     }
 
     #[test]

@@ -20,6 +20,8 @@ export interface ActionItem {
 export type Theme = 'phosphor' | 'night' | 'paper';
 export type EffectsLevel = 'full' | 'subtle' | 'off';
 export type MotionPreference = 'system' | 'reduce';
+/** How new game text appears: `lines` types it line by line, `blocks` wipes each paragraph at once. */
+export type RevealMode = 'lines' | 'blocks';
 
 export interface TranscriptEntry {
 	id: number;
@@ -194,4 +196,18 @@ export interface GhostLine {
 	before: number | null;
 	/** The new text, for `added` and `changed`. */
 	text: string;
+}
+
+/** An author note or TODO in a list. */
+export interface NoteItem {
+	/** A stable key, for example `rooms/shore.yaml#notes[1]`. */
+	key: string;
+	text: string;
+	todo: boolean;
+	done: boolean;
+	/** Where the note is, for example "The Shore" or "fragment 2". Leave it out where it is clear. */
+	where?: string;
+	/** The thread that the note is a beat of. */
+	thread?: string | null;
+	role?: 'setup' | 'payoff' | 'mention' | null;
 }

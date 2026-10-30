@@ -65,6 +65,11 @@ export class Workspace {
 		return null;
 	}
 
+	/** Start a new game on the files now, for example after the first rooms of a new story came in. */
+	async restart() {
+		await this.#start(this.project.files);
+	}
+
 	/** Link a folder on disk and play the story in it. */
 	async linkFolder() {
 		await this.#start(await this.project.linkFolder());

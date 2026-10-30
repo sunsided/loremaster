@@ -1,4 +1,4 @@
-use crate::Id;
+use crate::{Id, Note};
 use serde::{Deserialize, Serialize};
 
 /// Where a fragment sits when a description is assembled. Layers are
@@ -54,6 +54,8 @@ pub struct Fragment {
     pub layer: Layer,
     /// When visible, hide the fragments before it in the same layer.
     pub replaces: bool,
+    /// Author notes on this one fragment, for example the setup of a thread.
+    pub notes: Vec<Note>,
 }
 
 impl Fragment {
@@ -65,6 +67,7 @@ impl Fragment {
             mode: FragmentMode::Always,
             layer: Layer::Base,
             replaces: false,
+            notes: Vec::new(),
         }
     }
 }
@@ -93,6 +96,8 @@ struct FragmentFull {
     layer: Layer,
     #[serde(default, skip_serializing_if = "is_default")]
     replaces: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notes: Vec<Note>,
 }
 
 fn is_default<T: Default + PartialEq>(value: &T) -> bool {
@@ -115,6 +120,7 @@ impl From<FragmentRepr> for Fragment {
                     mode: f.mode,
                     layer: f.layer,
                     replaces: f.replaces,
+                    notes: f.notes,
                 }
             }
         }
@@ -128,6 +134,7 @@ impl From<Fragment> for FragmentRepr {
             && f.mode == FragmentMode::Always
             && f.layer == Layer::Base
             && !f.replaces
+            && f.notes.is_empty()
             && f.variants.len() == 1;
         if plain {
             return FragmentRepr::Plain(f.variants.into_iter().next().unwrap_or_default());
@@ -145,6 +152,7 @@ impl From<Fragment> for FragmentRepr {
             mode: f.mode,
             layer: f.layer,
             replaces: f.replaces,
+            notes: f.notes,
         })
     }
 }

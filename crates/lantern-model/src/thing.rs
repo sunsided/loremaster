@@ -1,4 +1,4 @@
-use crate::{Fragment, Frames, Id, Value};
+use crate::{Fragment, Frames, Id, Note, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -50,6 +50,9 @@ pub struct Thing {
     /// Author text around the responses to verbs used on this thing.
     #[serde(default, skip_serializing_if = "Frames::is_empty")]
     pub frames: Frames,
+    /// Author notes. The player never sees them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<Note>,
 }
 
 /// One stage of a thing's name, for example "shadow", then "grim-looking man",

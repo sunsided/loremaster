@@ -12,14 +12,15 @@
 		title: 'Molecules/AiStatus',
 		component: AiStatus,
 		tags: ['autodocs'],
-		args: { jobs, differ: null, onreview: fn(), oncancel: fn(), onlink: fn(), onproposals: fn() },
+		args: { jobs, differ: null, onreview: fn(), oncancel: fn(), onlink: fn(), onproposals: fn(), onagain: fn() },
 		parameters: {
 			docs: {
 				description: {
 					component: `The AI section of the Here panel. It shows only while \`lantern serve\` runs.
 
 - **Review this room** starts the job \`review_room\` for the current room. The job plays from the state of the editor.
-- **The jobs**: what Claude Code does now ("Draft an exit", "Review the room"), what for, the time, the proposals it made and the cost. A running job has Cancel.
+- **The jobs**: what Claude Code does now ("Draft an exit", "Review the room", "Draft the first rooms"), what for, the time, the proposals it made and the cost. A running job has Cancel.
+- **Another take**: the draft of a new story can run again while its proposal is open. The button shows the cost of the last job, so that the author decides.
 - **A warning** when the server reads other files than the editor (the editor keeps a working copy in the browser; the server reads the folder on disk). Proposals for those files cannot be accepted. "Open the story folder" links the folder, so both use the same files.`
 				}
 			}
@@ -28,4 +29,21 @@
 </script>
 
 <Story name="Jobs" />
+<Story
+	name="New story draft"
+	args={{
+		jobs: [
+			{
+				id: 'j1',
+				task: 'seed_story',
+				about: 'A lighthouse keeper writes letters to a ship that sank.',
+				status: 'done' as const,
+				seconds: 0,
+				cost: 0.26,
+				proposals: 1,
+				again: true
+			}
+		]
+	}}
+/>
 <Story name="Files differ" args={{ jobs: [], differ: ['rooms/shore.yaml'] }} />

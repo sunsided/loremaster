@@ -1,4 +1,4 @@
-import init, { Engine as WasmEngine } from './pkg/lantern-wasm.js';
+import init, { Engine as WasmEngine, newStory as wasmNewStory, projectNotes, projectThreads } from './pkg/lantern-wasm.js';
 import type {
 	AuthorCommand,
 	AtlasRoom,
@@ -7,6 +7,8 @@ import type {
 	FrameUse,
 	MarkupCheck,
 	Inspect,
+	NoteRef,
+	ThreadView,
 	PhaseView,
 	VarView,
 	Command,
@@ -30,6 +32,24 @@ let ready: Promise<unknown> | undefined;
 export function loadEngine(): Promise<unknown> {
 	ready ??= init();
 	return ready;
+}
+
+/** The files of a new story with this title: `story.yaml` and one start room. */
+export async function newStory(title: string): Promise<SourceFile[]> {
+	await loadEngine();
+	return wasmNewStory(title) as SourceFile[];
+}
+
+/** All author notes of the files, with their place. Empty when the files do not load. */
+export async function notesOf(files: SourceFile[]): Promise<NoteRef[]> {
+	await loadEngine();
+	return projectNotes(files) as NoteRef[];
+}
+
+/** All threads of the files, with their beats. Empty when the files do not load. */
+export async function threadsOf(files: SourceFile[]): Promise<ThreadView[]> {
+	await loadEngine();
+	return projectThreads(files) as ThreadView[];
 }
 
 /** Thrown when a project has errors; carries the diagnostics. */

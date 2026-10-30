@@ -1,5 +1,7 @@
 use crate::{Diagnostic, Severity};
-use lantern_model::{ClockConfig, Fragment, Id, Room, Rule, Story, Thing, VarDef, VerbDef};
+use lantern_model::{
+    ClockConfig, Fragment, Id, Note, Room, Rule, Story, Thing, Thread, VarDef, VerbDef,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -45,6 +47,8 @@ struct StoryFile {
     frames: lantern_model::Frames,
     #[serde(default)]
     seed: u64,
+    #[serde(default)]
+    notes: Vec<Note>,
 }
 
 /// Load a project from its files. Paths use `/` and are relative to the
@@ -56,6 +60,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut rooms = Vec::new();
     let mut things = Vec::new();
     let mut rules = Vec::new();
+    let mut threads = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -86,6 +91,15 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                 }
                 Err(e) => errors.push(parse_err(e)),
             },
+            "threads" => {
+                match serde_saphyr::from_str::<Thread>(&with_default_id(&file.text, stem)) {
+                    Ok(t) => {
+                        origins.insert(format!("thread:{}", t.id), path.to_string());
+                        threads.push(t);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                }
+            }
             "rules" => {
                 let parsed = if file.text.trim_start().starts_with('-') {
                     serde_saphyr::from_str::<Vec<Rule>>(&file.text)
@@ -134,6 +148,8 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         rules,
         frames: header.frames,
         seed: header.seed,
+        notes: header.notes,
+        threads,
     };
     Ok(Project {
         story,

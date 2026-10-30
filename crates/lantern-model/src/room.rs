@@ -1,4 +1,4 @@
-use crate::{Fragment, Frames, Id};
+use crate::{Fragment, Frames, Id, Note};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -26,6 +26,9 @@ pub struct Room {
     /// Author text around the responses to verbs in this room.
     #[serde(default, skip_serializing_if = "Frames::is_empty")]
     pub frames: Frames,
+    /// Author notes. The player never sees them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<Note>,
 }
 
 impl Room {

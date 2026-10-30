@@ -1,14 +1,14 @@
-//! `lantern play <dir>`, `lantern check <dir>`, `lantern explore <dir>` and
-//! `lantern mcp <dir>` and `lantern serve <dir> [--port N]`.
+//! `lantern new <dir> [--title T] [--idea I]`, `lantern play <dir>`, `lantern check <dir> [--todos]`,
+//! `lantern explore <dir>`, `lantern mcp <dir>` and `lantern serve <dir | --bootstrap> [--port N]`.
 
-use lantern_project::{Project, Severity, check, load, read_dir};
+use lantern_project::{Project, Severity, check, load, open_todos, read_dir};
 use lantern_runtime::{BlockKind, Budget, Game, Turn, World};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern serve <project-folder> [--port N]";
+const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       lantern check <project-folder> --todos\n       lantern serve <project-folder | --bootstrap> [--port N]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -16,6 +16,25 @@ fn main() -> ExitCode {
         eprintln!("{USAGE}");
         return ExitCode::from(2);
     };
+    if cmd == "new" {
+        let (mut title, mut idea) = ("Untitled", None);
+        let mut rest = args[2..].chunks(2);
+        for pair in rest.by_ref() {
+            match pair {
+                [flag, value] if flag == "--title" => title = value,
+                [flag, value] if flag == "--idea" => idea = Some(value.as_str()),
+                _ => {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                }
+            }
+        }
+        let made = new_story(Path::new(dir), title);
+        return match idea {
+            Some(idea) if made == ExitCode::SUCCESS => seed(Path::new(dir), idea),
+            _ => made,
+        };
+    }
     // The MCP server owns stdout and also serves a project with errors, so it skips `open`.
     if cmd == "mcp" {
         return match lantern_mcp::serve_stdio(Path::new(dir)) {
@@ -41,7 +60,17 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         };
-        return match lantern_mcp::http::serve_http(Path::new(dir), port) {
+        // `--bootstrap`: a new folder in the temporary directory, for a story that starts in the editor.
+        let folder = if dir == "--bootstrap" {
+            std::env::temp_dir().join(format!("lantern-bootstrap-{}", std::process::id()))
+        } else {
+            Path::new(dir).to_path_buf()
+        };
+        if let Err(e) = std::fs::create_dir_all(&folder) {
+            eprintln!("error: cannot make {}: {e}", folder.display());
+            return ExitCode::FAILURE;
+        }
+        return match lantern_mcp::http::serve_http(&folder, port) {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 eprintln!("error: {e}");
@@ -53,6 +82,15 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     match cmd.as_str() {
+        "check" if args.get(2).is_some_and(|a| a == "--todos") => {
+            let todos = open_todos(&project);
+            for t in &todos {
+                let line = t.line.map(|l| format!(":{l}")).unwrap_or_default();
+                println!("{}{line} ({}): {}", t.file, t.at, t.note.text);
+            }
+            println!("{} open TODO(s).", todos.len());
+            ExitCode::SUCCESS
+        }
         "check" => {
             let n = project.story.rooms.len();
             println!(
@@ -68,6 +106,68 @@ fn main() -> ExitCode {
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
+        }
+    }
+}
+
+/// Write the files of a new story into a folder. The folder must not hold a story yet.
+fn new_story(dir: &Path, title: &str) -> ExitCode {
+    if dir.join("story.yaml").exists() {
+        eprintln!("error: {} has a story.yaml already", dir.display());
+        return ExitCode::FAILURE;
+    }
+    for file in lantern_project::scaffold(title) {
+        let path = dir.join(&file.path);
+        let written = path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| std::fs::write(&path, &file.text));
+        if let Err(e) = written {
+            eprintln!("error: cannot write {}: {e}", path.display());
+            return ExitCode::FAILURE;
+        }
+    }
+    println!(
+        "New story in {}. Play it with `lantern play {}`.",
+        dir.display(),
+        dir.display()
+    );
+    ExitCode::SUCCESS
+}
+
+/// Let the AI expand an idea into the first rooms of the new story in `dir`, as a proposal.
+fn seed(dir: &Path, idea: &str) -> ExitCode {
+    println!("✦ Drafting the first rooms with AI…");
+    let job = lantern_mcp::seed_folder(dir, idea, |e| {
+        if e.kind != "text" {
+            println!("  {}: {}", e.kind, e.text);
+        }
+    });
+    match job {
+        Ok(job) if !job.proposals.is_empty() => {
+            if let Some(result) = &job.result {
+                println!("\n{}", result.trim());
+            }
+            if let Some(cost) = job.cost_usd {
+                println!("\nCost: about ${cost:.2} (an estimate with a Claude plan login).");
+            }
+            println!(
+                "\nProposal {} is ready. Start `lantern serve {}` and accept it in the editor.",
+                job.proposals.join(", "),
+                dir.display()
+            );
+            ExitCode::SUCCESS
+        }
+        Ok(job) => {
+            eprintln!(
+                "error: the AI made no proposal ({:?}). The story stays empty.",
+                job.status
+            );
+            ExitCode::FAILURE
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::FAILURE
         }
     }
 }

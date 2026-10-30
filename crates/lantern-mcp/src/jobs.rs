@@ -141,6 +141,17 @@ impl Jobs {
         }
     }
 
+    /// Jobs whose agent starts its own `lantern mcp <folder>` on stdio, for a
+    /// command line run without `lantern serve`.
+    pub fn stdio(agent: Agent, program: &str, folder: &str) -> Self {
+        let mut jobs = Self::new(agent, "");
+        jobs.mcp_config = serde_json::json!({
+            "mcpServers": { "lantern": { "type": "stdio", "command": program, "args": ["mcp", folder] } }
+        })
+        .to_string();
+        jobs
+    }
+
     /// The id the next job gets, so the caller can prepare its play session first.
     pub fn next_id(&self) -> String {
         format!("j{}", self.next)

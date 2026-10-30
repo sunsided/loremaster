@@ -12,6 +12,9 @@ There are two servers. Both serve the same tools.
 | --- | --- | --- |
 | `lantern mcp <project-folder>` | stdin and stdout | One assistant uses the project. The assistant starts the server. |
 | `lantern serve <project-folder> [--port N]` | HTTP on `127.0.0.1`, port 4710 by default | The editor and one or more assistants use the project at the same time. You start the server. |
+| `lantern serve --bootstrap [--port N]` | The same | You start a new story in the editor and want the AI to draft it. The server uses a new empty folder in the temporary directory. |
+
+If the folder does not exist, `lantern serve` makes it.
 
 ```sh
 cargo build --release -p lantern-cli
@@ -79,6 +82,7 @@ A task prompt is a request for one task. The editor and MCP clients use the same
 | Prompt | Arguments | What the assistant does |
 | --- | --- | --- |
 | `imagine_exit` | `room`, `direction`. Optional: `session`, `rejected`. | The player tried to go in a direction that has no exit. The assistant makes 3 proposals of different kinds, for example a new room, a hidden exit or a scenery thing. It replies with one line for each proposal: the id and a short pitch. |
+| `seed_story` | `idea`. Optional: `rooms` (2 or 3, the default is 3), `rejected`. | The project is a new story. The assistant expands the idea into the first rooms, as one proposal: `story.yaml` with a title, an intro and the premise as a note, the rooms with exits in both directions and map positions, at most 2 things, one TODO in each room, and 1 or 2 open threads with their setup notes. It replies with the proposal id and one line for each room. |
 | `review_room` | `room`. Optional: `session`. | The assistant reads the room in all its states and in its surroundings. It replies with a list of findings: the fragment, how serious the problem is, the problem and the fix. It makes one proposal for the clear fixes. |
 
 `session` is the play session that has the state of the player. The default is `main`. The assistant does not change this session. `rejected` is a list of ideas that the author rejected before, one on each line. The assistant does not offer these ideas again.
@@ -89,6 +93,20 @@ An MCP client gets the prompts with `prompts/list`. It gets the text of one prom
 { "jsonrpc": "2.0", "id": 1, "method": "prompts/get",
   "params": { "name": "imagine_exit", "arguments": { "room": "shore", "direction": "down" } } }
 ```
+
+## Start a new story with AI
+
+You can start a story from an idea. The AI writes the first 2 or 3 rooms as one proposal. You accept it or reject it.
+
+| Where | How |
+| --- | --- |
+| Terminal | `lantern new <folder> --title "The Drowned Bell" --idea "A church bell sank in a storm. At low tide it still rings."` The command writes the new story, runs the job and tells you the proposal id. Then start `lantern serve <folder>` and accept the proposal in the editor. |
+| Editor | Start `lantern serve --bootstrap`. In the editor, select "New story…", type the title and the idea, then select "Create and draft with AI". When the proposal comes, open Atlas › Proposals and select "Accept". The server also writes the files into its folder, and the game starts again from the intro. |
+| MCP client | Call the tool `bootstrap_project` with `idea` (and `title`, `rooms` if you want). It writes the new story, then gives the `seed_story` request. The assistant follows the request. |
+
+Bootstrap works only on a folder that has no story, or that has only a new story without changes. Else it refuses, and no file changes.
+
+A job takes approximately 1 minute. At the `low` effort level, a test run cost approximately $0.26, as an estimate with a Claude plan login. "✦ Another take" in the editor starts one more job; each job has its own cost.
 
 ## Jobs
 
@@ -113,7 +131,7 @@ The body of `POST /jobs` has these fields:
 | `state` | Optional. A state that the editor saved. The server starts a new session `job-<id>` from this state, and the job uses that session. |
 | `model` | Optional. The model for this job, for example `sonnet`. It replaces `LANTERN_CLAUDE_MODEL`. |
 
-For `imagine_exit`, if `args` has no `rejected`, the server adds the last 20 rejected proposals from `.lantern/rejected.jsonl`.
+For `imagine_exit` and `seed_story`, if `args` has no `rejected`, the server adds the last 20 rejected proposals from `.lantern/rejected.jsonl`.
 
 Before the server starts the agent, it gets the context of the task and puts it in the prompt: `story.yaml`, the room file, the neighbours (1 hop) and the scene of the session. For `imagine_exit` it also gives the variables. For `review_room` it also gives the room matrix. The writing guide is in the prompt too. Thus the agent does not use turns to get them. An MCP client that uses `prompts/get` does not get this context. The prompt then tells the assistant to get it with the tools.
 
@@ -148,7 +166,7 @@ If the project has errors, the read tools and `check` still work. The play tools
 
 ## Proposals
 
-A proposal is a change that an assistant suggests. It contains whole files: new or changed files with their full text, and the paths of files to delete. It can only touch `story.yaml` and the files in `rooms/`, `things/` and `rules/`.
+A proposal is a change that an assistant suggests. It contains whole files: new or changed files with their full text, and the paths of files to delete. It can only touch `story.yaml` and the files in `rooms/`, `things/`, `rules/` and `threads/`.
 
 `propose` takes the changes in two forms:
 
@@ -193,7 +211,7 @@ A `fragment` change has these fields:
 | `fragment_id` | The `id` of the fragment, if it has one. |
 | `before_index`, `after_index` | The index of the fragment in the list before and after. Together with `owner`, an index finds the runs in the transcript. |
 | `before`, `after` | The fragment as YAML gives it: a string or a map. An added fragment has no `before`. A removed fragment has no `after`. |
-| `before_fragment`, `after_fragment` | The same fragments in one form: `{ id, variants, when, mode, layer, replaces }`. |
+| `before_fragment`, `after_fragment` | The same fragments in one form: `{ id, variants, when, mode, layer, replaces, notes }`. |
 
 The values are the YAML values as JSON.
 
@@ -216,5 +234,6 @@ To play a proposal before you accept it, use `session_start` with `proposal`.
 | `GET /jobs` | Gives all jobs. |
 | `GET /jobs/<id>` | Gives one job, with its status, events, result and proposals. |
 | `POST /jobs/<id>/cancel` | Stops a running job. |
+| `POST /bootstrap` | Starts a new story from an idea. The body is `{ "title": "...", "idea": "...", "rooms": 3 }`; `title`, `rooms` and `model` are optional. The server writes the new story (the same files as `lantern new`), then starts a `seed_story` job. The reply is `{ "id": "j1" }` with status 202. When the folder has a story, the reply has status 409. |
 
 The server accepts requests only from `127.0.0.1`. A request from a browser must come from a page on `localhost`, `127.0.0.1` or `[::1]`. A `POST` must have `Content-Type: application/json`.
