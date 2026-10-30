@@ -9,7 +9,7 @@
 		entries: TranscriptEntry[];
 		/** The current room id. Fragment numbers show for this room only. */
 		room: string;
-		/** Show fragment numbers before room text. */
+		/** Show fragment numbers before room text. The app shows them in write mode only. */
 		showSources?: boolean;
 		/** The highlighted fragment index, or null. */
 		focus?: number | null;

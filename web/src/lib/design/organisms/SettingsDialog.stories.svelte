@@ -10,7 +10,7 @@
 		parameters: {
 			docs: {
 				description: {
-					component: `The settings dialog sets the theme, the visual effects, the motion and the fragment numbers.
+					component: `The settings dialog sets the theme, the visual effects, the motion and the author tooltips.
 
 It is a modal \`dialog\`. When it opens, focus goes into the dialog and stays there. Escape closes it. When it closes, focus goes back to the button that opened it.
 
@@ -32,11 +32,10 @@ The app keeps these settings in the browser storage of the user.`
 	let theme = $state<'phosphor' | 'night' | 'paper'>('phosphor');
 	let effects = $state<'full' | 'subtle' | 'off'>('full');
 	let motion = $state<'system' | 'reduce'>('system');
-	let sources = $state(true);
 </script>
 
 <Story name="Open from a button" asChild>
 	<Button aria-haspopup="dialog" aria-expanded={open} onclick={() => (open = true)}>Look and motion</Button>
-	<p>Theme: {theme} · effects: {effects} · motion: {motion} · numbers: {sources ? 'on' : 'off'}</p>
-	<SettingsDialog bind:open bind:theme bind:effects bind:motion bind:sources />
+	<p>Theme: {theme} · effects: {effects} · motion: {motion}</p>
+	<SettingsDialog bind:open bind:theme bind:effects bind:motion />
 </Story>

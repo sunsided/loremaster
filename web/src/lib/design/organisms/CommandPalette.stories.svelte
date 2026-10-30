@@ -25,7 +25,7 @@ The app gives these groups:
 - **Rules**: show a rule card in the Rules tab and move focus to it.
 - **States**: set a flag to its other value, or set an enum variable to a value.
 - **Time**: set the time to the start of a phase.
-- **Look** and **Game**: theme, effects, fragment numbers, settings and restart.
+- **Look** and **Game**: theme, effects, tooltips, settings and restart.
 - **Play**: the last item runs the search text as a typed command.
 
 Each word of the search must be in the action text. The best match is first. Actions that change the game state show in the transcript as "(author)" lines and in the Story tab.

@@ -20,6 +20,6 @@ Use \`hint\` for a short fact after the label, such as the current system settin
 	});
 </script>
 
-<Story name="Checked">Show fragment numbers in the transcript</Story>
-<Story name="Unchecked" args={{ checked: false }}>Show fragment numbers in the transcript</Story>
+<Story name="Checked">Show author tooltips on things and exits</Story>
+<Story name="Unchecked" args={{ checked: false }}>Show author tooltips on things and exits</Story>
 <Story name="With hint" args={{ hint: '(now: on)' }}>Reveal new text line by line</Story>

@@ -3,11 +3,11 @@
 	import { fn } from 'storybook/test';
 	import AppHeader from './AppHeader.svelte';
 
-	const views = [
-		{ id: 'play', label: 'Play and write' },
-		{ id: 'map', label: 'Map', disabled: true },
-		{ id: 'story', label: 'Story', disabled: true },
-		{ id: 'rules', label: 'Rules', disabled: true }
+	const projectItems = [
+		{ id: 'folder', label: 'Open a story folder on disk', run: fn(), group: 'Files' },
+		{ id: 'export', label: 'Export the story as a zip file', run: fn(), group: 'Files' },
+		{ id: 'import', label: 'Import a story from a zip file', run: fn(), group: 'Files' },
+		{ id: 'cantina', label: 'Open the example “cantina”', run: fn(), group: 'Examples' }
 	];
 
 	const { Story } = defineMeta({
@@ -16,30 +16,33 @@
 		tags: ['autodocs'],
 		args: {
 			title: 'The Lighthouse',
-			views,
-			current: 'play',
-			now: ['day 1 · 20:30 · dusk', 'The Shore'],
+			saved: 'saved in browser',
+			projectItems,
+			mode: 'play',
+			onmode: fn(),
 			settingsOpen: false,
-			onview: fn(),
-			onsettings: fn()
+			onsettings: fn(),
+			onpalette: fn()
 		},
 		parameters: {
 			layout: 'fullscreen',
 			docs: {
 				description: {
-					component: `The app header shows the story title, the views and the state of the game now.
+					component: `The app header has four things:
 
-The page has one view now, so it passes no views. The views are for later top-level views, such as a project list. They are a \`nav\` list. The current view has \`aria-current="page"\`. A view that is not available yet is disabled.
-The "now" tags show facts, not controls.
-The "Look and motion" button opens the settings dialog. It has \`aria-haspopup="dialog"\` and \`aria-expanded\`.
+1. The **project menu**: the story title with a ▾. It opens the file actions (story folder, zip export and import, back to the bundled example) and the other examples. Next to it, a dot and a few words tell where the changes go, for example "saved in browser". The dot is in the warning colour when the author must act, for example to give folder access again.
+2. The **Play / Write switch** (ModeSwitch). Ctrl+E (Cmd+E) switches from anywhere.
+3. The **Commands** icon button (⌘). It opens the command palette, also with Ctrl+K.
+4. The **Look and motion** icon button (gear). It opens the settings dialog.
 
-On narrow screens the header wraps to more lines.`
+The state of the game (room, time, turn) is not in the header. It is in the status line of the screen (StatusLine).
+On a phone the header fits in one row.`
 				}
 			}
 		}
 	});
 </script>
 
-<Story name="Default" args={{ views: [], current: '' }} />
-<Story name="With views" />
-<Story name="Before the game starts" args={{ now: [] }} />
+<Story name="Play" />
+<Story name="Write" args={{ mode: 'write', saved: 'edited, saved in browser' }} />
+<Story name="Folder needs access" args={{ saved: 'folder needs access', savedState: 'attention' }} />

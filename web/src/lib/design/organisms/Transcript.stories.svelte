@@ -39,7 +39,7 @@ The **room brief** is one line under the newest turn: the room, the things here 
 
 Screen-reader labels, such as "You typed:", are not part of copied text.
 
-When "Show sources" is on, text from an action frame has a small "frame" mark before it. The mark has a title that names the frame, for example "story frame for look, before".
+When \`showSources\` is on (in the app: in write mode), text from an action frame has a small "frame" mark before it. The mark has a title that names the frame, for example "story frame for look, before".
 
 Two kinds of text are not story prose, and they look different:
 - A **parser note**, such as "(first opening the cottage door)", tells the player about a step that the game did by itself. It is small, italic and muted, in the interface font.

@@ -16,9 +16,8 @@
 	import { examples } from '#lib/engine/example.ts';
 	import { settings } from '#lib/settings.svelte.ts';
 	import Button from '#lib/design/atoms/Button.svelte';
-	import Checkbox from '#lib/design/atoms/Checkbox.svelte';
 	import CommandPrompt from '#lib/design/molecules/CommandPrompt.svelte';
-	import StatusBar from '#lib/design/molecules/StatusBar.svelte';
+	import StatusLine from '#lib/design/organisms/StatusLine.svelte';
 	import AppHeader from '#lib/design/organisms/AppHeader.svelte';
 	import AssemblyPanel from '#lib/design/organisms/AssemblyPanel.svelte';
 	import MapPanel from '#lib/design/organisms/MapPanel.svelte';
@@ -34,7 +33,7 @@
 	import ExplorerView from '#lib/design/organisms/ExplorerView.svelte';
 	import type { Exploration } from '#lib/engine/types.ts';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
-	import type { PaletteItem, TabItem } from '#lib/design/types.ts';
+	import type { MenuItem, PaletteItem, TabItem } from '#lib/design/types.ts';
 
 	let workspace: Workspace | undefined = $state();
 	const session = $derived(workspace?.session ?? undefined);
@@ -129,6 +128,28 @@
 		prompt?.focus();
 	}
 
+	/** The project menu in the header: files, and the other examples. The command palette has them too. */
+	const projectItems = $derived.by<MenuItem[]>(() => {
+		const ws = workspace;
+		if (!ws) return [];
+		const p = ws.project;
+		const items: MenuItem[] = [];
+		if (canLinkFolder()) {
+			if (p.storage === 'folder-locked')
+				items.push({ id: 'files-reconnect', group: 'Files', label: `Give access to the folder “${p.folderName}” again`, run: () => fileAction(() => ws.reconnect()) });
+			if (p.storage === 'folder')
+				items.push({ id: 'files-unlink', group: 'Files', label: `Stop saving to the folder “${p.folderName}”`, run: () => fileAction(() => ws.unlinkFolder()) });
+			else items.push({ id: 'files-link', group: 'Files', label: 'Open a story folder on disk', run: () => fileAction(() => ws.linkFolder()) });
+		}
+		items.push({ id: 'files-export', group: 'Files', label: 'Export the story as a zip file', run: () => exportZip(ws) });
+		items.push({ id: 'files-import', group: 'Files', label: 'Import a story from a zip file', run: () => zipInput?.click() });
+		if (p.edited || p.storage === 'folder')
+			items.push({ id: 'files-reset', group: 'Files', label: `Go back to the bundled example “${p.name}”`, run: () => fileAction(() => ws.reset()) });
+		for (const name of Object.keys(examples).filter((n) => n !== storyName))
+			items.push({ id: `story-${name}`, group: 'Examples', label: `Open the example “${name}”`, run: () => openStory(name) });
+		return items;
+	});
+
 	/** Everything the command palette can do, built from the game state now. */
 	const paletteItems = $derived.by<PaletteItem[]>(() => {
 		const s = session;
@@ -200,12 +221,6 @@
 			items.push({ id: `fx-${level}`, group: 'Look', label: `Effects: ${level}`, run: () => (settings.effects = level) });
 		}
 		items.push({
-			id: 'sources',
-			group: 'Look',
-			label: settings.sources ? 'Hide fragment numbers' : 'Show fragment numbers',
-			run: () => (settings.sources = !settings.sources)
-		});
-		items.push({
 			id: 'tooltips',
 			group: 'Look',
 			label: settings.tooltips ? 'Hide author tooltips' : 'Show author tooltips',
@@ -213,33 +228,11 @@
 		});
 		items.push({ id: 'settings', group: 'Look', label: 'Open look and motion settings', run: () => (showSettings = true) });
 		items.push({ id: 'restart', group: 'Game', label: 'Restart the game', run: () => s.restart() });
-		const ws = workspace!;
-		const p = ws.project;
-		if (canLinkFolder()) {
-			if (p.storage === 'folder-locked')
-				items.push({ id: 'files-reconnect', group: 'Files', label: `Give access to the folder “${p.folderName}” again`, run: () => fileAction(() => ws.reconnect()) });
-			if (p.storage === 'folder')
-				items.push({ id: 'files-unlink', group: 'Files', label: `Stop saving to the folder “${p.folderName}”`, run: () => fileAction(() => ws.unlinkFolder()) });
-			else
-				items.push({ id: 'files-link', group: 'Files', label: 'Open a story folder on disk', keywords: 'link save directory', run: () => fileAction(() => ws.linkFolder()) });
-		}
 		items.push({ id: 'write-toggle', group: 'Write', label: writing ? 'Stop writing' : 'Write in the game', keywords: 'edit mode', run: toggleWriting });
 		items.push({ id: 'create-exit', group: 'Write', label: `Create an exit from ${s.scene.room_name}`, keywords: 'new room door', run: () => openPanel({ creating: { kind: 'exit' } }) });
 		items.push({ id: 'create-thing', group: 'Write', label: `Create a thing in ${s.scene.room_name}`, keywords: 'new object item', run: () => openPanel({ creating: { kind: 'thing' } }) });
 		items.push({ id: 'create-character', group: 'Write', label: `Create a character in ${s.scene.room_name}`, keywords: 'new person npc', run: () => openPanel({ creating: { kind: 'character' } }) });
-		items.push({ id: 'files-export', group: 'Files', label: 'Export the story as a zip file', keywords: 'download save', run: () => exportZip(ws) });
-		items.push({ id: 'files-import', group: 'Files', label: 'Import a story from a zip file', keywords: 'upload load', run: () => zipInput?.click() });
-		if (p.edited || p.storage === 'folder')
-			items.push({ id: 'files-reset', group: 'Files', label: `Go back to the bundled example “${p.name}”`, keywords: 'discard revert', run: () => fileAction(() => ws.reset()) });
-		for (const name of Object.keys(examples).filter((n) => n !== storyName)) {
-			items.push({
-				id: `story-${name}`,
-				group: 'Game',
-				label: `Open the example “${name}”`,
-				keywords: 'story switch load',
-				run: () => openStory(name)
-			});
-		}
+		items.push(...projectItems.map((i) => ({ ...i, group: i.group === 'Examples' ? 'Game' : 'Files' })));
 		return items;
 	});
 
@@ -617,28 +610,37 @@
 		{#snippet header()}
 			<AppHeader
 				title={s.game.title}
-				now={[`day ${s.scene.day} · ${s.scene.time} · ${s.scene.phase}`, s.scene.room_name, storageLabel]}
+				saved={storageLabel}
+				savedState={workspace?.project.storage === 'folder-locked' ? 'attention' : 'ok'}
+				{projectItems}
+				mode={writing ? 'write' : 'play'}
+				onmode={(m) => {
+					if ((m === 'write') !== writing) toggleWriting();
+				}}
 				settingsOpen={showSettings}
 				onsettings={() => (showSettings = true)}
 				onpalette={() => (showPalette = true)}
-				{writing}
-				onwrite={toggleWriting}
+			/>
+		{/snippet}
+		{#snippet status()}
+			<StatusLine
+				room={s.scene.room_name}
+				level={new Set(s.map.rooms.map((r) => r.level)).size > 1 ? (s.map.rooms.find((r) => r.current)?.level ?? null) : null}
+				day={s.scene.day}
+				time={s.scene.time}
+				phase={s.scene.phase}
+				turn={s.scene.turns}
+				turnItems={[{ id: 'restart', label: 'Restart the game', run: () => s.restart() }]}
 			/>
 		{/snippet}
 		{#snippet effects()}
 			<ScreenEffects theme={settings.theme} effects={settings.effects} />
 		{/snippet}
 		{#snippet player()}
-			<StatusBar items={[`turn ${s.scene.turns}`, s.scene.time, s.scene.room]}>
-				{#snippet actions()}
-					<Checkbox bind:checked={settings.sources}>Show sources</Checkbox>
-					<Button size="compact" variant="quiet" onclick={() => s.restart()}>Restart</Button>
-				{/snippet}
-			</StatusBar>
 			<Transcript
 				entries={s.entries}
 				room={s.scene.room}
-				showSources={settings.sources}
+				showSources={writing}
 				focus={s.focus}
 				effects={settings.effects}
 				reduceMotion={settings.reduceMotion}
@@ -798,7 +800,6 @@
 		bind:theme={settings.theme}
 		bind:effects={settings.effects}
 		bind:motion={settings.motion}
-		bind:sources={settings.sources}
 		bind:tooltips={settings.tooltips}
 		systemReduce={settings.systemReduce}
 	/>

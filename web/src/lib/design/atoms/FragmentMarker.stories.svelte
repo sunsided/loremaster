@@ -16,7 +16,7 @@
 Hover or focus highlights the same fragment in the assembly panel. A click keeps the highlight on. A second click removes it.
 Screen readers announce "Fragment 2" and the pressed state.
 
-The marker shows only when "Show sources" is on.`
+The marker shows only in write mode.`
 				}
 			}
 		}

@@ -8,11 +8,10 @@ interface Stored {
 	theme: Theme;
 	effects: Effects;
 	motion: Motion;
-	sources: boolean;
 	tooltips: boolean;
 }
 
-const defaults: Stored = { theme: 'phosphor', effects: 'full', motion: 'system', sources: true, tooltips: true };
+const defaults: Stored = { theme: 'phosphor', effects: 'full', motion: 'system', tooltips: true };
 
 function read(): Stored {
 	try {
@@ -27,8 +26,6 @@ class Settings {
 	theme = $state<Theme>(defaults.theme);
 	effects = $state<Effects>(defaults.effects);
 	motion = $state<Motion>(defaults.motion);
-	/** Show fragment numbers in the transcript. */
-	sources = $state(defaults.sources);
 	/** Show author tooltips on things and exits. */
 	tooltips = $state(defaults.tooltips);
 	/** The operating system asks for reduced motion. */
@@ -41,7 +38,6 @@ class Settings {
 		this.theme = s.theme;
 		this.effects = s.effects;
 		this.motion = s.motion;
-		this.sources = s.sources;
 		this.tooltips = s.tooltips;
 		if (typeof window !== 'undefined' && window.matchMedia) {
 			const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -54,7 +50,6 @@ class Settings {
 					theme: this.theme,
 					effects: this.effects,
 					motion: this.motion,
-					sources: this.sources,
 					tooltips: this.tooltips
 				};
 				try {

@@ -105,6 +105,9 @@
 	--color-text-warning: #ffcb52;
 	--color-text-on-accent: #06210f;
 	--color-accent: #39ff88;
+	/* The status line on top of the screen: inverse video, like the Infocom games. */
+	--color-status-bg: var(--color-accent);
+	--color-status-text: var(--color-text-on-accent);
 	--color-warning: #ffb000;
 	--color-border-subtle: #1f2b22;
 	--color-border-control: #3a7a50;
@@ -141,6 +144,9 @@
 	--color-text-warning: #f7d58c;
 	--color-text-on-accent: #0b1f1c;
 	--color-accent: #5ec4b6;
+	/* The status line on top of the screen: inverse video, like the Infocom games. */
+	--color-status-bg: var(--color-accent);
+	--color-status-text: var(--color-text-on-accent);
 	--color-warning: #f2b544;
 	--color-border-subtle: #2d3240;
 	--color-border-control: #6a7388;
@@ -177,6 +183,9 @@
 	--color-text-warning: #8a3320;
 	--color-text-on-accent: #ffffff;
 	--color-accent: #2f4b8a;
+	/* The status line on top of the screen: inverse video, like the Infocom games. */
+	--color-status-bg: var(--color-accent);
+	--color-status-text: var(--color-text-on-accent);
 	--color-warning: #b3412e;
 	--color-border-subtle: #dedad1;
 	--color-border-control: #857a67;

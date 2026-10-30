@@ -10,6 +10,8 @@
 		glow?: string;
 		header: Snippet;
 		player: Snippet;
+		/** The status line, edge to edge on top of the player screen. */
+		status?: Snippet;
 		/** The screen texture layers. */
 		effects?: Snippet;
 		/** The side panel on the right. */
@@ -18,7 +20,7 @@
 		map?: Snippet;
 	}
 
-	let { skipTo = 'command', fxClass = 'fx-off', glow = 'none', header, player, effects, panel, map }: Props = $props();
+	let { skipTo = 'command', fxClass = 'fx-off', glow = 'none', header, player, status, effects, panel, map }: Props = $props();
 </script>
 
 <!--
@@ -38,6 +40,7 @@
 			{/if}
 			<main class="screen fx-screen" aria-label="Player">
 				{@render effects?.()}
+				{#if status}<div class="status">{@render status()}</div>{/if}
 				<div class="player">{@render player()}</div>
 			</main>
 			{#if panel}
@@ -87,11 +90,16 @@
 	.screen {
 		position: relative;
 		display: flex;
+		flex-direction: column;
 		min-width: 0;
 		min-height: 0;
 		overflow: hidden;
 		background: var(--color-surface);
 		box-shadow: var(--shadow-screen);
+	}
+	.status {
+		position: relative;
+		z-index: var(--z-content);
 	}
 	.player {
 		position: relative;
@@ -102,7 +110,8 @@
 		gap: var(--space-5);
 		box-sizing: border-box;
 		min-width: 0;
-		padding: var(--space-8) clamp(var(--space-6), 4vw, var(--space-10));
+		min-height: 0;
+		padding: var(--space-7) clamp(var(--space-6), 4vw, var(--space-10)) var(--space-6);
 	}
 	.panel,
 	.map {

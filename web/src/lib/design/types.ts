@@ -137,3 +137,13 @@ export interface WriterTools {
 export type CreateRequest =
 	| { kind: 'exit'; direction: string; to: { name: string } | { id: string }; back: boolean }
 	| { kind: 'thing' | 'character'; name: string; portable: boolean; proper: boolean };
+
+/** An action in a MenuButton. */
+export interface MenuItem {
+	id: string;
+	label: string;
+	run: () => void;
+	disabled?: boolean;
+	/** Items with a group start a new section with this heading. */
+	group?: string;
+}

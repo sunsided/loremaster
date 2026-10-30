@@ -3,7 +3,7 @@
 	import { entries, exits, fragments, inventory, map as lighthouseMap, parts, things, verbs } from '../fixtures.ts';
 	import InspectorPanel from '../organisms/InspectorPanel.svelte';
 	import CommandPrompt from '../molecules/CommandPrompt.svelte';
-	import StatusBar from '../molecules/StatusBar.svelte';
+	import StatusLine from '../organisms/StatusLine.svelte';
 	import AppHeader from '../organisms/AppHeader.svelte';
 	import AssemblyPanel from '../organisms/AssemblyPanel.svelte';
 	import MapPanel from '../organisms/MapPanel.svelte';
@@ -21,6 +21,8 @@
 			docs: {
 				description: {
 					component: `The player layout is the frame of the play-and-write page. It has a header, the player screen and the side panel.
+
+The screen starts with the status line (the \`status\` snippet), edge to edge, then the player.
 
 The layout has four steps:
 1. Below 900px (\`--bp-stack\`): one column. The panel goes under the player, and the page scrolls.
@@ -42,17 +44,15 @@ Use the viewport menu in the toolbar to see the layout at phone width. To see th
 <Story name="Play and write" asChild>
 	<PlayerLayout fxClass="fx-subtle" glow="var(--fx-glow-soft)">
 		{#snippet header()}
-			<AppHeader
-				title="The Lighthouse"
-				now={['day 1 · 20:30 · dusk', 'The Shore']}
-				onsettings={() => {}}
-			/>
+			<AppHeader title="The Lighthouse" saved="bundled example" onmode={() => {}} onsettings={() => {}} onpalette={() => {}} />
 		{/snippet}
 		{#snippet effects()}
 			<ScreenEffects theme="phosphor" effects="subtle" />
 		{/snippet}
+		{#snippet status()}
+			<StatusLine room="The Shore" day={1} time="20:35" phase="dusk" turn={1} turnItems={[{ id: 'restart', label: 'Restart the game', run: () => {} }]} />
+		{/snippet}
 		{#snippet player()}
-			<StatusBar items={['turn 1', '20:35', 'shore']} />
 			<Transcript {entries} room="shore" onthing={() => {}} onexit={() => {}} />
 			<CommandPrompt oncommand={() => {}} />
 			<VerbBar verbs={verbs} {things} {inventory} {exits} onverb={() => {}} onthing={() => {}} onexit={() => {}} />
