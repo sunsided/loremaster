@@ -613,3 +613,28 @@ export const blackbeardTalk: TalkView = {
 	relations: [['trust', 0]],
 	memories: ['asked_marigold']
 };
+
+/** A talk with Blackbeard: the player chose "Who are you?". */
+export const talkTurns: Turn[] = [
+	{
+		blocks: [
+			{ kind: 'command', runs: [{ text: 'talk to shadow' }] },
+			{ kind: 'speech', runs: [{ text: 'The figure looks up. It is a man, grim-looking, with eyes like nails. "Sit, if you like."' }] }
+		],
+		ended: false,
+		log: []
+	},
+	{
+		blocks: [
+			{ kind: 'said', runs: [{ text: '"Who are you?"' }] },
+			{ kind: 'speech', runs: [{ text: '"They call me Blackbeard," he says. "And you\'re looking for a ship."' }] }
+		],
+		ended: false,
+		log: [],
+		talk: { dialogue: 'blackbeard', with: 'blackbeard', name: 'Blackbeard', node: 'names' },
+		choices: [
+			{ index: 0, text: '"The *Marigold*. Where did she go?"' },
+			{ index: 1, text: '"Just passing through."' }
+		]
+	}
+];

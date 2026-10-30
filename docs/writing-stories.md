@@ -168,14 +168,16 @@ Conditions can read the new values:
 
 During a talk:
 
-- The game shows the answers as a numbered list. Type a number, or the first word of an answer. In the web player, click an answer or push its number key.
+- The story text shows only what is said: the answer of the player, then the line of the thing.
+- In the web player, the answers are in the verb bar, as numbered buttons. Click an answer or push its number key. When the talk starts, the focus goes to the first answer.
+- In the terminal, the answers show as a numbered list after the text. Type a number, or the first word of an answer.
 - Each answer takes one turn.
 - Other commands do not run. To leave the talk, type `bye` or `leave`, or push Escape.
 - A talk ends when the player chooses an answer that ends it, when a node has no answer that shows, or when an effect takes the player away.
 
 `loremaster check` examines each dialogue: conditions, markup, targets of `go`, and nodes that no start node leads to.
 
-![A talk with Blackbeard in the web player. The answers show as a numbered list in the story text and in the verb bar.](images/talk.png)
+![A talk with Blackbeard in the web player. The story text shows what is said. The answers are numbered buttons in the verb bar.](images/talk.png)
 
 In the editor, the room desk shows the dialogues of the things in the room. During a talk in write mode (Ctrl+E), you can change the line and the answers in the game text.
 

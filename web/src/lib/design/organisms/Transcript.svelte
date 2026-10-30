@@ -61,6 +61,11 @@
 		 * and the list of answers.
 		 */
 		talkwriter?: Snippet;
+		/**
+		 * Show the numbered answers of a talk in the text. Off by default: the verb bar shows the answers.
+		 * Set it for a layout without the verb bar, so that the talk stays playable.
+		 */
+		choicesInText?: boolean;
 		/** In write mode: the last command, when it got the default response. It offers "Write a response". */
 		respond?: string | null;
 		onrespond?: () => void;
@@ -87,6 +92,7 @@
 		respond = null,
 		onrespond,
 		talkwriter,
+		choicesInText = false,
 		preview = null,
 		margin = null,
 		ghosts = [],
@@ -448,8 +454,8 @@
 				{/each}
 				{#if entry.id === latest && entry.turn.talk && talkwriter}
 					{@render talkwriter()}
-				{:else if entry.id === latest && entry.turn.choices?.length}
-					<!-- The answers, numbered as the player types them. The verb bar has the buttons. -->
+				{:else if choicesInText && entry.id === latest && entry.turn.choices?.length}
+					<!-- The answers, numbered as the player types them, for a layout without the verb bar. -->
 					<ol class="choices" aria-label="Answers">
 						{#each entry.turn.choices as c (c.index)}
 							<li><span class="choice-number" aria-hidden="true">{c.index + 1}.</span><span>{#each pieces(c.text) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</span></li>

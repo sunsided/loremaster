@@ -48,7 +48,7 @@ A two-object verb, such as "Use", waits for a second thing. The "just use it" bu
 The verbs are toggle buttons (\`aria-pressed\`). The sentence line is a live region, so screen readers announce the command as it grows.
 The verb grid changes its number of columns with the width of the screen.
 
-During a talk (\`talkingTo\` is set), the answers that the player can choose show above the verbs, as a numbered list of buttons, with "Leave" after them. The verbs and the things dim and are inert: they do not take focus, and screen readers skip them. Only an answer or "Leave" ends the turn. The number keys and Escape do the same as the buttons; \`aria-keyshortcuts\` tells assistive technology.`
+During a talk (\`talkingTo\` is set), the answers that the player can choose show above the verbs, as a numbered list of buttons, with "Leave" after them. This is the only place of the answers: the transcript shows only what is said. When a talk starts, the focus goes to the first answer. After a choice, the focus goes to the new first answer when it was on an old one. The verbs and the things dim and are inert: they do not take focus, and screen readers skip them. Only an answer or "Leave" ends the turn. The number keys and Escape do the same as the buttons; \`aria-keyshortcuts\` tells assistive technology.`
 				}
 			}
 		}
