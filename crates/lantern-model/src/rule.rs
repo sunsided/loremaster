@@ -1,4 +1,4 @@
-use crate::{Id, TimeOfDay, Value};
+use crate::{Id, Note, TimeOfDay, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -16,6 +16,9 @@ pub struct Rule {
     /// For verb events: the rule's text replaces the default response.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub instead: bool,
+    /// Author notes. The player never sees them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<Note>,
 }
 
 /// What a rule listens for.

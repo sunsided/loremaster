@@ -1,14 +1,14 @@
-//! `lantern play <dir>`, `lantern check <dir>`, `lantern explore <dir>` and
+//! `lantern play <dir>`, `lantern check <dir> [--todos]`, `lantern explore <dir>` and
 //! `lantern mcp <dir>` and `lantern serve <dir> [--port N]`.
 
-use lantern_project::{Project, Severity, check, load, read_dir};
+use lantern_project::{Project, Severity, check, load, open_todos, read_dir};
 use lantern_runtime::{BlockKind, Budget, Game, Turn, World};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern serve <project-folder> [--port N]";
+const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern check <project-folder> --todos\n       lantern serve <project-folder> [--port N]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -53,6 +53,15 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     };
     match cmd.as_str() {
+        "check" if args.get(2).is_some_and(|a| a == "--todos") => {
+            let todos = open_todos(&project);
+            for t in &todos {
+                let line = t.line.map(|l| format!(":{l}")).unwrap_or_default();
+                println!("{}{line} ({}): {}", t.file, t.at, t.note.text);
+            }
+            println!("{} open TODO(s).", todos.len());
+            ExitCode::SUCCESS
+        }
         "check" => {
             let n = project.story.rooms.len();
             println!(

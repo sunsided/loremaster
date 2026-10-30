@@ -148,7 +148,7 @@ If the project has errors, the read tools and `check` still work. The play tools
 
 ## Proposals
 
-A proposal is a change that an assistant suggests. It contains whole files: new or changed files with their full text, and the paths of files to delete. It can only touch `story.yaml` and the files in `rooms/`, `things/` and `rules/`.
+A proposal is a change that an assistant suggests. It contains whole files: new or changed files with their full text, and the paths of files to delete. It can only touch `story.yaml` and the files in `rooms/`, `things/`, `rules/` and `threads/`.
 
 `propose` takes the changes in two forms:
 
@@ -193,7 +193,7 @@ A `fragment` change has these fields:
 | `fragment_id` | The `id` of the fragment, if it has one. |
 | `before_index`, `after_index` | The index of the fragment in the list before and after. Together with `owner`, an index finds the runs in the transcript. |
 | `before`, `after` | The fragment as YAML gives it: a string or a map. An added fragment has no `before`. A removed fragment has no `after`. |
-| `before_fragment`, `after_fragment` | The same fragments in one form: `{ id, variants, when, mode, layer, replaces }`. |
+| `before_fragment`, `after_fragment` | The same fragments in one form: `{ id, variants, when, mode, layer, replaces, notes }`. |
 
 The values are the YAML values as JSON.
 

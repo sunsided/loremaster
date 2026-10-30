@@ -163,7 +163,7 @@ pub(crate) fn check_paths(p: &Proposal) -> Result<(), ToolError> {
         ));
     }
     for path in p.files.iter().map(|f| &f.path).chain(&p.delete) {
-        let in_folder = ["rooms/", "things/", "rules/"]
+        let in_folder = ["rooms/", "things/", "rules/", "threads/"]
             .iter()
             .any(|d| path.strip_prefix(d).is_some_and(|rest| !rest.contains('/')));
         let ok = (path == "story.yaml" || in_folder)
@@ -173,7 +173,7 @@ pub(crate) fn check_paths(p: &Proposal) -> Result<(), ToolError> {
                 .any(|c| c.is_empty() || c == "." || c == "..");
         if !ok {
             return Err(err(format!(
-                "`{path}` is not a project file. Use story.yaml, or rooms/, things/ or rules/ with one `.yaml` file name."
+                "`{path}` is not a project file. Use story.yaml, or rooms/, things/, rules/ or threads/ with one `.yaml` file name."
             )));
         }
     }
@@ -542,6 +542,7 @@ fn normalised(v: &Value) -> Value {
             "mode": f.mode,
             "layer": f.layer,
             "replaces": f.replaces,
+            "notes": f.notes,
         }),
         Err(_) => Value::Null,
     }
