@@ -79,13 +79,19 @@ impl Workspace {
         self.world = None;
         self.diagnostics = match load(self.files.clone()) {
             Ok(project) => {
-                let diags = check(&project);
+                let mut diags = check(&project);
                 if !diags.iter().any(|d| d.severity == Severity::Error) {
+                    // A compile error joins the warnings of the check; they stay valid.
                     match World::compile(project.story.clone()) {
                         Ok(world) => self.world = Some(Arc::new(world)),
-                        Err(e) => {
-                            return self.compile_failed(project, e.at.clone(), e.error.message);
-                        }
+                        Err(e) => diags.push(Diagnostic {
+                            severity: Severity::Error,
+                            file: String::new(),
+                            at: e.at.clone(),
+                            message: e.error.message,
+                            line: None,
+                            column: None,
+                        }),
                     }
                 }
                 self.project = Some(project);
@@ -94,18 +100,6 @@ impl Workspace {
             Err(diags) => diags,
         };
         self.carry_sessions();
-    }
-
-    fn compile_failed(&mut self, project: Project, at: String, message: String) {
-        self.diagnostics = vec![Diagnostic {
-            severity: Severity::Error,
-            file: String::new(),
-            at,
-            message,
-            line: None,
-            column: None,
-        }];
-        self.project = Some(project);
     }
 
     /// Move the sessions to the new world. While the project has errors there is

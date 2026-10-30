@@ -281,8 +281,10 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
         })),
         "explore" => {
             let budget = Budget {
-                max_states: a.usize_or("max_states", Budget::default().max_states),
-                max_depth: a.usize_or("max_depth", Budget::default().max_depth),
+                max_states: a
+                    .usize_or("max_states", Budget::default().max_states)
+                    .max(1),
+                max_depth: a.usize_or("max_depth", Budget::default().max_depth).max(1),
             };
             let fresh = Game::new(ws.world()?.clone());
             json(&lantern_runtime::explore(&fresh, budget))

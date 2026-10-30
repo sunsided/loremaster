@@ -71,6 +71,14 @@ impl Server {
                 ));
             }
         };
+        if msg.is_array() {
+            // MCP 2025-06-18 and later have no batches.
+            return Some(error_reply(
+                Value::Null,
+                -32600,
+                "Batch requests are not supported",
+            ));
+        }
         let id = msg.get("id").cloned()?; // No id: a notification. Nothing to answer.
         let method = msg
             .get("method")
@@ -144,10 +152,14 @@ impl Server {
 
     /// Read the project folder again and reload when a file changed.
     fn refresh(&mut self) {
-        if let Ok(files) = read_sorted(&self.root)
-            && self.ws.is_stale(&files)
-        {
-            self.ws.reload(files);
+        // stderr is free for logs: stdout carries the protocol.
+        match read_sorted(&self.root) {
+            Ok(files) if self.ws.is_stale(&files) => self.ws.reload(files),
+            Ok(_) => {}
+            Err(e) => eprintln!(
+                "lantern mcp: cannot read {}: {e}; the tools use the files read before",
+                self.root.display()
+            ),
         }
     }
 }
@@ -212,6 +224,13 @@ mod tests {
         let mut s = server();
         let r = send(&mut s, json!({ "jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": { "name": "nope" } })).unwrap();
         assert_eq!(r["result"]["isError"], true);
+    }
+
+    #[test]
+    fn a_batch_gets_an_error() {
+        let mut s = server();
+        let r = s.handle_line("[]").unwrap();
+        assert_eq!(r["error"]["code"], -32600);
     }
 
     #[test]
