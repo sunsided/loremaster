@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type { ExitInfo, MapView, RuleView, ThingInfo } from '#lib/engine/types.ts';
 	import Button from '../atoms/Button.svelte';
 	import ProseLink from '../atoms/ProseLink.svelte';
@@ -42,6 +43,8 @@
 		onopen: (view: 'map' | 'story' | 'rules' | 'explore') => void;
 		onthing: (id: string, name: string) => void;
 		onexit: (direction: string) => void;
+		/** The AI section, while the AI server runs. It shows first. */
+		ai?: Snippet;
 	}
 
 	let {
@@ -60,7 +63,8 @@
 		onrule,
 		onopen,
 		onthing,
-		onexit
+		onexit,
+		ai
 	}: Props = $props();
 
 	const previewing = $derived(Object.keys(preview).length > 0);
@@ -75,6 +79,9 @@
 	the last turn, and the things and exits. The whole world is one step away in the full views.
 -->
 <div class="here" aria-label="Here and now" role="region">
+	{#if ai}
+		<PanelSection id="here-ai" title="✦ AI">{@render ai()}</PanelSection>
+	{/if}
 	<PanelSection id="here-map" title="Around you">
 		{#snippet actions()}<button type="button" class="link" onclick={() => onopen('map')}>Map ↗</button>{/snippet}
 		<MapPanel {map} compact />

@@ -46,6 +46,31 @@ export interface ProposalView {
 	files: { path: string; base_sha: string | null; before: string | null; after: string | null }[];
 }
 
+/** A job of `lantern serve`: one task that Claude Code does, for example `imagine_exit`. */
+export interface JobView {
+	id: string;
+	task: string;
+	args: Record<string, unknown>;
+	status: 'running' | 'done' | 'failed' | 'cancelled';
+	events: { kind: string; text: string }[];
+	result: string | null;
+	proposals: string[];
+	cost_usd: number | null;
+	model: string | null;
+	/** When the editor started the job, for the elapsed time. The server does not send it. */
+	started?: number;
+}
+
+/** Whether the files that the server reads are the files of the editor. */
+export interface SyncState {
+	/** True when the checked files are the same. */
+	same: boolean;
+	/** Files that differ, or that only one side has. */
+	differ: string[];
+	/** The number of files that the check compared by content. */
+	checked: number;
+}
+
 async function sha256(text: string): Promise<string> {
 	const bytes = new TextEncoder().encode(text);
 	const hash = await crypto.subtle.digest('SHA-256', bytes);
@@ -57,7 +82,11 @@ export class AiLink {
 	/** True while the server answers. */
 	reachable = $state(false);
 	proposals = $state<ProposalView[]>([]);
+	jobs = $state<JobView[]>([]);
+	/** The last comparison of the files of the server and of the editor, or null before the first one. */
+	sync = $state<SyncState | null>(null);
 	#timer: ReturnType<typeof setTimeout> | null = null;
+	#started = new Map<string, number>();
 	#stopped = false;
 
 	/** Read the proposals now, then again after a pause: often while the server answers, rarely when it does not. */
@@ -76,12 +105,79 @@ export class AiLink {
 			const res = await fetch(`${SERVE}/proposals`);
 			if (!res.ok) throw new Error(String(res.status));
 			this.proposals = (await res.json()) as ProposalView[];
+			const jobs = await fetch(`${SERVE}/jobs`);
+			if (jobs.ok)
+				this.jobs = ((await jobs.json()) as JobView[]).map((j) => ({ ...j, started: this.#started.get(j.id) ?? Date.now() }));
 			this.reachable = true;
 		} catch {
 			this.reachable = false;
 			this.proposals = [];
+			this.jobs = [];
 		}
-		if (!this.#stopped) this.#timer = setTimeout(() => this.#poll(), this.reachable ? 4000 : 20000);
+		const running = this.jobs.some((j) => j.status === 'running');
+		if (!this.#stopped) this.#timer = setTimeout(() => this.#poll(), !this.reachable ? 20000 : running ? 1500 : 4000);
+	}
+
+	/** Call one MCP tool of the server and give its text result. */
+	async #tool(name: string, args: Record<string, unknown>): Promise<string> {
+		const res = await fetch(`${SERVE}/mcp`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
+		});
+		const body = await res.json();
+		if (body.error || body.result?.isError) throw new Error(body.error?.message ?? body.result?.content?.[0]?.text ?? 'tool error');
+		return body.result.content[0].text as string;
+	}
+
+	/**
+	 * Compare the files that the server reads with the files of the editor. The paths are compared always;
+	 * the contents of the edited files, and of all files in a small story (up to 80 files).
+	 */
+	async compare(files: { path: string; text: string }[], edited: Set<string>): Promise<SyncState | null> {
+		if (!this.reachable) return null;
+		try {
+			const paths: string[] = JSON.parse(await this.#tool('list_files', {}));
+			const mine = new Map(files.map((f) => [f.path, f.text]));
+			const differ = [...paths.filter((p) => !mine.has(p)), ...[...mine.keys()].filter((p) => !paths.includes(p))];
+			const toRead = paths.filter((p) => mine.has(p) && (files.length <= 80 || edited.has(p)));
+			for (const path of toRead) {
+				const { text } = JSON.parse(await this.#tool('read_file', { path })) as { text: string };
+				if (text !== mine.get(path)) differ.push(path);
+			}
+			this.sync = { same: differ.length === 0, differ, checked: toRead.length };
+		} catch {
+			this.sync = null;
+		}
+		return this.sync;
+	}
+
+	/** Start a job, for example `imagine_exit` with `{ room, direction }`. `state` is the save state of the editor. */
+	async startJob(task: string, args: Record<string, unknown>, state?: unknown): Promise<string | null> {
+		try {
+			const res = await fetch(`${SERVE}/jobs`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ task, args, ...(state ? { state } : {}) })
+			});
+			if (!res.ok) return `${res.status} ${await res.text()}`;
+			const { id } = (await res.json()) as { id: string };
+			this.#started.set(id, Date.now());
+			this.jobs = [...this.jobs, { id, task, args, status: 'running', events: [], result: null, proposals: [], cost_usd: null, model: null, started: Date.now() }];
+			if (this.#timer) clearTimeout(this.#timer);
+			this.#timer = setTimeout(() => this.#poll(), 1500);
+			return null;
+		} catch (e) {
+			return String(e);
+		}
+	}
+
+	async cancelJob(id: string) {
+		try {
+			await this.#post(`/jobs/${id}/cancel`, {});
+		} catch {
+			// The job ended meanwhile.
+		}
 	}
 
 	async #post(path: string, body: unknown) {
@@ -120,6 +216,7 @@ export class AiLink {
 		return null;
 	}
 
+	/** Reject a proposal. The note tells the assistant why; `imagine_exit` does not offer the idea again. */
 	async reject(view: ProposalView, note?: string): Promise<string | null> {
 		try {
 			await this.#post(`/proposals/${view.id}/reject`, note ? { note } : {});

@@ -3,6 +3,7 @@
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
 	import { AiLink, type ProposalView } from '#lib/project/proposals.svelte.ts';
 	import ProposalCard from '#lib/design/molecules/ProposalCard.svelte';
+	import AiStatus from '#lib/design/molecules/AiStatus.svelte';
 	import { canLinkFolder } from '#lib/project/store.ts';
 	import { emptyFragment, insertFragment, removeFragment, writeFragment } from '#lib/project/yaml-edit.ts';
 	import FragmentWriter from '#lib/design/organisms/FragmentWriter.svelte';
@@ -158,6 +159,44 @@
 	}
 	const proposalSummaries = $derived(ai.proposals.map(summarize));
 
+	// Compare the files of the AI server with the files of the editor, when the server comes up and after changes.
+	let syncTimer: ReturnType<typeof setTimeout> | null = null;
+	$effect(() => {
+		const ws = workspace;
+		const reachable = ai.reachable;
+		const files = ws?.project.files;
+		if (!ws || !reachable || !files) return;
+		if (syncTimer) clearTimeout(syncTimer);
+		syncTimer = setTimeout(() => void ai.compare(files, ws.project.editedPaths()), 800);
+	});
+	const aiDiffers = $derived(ai.reachable && ai.sync !== null && !ai.sync.same);
+
+	/** Start an AI job from the current game. The job plays from the state of the editor. */
+	async function aiJob(task: string, args: Record<string, unknown>) {
+		const s = session;
+		if (!s) return;
+		const problem = await ai.startJob(task, args, s.game.save());
+		if (problem) failure = problem;
+	}
+	let now = $state(Date.now());
+	$effect(() => {
+		if (!ai.jobs.some((j) => j.status === 'running')) return;
+		const t = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(t);
+	});
+	const aiJobs = $derived(
+		ai.jobs.map((j) => ({
+			id: j.id,
+			task: j.task,
+			about: Object.values(j.args).filter((v) => typeof v === 'string').join(', '),
+			status: j.status,
+			seconds: Math.max(0, Math.round((now - (j.started ?? now)) / 1000)),
+			cost: j.cost_usd,
+			proposals: j.proposals.length
+		}))
+	);
+	const runningJob = $derived(aiJobs.find((j) => j.status === 'running'));
+
 	/** The ghost lines of the proposals that change the text of the current room. */
 	const ghostsHere = $derived.by<GhostLine[]>(() => {
 		const s = session;
@@ -179,11 +218,11 @@
 		return out;
 	});
 
-	async function onProposal(id: string, action: 'accept' | 'reject') {
+	async function onProposal(id: string, action: 'accept' | 'reject', note?: string) {
 		const view = ai.proposals.find((p) => p.id === id);
 		const ws = workspace;
 		if (!view || !ws) return;
-		const problem = action === 'accept' ? await ai.accept(view, ws) : await ai.reject(view);
+		const problem = action === 'accept' ? await ai.accept(view, ws) : await ai.reject(view, note);
 		proposalProblems = { ...proposalProblems, [id]: problem ?? '' };
 		if (!problem) delete proposalProblems[id];
 	}
@@ -764,6 +803,20 @@
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
 </svelte:head>
 
+{#snippet aiSection()}
+	{#if session}
+		{@const s = session}
+		<AiStatus
+			jobs={aiJobs}
+			differ={aiDiffers ? (ai.sync?.differ ?? []) : null}
+			onreview={() => aiJob('review_room', { room: s.scene.room })}
+			oncancel={(id) => ai.cancelJob(id)}
+			onlink={canLinkFolder() ? () => fileAction(() => workspace!.linkFolder()) : undefined}
+			onproposals={() => openAtlas('proposals')}
+		/>
+	{/if}
+{/snippet}
+
 {#snippet fragmentWriterView()}
 	{#if writingAt && writingAt.fragment >= -1 && writerFragment && writerTools && draft && session}
 		{@const at = writingAt}
@@ -854,7 +907,7 @@
 								full
 								problem={proposalProblems[p.id] ?? null}
 								onaccept={() => onProposal(p.id, 'accept')}
-								onreject={() => onProposal(p.id, 'reject')}
+								onreject={(note) => onProposal(p.id, 'reject', note)}
 							/>
 						{:else}
 							<p class="muted-line">No open proposals. An assistant makes them through lantern serve.</p>
@@ -919,8 +972,8 @@
 		{#snippet header()}
 			<AppHeader
 				title={s.game.title}
-				saved={storageLabel}
-				savedState={workspace?.project.storage === 'folder-locked' ? 'attention' : 'ok'}
+				saved={aiDiffers ? `${storageLabel} · AI sees other files` : storageLabel}
+				savedState={workspace?.project.storage === 'folder-locked' || aiDiffers ? 'attention' : 'ok'}
 				{projectItems}
 				mode={writing ? 'write' : 'play'}
 				onmode={(m) => {
@@ -943,7 +996,9 @@
 				onroom={() => openAtlas('map')}
 			>
 				{#snippet marks()}
-					{#if ai.reachable && ai.proposals.length}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
+					{#if runningJob}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
+							>✦ {runningJob.task === 'review_room' ? 'reviewing' : 'drafting'}… {runningJob.seconds} s</button
+						>{:else if ai.reachable && ai.proposals.length}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
 							>✦ {ai.proposals.length} {ai.proposals.length === 1 ? 'proposal' : 'proposals'}</button
 						>{/if}
 					{#if Object.keys(previewValues).length}<span class="preview-mark"
@@ -991,6 +1046,12 @@
 							name={creating.name}
 							onsubmit={create}
 							oncancel={closeWriter}
+							ondraft={ai.reachable && creating.kind === 'exit'
+								? (dir) => {
+										void aiJob('imagine_exit', { room: s.scene.room, direction: dir });
+										closeWriter();
+									}
+								: undefined}
 						/>
 					{:else if writingAt?.fragment === -2 && responding && writerTools}
 						{@const r = responding}
@@ -1084,6 +1145,7 @@
 					onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
 					onthing={(id, name) => s.pickThing(id, name)}
 					onexit={(dir) => s.pickExit(dir)}
+					ai={ai.reachable ? aiSection : undefined}
 				/>
 			{:else}
 				<BottomSheet title="Here" summary={sheetSummary}>
@@ -1107,6 +1169,7 @@
 						onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
 						onthing={(id, name) => s.pickThing(id, name)}
 						onexit={(dir) => s.pickExit(dir)}
+						ai={ai.reachable ? aiSection : undefined}
 					/>
 				</BottomSheet>
 			{/if}

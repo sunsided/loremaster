@@ -145,6 +145,12 @@ export class Project {
 		this.edited = false;
 	}
 
+	/** The paths of the files that differ from the bundled example, or that it does not have. */
+	editedPaths(): Set<string> {
+		const bundled = new Map(this.#bundled.map((f) => [f.path, f.text]));
+		return new Set(this.files.filter((f) => bundled.get(f.path) !== f.text).map((f) => f.path));
+	}
+
 	zip(): Uint8Array {
 		return store.toZip(this.files);
 	}

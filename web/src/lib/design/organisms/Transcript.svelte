@@ -42,7 +42,7 @@
 		/** Write mode: ghost lines of AI proposals for the room text, with their proposals for the cards in the margin. */
 		ghosts?: GhostLine[];
 		proposals?: ProposalSummary[];
-		onproposal?: (id: string, action: 'accept' | 'reject') => void;
+		onproposal?: (id: string, action: 'accept' | 'reject', note?: string) => void;
 		/** A problem from the last proposal action, by proposal id. */
 		proposalProblems?: Record<string, string>;
 		/** A preview of the room text in other values. It shows in place of the newest room text, marked. */
@@ -274,7 +274,7 @@
 					proposal={card}
 					problem={proposalProblems[card.id] ?? null}
 					onaccept={() => onproposal?.(card.id, 'accept')}
-					onreject={() => onproposal?.(card.id, 'reject')}
+					onreject={(note) => onproposal?.(card.id, 'reject', note)}
 				/>
 			</div>
 		{:else}

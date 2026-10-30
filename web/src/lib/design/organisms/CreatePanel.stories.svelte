@@ -28,6 +28,8 @@
 - **Thing**: the name, and "the player can take it". After "Create" the writer opens for the presence text of the thing.
 - **Character**: the name, and "proper name, without "the"".
 
+With \`ondraft\` (while the AI server runs), a new exit can also be **drafted with AI**: the job \`imagine_exit\` makes some proposals for that direction, and they show as ghost text and in Atlas › Proposals.
+
 The ids come from the names, for example "The Beach" becomes \`the_beach\`. Enter creates, Escape cancels.
 \`onsubmit\` returns a problem text when the story does not build with the new files; the panel then stays open and shows it.`
 				}
@@ -39,4 +41,5 @@ The ids come from the names, for example "The Beach" becomes \`the_beach\`. Ente
 <Story name="New exit" />
 <Story name="New thing" args={{ kind: 'thing', name: 'brass key' }} />
 <Story name="New character" args={{ kind: 'character' }} />
+<Story name="New exit, with AI" args={{ ondraft: fn() }} />
 <Story name="Refused" args={{ onsubmit: fn(async () => 'There is already a room `the_beach`.') }} />

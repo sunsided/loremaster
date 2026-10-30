@@ -270,7 +270,14 @@ When `lantern serve` runs for the story (read `docs/ai-tools.md`), the editor re
 
 - The status line shows "✦ N proposals". Select it to open Atlas › Proposals, with each proposal, its changes and its problems.
 - In write mode, a proposal that changes the text of the current room shows as ghost text (italics, a dotted line and ✦) under the fragment that it changes, with its card in the margin.
-- "Accept" writes the proposal into the working copy of the editor, then tells the server. The editor refuses a proposal when a file that it changes is different now. "Reject" tells the server to drop it.
+- "Accept" writes the proposal into the working copy of the editor, then tells the server. The editor refuses a proposal when a file that it changes is different now. "Reject…" asks why (optional) and tells the server to drop it. The AI reads the note and does not offer the idea again.
+
+The Here panel has an "✦ AI" section while the server runs:
+
+- "Review this room" asks the AI to read the room in all its states and to propose fixes.
+- In write mode, a direction without an exit offers "✦ Draft … with AI" next to the form: the AI proposes some exits or things for that direction.
+- The running jobs show with their time, their proposals and their cost, and you can cancel them. The status line shows "✦ drafting… 12 s".
+- The server reads the story folder on disk, and the editor keeps a working copy in the browser. When the two differ, the section and the header warn you. Open the story folder (Chromium browsers), so that both use the same files.
 
 ### Where the changes go
 

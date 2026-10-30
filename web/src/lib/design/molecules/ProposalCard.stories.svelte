@@ -24,6 +24,7 @@
 
 - In write mode the card sits in the margin next to its ghost text. In Atlas › Proposals it is \`full\`: it also lists the changes and the problems.
 - Accept is off while the proposal has problems. Accept applies the proposal to the working copy of the editor (only when the files did not change since the proposal), then tells the server.
+- Reject asks for an optional note first ("Why?"). The server keeps the note, and the AI does not offer the idea again.
 - A problem from the last action shows in the card, for example "The file rooms/shore.yaml changed after the proposal was made".`
 				}
 			}

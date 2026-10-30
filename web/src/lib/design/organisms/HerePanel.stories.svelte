@@ -43,6 +43,8 @@
 4. **Last turn**: the command, the rules that fired and the changes. "Story ↗" opens the timeline.
 5. **Things and exits**: the things in reach and the exits, as links that play.
 
+While the AI server runs, an \"✦ AI\" section comes first (the \`ai\` snippet, usually AiStatus).
+
 The panel is a region with the name "Here and now". Each section has a heading with a button that folds it.`
 				}
 			}

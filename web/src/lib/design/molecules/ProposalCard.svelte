@@ -6,13 +6,16 @@
 		/** Show the list of changes and problems. The margin card is short; the Atlas card is full. */
 		full?: boolean;
 		onaccept: () => void;
-		onreject: () => void;
+		/** Reject, with an optional note why. The AI does not offer a rejected idea again. */
+		onreject: (note?: string) => void;
 		/** A problem from the last action, for example "The file changed after the proposal was made". */
 		problem?: string | null;
 	}
 
 	let { proposal, full = false, onaccept, onreject, problem = null }: Props = $props();
 	const id = $props.id();
+	let rejecting = $state(false);
+	let note = $state('');
 </script>
 
 <!--
@@ -39,10 +42,29 @@
 		{/if}
 	{/if}
 	{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
-	<div class="actions">
-		<button type="button" class="accept" disabled={!proposal.ok} onclick={onaccept}>Accept</button>
-		<button type="button" onclick={onreject}>Reject</button>
-	</div>
+	{#if rejecting}
+		<form
+			class="note"
+			onsubmit={(e) => {
+				e.preventDefault();
+				onreject(note.trim() || undefined);
+				rejecting = false;
+			}}
+		>
+			<label for="{id}-note">Why? (optional, the AI reads it)</label>
+			<!-- svelte-ignore a11y_autofocus -->
+			<input id="{id}-note" bind:value={note} autocomplete="off" autofocus onkeydown={(e) => e.key === 'Escape' && (rejecting = false)} />
+			<div class="actions">
+				<button type="submit">Reject</button>
+				<button type="button" onclick={() => (rejecting = false)}>Back</button>
+			</div>
+		</form>
+	{:else}
+		<div class="actions">
+			<button type="button" class="accept" disabled={!proposal.ok} onclick={onaccept}>Accept</button>
+			<button type="button" onclick={() => (rejecting = true)}>Reject…</button>
+		</div>
+	{/if}
 </section>
 
 <style>
@@ -96,6 +118,26 @@
 		background: var(--color-ghost);
 		color: var(--color-surface);
 		font-weight: var(--font-weight-strong);
+	}
+	.note {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+	.note label {
+		color: var(--color-text-muted);
+	}
+	.note input {
+		min-height: var(--size-target-compact);
+		padding: 0 var(--space-2);
+		border: var(--size-border) solid var(--color-border-control);
+		background: var(--color-surface);
+		color: var(--color-text);
+		font: inherit;
+	}
+	.note input:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 1px;
 	}
 	button:disabled {
 		opacity: 0.5;

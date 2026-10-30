@@ -22,9 +22,11 @@
 		/** Create it. Returns a problem text when the story does not build with it. */
 		onsubmit: (request: CreateRequest) => Promise<string | null>;
 		oncancel: () => void;
+		/** For an exit: let the AI draft options for this direction instead. When set, the panel offers it. */
+		ondraft?: (direction: string) => void;
 	}
 
-	let { kind, here, direction = '', directions = [], rooms = [], name = '', onsubmit, oncancel }: Props = $props();
+	let { kind, here, direction = '', directions = [], rooms = [], name = '', onsubmit, oncancel, ondraft }: Props = $props();
 
 	const id = $props.id();
 	let dir = $state(untrack(() => direction || directions[0] || 'north'));
@@ -110,6 +112,9 @@
 		<div class="row">
 			<Button variant="primary" size="compact" type="submit" disabled={busy}>Create</Button>
 			<Button size="compact" type="button" onclick={oncancel}>Cancel</Button>
+			{#if kind === 'exit' && ondraft}
+				<Button size="compact" type="button" variant="quiet" onclick={() => ondraft(dir)}>✦ Draft "{dir}" with AI</Button>
+			{/if}
 		</div>
 	</form>
 </section>
