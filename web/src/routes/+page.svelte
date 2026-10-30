@@ -472,6 +472,7 @@
 		if (writing) toggleWriting();
 		const play = base.sandbox(game);
 		if (room && room !== play.scene.room) play.author({ type: 'goto', room });
+		leaveSandbox();
 		sandbox = { proposal: id, summary: view.summary, session: play };
 		closeAtlas();
 		await tick();
@@ -479,11 +480,14 @@
 	}
 	/** Leave the sandbox: the game is as it was before Walk in. */
 	function leaveSandbox() {
+		const old = sandbox;
 		sandbox = null;
+		// The sandbox has its own engine; give its memory back.
+		old?.session.game.free();
 	}
 	// The sandbox ends when its proposal goes: accepted, rejected or withdrawn.
 	$effect(() => {
-		if (sandbox && !ai.proposals.some((p) => p.id === sandbox?.proposal)) sandbox = null;
+		if (sandbox && !ai.proposals.some((p) => p.id === sandbox?.proposal)) leaveSandbox();
 	});
 
 	// The findings of the last AI review of the current room, as notes in the margin of write mode.
