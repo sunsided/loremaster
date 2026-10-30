@@ -29,6 +29,8 @@ pub struct Game {
 pub struct VerbInfo {
     pub id: String,
     pub label: String,
+    /// The words that the parser accepts for the verb, for example `take` and `pick up`.
+    pub words: Vec<String>,
     pub slots: VerbSlots,
     pub preposition: Option<String>,
     pub bar: bool,
@@ -1764,6 +1766,7 @@ impl Game {
             .map(|v| VerbInfo {
                 id: v.id.to_string(),
                 label: v.label.clone(),
+                words: v.words.clone(),
                 slots: v.slots,
                 preposition: v.preposition.clone(),
                 bar: v.bar,

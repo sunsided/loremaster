@@ -163,6 +163,14 @@
 		ai.reachable ? null : 'To draft with AI, start `lantern serve --bootstrap` and keep this page open.'
 	);
 
+	/** The words that Tab completes in the command prompt: the verbs; the things in reach and carried, and the exits. */
+	const promptVerbs = $derived(session?.verbs.flatMap((v) => v.words) ?? []);
+	const promptNouns = $derived.by(() => {
+		const s = session;
+		if (!s) return [];
+		return [...s.scene.things.map((t) => t.name), ...s.scene.inventory.map((t) => t.name), ...s.scene.exits.map((e) => e.direction)];
+	});
+
 	// Author notes and TODOs, read from the files after each change.
 	let allNotes = $state<NoteRef[]>([]);
 	$effect(() => {
@@ -1311,7 +1319,7 @@
 				{/snippet}
 			</Transcript>
 			{#if !s.scene.ended}
-				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={play} />
+				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={play} verbs={promptVerbs} nouns={promptNouns} />
 				<VerbBar
 					verbs={s.barVerbs}
 					selected={s.preview.verb}

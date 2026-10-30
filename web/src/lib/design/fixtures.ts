@@ -108,17 +108,17 @@ export const entries: TranscriptEntry[] = [
 ];
 
 export const verbs: VerbInfo[] = [
-	{ id: 'go', label: 'Walk to', slots: 'one', preposition: null, bar: false },
-	{ id: 'look', label: 'Look around', slots: 'none', preposition: null, bar: true },
-	{ id: 'examine', label: 'Look at', slots: 'one', preposition: null, bar: true },
-	{ id: 'take', label: 'Pick up', slots: 'one', preposition: null, bar: true },
-	{ id: 'use', label: 'Use', slots: 'two', preposition: 'on', bar: true },
-	{ id: 'open', label: 'Open', slots: 'one', preposition: null, bar: true },
-	{ id: 'close', label: 'Close', slots: 'one', preposition: null, bar: true },
-	{ id: 'talk', label: 'Talk to', slots: 'one', preposition: null, bar: true },
-	{ id: 'give', label: 'Give', slots: 'two', preposition: 'to', bar: true },
-	{ id: 'push', label: 'Push', slots: 'one', preposition: null, bar: true },
-	{ id: 'pull', label: 'Pull', slots: 'one', preposition: null, bar: true }
+	{ id: 'go', label: 'Walk to', words: ['go', 'walk'], slots: 'one', preposition: null, bar: false },
+	{ id: 'look', label: 'Look around', words: ['look', 'l'], slots: 'none', preposition: null, bar: true },
+	{ id: 'examine', label: 'Look at', words: ['examine', 'x', 'look at'], slots: 'one', preposition: null, bar: true },
+	{ id: 'take', label: 'Pick up', words: ['take', 'get', 'pick up'], slots: 'one', preposition: null, bar: true },
+	{ id: 'use', label: 'Use', words: ['use'], slots: 'two', preposition: 'on', bar: true },
+	{ id: 'open', label: 'Open', words: ['open'], slots: 'one', preposition: null, bar: true },
+	{ id: 'close', label: 'Close', words: ['close', 'shut'], slots: 'one', preposition: null, bar: true },
+	{ id: 'talk', label: 'Talk to', words: ['talk to', 'ask'], slots: 'one', preposition: null, bar: true },
+	{ id: 'give', label: 'Give', words: ['give'], slots: 'two', preposition: 'to', bar: true },
+	{ id: 'push', label: 'Push', words: ['push', 'press'], slots: 'one', preposition: null, bar: true },
+	{ id: 'pull', label: 'Pull', words: ['pull'], slots: 'one', preposition: null, bar: true }
 ];
 
 export const things: ThingInfo[] = [
