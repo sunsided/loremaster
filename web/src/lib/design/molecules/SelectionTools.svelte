@@ -13,9 +13,15 @@
 		onclose: () => void;
 		/** Set to a new number to move the focus into the toolbar (Ctrl+. in the editor). */
 		focus?: number;
+		/** A click outside the toolbar: close it and leave the focus where the click put it. */
+		ondismiss?: () => void;
 	}
 
-	let { rect, actions, onclose, focus = 0 }: Props = $props();
+	let { rect, actions, onclose, focus = 0, ondismiss }: Props = $props();
+
+	function outside(event: PointerEvent) {
+		if (bar && !bar.contains(event.target as Node)) ondismiss?.();
+	}
 	let bar: HTMLElement | undefined = $state();
 
 	const top = $derived(rect.top > 56 ? rect.top - 44 : rect.bottom + 8);
@@ -42,9 +48,11 @@
 <!--
 	A small toolbar over selected text in the writer: "type first, tune later".
 	The mouse uses it at once; with the keyboard, Ctrl+. moves the focus into it, the arrow keys move between
-	the buttons, and Escape goes back to the text.
+	the buttons, and Escape goes back to the text. A click outside the toolbar closes it.
 	mousedown does not take the focus from the editor, so the selection stays.
 -->
+<svelte:window onpointerdown={outside} />
+
 <div
 	class="tools"
 	role="toolbar"

@@ -15,7 +15,8 @@
 				{ id: 'when', label: 'Only when…', run: fn() },
 				{ id: 'variants', label: 'Make variants', run: fn() }
 			],
-			onclose: fn()
+			onclose: fn(),
+			ondismiss: fn()
 		},
 		parameters: {
 			docs: {
@@ -29,7 +30,7 @@ The writer gives these actions, when they apply:
 - **Only when…**: \`{ ? …}\` around the selection, with the cursor where the condition goes.
 - **Make variants**: alternatives in the selection, split at " / " or at line breaks, become the variants of the fragment.
 
-A mousedown on the toolbar does not take the focus, so the selection stays. With the keyboard, Ctrl+. in the editor moves the focus to the first button (\`focus\` changes), the arrow keys move between the buttons, and Escape goes back to the text.`
+A mousedown on the toolbar does not take the focus, so the selection stays. With the keyboard, Ctrl+. in the editor moves the focus to the first button (\`focus\` changes), the arrow keys move between the buttons, and Escape goes back to the text. A click outside the toolbar closes it (\`ondismiss\`).`
 				}
 			}
 		}

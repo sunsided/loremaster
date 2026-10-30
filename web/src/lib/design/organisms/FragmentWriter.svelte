@@ -178,7 +178,7 @@
 	Enter saves, Shift+Enter adds a line break, Escape cancels.
 -->
 {#if draft.selection && actions.length}
-	<SelectionTools rect={draft.selection.rect} {actions} focus={draft.toolsFocus} onclose={() => (draft.target = { ...draft.selection!, view: draft.selection!.view, n: (draft.target?.n ?? 0) + 1 })} />
+	<SelectionTools rect={draft.selection.rect} {actions} focus={draft.toolsFocus} ondismiss={() => (draft.selection = null)} onclose={() => (draft.target = { ...draft.selection!, view: draft.selection!.view, n: (draft.target?.n ?? 0) + 1 })} />
 {/if}
 
 <section class="writer" aria-labelledby="{id}-title" bind:this={section}>
