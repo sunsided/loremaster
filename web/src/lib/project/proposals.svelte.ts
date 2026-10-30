@@ -165,7 +165,7 @@ export class AiLink {
 		try {
 			this.#base ??= await findServer(this.#linkHosted());
 			if (this.#base === null) throw new Error('no server');
-			const res = await fetch(`${this.#base}/proposals`);
+			const res = await fetch(this.#url('/proposals'));
 			if (!res.ok) throw new Error(String(res.status));
 			this.proposals = (await res.json()) as ProposalView[];
 			this.reachable = true;
@@ -179,7 +179,7 @@ export class AiLink {
 		if (this.reachable) {
 			// A failed jobs read keeps the proposals and the last known jobs.
 			try {
-				const jobs = await fetch(`${this.#base}/jobs`);
+				const jobs = await fetch(this.#url('/jobs'));
 				if (jobs.ok)
 					this.jobs = ((await jobs.json()) as JobView[]).map((j) => ({ ...j, started: this.#started.get(j.id) ?? Date.now() }));
 			} catch {
@@ -192,9 +192,15 @@ export class AiLink {
 		if (!this.#stopped) this.#timer = setTimeout(() => this.#poll(), !this.reachable ? 20000 : running ? 1500 : 4000);
 	}
 
+	/** The address of an endpoint. Throws when no server answered yet, so that no request goes to `null/...`. */
+	#url(path: string): string {
+		if (this.#base === null) throw new Error('lantern serve is not connected.');
+		return `${this.#base}${path}`;
+	}
+
 	/** Call one MCP tool of the server and give its text result. */
 	async #tool(name: string, args: Record<string, unknown>): Promise<string> {
-		const res = await fetch(`${this.#base}/mcp`, {
+		const res = await fetch(this.#url('/mcp'), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } })
@@ -231,7 +237,7 @@ export class AiLink {
 	/** Start a job, for example `imagine_exit` with `{ room, direction }`. `state` is the save state of the editor. */
 	async startJob(task: string, args: Record<string, unknown>, state?: unknown): Promise<string | null> {
 		try {
-			const res = await fetch(`${this.#base}/jobs`, {
+			const res = await fetch(this.#url('/jobs'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ task, args, ...(state ? { state } : {}) })
@@ -255,7 +261,7 @@ export class AiLink {
 	 */
 	async bootstrap(title: string, idea: string): Promise<string | null> {
 		try {
-			const res = await fetch(`${this.#base}/bootstrap`, {
+			const res = await fetch(this.#url('/bootstrap'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ title, idea })
@@ -289,7 +295,7 @@ export class AiLink {
 	}
 
 	async #post(path: string, body: unknown) {
-		const res = await fetch(`${this.#base}${path}`, {
+		const res = await fetch(this.#url(path), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)
