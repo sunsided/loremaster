@@ -133,3 +133,22 @@ fn a_note_line_skips_the_same_text_in_the_story_text() {
     let lines: Vec<_> = lantern_project::notes(&p).iter().map(|n| n.line).collect();
     check!(lines == [Some(5), Some(6)]);
 }
+
+#[test]
+fn a_short_note_does_not_take_the_line_of_a_longer_one() {
+    let files = vec![
+        file("story.yaml", "title: x\nstart: a\n"),
+        file(
+            "rooms/a.yaml",
+            "name: A\nnotes:\n  - banana\n  - { text: \"a\", thread: t }\n  - todo: an\n",
+        ),
+        file("threads/t.yaml", "name: T\n"),
+    ];
+    let p = load(files).unwrap();
+    let lines: Vec<_> = lantern_project::notes(&p)
+        .iter()
+        .filter(|n| n.entity == "room:a")
+        .map(|n| n.line)
+        .collect();
+    check!(lines == [Some(3), Some(4), Some(5)]);
+}

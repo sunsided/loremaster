@@ -110,6 +110,38 @@ pub fn threads(project: &Project) -> Vec<ThreadView> {
         .collect()
 }
 
+/// The note text on one line, for example `Keep it.` in `  - todo: "Keep it."` or in
+/// `- { text: Keep it., thread: x }`. None when the line holds no `text` or `todo` value.
+fn note_value(line: &str) -> Option<&str> {
+    let rest = line
+        .trim_start()
+        .strip_prefix("- ")
+        .unwrap_or(line.trim_start());
+    let (rest, flow) = match rest.strip_prefix('{') {
+        Some(r) => (r.trim_start(), true),
+        None => (rest, false),
+    };
+    let rest = rest
+        .strip_prefix("text:")
+        .or_else(|| rest.strip_prefix("todo:"))
+        .map(str::trim_start)
+        .unwrap_or(rest);
+    // A quoted value ends at the same quote sign that is not escaped.
+    if let Some(quote) = rest.chars().next().filter(|c| *c == '"' || *c == '\'') {
+        let inner = &rest[1..];
+        return inner
+            .char_indices()
+            .find(|&(i, c)| c == quote && !inner[..i].ends_with('\\'))
+            .map(|(i, _)| &inner[..i]);
+    }
+    let end = if flow {
+        rest.find([',', '}']).unwrap_or(rest.len())
+    } else {
+        rest.find(" #").unwrap_or(rest.len())
+    };
+    Some(rest[..end].trim_end())
+}
+
 /// The 1-based lines where `needle` is the text of a note: inside a list under a `notes:` key.
 fn note_lines(text: &str, needle: &str) -> Vec<u32> {
     let lines: Vec<&str> = text.lines().collect();
@@ -136,7 +168,7 @@ fn note_lines(text: &str, needle: &str) -> Vec<u32> {
     lines
         .iter()
         .enumerate()
-        .filter(|(i, l)| l.contains(needle) && under_notes(*i))
+        .filter(|(i, l)| note_value(l) == Some(needle) && under_notes(*i))
         .map(|(i, _)| i as u32 + 1)
         .collect()
 }
