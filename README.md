@@ -66,6 +66,10 @@ These rules apply to all web work:
 
 Write all documentation in ASD-STE100 Simplified Technical English. The "Foundations/Writing documentation" page in Storybook gives the rules.
 
+## Contributing
+
+lantern uses GitHub Flow: `main` and short-lived `feature/` branches. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 EUPL-1.2. Read [LICENSE](LICENSE).
