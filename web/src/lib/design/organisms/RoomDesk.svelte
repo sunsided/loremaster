@@ -104,7 +104,7 @@
 	On a phone the sections are tabs, because a long list of folded sections is hard to use with a thumb.
 -->
 <div class="desk" aria-label="Room desk: {room}" role="region">
-	<header class="head">
+	<div class="head">
 		<p class="room">{room}</p>
 		<p class="where">{file ?? 'no file yet'}{level !== null ? ` · level ${level}` : ''}</p>
 		<p class="reach">
@@ -125,7 +125,7 @@
 				<button type="button" class="link" onclick={onexplore}>Checks ↗</button>
 			{/if}
 		</p>
-	</header>
+	</div>
 
 	{#if tabs}
 		<div class="tabs" role="tablist" aria-label="Room desk">

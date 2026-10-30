@@ -1571,9 +1571,7 @@
 					{#if ai.reachable && !sandbox}
 						<StatusTray
 							bind:open={aiTrayOpen}
-							label={runningJob
-								? `AI: ${runningJob.task === 'review_room' ? 'reviewing' : 'drafting'}, ${runningJob.seconds} seconds. Show the jobs.`
-								: `AI: ${ai.proposals.length} open proposals. Show the jobs.`}
+							hint="Show the AI jobs."
 							title="AI · lantern serve"
 							meta={aiCost > 0 ? `$${aiCost.toFixed(2)}` : undefined}
 						>

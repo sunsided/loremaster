@@ -2,8 +2,8 @@
 	import type { Snippet } from 'svelte';
 
 	interface Props {
-		/** The accessible name of the chip, for example "AI jobs: drafting, 12 seconds". */
-		label: string;
+		/** Words for screen readers after the text of the chip, for example "Show the AI jobs." */
+		hint: string;
 		/** What the chip shows on the status line. */
 		chip: Snippet;
 		/** The heading of the tray, for example "AI · lantern serve". */
@@ -15,7 +15,7 @@
 		open?: boolean;
 	}
 
-	let { label, chip, title, meta, children, open = $bindable(false) }: Props = $props();
+	let { hint, chip, title, meta, children, open = $bindable(false) }: Props = $props();
 	let root: HTMLElement | undefined = $state();
 	let button: HTMLButtonElement | undefined = $state();
 	let panel: HTMLElement | undefined = $state();
@@ -71,10 +71,9 @@
 		bind:this={button}
 		type="button"
 		class="chip"
-		aria-label={label}
 		aria-expanded={open}
 		aria-controls="{id}-tray"
-		onclick={toggle}>{@render chip()}<span class="caret" aria-hidden="true">▾</span></button
+		onclick={toggle}>{@render chip()}<span class="visually-hidden">. {hint}</span><span class="caret" aria-hidden="true">▾</span></button
 	>
 	<div class="tray" id="{id}-tray" role="group" aria-labelledby="{id}-title" tabindex="-1" bind:this={panel} hidden={!open} style:top="{place.top}px" style:left="{place.left}px">
 		<p class="head"><span id="{id}-title" class="title">{title}</span>{#if meta}<span class="meta">{meta}</span>{/if}</p>
@@ -150,5 +149,13 @@
 	}
 	.body {
 		padding: var(--space-4);
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 </style>
