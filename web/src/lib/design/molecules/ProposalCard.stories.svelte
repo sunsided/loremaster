@@ -20,7 +20,7 @@
 		parameters: {
 			docs: {
 				description: {
-					component: `An AI proposal from \`lantern serve\`: its id and summary, whether the story builds with it, and Accept and Reject.
+					component: `An AI proposal from \`loremaster serve\`: its id and summary, whether the story builds with it, and Accept and Reject.
 
 - In write mode the card sits in the margin next to its ghost text. In Atlas › AI it is \`full\`: it also lists the changes and the problems.
 - Accept is off while the proposal has problems. Accept applies the proposal to the working copy of the editor (only when the files did not change since the proposal), then tells the server.

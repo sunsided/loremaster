@@ -1,0 +1,21 @@
+[package]
+name = "loremaster-lang"
+description = "Condition expressions and inline text markup for loremaster stories."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+dramaturge-model.workspace = true
+loremaster-model.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+assert2.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

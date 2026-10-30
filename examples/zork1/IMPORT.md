@@ -1,6 +1,6 @@
 # Import report: Zork I: The Great Underground Empire
 
-lantern-zil makes this file. Do not edit it. Run the importer again to make it new.
+loremaster-zil makes this file. Do not edit it. Run the importer again to make it new.
 
 ## Summary
 
@@ -228,7 +228,7 @@ A routine decides these exits in the original. The importer uses hints from `hin
 
 ## Things in a different place
 
-A lantern thing is in one room, or nowhere. These things are in a container, in more than one room, or not visible in the original.
+A loremaster thing is in one room, or nowhere. These things are in a container, in more than one room, or not visible in the original.
 
 | Thing | Note |
 | --- | --- |

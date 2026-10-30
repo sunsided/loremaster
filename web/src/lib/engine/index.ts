@@ -1,4 +1,4 @@
-import init, { Engine as WasmEngine, newStory as wasmNewStory, projectNotes, projectThreads } from './pkg/lantern-wasm.js';
+import init, { Engine as WasmEngine, newStory as wasmNewStory, projectNotes, projectThreads } from './pkg/loremaster-wasm.js';
 import type {
 	AuthorCommand,
 	AtlasRoom,

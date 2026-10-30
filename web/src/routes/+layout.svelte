@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-	<title>lantern</title>
+	<title>loremaster</title>
 </svelte:head>
 
 {@render children()}

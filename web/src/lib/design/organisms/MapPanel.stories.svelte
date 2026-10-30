@@ -24,7 +24,7 @@ Each room has its grid position from the story file (\`position\`). A room witho
 - A hidden exit has a dashed line. A one-way exit has an arrow.
 - Up, down, in, out and named exits have a label, because the line alone does not show the direction.
 - An exit that only prints a message (it leads nowhere) is a short line out of the room that ends in a bar.
-- **AI proposals**: while \`lantern serve\` has open proposals that add or remove rooms or exits, the map shows them. What a proposal adds is dashed in the ghost colour, and a new room has ✦ before its name. What it removes is in the warning colour, and a removed room is struck through. The legend explains the marks, and the list for screen readers says "proposed by AI" or "an AI proposal removes it".
+- **AI proposals**: while \`loremaster serve\` has open proposals that add or remove rooms or exits, the map shows them. What a proposal adds is dashed in the ghost colour, and a new room has ✦ before its name. What it removes is in the warning colour, and a removed room is struck through. The legend explains the marks, and the list for screen readers says "proposed by AI" or "an AI proposal removes it".
 
 The drawing is for sighted users only. The same facts are in a list for screen readers: each room with its state, then each connection.
 

@@ -30,7 +30,7 @@
 
 <Story name="AI jobs" asChild>
 	<div style="padding: 8px; background: var(--color-status-bg); color: var(--color-status-text); font-family: var(--font-ui); font-size: var(--font-size-sm); font-weight: var(--font-weight-strong);">
-		<StatusTray hint="Show the AI jobs." title="AI · lantern serve" meta="$0.04">
+		<StatusTray hint="Show the AI jobs." title="AI · loremaster serve" meta="$0.04">
 			{#snippet chip()}✦ drafting… 12 s{/snippet}
 			<AiStatus {jobs} oncancel={fn()} onproposals={fn()} />
 		</StatusTray>
@@ -38,7 +38,7 @@
 </Story>
 <Story name="Open" asChild>
 	<div style="min-height: 320px; padding: 8px; background: var(--color-status-bg); color: var(--color-status-text); font-family: var(--font-ui); font-size: var(--font-size-sm); font-weight: var(--font-weight-strong);">
-		<StatusTray hint="Show the AI jobs." title="AI · lantern serve" meta="$0.04" open>
+		<StatusTray hint="Show the AI jobs." title="AI · loremaster serve" meta="$0.04" open>
 			{#snippet chip()}✦ 2 proposals{/snippet}
 			<AiStatus {jobs} differ={['rooms/shore.yaml']} oncancel={fn()} onlink={fn()} onproposals={fn()} />
 		</StatusTray>

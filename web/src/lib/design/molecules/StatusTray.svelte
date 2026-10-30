@@ -6,7 +6,7 @@
 		hint: string;
 		/** What the chip shows on the status line. */
 		chip: Snippet;
-		/** The heading of the tray, for example "AI · lantern serve". */
+		/** The heading of the tray, for example "AI · loremaster serve". */
 		title: string;
 		/** A short fact at the right of the heading, for example "$0.31". */
 		meta?: string;

@@ -1,6 +1,8 @@
 // Which panel sections the user folded. The choice stays in browser storage when it is available.
 
-const KEY = 'lantern.sections.closed';
+import '#lib/migrate.ts';
+
+const KEY = 'loremaster.sections.closed';
 
 function read(): string[] {
 	try {

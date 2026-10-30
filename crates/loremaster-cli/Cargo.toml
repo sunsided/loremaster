@@ -1,0 +1,24 @@
+[package]
+name = "loremaster-cli"
+description = "Terminal player and checker for loremaster stories."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "loremaster"
+path = "src/main.rs"
+
+[dependencies]
+loremaster-mcp.workspace = true
+loremaster-project.workspace = true
+loremaster-runtime.workspace = true
+
+[features]
+# The `loremaster` binary serves the web editor. Build the web app first: `task build:local`.
+embed-ui = ["loremaster-mcp/embed-ui"]
+
+[lints]
+workspace = true

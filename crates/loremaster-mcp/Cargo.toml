@@ -1,0 +1,23 @@
+[package]
+name = "loremaster-mcp"
+description = "MCP server and proposal endpoints for loremaster projects: `loremaster mcp` (stdio) and `loremaster serve` (local HTTP)."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+loremaster-project.workspace = true
+loremaster-tools.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tiny_http.workspace = true
+include_dir = { workspace = true, optional = true }
+
+[features]
+# Embed the built web app (web/build) and serve it at `/`. Run `task web:build` first.
+embed-ui = ["dep:include_dir"]
+
+[lints]
+workspace = true

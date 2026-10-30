@@ -1,0 +1,11 @@
+# Trunk builds and watches the WASM crate; SvelteKit/Vite serves the app and
+# picks up the output as a normal module. See web/README note in the repo README.
+[build]
+target = "index.html"
+dist = "../../web/src/lib/engine/pkg"
+filehash = false
+# The SvelteKit app does its own HTML; we only want the .js/.wasm/.d.ts.
+inject_scripts = false
+
+[watch]
+watch = ["../loremaster-model", "../loremaster-lang", "../loremaster-project", "../loremaster-runtime", "src", "Cargo.toml"]

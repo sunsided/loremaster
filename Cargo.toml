@@ -1,15 +1,15 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/lantern-cli",
-    "crates/lantern-lang",
-    "crates/lantern-mcp",
-    "crates/lantern-model",
-    "crates/lantern-project",
-    "crates/lantern-runtime",
-    "crates/lantern-tools",
-    "crates/lantern-wasm",
-    "crates/lantern-zil",
+    "crates/loremaster-cli",
+    "crates/loremaster-lang",
+    "crates/loremaster-mcp",
+    "crates/loremaster-model",
+    "crates/loremaster-project",
+    "crates/loremaster-runtime",
+    "crates/loremaster-tools",
+    "crates/loremaster-wasm",
+    "crates/loremaster-zil",
 ]
 
 [workspace.package]
@@ -20,12 +20,12 @@ authors = ["Markus Mayer"]
 publish = false
 
 [workspace.dependencies]
-lantern-lang = { path = "crates/lantern-lang" }
-lantern-model = { path = "crates/lantern-model" }
-lantern-project = { path = "crates/lantern-project" }
-lantern-runtime = { path = "crates/lantern-runtime" }
-lantern-tools = { path = "crates/lantern-tools" }
-lantern-mcp = { path = "crates/lantern-mcp" }
+loremaster-lang = { path = "crates/loremaster-lang" }
+loremaster-model = { path = "crates/loremaster-model" }
+loremaster-project = { path = "crates/loremaster-project" }
+loremaster-runtime = { path = "crates/loremaster-runtime" }
+loremaster-tools = { path = "crates/loremaster-tools" }
+loremaster-mcp = { path = "crates/loremaster-mcp" }
 dramaturge-model = "0.1.0"
 dramaturge-runtime = "0.1.0"
 serde = { version = "1", features = ["derive", "rc"] }
@@ -43,5 +43,5 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 
-[profile.release.package.lantern-wasm]
+[profile.release.package.loremaster-wasm]
 opt-level = "s"

@@ -27,7 +27,7 @@ The view shows:
 5. **Never shown** fragments and **never fired** rules.
 
 "Replay this path" starts the game again and plays the path, so the author can continue from that state.
-The terminal command \`lantern explore <folder>\` prints the same report.`
+The terminal command \`loremaster explore <folder>\` prints the same report.`
 				}
 			}
 		}

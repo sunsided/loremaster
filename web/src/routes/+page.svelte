@@ -62,7 +62,7 @@
 	/** Walk in: a proposal played in a sandbox, before the author accepts it. Nothing in it is saved. */
 	let sandbox = $state.raw<{ proposal: string; summary: string; session: Session } | null>(null);
 	const session = $derived(sandbox?.session ?? workspace?.session ?? undefined);
-	const STORY_KEY = 'lantern.story';
+	const STORY_KEY = 'loremaster.story';
 	let mine = $state<StoryEntry[]>(myStories());
 	let storyName = $state(readStory());
 	let showNewStory = $state(false);
@@ -116,9 +116,9 @@
 		}
 	}
 	const problems = $derived(workspace?.problems ?? []);
-	// In development, the workspace is on `window.lantern` for experiments in the browser console.
+	// In development, the workspace is on `window.loremaster` for experiments in the browser console.
 	$effect(() => {
-		if (import.meta.env.DEV) (window as unknown as { lantern?: Workspace }).lantern = workspace;
+		if (import.meta.env.DEV) (window as unknown as { loremaster?: Workspace }).loremaster = workspace;
 	});
 	let failure = $state('');
 	let zipInput: HTMLInputElement | undefined = $state();
@@ -167,11 +167,11 @@
 		return kind === 'thing' || kind === 'exit' ? kind : null;
 	}
 
-	// AI proposals from `lantern serve`, when it runs.
+	// AI proposals from `loremaster serve`, when it runs.
 	const ai = new AiLink(() => settings.serveLink);
 	// Why the new story dialog cannot draft with AI now; null when it can.
 	const newStoryAi = $derived(
-		ai.reachable ? null : 'To draft with AI, start `lantern serve --bootstrap` and keep this page open.'
+		ai.reachable ? null : 'To draft with AI, start `loremaster serve --bootstrap` and keep this page open.'
 	);
 
 	/** The words that Tab completes in the command prompt: the verbs; the things in reach and carried, and the exits. */
@@ -1232,7 +1232,7 @@
 />
 
 <svelte:head>
-	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
+	<title>{session ? `${session.game.title} · loremaster` : 'loremaster'}</title>
 </svelte:head>
 
 {#snippet notesSection()}
@@ -1468,7 +1468,7 @@
 								onwalk={() => walkIn(p.id)}
 							/>
 						{:else}
-							<p class="muted-line">No open proposals. An assistant makes them through lantern serve.</p>
+							<p class="muted-line">No open proposals. An assistant makes them through loremaster serve.</p>
 						{/each}
 					</section>
 				{:else if atlasTab === 'state'}
@@ -1572,7 +1572,7 @@
 						<StatusTray
 							bind:open={aiTrayOpen}
 							hint="Show the AI jobs."
-							title="AI · lantern serve"
+							title="AI · loremaster serve"
 							meta={aiCost > 0 ? `$${aiCost.toFixed(2)}` : undefined}
 						>
 							{#snippet chip()}✦ {runningJob

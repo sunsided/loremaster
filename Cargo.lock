@@ -287,109 +287,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lantern-cli"
-version = "0.1.0"
-dependencies = [
- "lantern-mcp",
- "lantern-project",
- "lantern-runtime",
-]
-
-[[package]]
-name = "lantern-lang"
-version = "0.1.0"
-dependencies = [
- "assert2",
- "dramaturge-model",
- "lantern-model",
- "serde",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "lantern-mcp"
-version = "0.1.0"
-dependencies = [
- "include_dir",
- "lantern-project",
- "lantern-tools",
- "serde",
- "serde_json",
- "tiny_http",
-]
-
-[[package]]
-name = "lantern-model"
-version = "0.1.0"
-dependencies = [
- "assert2",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "lantern-project"
-version = "0.1.0"
-dependencies = [
- "assert2",
- "lantern-lang",
- "lantern-model",
- "serde",
- "serde-saphyr",
- "thiserror",
-]
-
-[[package]]
-name = "lantern-runtime"
-version = "0.1.0"
-dependencies = [
- "assert2",
- "dramaturge-model",
- "dramaturge-runtime",
- "lantern-lang",
- "lantern-model",
- "lantern-project",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "lantern-tools"
-version = "0.1.0"
-dependencies = [
- "assert2",
- "lantern-model",
- "lantern-project",
- "lantern-runtime",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "lantern-wasm"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "lantern-lang",
- "lantern-model",
- "lantern-project",
- "lantern-runtime",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "lantern-zil"
-version = "0.1.0"
-dependencies = [
- "assert2",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -406,6 +303,109 @@ name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+
+[[package]]
+name = "loremaster-cli"
+version = "0.1.0"
+dependencies = [
+ "loremaster-mcp",
+ "loremaster-project",
+ "loremaster-runtime",
+]
+
+[[package]]
+name = "loremaster-lang"
+version = "0.1.0"
+dependencies = [
+ "assert2",
+ "dramaturge-model",
+ "loremaster-model",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "loremaster-mcp"
+version = "0.1.0"
+dependencies = [
+ "include_dir",
+ "loremaster-project",
+ "loremaster-tools",
+ "serde",
+ "serde_json",
+ "tiny_http",
+]
+
+[[package]]
+name = "loremaster-model"
+version = "0.1.0"
+dependencies = [
+ "assert2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "loremaster-project"
+version = "0.1.0"
+dependencies = [
+ "assert2",
+ "loremaster-lang",
+ "loremaster-model",
+ "serde",
+ "serde-saphyr",
+ "thiserror",
+]
+
+[[package]]
+name = "loremaster-runtime"
+version = "0.1.0"
+dependencies = [
+ "assert2",
+ "dramaturge-model",
+ "dramaturge-runtime",
+ "loremaster-lang",
+ "loremaster-model",
+ "loremaster-project",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "loremaster-tools"
+version = "0.1.0"
+dependencies = [
+ "assert2",
+ "loremaster-model",
+ "loremaster-project",
+ "loremaster-runtime",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "loremaster-wasm"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "loremaster-lang",
+ "loremaster-model",
+ "loremaster-project",
+ "loremaster-runtime",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "loremaster-zil"
+version = "0.1.0"
+dependencies = [
+ "assert2",
+]
 
 [[package]]
 name = "memchr"

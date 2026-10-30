@@ -11,7 +11,7 @@
 		parameters: {
 			docs: {
 				description: {
-					component: `The AI help for the current room, in the room desk. It shows only while \`lantern serve\` runs.
+					component: `The AI help for the current room, in the room desk. It shows only while \`loremaster serve\` runs.
 
 - **Review this room** starts the job \`review_room\` for the current room. While the review runs, the button shows the time and you cannot click it.
 - **Findings**: the number of findings of the last review of this room. The findings are notes in the margin, next to their lines. This block does not show them again.

@@ -1,0 +1,22 @@
+[package]
+name = "loremaster-tools"
+description = "The operations an AI assistant may do on a loremaster project: read, play and verify. No IO."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+loremaster-model.workspace = true
+loremaster-project.workspace = true
+loremaster-runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+assert2.workspace = true
+
+[lints]
+workspace = true

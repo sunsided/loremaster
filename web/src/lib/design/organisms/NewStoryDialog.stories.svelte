@@ -16,7 +16,7 @@ The author gives a title. The idea is optional:
 - Without an idea, the story has one room with a placeholder text.
 - With an idea, the AI drafts two or three connected rooms as one proposal. The author accepts or rejects it.
 
-When \`lantern serve\` does not run, the idea field still shows, with the reason in its help text. Then the dialog makes the empty story.
+When \`loremaster serve\` does not run, the idea field still shows, with the reason in its help text. Then the dialog makes the empty story.
 
 It is a modal \`dialog\`. When it opens, focus goes to the title. Escape closes it. Enter in the title creates the story.`
 				},
@@ -42,7 +42,7 @@ It is a modal \`dialog\`. When it opens, focus goes to the title. Escape closes 
 	<p>{made}</p>
 	<NewStoryDialog
 		bind:open
-		aiUnavailable="Start `lantern serve` for this story to use the AI."
+		aiUnavailable="Start `loremaster serve` for this story to use the AI."
 		oncreate={(s) => (made = `Created “${s.title}”.`)}
 	/>
 </Story>
