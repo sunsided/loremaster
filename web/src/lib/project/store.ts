@@ -98,6 +98,14 @@ export async function saveWorkingFile(story: string, path: string, text: string)
 	return true;
 }
 
+/** Remove one file of the working copy. */
+export async function removeWorkingFile(story: string, path: string): Promise<boolean> {
+	const base = await root();
+	if (!base) return false;
+	await removeFile(await base.getDirectoryHandle(story, { create: true }), path);
+	return true;
+}
+
 /** Remove the working copy of a story, so that the bundled files show again. */
 export async function dropWorkingCopy(story: string) {
 	const base = await root();

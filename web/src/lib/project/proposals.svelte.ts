@@ -257,13 +257,16 @@ export class AiLink {
 	 * the new rooms. The seed of a new story does this: the server's folder is the editor's story.
 	 */
 	async #accept(view: ProposalView, workspace: Workspace, serverWrites = false): Promise<string | null> {
-		const changes: { path: string; text: string }[] = [];
+		const changes: { path: string; text: string | null }[] = [];
 		for (const f of view.files) {
 			const now = workspace.project.file(f.path)?.text ?? null;
 			if (f.base_sha !== null && (now === null || (await sha256(now)) !== f.base_sha))
 				return `The file ${f.path} changed after the proposal was made. Reject it, or ask for a new one.`;
 			if (f.base_sha === null && now !== null) return `The file ${f.path} exists now. The proposal wanted to make it.`;
-			if (f.after === null) return `The proposal deletes ${f.path}. The editor cannot delete files yet; accept it in the server.`;
+			if (f.after === null) {
+				changes.push({ path: f.path, text: null });
+				continue;
+			}
 			// Keep the lines that the proposal did not change byte for byte.
 			changes.push({ path: f.path, text: now === null ? f.after : keepLines(now, f.after) });
 		}

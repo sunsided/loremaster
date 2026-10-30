@@ -117,6 +117,20 @@ export function addExit(text: string, direction: Direction, to: string): string 
 	return keepLines(text, doc.toString({ lineWidth: 0, flowCollectionPadding: true }));
 }
 
+/** Add a message exit to a room file: a move in that direction only prints the message. It replaces a message exit there. */
+export function addMessageExit(text: string, direction: Direction, message: string): string {
+	const doc = parseDocument(text);
+	let exits = doc.get('exits', true);
+	if (!isSeq(exits)) {
+		exits = new YAMLSeq();
+		doc.set('exits', exits);
+	}
+	const old = (exits as YAMLSeq).items.find((e) => e instanceof YAMLMap && e.get('direction') === direction && !e.has('to'));
+	if (old instanceof YAMLMap) old.set('blocked', message);
+	else (exits as YAMLSeq).add(flow({ direction, blocked: message }));
+	return keepLines(text, doc.toString({ lineWidth: 0, flowCollectionPadding: true }));
+}
+
 /** A new thing file, in a room. */
 export function thingFile(o: { name: string; room: string; proper?: boolean; portable?: boolean; listed?: boolean; props?: Record<string, boolean | number | string> }): string {
 	const lines = [`name: ${JSON.stringify(o.name)}`, `location: { room: ${o.room} }`];

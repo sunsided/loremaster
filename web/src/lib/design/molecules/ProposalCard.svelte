@@ -10,20 +10,35 @@
 		onreject: (note?: string) => void;
 		/** A problem from the last action, for example "The file changed after the proposal was made". */
 		problem?: string | null;
+		/** Play the story with the proposal in a sandbox. When set, the card offers Walk in. */
+		onwalk?: () => void;
 	}
 
-	let { proposal, full = false, onaccept, onreject, problem = null }: Props = $props();
+	let { proposal, full = false, onaccept, onreject, problem = null, onwalk }: Props = $props();
 	const id = $props.id();
 	let rejecting = $state(false);
 	let note = $state('');
+
+	/** Keys while the focus is in the card, not in the note: A accepts, R rejects, W walks in. */
+	function keys(e: KeyboardEvent) {
+		if (e.ctrlKey || e.metaKey || e.altKey || e.target instanceof HTMLInputElement) return;
+		const key = e.key.toLowerCase();
+		if (key === 'a' && proposal.ok) onaccept();
+		else if (key === 'r') rejecting = true;
+		else if (key === 'w' && onwalk) onwalk();
+		else return;
+		e.preventDefault();
+	}
 </script>
 
 <!--
 	An AI proposal: its summary, whether the story builds with it, and Accept and Reject.
 	Accept is off while the proposal has problems. The card sits next to its ghost text in the margin,
-	and in Atlas › Proposals.
+	and in Atlas › Proposals. With the focus in the card, A accepts, R rejects and W walks in.
+	Alt+P moves the focus to the next proposal card on the page.
 -->
-<section class="proposal" aria-labelledby="{id}-title">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<section class="proposal" aria-labelledby="{id}-title" data-proposal={proposal.id} tabindex="-1" onkeydown={keys}>
 	<p class="head" id="{id}-title"><span aria-hidden="true">✦ </span>Proposal {proposal.id} · {proposal.summary}</p>
 	<p class="check" class:bad={!proposal.ok || proposal.stale}>
 		{#if !proposal.ok}{proposal.problems.length} {proposal.problems.length === 1 ? 'problem' : 'problems'}{:else if proposal.stale}a file
@@ -61,8 +76,9 @@
 		</form>
 	{:else}
 		<div class="actions">
-			<button type="button" class="accept" disabled={!proposal.ok} onclick={onaccept}>Accept</button>
-			<button type="button" onclick={() => (rejecting = true)}>Reject…</button>
+			<button type="button" class="accept" disabled={!proposal.ok} onclick={onaccept} aria-keyshortcuts="A" title="Accept (A)">Accept</button>
+			{#if onwalk}<button type="button" onclick={onwalk} aria-keyshortcuts="W" title="Play it in a sandbox first (W)">Walk in</button>{/if}
+			<button type="button" onclick={() => (rejecting = true)} aria-keyshortcuts="R" title="Reject (R)">Reject…</button>
 		</div>
 	{/if}
 </section>
@@ -141,6 +157,10 @@
 	}
 	button:disabled {
 		opacity: 0.5;
+	}
+	.proposal:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
 	}
 	button:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-focus);

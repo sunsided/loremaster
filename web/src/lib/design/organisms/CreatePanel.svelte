@@ -33,6 +33,8 @@
 	let target = $state<string>('new');
 	let title = $state(untrack(() => name));
 	let back = $state(true);
+	/** For a message exit: what a move in that direction prints. */
+	let message = $state('');
 	let portable = $state(untrack(() => kind === 'thing'));
 	let proper = $state(false);
 	let busy = $state(false);
@@ -49,6 +51,7 @@
 		kind === 'exit' ? `New exit from ${here}` : kind === 'character' ? `New character in ${here}` : `New thing in ${here}`
 	);
 	const needsName = $derived(kind !== 'exit' || target === 'new');
+	const isMessage = $derived(kind === 'exit' && target === 'message');
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -57,10 +60,19 @@
 			nameInput?.focus();
 			return;
 		}
+		if (isMessage && !message.trim()) {
+			problem = 'Write the message.';
+			return;
+		}
 		busy = true;
 		problem = await onsubmit(
 			kind === 'exit'
-				? { kind, direction: dir, to: target === 'new' ? { name: title.trim() } : { id: target }, back }
+				? {
+						kind,
+						direction: dir,
+						to: target === 'new' ? { name: title.trim() } : target === 'message' ? { message: message.trim() } : { id: target },
+						back: back && !isMessage
+					}
 				: { kind, name: title.trim(), portable: kind === 'thing' && portable, proper }
 		);
 		busy = false;
@@ -87,7 +99,22 @@
 				<Select
 					label="Leads to"
 					bind:value={target}
-					options={[{ value: 'new', label: 'a new room' }, ...rooms.map((r) => ({ value: r.id, label: r.name }))]}
+					options={[
+						{ value: 'new', label: 'a new room' },
+						{ value: 'message', label: 'nowhere, only a message' },
+						...rooms.map((r) => ({ value: r.id, label: r.name }))
+					]}
+				/>
+			</div>
+		{/if}
+		{#if isMessage}
+			<div class="name">
+				<TextInput
+					id="{id}-message"
+					label="What a move there prints"
+					bind:value={message}
+					autocomplete="off"
+					placeholder="Cold surf breaks over the rocks."
 				/>
 			</div>
 		{/if}
@@ -104,7 +131,7 @@
 			</div>
 		{/if}
 		<div class="row">
-			{#if kind === 'exit'}<Checkbox bind:checked={back}>with the way back</Checkbox>{/if}
+			{#if kind === 'exit' && !isMessage}<Checkbox bind:checked={back}>with the way back</Checkbox>{/if}
 			{#if kind === 'thing'}<Checkbox bind:checked={portable}>the player can take it</Checkbox>{/if}
 			{#if kind === 'character'}<Checkbox bind:checked={proper}>proper name, without "the"</Checkbox>{/if}
 		</div>

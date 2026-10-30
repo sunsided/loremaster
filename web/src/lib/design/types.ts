@@ -137,7 +137,8 @@ export interface WriterTools {
 
 /** What the author asks to create in the game. */
 export type CreateRequest =
-	| { kind: 'exit'; direction: string; to: { name: string } | { id: string }; back: boolean }
+	/** `to`: a new room by name, a room by id, or no room: a message exit that only prints `message`. */
+	| { kind: 'exit'; direction: string; to: { name: string } | { id: string } | { message: string }; back: boolean }
 	| { kind: 'thing' | 'character'; name: string; portable: boolean; proper: boolean };
 
 /** An action in a MenuButton. */

@@ -53,11 +53,21 @@ export class Session {
 	focus = $state<number | null>(null);
 	#next = 0;
 
-	constructor(game: Game) {
+	/** `first` is the first turn to show; by default the game starts from its beginning. */
+	constructor(game: Game, first?: Turn) {
 		this.game = game;
 		this.verbs = game.verbs();
 		this.phases = game.phases();
-		this.#push(game.start());
+		this.#push(first ?? game.start());
+	}
+
+	/**
+	 * A sandbox: this game state in another build of the story, for example the files of an AI proposal.
+	 * The new session starts with the room text; this session does not change.
+	 */
+	sandbox(game: Game): Session {
+		game.carryOver(this.game);
+		return new Session(game, game.describe());
 	}
 
 	/** The verb bar: Walk to and Look around first, then the verbs that take things. */

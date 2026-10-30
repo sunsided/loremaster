@@ -46,6 +46,8 @@
 		ghosts?: GhostLine[];
 		proposals?: ProposalSummary[];
 		onproposal?: (id: string, action: 'accept' | 'reject', note?: string) => void;
+		/** Play a proposal in a sandbox before the author accepts it. */
+		onwalk?: (id: string) => void;
 		/** A problem from the last proposal action, by proposal id. */
 		proposalProblems?: Record<string, string>;
 		/** A preview of the room text in other values. It shows in place of the newest room text, marked. */
@@ -80,6 +82,7 @@
 		ghosts = [],
 		proposals = [],
 		onproposal,
+		onwalk,
 		proposalProblems = {}
 	}: Props = $props();
 
@@ -280,6 +283,7 @@
 					problem={proposalProblems[card.id] ?? null}
 					onaccept={() => onproposal?.(card.id, 'accept')}
 					onreject={(note) => onproposal?.(card.id, 'reject', note)}
+					onwalk={onwalk ? () => onwalk(card.id) : undefined}
 				/>
 			</div>
 		{:else}
