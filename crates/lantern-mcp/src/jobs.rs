@@ -6,7 +6,7 @@
 //! its own thread; the server stays free to answer the agent's MCP calls.
 //!
 //! Set `LANTERN_CLAUDE` to the `claude` program to use (default: `claude` on
-//! the `PATH`) and `LANTERN_CLAUDE_MODEL` to pick a model.
+//! the `PATH`) and `LANTERN_CLAUDE_MODEL` to pick a model (default: `sonnet`).
 
 use serde::Serialize;
 use serde_json::Value;
@@ -46,8 +46,9 @@ pub struct Job {
     pub proposals: Vec<String>,
     /// The agent's session, to continue it later.
     pub agent_session: Option<String>,
-    /// The model of the job: the `model` of the request, or else `LANTERN_CLAUDE_MODEL`.
-    /// `None` when neither is set, so that Claude Code uses its default model.
+    /// The model of the job: the `model` of the request, or else `LANTERN_CLAUDE_MODEL`
+    /// (default `sonnet`). `None` when `LANTERN_CLAUDE_MODEL` is empty, so that Claude Code
+    /// uses its own default model.
     pub model: Option<String>,
     pub cost_usd: Option<f64>,
 }
@@ -66,16 +67,17 @@ pub struct Agent {
 }
 
 impl Agent {
-    /// Claude Code, from `LANTERN_CLAUDE`, `LANTERN_CLAUDE_MODEL` and
-    /// `LANTERN_CLAUDE_EFFORT` (default `low`; empty for Claude Code's default).
+    /// Claude Code, from `LANTERN_CLAUDE`, `LANTERN_CLAUDE_MODEL` (default `sonnet`)
+    /// and `LANTERN_CLAUDE_EFFORT` (default `low`). An empty model or effort gives
+    /// Claude Code's own default.
+    ///
+    /// Sonnet is the default because a job is a short, tool-heavy task: it is about
+    /// as fast as larger models and uses less than half of the plan's quota.
     pub fn from_env() -> Self {
         Self {
             program: std::env::var("LANTERN_CLAUDE").unwrap_or_else(|_| "claude".into()),
-            model: std::env::var("LANTERN_CLAUDE_MODEL").ok(),
-            effort: match std::env::var("LANTERN_CLAUDE_EFFORT") {
-                Ok(e) => Some(e).filter(|e| !e.trim().is_empty()),
-                Err(_) => Some("low".into()),
-            },
+            model: setting(std::env::var("LANTERN_CLAUDE_MODEL").ok(), DEFAULT_MODEL),
+            effort: setting(std::env::var("LANTERN_CLAUDE_EFFORT").ok(), "low"),
         }
     }
 
@@ -106,6 +108,17 @@ impl Agent {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         cmd
+    }
+}
+
+/// The model of a job when neither the request nor `LANTERN_CLAUDE_MODEL` names one.
+pub const DEFAULT_MODEL: &str = "sonnet";
+
+/// A setting from the environment: the default when it is not set, none when it is empty.
+fn setting(value: Option<String>, default: &str) -> Option<String> {
+    match value {
+        Some(v) => Some(v).filter(|v| !v.trim().is_empty()),
+        None => Some(default.into()),
     }
 }
 
@@ -442,6 +455,12 @@ mod tests {
         let blank = agent.command("hello", "{}", Some(" "));
         assert!(blank.get_args().any(|a| a == "haiku"));
         assert_eq!(pick_model(Some(""), Some("")), None);
+        assert_eq!(setting(None, DEFAULT_MODEL).as_deref(), Some("sonnet"));
+        assert_eq!(setting(Some("".into()), DEFAULT_MODEL), None);
+        assert_eq!(
+            setting(Some("opus".into()), DEFAULT_MODEL).as_deref(),
+            Some("opus")
+        );
         assert!(args.iter().any(|a| a == "--strict-mcp-config"));
     }
 
