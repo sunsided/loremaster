@@ -99,7 +99,7 @@ export function roomFile(o: { name: string; position: [number, number]; level?: 
 	return `${lines.join('\n')}\n`;
 }
 
-/** Add an exit to a room file. */
+/** Add an exit to a room file. A message exit (no `to`) in that direction becomes the new exit. */
 export function addExit(text: string, direction: Direction, to: string): string {
 	const doc = parseDocument(text);
 	let exits = doc.get('exits', true);
@@ -107,7 +107,13 @@ export function addExit(text: string, direction: Direction, to: string): string 
 		exits = new YAMLSeq();
 		doc.set('exits', exits);
 	}
-	(exits as YAMLSeq).add(flow({ direction, to }));
+	const message = (exits as YAMLSeq).items.find((e) => e instanceof YAMLMap && e.get('direction') === direction && !e.has('to'));
+	if (message instanceof YAMLMap) {
+		message.delete('blocked');
+		message.set('to', to);
+	} else {
+		(exits as YAMLSeq).add(flow({ direction, to }));
+	}
 	return keepLines(text, doc.toString({ lineWidth: 0, flowCollectionPadding: true }));
 }
 
