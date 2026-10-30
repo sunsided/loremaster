@@ -40,8 +40,11 @@ To let Claude Code use only the lantern tools, start it like this:
 ```sh
 claude -p "Review the room shore." \
   --mcp-config lantern-mcp.json --strict-mcp-config \
-  --allowedTools "mcp__lantern__*" --disallowedTools Bash Edit Write
+  --tools "ToolSearch,ListMcpResourcesTool,ReadMcpResourceTool" \
+  --allowedTools "mcp__lantern__*,ToolSearch,ListMcpResourcesTool,ReadMcpResourceTool"
 ```
+
+`--tools` turns off the built-in tools, for example Read, Grep and Bash. The three tools in the list stay on: Claude Code needs them to read the guide resource and to find deferred tools. Do not use `--tools ""`: then Claude Code cannot read the guide.
 
 The file `lantern-mcp.json` contains:
 
@@ -66,6 +69,61 @@ The file `lantern-mcp.json` contains:
 | Play | `session_start`, `input`, `act`, `author`, `scene`, `assembly`, `room_parts`, `inspect`, `vars`, `rules`, `verbs`, `map`, `save` |
 
 The server also gives this guide as a resource: `lantern://guide/writing-stories`.
+
+## Task prompts
+
+A task prompt is a request for one task. The editor and MCP clients use the same prompts. Thus a task works the same in the editor and in an assistant.
+
+| Prompt | Arguments | What the assistant does |
+| --- | --- | --- |
+| `imagine_exit` | `room`, `direction`. Optional: `session`, `rejected`. | The player tried to go in a direction that has no exit. The assistant makes 3 proposals of different kinds, for example a new room, a hidden exit or a scenery thing. It replies with one line for each proposal: the id and a short pitch. |
+| `review_room` | `room`. Optional: `session`. | The assistant reads the room in all its states and in its surroundings. It replies with a list of findings: the fragment, how serious the problem is, the problem and the fix. It makes one proposal for the clear fixes. |
+
+`session` is the play session that has the state of the player. The default is `main`. The assistant does not change this session. `rejected` is a list of ideas that the author rejected before, one on each line. The assistant does not offer these ideas again.
+
+An MCP client gets the prompts with `prompts/list`. It gets the text of one prompt with `prompts/get`, for example:
+
+```json
+{ "jsonrpc": "2.0", "id": 1, "method": "prompts/get",
+  "params": { "name": "imagine_exit", "arguments": { "room": "shore", "direction": "down" } } }
+```
+
+## Jobs
+
+A job is one task prompt that `lantern serve` gives to Claude Code. The editor starts a job with `POST /jobs`. Then it reads the progress with `GET /jobs/<id>`.
+
+The server starts `claude -p` with the login of the user, for example a Max plan. Claude Code connects to the server at `/mcp` and gets only the lantern tools, the MCP resources and the search for deferred tools. It cannot read files, search files or run commands on the computer. Thus it can only read, play and propose.
+
+These environment variables change the agent:
+
+| Variable | Contents |
+| --- | --- |
+| `LANTERN_CLAUDE` | The `claude` program. The default is `claude` on the `PATH`. |
+| `LANTERN_CLAUDE_MODEL` | The model, for example `sonnet`. If you do not set it, Claude Code uses its default model. |
+
+The body of `POST /jobs` has these fields:
+
+| Field | Contents |
+| --- | --- |
+| `task` | The name of a task prompt, for example `imagine_exit`. |
+| `args` | The arguments of the prompt, as an object. |
+| `state` | Optional. A state that the editor saved. The server starts a new session `job-<id>` from this state, and the job uses that session. |
+
+For `imagine_exit`, if `args` has no `rejected`, the server adds the last 20 rejected proposals from `.lantern/rejected.jsonl`.
+
+The reply is `{ "id": "j1" }` with status 202. A job has these fields:
+
+| Field | Contents |
+| --- | --- |
+| `id`, `task`, `args` | The id, the task prompt and its arguments. |
+| `status` | `running`, `done`, `failed` or `cancelled`. |
+| `events` | The steps of the job: `{ kind, text }`. `kind` is `tool` (the agent used a lantern tool; `text` is the tool name), `text` (the agent wrote text) or `error`. |
+| `result` | The last reply of the agent, or `null`. |
+| `proposals` | The ids of the proposals that the agent made and did not withdraw. |
+| `agent_session` | The Claude Code session id. |
+| `cost_usd` | The cost that Claude Code gave for the job. |
+
+When you cancel a job, the proposals that it made stay.
 
 ## Sessions
 
@@ -135,5 +193,9 @@ To play a proposal before you accept it, use `session_start` with `proposal`.
 | `GET /proposals/<id>` | Gives the view of one proposal. |
 | `POST /proposals/<id>/accept` | Writes the proposal into the project files, then removes the proposal. A proposal with errors is refused (status 409). A stale proposal is refused too, unless the body is `{ "force": true }`. If the editor wrote the change itself, send `{ "applied": true }`: the server then only removes the proposal. |
 | `POST /proposals/<id>/reject` | Removes the proposal. The body `{ "note": "why" }` is optional. The server adds the note to `.lantern/rejected.jsonl`. |
+| `POST /jobs` | Starts a job. See [Jobs](#jobs). The reply has status 202. |
+| `GET /jobs` | Gives all jobs. |
+| `GET /jobs/<id>` | Gives one job, with its status, events, result and proposals. |
+| `POST /jobs/<id>/cancel` | Stops a running job. |
 
 The server accepts requests only from `127.0.0.1`. A request from a browser must come from a page on `localhost`, `127.0.0.1` or `[::1]`. A `POST` must have `Content-Type: application/json`.
