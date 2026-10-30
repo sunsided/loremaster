@@ -12,9 +12,11 @@
 //! The tools read, play and verify. They do not change project files: an
 //! assistant suggests a change as a [`Proposal`], and a person accepts it.
 
+mod prompts;
 mod proposal;
 mod tools;
 
+pub use prompts::{PromptDef, prompts, prompts_json, render_prompt};
 pub use proposal::{Change, FileChange, PreviewText, Proposal, ProposalView, RoomPreview, sha256};
 
 pub use tools::{ToolDef, tools};
@@ -76,6 +78,11 @@ impl Workspace {
         };
         ws.reload(files);
         ws
+    }
+
+    /// End a play session. Returns false when there is no such session.
+    pub fn end_session(&mut self, name: &str) -> bool {
+        self.sessions.remove(name).is_some()
     }
 
     /// Replace the project files. Sessions keep their state where the new

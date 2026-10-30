@@ -12,9 +12,10 @@
 //! `.lantern/.gitignore` keeps them out of git; delete that line to track them.
 
 pub mod http;
+pub mod jobs;
 
 use lantern_project::read_dir;
-use lantern_tools::{Proposal, Workspace, tools};
+use lantern_tools::{Proposal, Workspace, prompts_json, render_prompt, tools};
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -76,6 +77,40 @@ impl Server {
         &self.ws
     }
 
+    /// Run one tool as an MCP call would: refresh first, save the proposals after.
+    pub fn call_tool(&mut self, name: &str, args: Value) -> Result<Value, String> {
+        self.refresh();
+        let result = self.ws.call(name, args);
+        self.save_proposals();
+        result.map_err(|e| e.0)
+    }
+
+    /// End a play session, for example the session of a job that did not start.
+    pub fn end_session(&mut self, name: &str) -> bool {
+        self.ws.end_session(name)
+    }
+
+    /// The summaries and notes of rejected proposals, newest last, at most `limit`.
+    pub fn rejected(&self, limit: usize) -> Vec<String> {
+        let log = self.root.join(".lantern").join("rejected.jsonl");
+        let text = std::fs::read_to_string(log).unwrap_or_default();
+        let lines: Vec<String> = text
+            .lines()
+            .filter_map(|l| serde_json::from_str::<Value>(l).ok())
+            .map(|v| {
+                // One line for each proposal, also when the note has line breaks.
+                let one_line = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+                let summary =
+                    one_line(v.get("summary").and_then(Value::as_str).unwrap_or_default());
+                match v.get("note").and_then(Value::as_str).map(one_line) {
+                    Some(note) => format!("- {summary} (rejected: {note})"),
+                    None => format!("- {summary}"),
+                }
+            })
+            .collect();
+        lines[lines.len().saturating_sub(limit)..].to_vec()
+    }
+
     /// Handle one JSON-RPC message. Returns the reply, or nothing for a notification.
     pub fn handle_line(&mut self, line: &str) -> Option<Value> {
         let msg: Value = match serde_json::from_str(line) {
@@ -117,7 +152,7 @@ impl Server {
                     .unwrap_or(PROTOCOL_VERSIONS[0]);
                 Ok(json!({
                     "protocolVersion": version,
-                    "capabilities": { "tools": {}, "resources": {} },
+                    "capabilities": { "tools": {}, "resources": {}, "prompts": {} },
                     "serverInfo": { "name": "lantern", "version": env!("CARGO_PKG_VERSION") },
                     "instructions": INSTRUCTIONS,
                 }))
@@ -149,6 +184,18 @@ impl Server {
                     Err(e) => (e.0, true),
                 };
                 Ok(json!({ "content": [{ "type": "text", "text": text }], "isError": is_error }))
+            }
+            "prompts/list" => Ok(json!({ "prompts": prompts_json() })),
+            "prompts/get" => {
+                let name = params
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let args = params.get("arguments").cloned().unwrap_or(Value::Null);
+                let text = render_prompt(name, &args).map_err(|e| (-32602, e.0))?;
+                Ok(json!({
+                    "messages": [{ "role": "user", "content": { "type": "text", "text": text } }],
+                }))
             }
             "resources/list" => Ok(json!({
                 "resources": [{
@@ -365,6 +412,17 @@ mod tests {
     }
 
     #[test]
+    fn a_rejected_note_stays_on_one_line() {
+        let dir = std::env::temp_dir().join(format!("lantern-rejected-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join(".lantern")).unwrap();
+        let entry = json!({ "summary": "A pier", "note": "too\nmodern" });
+        std::fs::write(dir.join(".lantern/rejected.jsonl"), format!("{entry}\n")).unwrap();
+        let s = Server::new(dir.clone()).unwrap();
+        assert_eq!(s.rejected(20), ["- A pier (rejected: too modern)"]);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
     fn initialize_answers_with_a_known_version() {
         let mut s = server();
         let r = send(&mut s, json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } })).unwrap();
@@ -424,7 +482,7 @@ mod tests {
         let mut s = server();
         let r = send(
             &mut s,
-            json!({ "jsonrpc": "2.0", "id": 5, "method": "prompts/list" }),
+            json!({ "jsonrpc": "2.0", "id": 5, "method": "sampling/nope" }),
         )
         .unwrap();
         assert_eq!(r["error"]["code"], -32601);
