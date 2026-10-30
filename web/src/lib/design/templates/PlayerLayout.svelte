@@ -156,9 +156,13 @@
 		.screen {
 			min-height: 85dvh;
 		}
+		/* On a phone the panel is a bottom sheet (fixed), so it takes no place in the page; the page keeps
+		   room at the bottom for the line of the sheet. */
 		.panel {
 			border-left: 0;
-			border-top: var(--size-border) solid var(--color-border-subtle);
+		}
+		.frame {
+			padding-bottom: calc(var(--size-target) + var(--space-5));
 		}
 	}
 </style>

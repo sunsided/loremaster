@@ -26,6 +26,7 @@
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
 	import HerePanel from '#lib/design/organisms/HerePanel.svelte';
+	import BottomSheet from '#lib/design/organisms/BottomSheet.svelte';
 	import StateSwitch from '#lib/design/atoms/StateSwitch.svelte';
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
@@ -620,6 +621,17 @@
 			texts: new Set(m.cells.map((c) => c.text)).size
 		};
 	});
+	/** The line of the bottom sheet on phones: exits, and the next rule that matters. */
+	const sheetSummary = $derived.by(() => {
+		const s = session;
+		if (!s) return '';
+		const parts = [`${s.scene.exits.length} ${s.scene.exits.length === 1 ? 'exit' : 'exits'}`];
+		const rule = s.rules.find((r) => r.relevant);
+		if (rule) parts.push(`${rule.id} ${rule.relevant}`);
+		if (Object.keys(previewValues).length) parts.unshift('PREVIEW');
+		return parts.join(' · ');
+	});
+
 	/** The values that the room text shows instead of the game: a preview. It never moves the game. */
 	let previewValues = $state<Record<string, string>>({});
 	$effect(() => {
@@ -972,7 +984,7 @@
 		{#snippet panel()}
 			{#if sideBySide && draft && writingAt && writingAt.fragment >= -1}
 				<div class="side-writer">{@render fragmentWriterView()}</div>
-			{:else}
+			{:else if sideBySide}
 				<HerePanel
 					map={hereMap}
 					switches={hereStates.switches}
@@ -994,6 +1006,30 @@
 					onthing={(id, name) => s.pickThing(id, name)}
 					onexit={(dir) => s.pickExit(dir)}
 				/>
+			{:else}
+				<BottomSheet title="Here" summary={sheetSummary}>
+					<HerePanel
+						map={hereMap}
+						switches={hereStates.switches}
+						texts={hereStates.texts}
+						preview={previewValues}
+						rules={s.rules.filter((r) => r.relevant)}
+						ruleCount={s.rules.length}
+						last={s.history.at(-1) ?? null}
+						things={s.scene.things}
+						exits={s.scene.exits}
+						onpreview={setPreview}
+						onreset={() => (previewValues = {})}
+						onapply={() => {
+							s.author({ type: 'situation', room: s.scene.room, values: Object.entries(previewValues) });
+							previewValues = {};
+						}}
+						onrule={showRule}
+						onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
+						onthing={(id, name) => s.pickThing(id, name)}
+						onexit={(dir) => s.pickExit(dir)}
+					/>
+				</BottomSheet>
 			{/if}
 		{/snippet}
 	</PlayerLayout>

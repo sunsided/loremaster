@@ -104,22 +104,7 @@
 			min-width: 0;
 		}
 		.wide,
-		.room-button {
-		padding: 0 var(--space-2);
-		margin-left: calc(-1 * var(--space-2));
-		border: var(--size-border) solid transparent;
-		background: none;
-		color: inherit;
-		font: inherit;
-	}
-	.room-button:hover {
-		border-color: var(--color-status-text);
-	}
-	.room-button:focus-visible {
-		outline: var(--size-focus-ring) solid var(--color-status-text);
-		outline-offset: 1px;
-	}
-	.level {
+		.level {
 			display: none;
 		}
 		.narrow {

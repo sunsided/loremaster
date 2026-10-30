@@ -89,7 +89,9 @@
 	--z-texture: 2;
 	--z-scanlines: 3;
 	--z-vignette: 4;
+	--z-sheet: 15; /* The bottom sheet on phones: over the page, under dialogs. */
 	--z-dialog: 20;
+	--motion-sheet: 160ms;
 }
 
 /* ---- Theme: phosphor (default) ---- */

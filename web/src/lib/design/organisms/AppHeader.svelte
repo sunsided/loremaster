@@ -132,6 +132,11 @@
 			white-space: nowrap;
 		}
 		.title {
+			display: block;
+			max-width: 9.5rem;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
 			font-size: var(--font-size-sm);
 		}
 	}

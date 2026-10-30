@@ -185,4 +185,21 @@
 			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 	}
+	/* Phone: the verbs are one row that scrolls sideways inside itself. */
+	@media (max-width: 599px) {
+		.verbs {
+			display: flex;
+			gap: var(--space-2);
+			overflow-x: auto;
+			padding-bottom: var(--space-2);
+			scrollbar-width: thin;
+		}
+		.verb {
+			flex: none;
+			margin-left: 0;
+			padding: 0 var(--space-3);
+			border: var(--size-border) solid var(--color-border-control);
+			overflow: visible;
+		}
+	}
 </style>
