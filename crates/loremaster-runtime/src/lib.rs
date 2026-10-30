@@ -27,12 +27,12 @@ pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, e
 pub use game::{
     AtlasRoom, AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game,
     Inspect, MapLink, MapRoom, MapView, MarkupCheck, PartView, PhaseView, RoomParts, RuleView,
-    Scene, TextError, ThingInfo, VarView, VerbInfo,
+    Scene, TalkOptionView, TalkView, TextError, ThingInfo, VarView, VerbInfo,
 };
 pub use matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix, room_matrix, text_matrix};
-pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
+pub use output::{Block, BlockKind, Choice, Link, LinkKind, LogEntry, Run, Source, TalkInfo, Turn};
 pub use parser::{Command, Preview};
-pub use state::{FragmentProgress, State};
+pub use state::{FragmentProgress, State, Talk};
 pub use text::{SourcePiece, SourceRole};
 pub use threads::ThreadReach;
 pub use world::{CompileError, World};

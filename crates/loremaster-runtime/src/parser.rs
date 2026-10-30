@@ -6,8 +6,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Command {
-    Verb { verb: Id, objects: Vec<Id> },
-    Go { direction: String },
+    Verb {
+        verb: Id,
+        objects: Vec<Id>,
+    },
+    Go {
+        direction: String,
+    },
+    /// Choose an answer in a talk, by its place in the list of choices (from 0).
+    Choose {
+        index: usize,
+    },
+    /// Leave a talk.
+    Leave,
 }
 
 /// What the parser can refer to right now.

@@ -145,7 +145,7 @@ impl Found {
                 Segment::Insert { operand, .. } => match operand {
                     Operand::Fact(name) => self.flag(Key::Fact(name.clone())),
                     Operand::Derived(d) => self.derived(d, &FactValue::Int(0)),
-                    Operand::ThingName(..) => {}
+                    Operand::ThingName(..) | Operand::Relation(..) => {}
                 },
                 Segment::Choice {
                     condition,

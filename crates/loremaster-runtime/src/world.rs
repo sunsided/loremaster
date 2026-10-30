@@ -1,5 +1,8 @@
-use dramaturge_model::Condition;
-use loremaster_lang::{LangError, Scope, Segment, compile_condition, compile_markup};
+use dramaturge_model::{Condition, DialogueNodeId, SymbolTable};
+use loremaster_lang::{
+    CompiledDialogue, LangError, Scope, Segment, compile_condition, compile_dialogue,
+    compile_markup,
+};
 use loremaster_model::{
     Effect, Fragment, FragmentMode, Id, Layer, Story, Value, VerbDef, standard_verbs,
 };
@@ -17,6 +20,9 @@ pub struct World {
     pub(crate) things: Vec<CThing>,
     pub(crate) rules: Vec<CRule>,
     pub(crate) frames: BTreeMap<Id, CFrame>,
+    pub(crate) dialogues: Vec<std::sync::Arc<CDialogue>>,
+    /// dramaturge ids of the player, things, memories, dialogue nodes and options.
+    pub symbols: SymbolTable,
     room_index: BTreeMap<Id, usize>,
     thing_index: BTreeMap<Id, usize>,
     /// The names that conditions and markup can use, for checks in the editor.
@@ -76,6 +82,34 @@ pub(crate) struct CFrame {
 pub(crate) struct CRule {
     pub when: Option<Condition>,
     pub then: Vec<CEffect>,
+}
+
+/// A dialogue lowered to a dramaturge graph, with its world effects compiled.
+#[derive(Debug, Clone)]
+pub(crate) struct CDialogue {
+    pub id: Id,
+    pub with: Id,
+    pub graph: CompiledDialogue,
+    /// The compiled `then` lists, by the index in their custom outcome.
+    pub effects: Vec<Vec<CEffect>>,
+    /// The node keys, in the order of the graph's nodes.
+    pub keys: Vec<String>,
+}
+
+impl CDialogue {
+    pub fn node(&self, id: DialogueNodeId) -> Option<&dramaturge_model::DialogueNode> {
+        self.graph.graph.nodes.iter().find(|n| n.id == id)
+    }
+
+    pub fn node_by_key(&self, key: &str) -> Option<&dramaturge_model::DialogueNode> {
+        let i = self.keys.iter().position(|k| k == key)?;
+        self.graph.graph.nodes.get(i)
+    }
+
+    pub fn key_of(&self, id: DialogueNodeId) -> Option<&str> {
+        let i = self.graph.graph.nodes.iter().position(|n| n.id == id)?;
+        self.keys.get(i).map(String::as_str)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -152,6 +186,17 @@ impl Compiler {
 }
 
 impl Compiler {
+    fn effect(&self, at: &str, e: &Effect) -> Result<CEffect, CompileError> {
+        Ok(match e {
+            Effect::Set(m) => CEffect::Set(m.clone()),
+            Effect::Add(m) => CEffect::Add(m.clone()),
+            Effect::Say(s) => CEffect::Say(self.markup(at, s)?),
+            Effect::Move(m) => CEffect::Move(m.clone()),
+            Effect::Goto(r) => CEffect::Goto(r.clone()),
+            Effect::End(s) => CEffect::End(self.markup(at, s)?),
+        })
+    }
+
     fn frames(
         &self,
         owner: &str,
@@ -241,21 +286,37 @@ impl World {
                     then: r
                         .then
                         .iter()
-                        .map(|e| {
-                            Ok(match e {
-                                Effect::Set(m) => CEffect::Set(m.clone()),
-                                Effect::Add(m) => CEffect::Add(m.clone()),
-                                Effect::Say(s) => CEffect::Say(c.markup(&at, s)?),
-                                Effect::Move(m) => CEffect::Move(m.clone()),
-                                Effect::Goto(r) => CEffect::Goto(r.clone()),
-                                Effect::End(s) => CEffect::End(c.markup(&at, s)?),
-                            })
-                        })
+                        .map(|e| c.effect(&at, e))
                         .collect::<Result<_, CompileError>>()?,
                 })
             })
             .collect::<Result<_, CompileError>>()?;
         let frames = c.frames("story", &story.frames)?;
+        let mut symbols = c.scope.symbols.clone();
+        let dialogues = story
+            .dialogues
+            .iter()
+            .map(|d| {
+                let owner = format!("dialogue:{}", d.id);
+                let graph =
+                    compile_dialogue(d, &c.scope, &mut symbols).map_err(|e| CompileError {
+                        at: format!("{owner}/{}", e.at),
+                        error: e.error,
+                    })?;
+                let effects = graph
+                    .effects
+                    .iter()
+                    .map(|list| list.iter().map(|e| c.effect(&owner, e)).collect())
+                    .collect::<Result<_, CompileError>>()?;
+                Ok(std::sync::Arc::new(CDialogue {
+                    id: d.id.clone(),
+                    with: d.with.clone(),
+                    graph,
+                    effects,
+                    keys: d.nodes.iter().map(|n| n.key.clone()).collect(),
+                }))
+            })
+            .collect::<Result<_, CompileError>>()?;
         let scope = c.scope.clone();
         let mut verbs = standard_verbs();
         verbs.extend(story.verbs.iter().cloned());
@@ -282,6 +343,8 @@ impl World {
             things,
             rules,
             frames,
+            dialogues,
+            symbols,
             room_index,
             thing_index,
         })
@@ -293,6 +356,15 @@ impl World {
 
     pub(crate) fn thing_idx(&self, id: &str) -> Option<usize> {
         self.thing_index.get(id).copied()
+    }
+
+    /// The dialogue of a thing.
+    pub(crate) fn dialogue_with(&self, thing: &str) -> Option<&std::sync::Arc<CDialogue>> {
+        self.dialogues.iter().find(|d| d.with.as_str() == thing)
+    }
+
+    pub(crate) fn dialogue(&self, id: &str) -> Option<&std::sync::Arc<CDialogue>> {
+        self.dialogues.iter().find(|d| d.id.as_str() == id)
     }
 
     pub fn verb(&self, id: &str) -> Option<&VerbDef> {
