@@ -274,7 +274,10 @@ fn exit(
                     let door = obj.atom().filter(|o| t.src.object(o).is_some());
                     match door {
                         Some(door) => e.door = Some(id(door)),
-                        None => report.exits.push(note(format!("door {}", show(obj)))),
+                        None => {
+                            report.exits.push(note(format!("door {}", show(obj))));
+                            return None;
+                        }
                     }
                 }
                 (_, [iff, flag]) if iff.is_atom("IF") => {
@@ -282,13 +285,19 @@ fn exit(
                         // With a message the exit is known but blocked; without one it is hidden.
                         Some(var) if blocked.is_some() => e.passable = Some(var),
                         Some(var) => e.visible = Some(var),
-                        None => report.exits.push(note(format!("condition {}", show(flag)))),
+                        None => {
+                            report.exits.push(note(format!("condition {}", show(flag))));
+                            return None;
+                        }
                     }
                 }
-                _ => report.exits.push(note(format!(
-                    "condition {}",
-                    cond.iter().map(show).collect::<Vec<_>>().join(" ")
-                ))),
+                _ => {
+                    report.exits.push(note(format!(
+                        "condition {}",
+                        cond.iter().map(show).collect::<Vec<_>>().join(" ")
+                    )));
+                    return None;
+                }
             }
             if e.passable.is_some() {
                 e.blocked = blocked;
@@ -558,6 +567,7 @@ mod tests {
         check!(field.exits[2].passable.as_deref() == Some("troll_flag"));
         check!(field.exits[2].blocked.as_deref() == Some("The troll stops you."));
         check!(w.report.message_exits.len() == 1);
+        check!(w.report.exits.is_empty());
         check!(w.story.vars.len() == 2);
         check!(w.rooms[1].position == (0, -1));
     }
@@ -576,6 +586,18 @@ mod tests {
         check!(door.props == vec![("open".to_string(), false)]);
         check!(w.report.placement.iter().any(|n| n.owner == "gem"));
         check!(w.report.placement.iter().any(|n| n.owner == "house"));
+    }
+
+    #[test]
+    fn drops_exits_with_untranslatable_conditions() {
+        let w = world(
+            r#"<DIRECTIONS NORTH>
+<GLOBAL COUNT 3>
+<ROOM A (DESC "A") (NORTH TO B IF COUNT)>
+<ROOM B (DESC "B")>"#,
+        );
+        check!(w.rooms[0].exits.is_empty());
+        check!(w.report.exits.len() == 1);
     }
 
     #[test]
