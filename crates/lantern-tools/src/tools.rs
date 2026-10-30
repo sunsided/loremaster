@@ -410,7 +410,7 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
             let list: Vec<Value> = ws
                 .proposals()
                 .map(|p| {
-                    let ok = ws.view_proposal(&p.id).is_ok_and(|v| v.ok);
+                    let ok = ws.proposal_ok(&p.id).unwrap_or(false);
                     json!({ "id": p.id, "summary": p.summary, "files": p.files.iter().map(|f| &f.path).collect::<Vec<_>>(), "delete": p.delete, "ok": ok })
                 })
                 .collect();

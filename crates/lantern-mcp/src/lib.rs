@@ -254,43 +254,46 @@ impl Server {
     /// With `applied`, the caller (the editor) already wrote the change itself,
     /// so only the proposal goes. A stale proposal, whose files changed since it
     /// was made, is refused unless `force`. Returns the paths written and deleted.
-    pub fn accept(&mut self, id: &str, applied: bool, force: bool) -> Result<Vec<String>, String> {
+    pub fn accept(&mut self, id: &str, applied: bool, force: bool) -> Result<Vec<String>, Refusal> {
         self.refresh();
         let p = self
             .ws
             .proposal(id)
             .cloned()
-            .ok_or_else(|| format!("There is no proposal `{id}`."))?;
+            .ok_or_else(|| Refusal::NotFound(format!("There is no proposal `{id}`.")))?;
         if applied {
             self.ws.remove_proposal(id);
             self.save_proposals();
             return Ok(Vec::new());
         }
-        let view = self.ws.view_proposal(id).map_err(|e| e.0)?;
+        let view = self
+            .ws
+            .view_proposal(id)
+            .map_err(|e| Refusal::NotFound(e.0))?;
         if !view.ok {
-            return Err(format!(
+            return Err(Refusal::Conflict(format!(
                 "Proposal `{id}` has errors. Fix them before you accept it."
-            ));
+            )));
         }
         if view.stale && !force {
-            return Err(format!(
+            return Err(Refusal::Conflict(format!(
                 "Proposal `{id}` is stale: a file it changes was changed after it was made. Accept with force to write it anyway."
-            ));
+            )));
         }
         let mut touched = Vec::new();
         for f in &p.files {
             let path = self.root.join(&f.path);
             if let Some(dir) = path.parent() {
-                std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+                std::fs::create_dir_all(dir).map_err(|e| Refusal::Io(e.to_string()))?;
             }
-            std::fs::write(&path, &f.text).map_err(|e| format!("{}: {e}", f.path))?;
+            std::fs::write(&path, &f.text).map_err(|e| Refusal::Io(format!("{}: {e}", f.path)))?;
             touched.push(f.path.clone());
         }
         for d in &p.delete {
             match std::fs::remove_file(self.root.join(d)) {
                 Ok(()) => touched.push(d.clone()),
                 Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-                Err(e) => return Err(format!("{d}: {e}")),
+                Err(e) => return Err(Refusal::Io(format!("{d}: {e}"))),
             }
         }
         self.ws.remove_proposal(id);
@@ -300,12 +303,12 @@ impl Server {
     }
 
     /// Remove a proposal without a change to the project. A note says why, for the next request.
-    pub fn reject(&mut self, id: &str, note: Option<&str>) -> Result<(), String> {
+    pub fn reject(&mut self, id: &str, note: Option<&str>) -> Result<(), Refusal> {
         self.refresh();
         let p = self
             .ws
             .remove_proposal(id)
-            .ok_or_else(|| format!("There is no proposal `{id}`."))?;
+            .ok_or_else(|| Refusal::NotFound(format!("There is no proposal `{id}`.")))?;
         self.save_proposals();
         let line = json!({ "id": p.id, "summary": p.summary, "note": note }).to_string();
         let log = self.root.join(".lantern").join("rejected.jsonl");
@@ -314,7 +317,7 @@ impl Server {
             .append(true)
             .open(&log)
             .and_then(|mut f| writeln!(f, "{line}"));
-        written.map_err(|e| format!("cannot write {}: {e}", log.display()))
+        written.map_err(|e| Refusal::Io(format!("cannot write {}: {e}", log.display())))
     }
 }
 
@@ -323,6 +326,25 @@ fn read_sorted(root: &Path) -> io::Result<Vec<lantern_project::SourceFile>> {
     let mut files = read_dir(root)?;
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(files)
+}
+
+/// Why `accept` or `reject` did not run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Refusal {
+    /// There is no such proposal.
+    NotFound(String),
+    /// The proposal has errors or is stale.
+    Conflict(String),
+    /// A file could not be written.
+    Io(String),
+}
+
+impl std::fmt::Display for Refusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound(m) | Self::Conflict(m) | Self::Io(m) => f.write_str(m),
+        }
+    }
 }
 
 fn error_reply(id: Value, code: i64, message: &str) -> Value {
@@ -385,6 +407,16 @@ mod tests {
         let mut s = server();
         let r = s.handle_line("[]").unwrap();
         assert_eq!(r["error"]["code"], -32600);
+    }
+
+    #[test]
+    fn accepting_a_missing_proposal_is_not_found() {
+        let mut s = server();
+        assert!(matches!(
+            s.accept("p999", false, false),
+            Err(Refusal::NotFound(_))
+        ));
+        assert!(matches!(s.reject("p999", None), Err(Refusal::NotFound(_))));
     }
 
     #[test]

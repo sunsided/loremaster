@@ -259,33 +259,12 @@ impl Workspace {
     /// Check a proposal against the project now.
     pub fn view_proposal(&self, id: &str) -> Result<ProposalView, ToolError> {
         let p = self.find_proposal(id)?;
-        let files = overlay(&self.files, p);
-        let (project, mut check) = match load(files) {
-            Ok(project) => {
-                let diags = check(&project);
-                (Some(project), diags)
-            }
-            Err(diags) => (None, diags),
-        };
-        let mut ok = !check.iter().any(|d| d.severity == Severity::Error);
-        let world = match (&project, ok) {
-            (Some(project), true) => match World::compile(project.story.clone()) {
-                Ok(w) => Some(Arc::new(w)),
-                Err(e) => {
-                    ok = false;
-                    check.push(Diagnostic {
-                        severity: Severity::Error,
-                        file: String::new(),
-                        at: e.at.clone(),
-                        message: e.error.message,
-                        line: None,
-                        column: None,
-                    });
-                    None
-                }
-            },
-            _ => None,
-        };
+        let Built {
+            project,
+            check,
+            world,
+        } = build(overlay(&self.files, p));
+        let ok = world.is_some();
         let new_problems = check
             .iter()
             .filter(|d| !self.diagnostics.iter().any(|b| same_problem(b, d)))
@@ -337,25 +316,58 @@ impl Workspace {
     /// A world with the proposal applied, to play it before it is accepted.
     pub(crate) fn proposal_world(&self, id: &str) -> Result<Arc<World>, ToolError> {
         let p = self.find_proposal(id)?;
-        let project = load(overlay(&self.files, p)).map_err(|_| {
+        build(overlay(&self.files, p)).world.ok_or_else(|| {
             err(format!(
-                "Proposal `{id}` does not load. Call `get_proposal` to see the problems."
-            ))
-        })?;
-        if check(&project)
-            .iter()
-            .any(|d| d.severity == Severity::Error)
-        {
-            return Err(err(format!(
                 "Proposal `{id}` has errors. Call `get_proposal` to see them."
-            )));
-        }
-        World::compile(project.story).map(Arc::new).map_err(|e| {
-            err(format!(
-                "Proposal `{id}` does not compile: {}",
-                e.error.message
             ))
         })
+    }
+
+    /// True when the project with the proposal has no errors. Cheaper than a view:
+    /// no diff and no room previews.
+    pub fn proposal_ok(&self, id: &str) -> Result<bool, ToolError> {
+        let p = self.find_proposal(id)?;
+        Ok(build(overlay(&self.files, p)).world.is_some())
+    }
+}
+
+/// A project loaded, checked and compiled. `world` is there only when there are no errors.
+struct Built {
+    project: Option<Project>,
+    check: Vec<Diagnostic>,
+    world: Option<Arc<World>>,
+}
+
+fn build(files: Vec<SourceFile>) -> Built {
+    let project = match load(files) {
+        Ok(p) => p,
+        Err(check) => {
+            return Built {
+                project: None,
+                check,
+                world: None,
+            };
+        }
+    };
+    let mut check = check(&project);
+    let mut world = None;
+    if !check.iter().any(|d| d.severity == Severity::Error) {
+        match World::compile(project.story.clone()) {
+            Ok(w) => world = Some(Arc::new(w)),
+            Err(e) => check.push(Diagnostic {
+                severity: Severity::Error,
+                file: String::new(),
+                at: e.at.clone(),
+                message: e.error.message,
+                line: None,
+                column: None,
+            }),
+        }
+    }
+    Built {
+        project: Some(project),
+        check,
+        world,
     }
 }
 

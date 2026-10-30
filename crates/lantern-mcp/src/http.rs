@@ -15,7 +15,7 @@
 //! `127.0.0.1`, and a `POST` only with `Content-Type: application/json`,
 //! which makes a browser ask first (CORS preflight).
 
-use crate::Server;
+use crate::{Refusal, Server};
 use serde_json::{Value, json};
 use std::io;
 use std::path::Path;
@@ -103,7 +103,7 @@ fn handle(server: &mut Server, mut request: Request) {
         (true, ["proposals", id, "accept"]) => {
             match server.accept(id, flag(&body, "applied"), flag(&body, "force")) {
                 Ok(files) => ok(json!({ "accepted": id, "files": files })),
-                Err(e) => error(409, &e),
+                Err(e) => refused(&e),
             }
         }
         (true, ["proposals", id, "reject"]) => {
@@ -112,7 +112,7 @@ fn handle(server: &mut Server, mut request: Request) {
                 .and_then(|v| v.get("note")?.as_str().map(str::to_string));
             match server.reject(id, note.as_deref()) {
                 Ok(()) => ok(json!({ "rejected": id })),
-                Err(e) => error(404, &e),
+                Err(e) => refused(&e),
             }
         }
         _ => error(404, "Not found."),
@@ -154,6 +154,15 @@ fn h(name: &str, value: &str) -> Header {
 
 fn ok(value: Value) -> Response<io::Cursor<Vec<u8>>> {
     Response::from_string(value.to_string()).with_header(h("Content-Type", "application/json"))
+}
+
+fn refused(r: &Refusal) -> Response<io::Cursor<Vec<u8>>> {
+    let status = match r {
+        Refusal::NotFound(_) => 404,
+        Refusal::Conflict(_) => 409,
+        Refusal::Io(_) => 500,
+    };
+    error(status, &r.to_string())
 }
 
 fn error(status: u16, message: &str) -> Response<io::Cursor<Vec<u8>>> {
