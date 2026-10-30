@@ -10,6 +10,8 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 
 ![Write mode: the same room. Each text fragment shows its layer and its condition in the margin, and the room desk shows the file, notes and rules.](docs/images/write.png)
 
+![A talk in the cantina example. The player asked Blackbeard "Who are you?", and he gave his name. The numbered answers show in the story text and in the verb bar, with "Leave". The verbs and things are dim during the talk. The side panel shows the node of the dialogue, its changes and the trust of the player.](docs/images/talk.png)
+
 ![The Atlas map of Zork I, imported from its ZIL source: 110 rooms on six floors, with the rooms of the current floor and the details of the selected room.](docs/images/atlas.png)
 
 ## Layout
@@ -25,7 +27,7 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 | `crates/loremaster-tools` | The operations that an AI assistant can do on a project: read, play and verify. It has no input or output of its own. |
 | `crates/loremaster-mcp` | The MCP server for one project: `loremaster mcp <project-folder>` on stdin and stdout, and `loremaster serve <project-folder>` on local HTTP with the proposal and job endpoints for the editor. A job gives a task prompt (`imagine_exit`, `review_room`) to Claude Code. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
-| `examples/cantina` | A small story with a character whose name changes. |
+| `examples/cantina` | A small story with a character whose name changes, and a dialogue with him. |
 | `examples/zork1` | Zork I, imported from its ZIL source. A large map for tests. Read `examples/zork1/README.md`. |
 | `examples/tower` | A spiral tower on four levels, for the level map. |
 | `crates/loremaster-zil` | The importer for ZIL games: `loremaster-zil <zil-folder> <project-folder>`. |
@@ -35,7 +37,7 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 
 ## How loremaster uses dramaturge
 
-loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.2 (`dramaturge-model` and `dramaturge-runtime`) for conditions and for the stored facts. All other parts are loremaster's own.
+loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.2 (`dramaturge-model`, `dramaturge-runtime` and `dramaturge-authoring`) for conditions, the stored facts and dialogues. All other parts are loremaster's own.
 
 | Part | dramaturge | loremaster |
 | --- | --- | --- |
@@ -44,7 +46,8 @@ loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.2 (`drama
 | Derived values | One `Condition::Custom` with the key `loremaster.derived` | A `CustomHandler` answers the time of day, the room, visits, carried things and the action verb |
 | Evaluation | `DefaultConditionEvaluator` walks `All`, `Any` and `Not` | `crates/loremaster-runtime/src/eval.rs` |
 | Text fragments, rules, verbs, parser, map, clock | Not used | loremaster's own model and runtime |
-| Dialogue, characters, relationships, memories, outcomes | Not used yet | |
+| Dialogues | `dialogues/*.yaml` compiles to a `DialogueGraph`, with ids from a `SymbolTable`. `DefaultRuntime` selects the answers that show and applies their outcomes. `dramaturge-authoring` examines each graph in `loremaster check` | `crates/loremaster-lang/src/dialogue.rs` and `crates/loremaster-runtime/src/game/talk.rs`. The text stays loremaster markup. World effects (`then`) and `add` go through `Outcome::Custom` |
+| Relations and memories | `<thing>.<axis>` and `remembers(<thing>, <memory>)` compile to `RelationshipAtLeast`/`AtMost` and `HasMemory`. The player is the entity `@player` | The save state keeps the same values again (`State.relations`, `State.memories`). Read [docs/dramaturge-dialogue-fit.md](docs/dramaturge-dialogue-fit.md) |
 
 ## Commands
 

@@ -175,6 +175,8 @@ During a talk:
 
 `loremaster check` examines each dialogue: conditions, markup, targets of `go`, and nodes that no start node leads to.
 
+![A talk with Blackbeard in the web player. The answers show as a numbered list in the story text and in the verb bar.](images/talk.png)
+
 In the editor, the room desk shows the dialogues of the things in the room. During a talk in write mode (Ctrl+E), you can change the line and the answers in the game text.
 
 ## Exits
