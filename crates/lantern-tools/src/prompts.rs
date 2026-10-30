@@ -148,7 +148,7 @@ pub fn render_prompt_with_context(
                  Work fast: the author waits for the reply. Use few tool calls and do not test how the engine works.\n\
                  \n\
                  1. {look}\n\
-                 2. Make 3 proposals with `propose`, each of a different kind. Kinds to choose from: a new room with an exit pair and a map position; an exit to a room that exists; an exit that is hidden (`visible`) or blocked (`passable` and `blocked`).\n\
+                 2. Make 3 proposals with `propose`, each of a different kind. Kinds to choose from: a new room with an exit pair and a map position; an exit to a room that exists; an exit that is hidden (`visible`) or blocked (`passable` and `blocked`); a message exit, when the way should lead nowhere: `{{ direction: {dir}, blocked: \"<text>\" }}` with no `to`, no `door`, no `passable` and no `traversal`. The move only shows the `blocked` text, which can have conditions.\n\
                  3. Keep each proposal small and consistent with the tone, the period and the neighbours. A new way must not go around a locked door or another obstacle. {edits}\n\
                  4. A proposal must have `ok: true`. If it has problems, make a fixed one and withdraw the old one. Do not play the proposals: the author does that.\n\
                  5. Do not change the session `{session}`.\n\
@@ -228,6 +228,7 @@ mod tests {
         .unwrap();
         assert!(text.contains("`shore`"));
         assert!(text.contains("go down"));
+        assert!(text.contains("{ direction: down, blocked:"));
         assert!(text.contains("a puddle"));
         assert!(text.contains("session `main`"));
     }
