@@ -264,6 +264,14 @@ In write mode, the game helps you make what is not there yet:
 
 The editor makes the ids from the names. For example, "The Beach" becomes `the_beach`.
 
+### AI proposals
+
+When `lantern serve` runs for the story (read `docs/ai-tools.md`), the editor reads the open proposals of the AI assistant from it:
+
+- The status line shows "✦ N proposals". Select it to open Atlas › Proposals, with each proposal, its changes and its problems.
+- In write mode, a proposal that changes the text of the current room shows as ghost text (italics, a dotted line and ✦) under the fragment that it changes, with its card in the margin.
+- "Accept" writes the proposal into the working copy of the editor, then tells the server. The editor refuses a proposal when a file that it changes is different now. "Reject" tells the server to drop it.
+
 ### Where the changes go
 
 A change goes into the story file. Only the changed lines in the file change, so comments and formatting stay.

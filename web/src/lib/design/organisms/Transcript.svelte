@@ -3,7 +3,9 @@
 	import type { Block, Run, Source } from '#lib/engine/types.ts';
 	import FragmentMarker from '../atoms/FragmentMarker.svelte';
 	import ProseLink from '../atoms/ProseLink.svelte';
-	import type { EffectsLevel, MarginInfo, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
+	import type { EffectsLevel, GhostLine, MarginInfo, ProposalSummary, RoomBrief, TranscriptEntry, WritingAt } from '../types.ts';
+	import GhostText from '../atoms/GhostText.svelte';
+	import ProposalCard from '../molecules/ProposalCard.svelte';
 
 	interface Props {
 		entries: TranscriptEntry[];
@@ -37,6 +39,12 @@
 		 * fragments that do not show now. Each fragment gets its own line, with its note in the margin.
 		 */
 		margin?: MarginInfo | null;
+		/** Write mode: ghost lines of AI proposals for the room text, with their proposals for the cards in the margin. */
+		ghosts?: GhostLine[];
+		proposals?: ProposalSummary[];
+		onproposal?: (id: string, action: 'accept' | 'reject') => void;
+		/** A problem from the last proposal action, by proposal id. */
+		proposalProblems?: Record<string, string>;
 		/** A preview of the room text in other values. It shows in place of the newest room text, marked. */
 		preview?: Block[] | null;
 		/** In write mode: the last command, when it got the default response. It offers "Write a response". */
@@ -64,8 +72,15 @@
 		respond = null,
 		onrespond,
 		preview = null,
-		margin = null
+		margin = null,
+		ghosts = [],
+		proposals = [],
+		onproposal,
+		proposalProblems = {}
 	}: Props = $props();
+
+	/** The first ghost line of each proposal gets its card in the margin. */
+	const firstGhost = $derived(new Set(proposals.map((p) => ghosts.find((g) => g.proposal === p.id)).filter(Boolean)));
 
 	/** Show the room fragments that do not show now, in place. */
 	let hiddenOpen = $state(false);
@@ -245,6 +260,29 @@
 							>{:else}{p.text}{/if}{/each}{/each}</button
 			>{:else}{#each g.runs as run, i (i)}{run.text}{/each}{/if}{/each}{/snippet}
 
+{#snippet ghostRow(g: GhostLine)}
+	{@const card = firstGhost.has(g) ? proposals.find((p) => p.id === g.proposal) : undefined}
+	<div class="mrow ghost-row">
+		<p class="block prose mtext">
+			{#if g.kind === 'removed'}<GhostText look="block">removes the line above</GhostText>{:else}<GhostText look="block"
+					>{g.text}</GhostText
+				>{/if}
+		</p>
+		{#if card}
+			<div class="mnote">
+				<ProposalCard
+					proposal={card}
+					problem={proposalProblems[card.id] ?? null}
+					onaccept={() => onproposal?.(card.id, 'accept')}
+					onreject={() => onproposal?.(card.id, 'reject')}
+				/>
+			</div>
+		{:else}
+			<p class="mnote ghost-note"><span class="tag">✦ {g.proposal}</span>{g.kind}</p>
+		{/if}
+	</div>
+{/snippet}
+
 <!--
 	Write mode with the margin: each fragment on its own line, and its note in the margin next to it.
 	The note describes the fragment for screen readers too (aria-describedby).
@@ -271,7 +309,13 @@
 				</p>
 			{/if}
 		</div>
+		{#if margin && g.source && g.source.owner === margin.owner}
+			{#each ghosts.filter((x) => x.kind !== 'added' && x.before === g.source?.fragment) as gh, k (k)}{@render ghostRow(gh)}{/each}
+		{/if}
 	{/each}
+	{#if block.kind === 'prose'}
+		{#each ghosts.filter((x) => x.kind === 'added') as gh, k (k)}{@render ghostRow(gh)}{/each}
+	{/if}
 	{#if block.kind === 'prose' && hiddenFragments.length}
 		<div class="mrow">
 			<p class="mtext">
@@ -530,6 +574,15 @@
 	}
 	.mnote.warn {
 		color: var(--color-text-warning);
+	}
+	.ghost-row .mnote:not(.ghost-note) {
+		padding-left: 0;
+		border-left: 0;
+	}
+	.ghost-note .tag {
+		border-color: var(--color-ghost);
+		color: var(--color-ghost);
+		text-transform: none;
 	}
 	.hidden-chip {
 		min-height: var(--size-target-compact);

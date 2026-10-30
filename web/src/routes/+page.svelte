@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
+	import { AiLink, type ProposalView } from '#lib/project/proposals.svelte.ts';
+	import ProposalCard from '#lib/design/molecules/ProposalCard.svelte';
 	import { canLinkFolder } from '#lib/project/store.ts';
 	import { emptyFragment, insertFragment, removeFragment, writeFragment } from '#lib/project/yaml-edit.ts';
 	import FragmentWriter from '#lib/design/organisms/FragmentWriter.svelte';
@@ -37,7 +39,7 @@
 	import AtlasLayout from '#lib/design/templates/AtlasLayout.svelte';
 	import type { Exploration } from '#lib/engine/types.ts';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
-	import type { MenuItem, PaletteItem } from '#lib/design/types.ts';
+	import type { GhostLine, MenuItem, PaletteItem, ProposalSummary } from '#lib/design/types.ts';
 
 	let workspace: Workspace | undefined = $state();
 	const session = $derived(workspace?.session ?? undefined);
@@ -120,17 +122,71 @@
 		return kind === 'thing' || kind === 'exit' ? kind : null;
 	}
 
+	// AI proposals from `lantern serve`, when it runs.
+	const ai = new AiLink();
+
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'proposals'>('map');
 	let atlasRoom = $state<string | null>(null);
-	const atlasTabs = [
+	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
 		{ id: 'rules', label: 'Rules' },
 		{ id: 'state', label: 'State' },
 		{ id: 'story', label: 'Story' },
-		{ id: 'checks', label: 'Checks' }
-	];
+		{ id: 'checks', label: 'Checks' },
+		...(ai.reachable ? [{ id: 'proposals', label: `Proposals ${ai.proposals.length}` }] : [])
+	]);
+
+	let proposalProblems = $state<Record<string, string>>({});
+
+	function summarize(v: ProposalView): ProposalSummary {
+		return {
+			id: v.id,
+			summary: v.summary,
+			ok: v.ok,
+			stale: v.stale,
+			problems: v.new_problems.map((p) => p.message),
+			changes: v.changes.map((c) =>
+				c.kind === 'fragment'
+					? `${c.owner} · fragment ${(c.after_index ?? c.before_index ?? 0) + 1} ${c.before_index == null ? 'added' : c.after_index == null ? 'removed' : 'changed'}`
+					: c.kind === 'field'
+						? `${c.entity} · ${c.field} changed`
+						: `${c.entity} ${c.kind}`
+			)
+		};
+	}
+	const proposalSummaries = $derived(ai.proposals.map(summarize));
+
+	/** The ghost lines of the proposals that change the text of the current room. */
+	const ghostsHere = $derived.by<GhostLine[]>(() => {
+		const s = session;
+		if (!s || !writing) return [];
+		const owner = `room:${s.scene.room}`;
+		const out: GhostLine[] = [];
+		for (const v of ai.proposals)
+			for (const c of v.changes) {
+				if (c.kind !== 'fragment' || c.owner !== owner) continue;
+				const raw = c.after_fragment?.variants[0] ?? '';
+				const shown = raw ? (renderMarkup(raw) ?? raw) : '';
+				out.push({
+					proposal: v.id,
+					kind: c.before_index == null ? 'added' : c.after_index == null ? 'removed' : 'changed',
+					before: c.before_index ?? null,
+					text: shown
+				});
+			}
+		return out;
+	});
+
+	async function onProposal(id: string, action: 'accept' | 'reject') {
+		const view = ai.proposals.find((p) => p.id === id);
+		const ws = workspace;
+		if (!view || !ws) return;
+		const problem = action === 'accept' ? await ai.accept(view, ws) : await ai.reject(view);
+		proposalProblems = { ...proposalProblems, [id]: problem ?? '' };
+		if (!problem) delete proposalProblems[id];
+	}
 	const atlasRooms = $derived.by(() => {
 		const s = session;
 		if (!s || !atlasOpen) return [];
@@ -668,6 +724,7 @@
 
 	onMount(() => {
 		openStory(storyName);
+		ai.start();
 		// Same query as --bp-ultrawide in PlayerLayout.
 		const wide = window.matchMedia('(min-width: 2200px) and (min-aspect-ratio: 21/9)');
 		ultrawide = wide.matches;
@@ -684,6 +741,7 @@
 			document.removeEventListener('visibilitychange', onVisibility);
 			wide.removeEventListener('change', onWide);
 			side.removeEventListener('change', onSide);
+			ai.stop();
 		};
 	});
 
@@ -788,6 +846,20 @@
 					/>
 				{:else if atlasTab === 'rules'}
 					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+				{:else if atlasTab === 'proposals'}
+					<section class="proposals-view" aria-label="Proposals">
+						{#each proposalSummaries as p (p.id)}
+							<ProposalCard
+								proposal={p}
+								full
+								problem={proposalProblems[p.id] ?? null}
+								onaccept={() => onProposal(p.id, 'accept')}
+								onreject={() => onProposal(p.id, 'reject')}
+							/>
+						{:else}
+							<p class="muted-line">No open proposals. An assistant makes them through lantern serve.</p>
+						{/each}
+					</section>
 				{:else if atlasTab === 'state'}
 					<section class="state-view" aria-label="State">
 						<table>
@@ -871,6 +943,9 @@
 				onroom={() => openAtlas('map')}
 			>
 				{#snippet marks()}
+					{#if ai.reachable && ai.proposals.length}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
+							>✦ {ai.proposals.length} {ai.proposals.length === 1 ? 'proposal' : 'proposals'}</button
+						>{/if}
 					{#if Object.keys(previewValues).length}<span class="preview-mark"
 							>PREVIEW · {Object.values(previewValues).join(', ')}</span
 						>{/if}
@@ -897,6 +972,10 @@
 				onwrite={startWriting}
 				onadd={() => (writingAt = { owner: `room:${s.scene.room}`, fragment: -1 })}
 				preview={previewTurn?.blocks ?? null}
+				ghosts={ghostsHere}
+				proposals={proposalSummaries.filter((p) => ghostsHere.some((g) => g.proposal === p.id))}
+				onproposal={onProposal}
+				{proposalProblems}
 				margin={writing ? marginInfo : null}
 				respond={respondable?.label ?? null}
 				onrespond={() => respondable && openPanel({ responding: respondable })}
@@ -1114,6 +1193,28 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--space-2);
+	}
+	.job-chip {
+		min-height: 1.6em;
+		padding: 0 var(--space-3);
+		border: 0;
+		background: var(--color-status-text);
+		color: var(--color-ghost);
+		font: inherit;
+	}
+	.job-chip:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-status-text);
+		outline-offset: 2px;
+	}
+	.proposals-view {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+		gap: var(--space-4);
+		padding: var(--space-5) var(--space-6);
+	}
+	.muted-line {
+		color: var(--color-text-muted);
+		font-family: var(--font-ui);
 	}
 	.state-view {
 		padding: var(--space-5) var(--space-6);

@@ -170,3 +170,28 @@ export interface MarginInfo {
 	things: number;
 	exits: number;
 }
+
+/** One open AI proposal, in short, for a card. */
+export interface ProposalSummary {
+	id: string;
+	summary: string;
+	/** True when the story builds with the proposal. */
+	ok: boolean;
+	/** True when a file changed after the proposal was made. */
+	stale: boolean;
+	/** The problems that the proposal adds. */
+	problems: string[];
+	/** One line for each change, for example "room:shore · description fragment 2 changed". */
+	changes: string[];
+}
+
+/** A line of ghost text: what a proposal would change in the room text in write mode. */
+export interface GhostLine {
+	proposal: string;
+	/** `added`: a new fragment. `changed`: a new text for a fragment. `removed`: the fragment goes. */
+	kind: 'added' | 'changed' | 'removed';
+	/** The fragment index before the change, for `changed` and `removed`. */
+	before: number | null;
+	/** The new text, for `added` and `changed`. */
+	text: string;
+}

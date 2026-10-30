@@ -111,6 +111,9 @@
 	/* The status line on top of the screen: inverse video, like the Infocom games. */
 	--color-status-bg: var(--color-accent);
 	--color-status-text: var(--color-text-on-accent);
+	/* AI proposals: a cooler colour, with italics, a dotted line and ✦, so the colour is not the only cue. */
+	--color-ghost: #8fe3d4;
+	--color-ghost-tint: color-mix(in srgb, var(--color-ghost) 12%, transparent);
 	--color-warning: #ffb000;
 	--color-border-subtle: #1f2b22;
 	--color-border-control: #3a7a50;
@@ -150,6 +153,9 @@
 	/* The status line on top of the screen: inverse video, like the Infocom games. */
 	--color-status-bg: var(--color-accent);
 	--color-status-text: var(--color-text-on-accent);
+	/* AI proposals: a cooler colour, with italics, a dotted line and ✦, so the colour is not the only cue. */
+	--color-ghost: #b4a7f5;
+	--color-ghost-tint: color-mix(in srgb, var(--color-ghost) 12%, transparent);
 	--color-warning: #f2b544;
 	--color-border-subtle: #2d3240;
 	--color-border-control: #6a7388;
@@ -189,6 +195,9 @@
 	/* The status line on top of the screen: inverse video, like the Infocom games. */
 	--color-status-bg: var(--color-accent);
 	--color-status-text: var(--color-text-on-accent);
+	/* AI proposals: a cooler colour, with italics, a dotted line and ✦, so the colour is not the only cue. */
+	--color-ghost: #5b3f8f;
+	--color-ghost-tint: color-mix(in srgb, var(--color-ghost) 12%, transparent);
 	--color-warning: #b3412e;
 	--color-border-subtle: #dedad1;
 	--color-border-control: #857a67;
