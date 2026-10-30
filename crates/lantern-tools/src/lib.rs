@@ -71,7 +71,8 @@ impl Workspace {
     }
 
     /// Replace the project files. Sessions keep their state where the new
-    /// world still has the rooms, things and variables they refer to.
+    /// world still has the rooms, things and variables they refer to. A reload
+    /// to a project with errors keeps the sessions for the next good reload.
     pub fn reload(&mut self, files: Vec<SourceFile>) {
         self.files = files;
         self.project = None;
@@ -105,17 +106,15 @@ impl Workspace {
             column: None,
         }];
         self.project = Some(project);
-        self.sessions.clear();
     }
 
+    /// Move the sessions to the new world. While the project has errors there is
+    /// no new world: the sessions wait with their state and move on the next good reload.
     fn carry_sessions(&mut self) {
-        match &self.world {
-            Some(world) => {
-                for game in self.sessions.values_mut() {
-                    *game = game.carry_over(world.clone());
-                }
+        if let Some(world) = &self.world {
+            for game in self.sessions.values_mut() {
+                *game = game.carry_over(world.clone());
             }
-            None => self.sessions.clear(),
         }
     }
 

@@ -155,3 +155,21 @@ fn draft_text_is_checked() {
     );
     assert!(!bad["error"].is_null());
 }
+
+#[test]
+fn a_session_survives_a_reload_with_errors() {
+    let mut ws = Workspace::new(files("lighthouse"));
+    call(&mut ws, "input", json!({ "text": "n" }));
+    let mut broken = files("lighthouse");
+    let shore = broken
+        .iter_mut()
+        .find(|f| f.path == "rooms/shore.yaml")
+        .unwrap();
+    shore
+        .text
+        .push_str("\n  - { direction: down, to: nowhere_room }\n");
+    ws.reload(broken);
+    assert!(ws.call("scene", json!({})).is_err());
+    ws.reload(files("lighthouse"));
+    assert!(call(&mut ws, "scene", json!({}))["room"] == "cottage");
+}
