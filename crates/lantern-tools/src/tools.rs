@@ -2,6 +2,7 @@
 
 use crate::{Args, ToolResult, Workspace, err, json};
 use lantern_model::{Effect, Layer, Location};
+use lantern_project::SourceFile;
 use lantern_runtime::{AuthorCommand, Budget, Command, Game, State, Turn};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, VecDeque};
@@ -157,14 +158,55 @@ pub fn tools() -> Vec<ToolDef> {
             session_only(),
             true,
         ),
+        // Propose.
+        def(
+            "propose",
+            "Suggest a change to the project. Give whole files: each new or changed file with its complete YAML text, and the paths of files to delete. In a changed file, keep every line you do not change byte for byte (read it with `read_file` first), so that the person sees only your change. Nothing changes until a person accepts it. Returns the proposal id and its check: the problems it adds, the changes per entity and fragment, and the text of each changed room in every state. Fix the problems with a new proposal, then `withdraw_proposal` the old one.",
+            schema(
+                json!({
+                    "summary": { "type": "string", "description": "One line: what the change does and why." },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": { "path": { "type": "string" }, "text": { "type": "string" } },
+                            "required": ["path", "text"]
+                        },
+                        "description": "For example [{\"path\":\"rooms/pier.yaml\",\"text\":\"name: The Pier\\n...\"}]."
+                    },
+                    "delete": { "type": "array", "items": { "type": "string" } }
+                }),
+                &["summary"],
+            ),
+            false,
+        ),
+        def(
+            "list_proposals",
+            "The open proposals, with id, summary, files and whether each has no errors now.",
+            schema(json!({}), &[]),
+            true,
+        ),
+        def(
+            "get_proposal",
+            "One proposal, checked against the project as it is now.",
+            schema(json!({ "id": { "type": "string" } }), &["id"]),
+            true,
+        ),
+        def(
+            "withdraw_proposal",
+            "Remove one of your proposals, for example after you made a better one.",
+            schema(json!({ "id": { "type": "string" } }), &["id"]),
+            false,
+        ),
         // Play.
         def(
             "session_start",
-            "Start a play session from the beginning, or from a saved state. Replaces a session of the same name. Returns the opening text.",
+            "Start a play session from the beginning, or from a saved state. Replaces a session of the same name. Returns the opening text. With `proposal`, the session plays the project with that proposal applied, so you can walk into a draft before anyone accepts it.",
             schema(
                 json!({
                     "session": { "type": "string", "description": SESSION },
-                    "state": { "type": "object", "description": "A state from `save`, or from the editor." }
+                    "state": { "type": "object", "description": "A state from `save`, or from the editor." },
+                    "proposal": { "type": "string", "description": "The id of a proposal to play." }
                 }),
                 &[],
             ),
@@ -318,7 +360,10 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
         }
         "symbols" => json(&ws.session(a.session())?.symbols()),
         "session_start" => {
-            let world = ws.world()?.clone();
+            let world = match a.opt_str("proposal") {
+                Some(id) => ws.proposal_world(id)?,
+                None => ws.world()?.clone(),
+            };
             let state: Option<State> = a.opt_value("state")?;
             let name = a.session().to_string();
             let (game, opening) = match state {
@@ -354,6 +399,29 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
             let game = ws.session(a.session())?;
             let turn = game.author(cmd);
             Ok(turn_json(&turn, game))
+        }
+        "propose" => {
+            let files: Vec<SourceFile> = a.opt_value("files")?.unwrap_or_default();
+            let delete: Vec<String> = a.opt_value("delete")?.unwrap_or_default();
+            let id = ws.add_proposal(a.str("summary")?.to_string(), files, delete)?;
+            json(&ws.view_proposal(&id)?)
+        }
+        "list_proposals" => {
+            let list: Vec<Value> = ws
+                .proposals()
+                .map(|p| {
+                    let ok = ws.proposal_ok(&p.id).unwrap_or(false);
+                    json!({ "id": p.id, "summary": p.summary, "files": p.files.iter().map(|f| &f.path).collect::<Vec<_>>(), "delete": p.delete, "ok": ok })
+                })
+                .collect();
+            Ok(json!(list))
+        }
+        "get_proposal" => json(&ws.view_proposal(a.str("id")?)?),
+        "withdraw_proposal" => {
+            let id = a.str("id")?;
+            ws.find_proposal(id)?;
+            ws.remove_proposal(id);
+            Ok(json!({ "withdrawn": id }))
         }
         "scene" => json(&ws.session(a.session())?.scene()),
         "assembly" => json(&ws.session(a.session())?.assembly()),

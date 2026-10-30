@@ -1,5 +1,5 @@
 //! `lantern play <dir>`, `lantern check <dir>`, `lantern explore <dir>` and
-//! `lantern mcp <dir>`.
+//! `lantern mcp <dir>` and `lantern serve <dir> [--port N]`.
 
 use lantern_project::{Project, Severity, check, load, read_dir};
 use lantern_runtime::{BlockKind, Budget, Game, Turn, World};
@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>";
+const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern serve <project-folder> [--port N]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -19,6 +19,29 @@ fn main() -> ExitCode {
     // The MCP server owns stdout and also serves a project with errors, so it skips `open`.
     if cmd == "mcp" {
         return match lantern_mcp::serve_stdio(Path::new(dir)) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if cmd == "serve" {
+        let port = match args.get(2).map(String::as_str) {
+            None => lantern_mcp::http::DEFAULT_PORT,
+            Some("--port") => match args.get(3).and_then(|p| p.parse().ok()) {
+                Some(p) => p,
+                None => {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                }
+            },
+            Some(_) => {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            }
+        };
+        return match lantern_mcp::http::serve_http(Path::new(dir), port) {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 eprintln!("error: {e}");

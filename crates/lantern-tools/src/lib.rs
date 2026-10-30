@@ -9,9 +9,13 @@
 //! This crate has no IO. The caller reads the files and gives them to
 //! [`Workspace::new`] or [`Workspace::reload`].
 //!
-//! The tools read, play and verify. They do not change project files.
+//! The tools read, play and verify. They do not change project files: an
+//! assistant suggests a change as a [`Proposal`], and a person accepts it.
 
+mod proposal;
 mod tools;
+
+pub use proposal::{Change, FileChange, PreviewText, Proposal, ProposalView, RoomPreview, sha256};
 
 pub use tools::{ToolDef, tools};
 
@@ -53,6 +57,8 @@ pub struct Workspace {
     diagnostics: Vec<Diagnostic>,
     world: Option<Arc<World>>,
     sessions: BTreeMap<String, Game>,
+    proposals: BTreeMap<String, Proposal>,
+    next_proposal: u64,
 }
 
 impl Workspace {
@@ -65,6 +71,8 @@ impl Workspace {
             diagnostics: Vec::new(),
             world: None,
             sessions: BTreeMap::new(),
+            proposals: BTreeMap::new(),
+            next_proposal: 1,
         };
         ws.reload(files);
         ws
