@@ -195,3 +195,17 @@ export interface GhostLine {
 	/** The new text, for `added` and `changed`. */
 	text: string;
 }
+
+/** An author note or TODO in a list. */
+export interface NoteItem {
+	/** A stable key, for example `rooms/shore.yaml#notes[1]`. */
+	key: string;
+	text: string;
+	todo: boolean;
+	done: boolean;
+	/** Where the note is, for example "The Shore" or "fragment 2". Leave it out where it is clear. */
+	where?: string;
+	/** The thread that the note is a beat of. */
+	thread?: string | null;
+	role?: 'setup' | 'payoff' | 'mention' | null;
+}

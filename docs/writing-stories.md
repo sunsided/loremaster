@@ -200,6 +200,12 @@ A dropped thread gives no warnings. Use it to keep an idea that you removed.
 
 To list all open TODOs with their file and line, run `cargo run -p lantern-cli -- check <folder> --todos`.
 
+In the editor:
+
+- The Here panel has a "Notes" section. It shows the notes and TODOs of the room and of the things in it. Type a text, then select "+ Note" or "+ TODO". Select the checkbox of a TODO when it is done. "×" removes a note.
+- The status line shows the number of open TODOs. Select it to open Atlas › TODOs, with all open TODOs of the story. Select the place of a TODO to go to its room.
+- In write mode, the margin note of a fragment shows its notes ("✎ 1 note") and its threads, for example "setup of lost_key".
+
 If a note contains a colon, put it in quotes, for example `- "Premise: a lighthouse without a keeper."`. Without quotes, YAML reads the colon as a map. lantern then keeps the text, but other tools can read it differently.
 
 ## The Atlas

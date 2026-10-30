@@ -45,6 +45,10 @@
 		onexit: (direction: string) => void;
 		/** The AI section, while the AI server runs. It shows first. */
 		ai?: Snippet;
+		/** The author notes and TODOs of the room and its things. */
+		notes?: Snippet;
+		/** A short fact for the notes title, for example "2 · 1 TODO". */
+		notesMeta?: string;
 	}
 
 	let {
@@ -64,7 +68,9 @@
 		onopen,
 		onthing,
 		onexit,
-		ai
+		ai,
+		notes,
+		notesMeta
 	}: Props = $props();
 
 	const previewing = $derived(Object.keys(preview).length > 0);
@@ -75,7 +81,7 @@
 
 <!--
 	The Here panel: what is true here and now. It has sections that fold, not tabs:
-	the rooms around, the values that the room text depends on (with a preview), the rules that matter here,
+	the rooms around, the author notes, the values that the room text depends on (with a preview), the rules that matter here,
 	the last turn, and the things and exits. The whole world is one step away in the full views.
 -->
 <div class="here" aria-label="Here and now" role="region">
@@ -86,6 +92,10 @@
 		{#snippet actions()}<button type="button" class="link" onclick={() => onopen('map')}>Map ↗</button>{/snippet}
 		<MapPanel {map} compact />
 	</PanelSection>
+
+	{#if notes}
+		<PanelSection id="here-notes" title="Notes" meta={notesMeta}>{@render notes()}</PanelSection>
+	{/if}
 
 	<PanelSection id="here-states" title="Depends on" meta={switches.length ? `${switches.length} values · ${texts} texts` : 'nothing'}>
 		{#snippet actions()}<button type="button" class="link" onclick={() => onopen('explore')}>All texts ↗</button>{/snippet}

@@ -12,8 +12,11 @@ use serde::{Deserialize, Serialize};
 ///   - todo: Decide if the ferryman comes back at dawn.
 ///   - { text: The gull knows where the key is., thread: lost_key, role: setup }
 /// ```
+///
+/// It serializes in one flat form (`{ id, text, todo, done, thread, role }`),
+/// so that the editor and the tools read every note the same way.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "NoteRepr", into = "NoteRepr")]
+#[serde(try_from = "NoteRepr")]
 pub struct Note {
     /// Optional stable name, so that other notes or an assistant can point at it.
     pub id: Option<Id>,
@@ -57,7 +60,7 @@ pub enum NoteRole {
     Mention,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(untagged)]
 enum NoteRepr {
     Plain(String),
@@ -67,20 +70,20 @@ enum NoteRepr {
     Colon(std::collections::BTreeMap<String, String>),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NoteFull {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     id: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     text: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     todo: Option<String>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default)]
     done: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     thread: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     role: Option<NoteRole>,
 }
 
@@ -118,27 +121,6 @@ impl TryFrom<NoteRepr> for Note {
             done: f.done,
             thread: f.thread,
             role: f.role,
-        })
-    }
-}
-
-impl From<Note> for NoteRepr {
-    fn from(n: Note) -> Self {
-        if n.id.is_none() && !n.todo && n.thread.is_none() {
-            return NoteRepr::Plain(n.text);
-        }
-        let (text, todo) = if n.todo {
-            (None, Some(n.text))
-        } else {
-            (Some(n.text), None)
-        };
-        NoteRepr::Full(NoteFull {
-            id: n.id,
-            text,
-            todo,
-            done: n.done,
-            thread: n.thread,
-            role: n.role,
         })
     }
 }
@@ -181,25 +163,28 @@ mod tests {
     fn plain_string_is_a_note() {
         let n: Note = serde_json::from_str(r#""Keep it eerie.""#).unwrap();
         check!(n == Note::text("Keep it eerie."));
-        check!(serde_json::to_string(&n).unwrap() == r#""Keep it eerie.""#);
+        check!(
+            serde_json::to_string(&n).unwrap()
+                == r#"{"id":null,"text":"Keep it eerie.","todo":false,"done":false,"thread":null,"role":null}"#
+        );
     }
 
     #[test]
-    fn todo_round_trips() {
+    fn a_done_todo_reads() {
         let json = r#"{"todo":"Name the ferryman.","done":true}"#;
         let n: Note = serde_json::from_str(json).unwrap();
+        check!(n.text == "Name the ferryman.");
         check!(n.todo);
         check!(n.done);
         check!(!n.is_open_todo());
-        check!(serde_json::to_string(&n).unwrap() == json);
     }
 
     #[test]
-    fn thread_beat_round_trips() {
+    fn a_thread_beat_reads() {
         let json = r#"{"text":"The gull knows.","thread":"lost_key","role":"setup"}"#;
         let n: Note = serde_json::from_str(json).unwrap();
+        check!(n.thread.as_ref().map(|t| t.as_str()) == Some("lost_key"));
         check!(n.role == Some(NoteRole::Setup));
-        check!(serde_json::to_string(&n).unwrap() == json);
     }
 
     #[test]

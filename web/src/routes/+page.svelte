@@ -17,7 +17,10 @@
 	import type { Source } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
-	import { newStory } from '#lib/engine/index.ts';
+	import { newStory, notesOf, type NoteRef } from '#lib/engine/index.ts';
+	import NotesList from '#lib/design/organisms/NotesList.svelte';
+	import type { NoteItem } from '#lib/design/types.ts';
+	import { addNote, pathOf, removeNote, setNoteDone } from '#lib/project/yaml-edit.ts';
 	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
 	import NewStoryDialog from '#lib/design/organisms/NewStoryDialog.svelte';
 	import { settings } from '#lib/settings.svelte.ts';
@@ -156,9 +159,104 @@
 		ai.reachable ? null : 'To draft with AI, start `lantern serve --bootstrap` and keep this page open.'
 	);
 
+	// Author notes and TODOs, read from the files after each change.
+	let allNotes = $state<NoteRef[]>([]);
+	$effect(() => {
+		const files = workspace?.project.files;
+		if (!files) return;
+		let current = true;
+		notesOf(files).then((n) => {
+			if (current) allNotes = n;
+		});
+		return () => {
+			current = false;
+		};
+	});
+	const openTodos = $derived(allNotes.filter((n) => n.note.todo && !n.note.done));
+	const noteKey = (n: NoteRef) => `${n.file}#${n.at}`;
+
+	/** Where a note is, in words: the room or thing name, or the fragment. */
+	function noteWhere(n: NoteRef, here: boolean): string | undefined {
+		const s = session;
+		const [kind, id] = n.entity.split(':');
+		const fragment = n.at.includes('.notes') ? n.at.match(/^(.*?)\[(\d+)\]/) : null;
+		const part = fragment ? `${fragment[1] === 'description' ? 'fragment' : fragment[1]} ${Number(fragment[2]) + 1}` : '';
+		if (here && kind === 'room') return part || undefined;
+		const name =
+			kind === 'room'
+				? (s?.map.rooms.find((r) => r.id === id)?.name ?? id)
+				: kind === 'thing'
+					? (s?.scene.things.find((t) => t.id === id)?.name ?? id)
+					: kind === 'thread'
+						? `thread ${id}`
+						: kind === 'rule'
+							? `rule ${id}`
+							: 'the story';
+		return part ? `${name} · ${part}` : name;
+	}
+	const noteItem = (n: NoteRef, here: boolean): NoteItem => ({
+		key: noteKey(n),
+		text: n.note.text,
+		todo: n.note.todo,
+		done: n.note.done,
+		where: noteWhere(n, here),
+		thread: n.note.thread,
+		role: n.note.role
+	});
+
+	/** The notes of the current room and of the things in it. */
+	const hereNotes = $derived.by(() => {
+		const s = session;
+		if (!s) return [];
+		const here = new Set([`room:${s.scene.room}`, ...s.scene.things.map((t) => `thing:${t.id}`)]);
+		return allNotes.filter((n) => here.has(n.entity)).map((n) => noteItem(n, true));
+	});
+	const hereNotesMeta = $derived.by(() => {
+		const todos = hereNotes.filter((n) => n.todo && !n.done).length;
+		return hereNotes.length ? `${hereNotes.length}${todos ? ` · ${todos} TODO` : ''}` : 'none';
+	});
+
+	/** Change the file of a note. A problem shows as the failure line. */
+	async function editNote(file: string, edit: (text: string) => string) {
+		const ws = workspace;
+		const text = ws?.project.file(file)?.text;
+		if (!ws || text === undefined) return;
+		try {
+			const problems = await ws.change(file, edit(text));
+			if (problems?.length) failure = problems.map((p) => p.message).join(' ');
+		} catch (e) {
+			failure = String(e);
+		}
+	}
+	function addRoomNote(note: { text: string; todo: boolean }) {
+		const s = session;
+		const file = s && workspace?.project.origins[`room:${s.scene.room}`];
+		if (file) editNote(file, (t) => addNote(t, ['notes'], note));
+	}
+	function toggleNote(key: string, done: boolean) {
+		const n = allNotes.find((x) => noteKey(x) === key);
+		if (n) editNote(n.file, (t) => setNoteDone(t, pathOf(n.at), done));
+	}
+	function deleteNote(key: string) {
+		const n = allNotes.find((x) => noteKey(x) === key);
+		if (n) editNote(n.file, (t) => removeNote(t, pathOf(n.at)));
+	}
+	/** Go to the room of a TODO. */
+	function goToNote(key: string) {
+		const n = allNotes.find((x) => noteKey(x) === key);
+		const s = session;
+		if (!n || !s) return;
+		const [kind, id] = n.entity.split(':');
+		const room = kind === 'room' ? id : kind === 'thing' ? s.game.atlas().find((r) => r.things.some((t) => t.id === id))?.id : undefined;
+		if (room) {
+			if (room !== s.scene.room) s.author({ type: 'goto', room });
+			closeAtlas();
+		}
+	}
+
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'proposals'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'proposals'>('map');
 	let atlasRoom = $state<string | null>(null);
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
@@ -166,6 +264,7 @@
 		{ id: 'state', label: 'State' },
 		{ id: 'story', label: 'Story' },
 		{ id: 'checks', label: 'Checks' },
+		{ id: 'todos', label: `TODOs ${openTodos.length}` },
 		...(ai.reachable ? [{ id: 'proposals', label: `Proposals ${ai.proposals.length}` }] : [])
 	]);
 	// The Proposals tab goes away when the server stops; show the map in its place.
@@ -737,10 +836,15 @@
 	const marginInfo = $derived.by(() => {
 		const s = session;
 		if (!s) return null;
+		const owner = `room:${s.scene.room}`;
 		const detail = (f: (typeof s.assembly)[number]) => {
 			const parts: string[] = [f.mode.replace('_', ' ')];
 			if (f.condition) parts.push(`when ${f.condition}`);
 			if (f.replaces) parts.push('replaces');
+			// Author notes on the fragment: a count, and the threads that it is a beat of.
+			const notes = allNotes.filter((n) => n.entity === owner && n.at.startsWith(`description[${f.index}].notes`));
+			if (notes.length) parts.push(`✎ ${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`);
+			for (const n of notes) if (n.note.thread) parts.push(`${n.note.role ?? 'beat'} of ${n.note.thread}`);
 			return parts.join(' · ');
 		};
 		return {
@@ -867,6 +971,10 @@
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
 </svelte:head>
 
+{#snippet notesSection()}
+	<NotesList notes={hereNotes} empty="No notes for this room yet." onadd={addRoomNote} ontoggle={toggleNote} onremove={deleteNote} />
+{/snippet}
+
 {#snippet aiSection()}
 	{#if session}
 		{@const s = session}
@@ -964,6 +1072,15 @@
 					/>
 				{:else if atlasTab === 'rules'}
 					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+				{:else if atlasTab === 'todos'}
+					<section class="todos-view" aria-label="TODOs">
+						<NotesList
+							notes={openTodos.map((n) => noteItem(n, false))}
+							empty="No open TODOs. Add one in the Notes section of the Here panel, or with todo: in a notes list."
+							ontoggle={toggleNote}
+							onselect={goToNote}
+						/>
+					</section>
 				{:else if atlasTab === 'proposals'}
 					<section class="proposals-view" aria-label="Proposals">
 						{#each proposalSummaries as p (p.id)}
@@ -1061,6 +1178,9 @@
 				onroom={() => openAtlas('map')}
 			>
 				{#snippet marks()}
+					{#if openTodos.length}<button type="button" class="job-chip" onclick={() => openAtlas('todos')}
+							>{openTodos.length} TODO</button
+						>{/if}
 					{#if runningJob}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
 							>✦ {runningJob.task === 'review_room' ? 'reviewing' : 'drafting'}… {runningJob.seconds} s</button
 						>{:else if ai.reachable && ai.proposals.length}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
@@ -1211,6 +1331,8 @@
 					onthing={(id, name) => s.pickThing(id, name)}
 					onexit={(dir) => s.pickExit(dir)}
 					ai={ai.reachable ? aiSection : undefined}
+					notes={notesSection}
+					notesMeta={hereNotesMeta}
 				/>
 			{:else}
 				<BottomSheet title="Here" summary={sheetSummary}>
@@ -1235,6 +1357,8 @@
 						onthing={(id, name) => s.pickThing(id, name)}
 						onexit={(dir) => s.pickExit(dir)}
 						ai={ai.reachable ? aiSection : undefined}
+					notes={notesSection}
+					notesMeta={hereNotesMeta}
 					/>
 				</BottomSheet>
 			{/if}
@@ -1336,6 +1460,10 @@
 	.job-chip:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-status-text);
 		outline-offset: 2px;
+	}
+	.todos-view {
+		max-width: 48rem;
+		padding: var(--space-5) var(--space-6);
 	}
 	.proposals-view {
 		display: grid;
