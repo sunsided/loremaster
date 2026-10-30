@@ -33,6 +33,9 @@ pub struct State {
     /// The last command, as verb and objects, to count repeats.
     #[serde(default)]
     pub last_command: Option<String>,
+    /// The room the player was in before the last move, for `back`.
+    #[serde(default)]
+    pub previous: Option<Id>,
     /// How many times in a row the player gave the last command.
     #[serde(default)]
     pub repeat: u32,
