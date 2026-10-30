@@ -28,7 +28,8 @@ impl Frag {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ExitOut {
     pub direction: String,
-    pub to: String,
+    /// The room the exit leads to; `None` for a message exit.
+    pub to: Option<String>,
     pub visible: Option<String>,
     pub door: Option<String>,
     pub passable: Option<String>,
@@ -172,10 +173,10 @@ impl RoomOut {
         if !self.exits.is_empty() {
             let _ = writeln!(out, "exits:");
             for e in &self.exits {
-                let mut fields = vec![
-                    format!("direction: {}", e.direction),
-                    format!("to: {}", e.to),
-                ];
+                let mut fields = vec![format!("direction: {}", e.direction)];
+                if let Some(to) = &e.to {
+                    fields.push(format!("to: {to}"));
+                }
                 let optional = [
                     ("visible", &e.visible),
                     ("door", &e.door),
@@ -259,7 +260,7 @@ mod tests {
             ],
             exits: vec![ExitOut {
                 direction: "east".into(),
-                to: "behind_house".into(),
+                to: Some("behind_house".into()),
                 door: Some("window".into()),
                 ..Default::default()
             }],

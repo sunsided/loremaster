@@ -8,3 +8,4 @@ exits:
   - { direction: down, to: cliff_middle }
   - { direction: northwest, to: clearing }
   - { direction: west, to: forest_3 }
+  - { direction: south, blocked: "Storm-tossed trees block your way." }

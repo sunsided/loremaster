@@ -4,6 +4,8 @@ position: [-1, 0]
 description:
   - "This is a forest, with trees in all directions. To the east, there appears to be sunlight."
 exits:
+  - { direction: up, blocked: "There is no tree here suitable for climbing." }
   - { direction: north, to: grating_clearing }
   - { direction: east, to: path }
   - { direction: south, to: forest_3 }
+  - { direction: west, blocked: "You would need a machete to go further west." }

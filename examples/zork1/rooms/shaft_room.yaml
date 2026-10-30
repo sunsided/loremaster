@@ -5,5 +5,6 @@ position: [-1, -13]
 description:
   - "This is a large room, in the middle of which is a small shaft descending through the floor into darkness below. To the west and the north are exits from this room. Constructed over the top of the shaft is a metal framework to which a heavy iron chain is attached."
 exits:
+  - { direction: down, blocked: "You wouldn't fit and would die if you could." }
   - { direction: west, to: bat_room }
   - { direction: north, to: smelly_room }

@@ -5,4 +5,8 @@ position: [8, 2]
 description:
   - "The river turns a corner here making it impossible to see the Dam. The White Cliffs loom on the east bank and large rocks prevent landing on the west."
 exits:
+  - { direction: up, blocked: "You cannot go upstream due to strong currents." }
   - { direction: down, to: river_3 }
+  - { direction: land, blocked: "There is no safe landing spot here." }
+  - { direction: east, blocked: "The White Cliffs prevent your landing here." }
+  - { direction: west, blocked: "Just in time you steer away from the rocks." }

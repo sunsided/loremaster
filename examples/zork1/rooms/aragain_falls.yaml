@@ -9,5 +9,6 @@ description:
     text: "A beautiful rainbow can be seen over the falls and to the west."
 exits:
   - { direction: west, to: on_rainbow, visible: "rainbow_flag" }
+  - { direction: down, blocked: "It's a long way..." }
   - { direction: north, to: shore }
   - { direction: up, to: on_rainbow, visible: "rainbow_flag" }

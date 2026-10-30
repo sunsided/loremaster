@@ -4,6 +4,8 @@ position: [1, -2]
 description:
   - "This is a dimly lit forest, with large trees all around."
 exits:
+  - { direction: up, blocked: "There is no tree here suitable for climbing." }
+  - { direction: north, blocked: "The forest becomes impenetrable to the north." }
   - { direction: east, to: mountains }
   - { direction: south, to: clearing }
   - { direction: west, to: path }

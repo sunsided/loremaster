@@ -11,5 +11,6 @@ exits:
   - { direction: northeast, to: north_of_house }
   - { direction: southeast, to: south_of_house }
   - { direction: west, to: forest_1 }
+  - { direction: east, blocked: "The door is boarded and you can't remove the boards." }
   - { direction: southwest, to: stone_barrow, visible: "won_flag" }
   - { direction: in, to: stone_barrow, visible: "won_flag" }

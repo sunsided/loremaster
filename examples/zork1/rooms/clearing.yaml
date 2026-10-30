@@ -4,6 +4,7 @@ position: [2, 0]
 description:
   - "You are in a small clearing in a well marked forest path that extends to the east and west."
 exits:
+  - { direction: up, blocked: "There is no tree here suitable for climbing." }
   - { direction: east, to: canyon_view }
   - { direction: north, to: forest_2 }
   - { direction: south, to: forest_3 }

@@ -12,3 +12,4 @@ exits:
   - { direction: south, to: reservoir_south }
   - { direction: up, to: in_stream }
   - { direction: west, to: in_stream }
+  - { direction: down, blocked: "The dam blocks your way." }

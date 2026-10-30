@@ -6,3 +6,4 @@ description:
   - "You are standing on a path beside a gently flowing stream. The path follows the stream, which flows from west to east."
 exits:
   - { direction: east, to: reservoir_south }
+  - { direction: west, blocked: "The stream emerges from a spot too small for you to enter." }

@@ -8,6 +8,7 @@ description:
   - when: "(not grate.open) and grate_revealed"
     text: "There is a grating securely fastened into the ground."
 exits:
+  - { direction: north, blocked: "The forest becomes impenetrable to the north." }
   - { direction: east, to: forest_2 }
   - { direction: west, to: forest_1 }
   - { direction: south, to: path }

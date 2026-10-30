@@ -18,7 +18,12 @@ fn table(out: &mut String, heading: &str, intro: &str, columns: (&str, &str), no
 
 pub fn render(world: &World) -> String {
     let r = &world.report;
-    let exits: usize = world.rooms.iter().map(|room| room.exits.len()).sum();
+    let exits: usize = world
+        .rooms
+        .iter()
+        .flat_map(|room| &room.exits)
+        .filter(|e| e.to.is_some())
+        .count();
     let mut out = String::new();
     let _ = writeln!(out, "# Import report: {}\n", world.story.title);
     let _ = writeln!(
@@ -30,7 +35,7 @@ pub fn render(world: &World) -> String {
          | Room descriptions that are not imported | {} |\n\
          | Exits | {exits} |\n\
          | Exits from hints | {} |\n\
-         | Exits that only show a message (not imported) | {} |\n\
+         | Message exits (only show a message) | {} |\n\
          | Other exits that are not imported | {} |\n\
          | Things | {} |\n\
          | Things in a different place | {} |\n\
@@ -73,10 +78,9 @@ pub fn render(world: &World) -> String {
     );
     table(
         &mut out,
-        "Exits that only show a message",
+        "Message exits",
         "In the original, these directions show a message and do not move the player. \
-         A lantern exit must have a destination, so the importer does not make them. \
-         The player gets the default response.",
+         The importer makes them as message exits: exits with `blocked` and no `to`.",
         ("Room", "Direction and message"),
         &r.message_exits,
     );
