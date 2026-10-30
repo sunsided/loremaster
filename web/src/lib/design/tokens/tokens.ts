@@ -52,6 +52,7 @@ export const sizeTokens: TokenInfo[] = [
 	{ name: '--measure-prose', use: 'Maximum line length of story text.' },
 	{ name: '--width-panel', use: 'Maximum width of the side panel (Here panel, fragment panel).' },
 	{ name: '--width-margin', use: 'Width of the margin notes next to the text in write mode.' },
+	{ name: '--opacity-dim', use: 'Opacity of controls that do not apply now, for example the verbs during a talk. They are also inert.' },
 	{ name: '--width-dialog', use: 'Maximum width of a dialog.' },
 	{ name: '--width-map', use: 'Maximum width of the map on ultrawide screens.' },
 	{ name: '--width-player-max', use: 'Maximum width of the player on ultrawide screens.' },

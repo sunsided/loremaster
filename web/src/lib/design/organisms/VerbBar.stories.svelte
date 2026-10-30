@@ -46,7 +46,9 @@ When the player clicks a verb, the verb goes into the prompt. When the player cl
 A two-object verb, such as "Use", waits for a second thing. The "just use it" button runs it with one thing.
 
 The verbs are toggle buttons (\`aria-pressed\`). The sentence line is a live region, so screen readers announce the command as it grows.
-The verb grid changes its number of columns with the width of the screen.`
+The verb grid changes its number of columns with the width of the screen.
+
+During a talk (\`talkingTo\` is set), the answers that the player can choose show above the verbs, as a numbered list of buttons, with "Leave" after them. The verbs and the things dim and are inert: they do not take focus, and screen readers skip them. Only an answer or "Leave" ends the turn. The number keys and Escape do the same as the buttons; \`aria-keyshortcuts\` tells assistive technology.`
 				}
 			}
 		}
@@ -58,5 +60,18 @@ The verb grid changes its number of columns with the width of the screen.`
 <Story name="Two-object verb" args={{ selected: 'use', sentence: 'Use oil lamp on _', canRunPartial: true }} />
 <Story name="Typed: look lighthouse" args={{ selected: 'examine', sentence: 'Look at lighthouse door', marked: ['cottage_door'] }} />
 <Story name="Pointer on a thing" args={{ hintedVerb: 'examine' }} />
+<Story
+	name="In a talk"
+	args={{
+		talkingTo: 'the grim-looking man',
+		choices: [
+			{ index: 0, text: '"Who are you?"' },
+			{ index: 1, text: '"I am looking for the *Marigold*."' },
+			{ index: 2, text: '"Not tonight."' }
+		],
+		onchoose: fn(),
+		onleave: fn()
+	}}
+/>
 <Story name="Walk to" args={{ selected: 'go', sentence: 'Walk to _' }} />
 <Story name="Empty hands" args={{ inventory: [] }} />

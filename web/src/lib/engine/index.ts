@@ -1,6 +1,9 @@
 import init, { Engine as WasmEngine, newStory as wasmNewStory, projectNotes, projectThreads } from './pkg/loremaster-wasm.js';
 import type {
 	AuthorCommand,
+	Choice,
+	DialogueOutline,
+	TalkView,
 	AtlasRoom,
 	Exploration,
 	RoomMatrix,
@@ -130,6 +133,31 @@ export class Game {
 
 	act(command: Command): Turn {
 		return this.#engine.act(command);
+	}
+
+	/** Choose an answer in the talk in progress, by its index in `choices`. */
+	choose(index: number): Turn {
+		return this.#engine.choose(index);
+	}
+
+	/** Leave the talk in progress. */
+	leave(): Turn {
+		return this.#engine.leave();
+	}
+
+	/** The answers the player can choose now. Empty outside a talk. */
+	choices(): Choice[] {
+		return this.#engine.choices();
+	}
+
+	/** The talk in progress for the inspector, with the hidden options, or null. */
+	talkView(): TalkView | null {
+		return this.#engine.talkView();
+	}
+
+	/** Every dialogue as an outline of nodes, options and their targets. */
+	dialogues(): DialogueOutline[] {
+		return this.#engine.dialogues();
 	}
 
 	scene(): Scene {

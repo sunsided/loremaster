@@ -5,7 +5,7 @@
 	import ProposalCard from '#lib/design/molecules/ProposalCard.svelte';
 	import AiStatus from '#lib/design/molecules/AiStatus.svelte';
 	import { canLinkFolder } from '#lib/project/store.ts';
-	import { emptyFragment, insertFragment, removeFragment, writeFragment } from '#lib/project/yaml-edit.ts';
+	import { emptyFragment, insertFragment, removeFragment, writeFragment, writeScalar } from '#lib/project/yaml-edit.ts';
 	import FragmentWriter from '#lib/design/organisms/FragmentWriter.svelte';
 	import ProseEditor from '#lib/design/molecules/ProseEditor.svelte';
 	import { FragmentDraft } from '#lib/design/fragment-draft.svelte.ts';
@@ -41,6 +41,8 @@
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
 	import HerePanel from '#lib/design/organisms/HerePanel.svelte';
+	import DialogueOutline from '#lib/design/organisms/DialogueOutline.svelte';
+	import TalkEditor, { type TalkEdit } from '#lib/design/molecules/TalkEditor.svelte';
 	import RoomDesk from '#lib/design/organisms/RoomDesk.svelte';
 	import AiHere from '#lib/design/molecules/AiHere.svelte';
 	import StatusTray from '#lib/design/molecules/StatusTray.svelte';
@@ -241,6 +243,17 @@
 		const here = new Set([`room:${s.scene.room}`, ...s.scene.things.map((t) => `thing:${t.id}`)]);
 		return allNotes.filter((n) => here.has(n.entity)).map((n) => noteItem(n, true));
 	});
+	/** The dialogues of the things in the current room and in the inventory, for the room desk. */
+	const dialoguesHere = $derived.by(() => {
+		const s = session;
+		if (!s) return [];
+		const things = [...s.scene.things, ...s.scene.inventory];
+		return s.dialogues.flatMap((outline) => {
+			const t = things.find((x) => x.id === outline.with);
+			return t ? [{ outline, name: t.name }] : [];
+		});
+	});
+
 	const hereNotesMeta = $derived.by(() => {
 		const todos = hereNotes.filter((n) => n.todo && !n.done).length;
 		return hereNotes.length ? `${hereNotes.length}${todos ? ` · ${todos} TODO` : ''}` : 'none';
@@ -801,6 +814,23 @@
 			document.getElementById('atlas-search')?.focus();
 			return;
 		}
+		// A talk: Escape leaves it, and a number key picks an answer when the focus is not in a text field.
+		const talking = session?.talk && !atlasOpen && !showPalette && !showSettings;
+		if (talking && session) {
+			const t = event.target as HTMLElement | null;
+			const field = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || !!t.closest('.cm-editor'));
+			if (event.key === 'Escape' && !(field && (t as HTMLInputElement).value)) {
+				event.preventDefault();
+				session.leave();
+				return;
+			}
+			const n = Number(event.key);
+			if (!field && !event.ctrlKey && !event.metaKey && !event.altKey && n >= 1 && n <= session.choices.length) {
+				event.preventDefault();
+				session.choose(n - 1);
+				return;
+			}
+		}
 		// In the fragment editor the key is left alone, so an open draft is not closed by accident.
 		const inEditor = event.target instanceof Element && !!event.target.closest('.cm-editor');
 		if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'e' && !showSettings && !inEditor) {
@@ -1042,6 +1072,27 @@
 		return null;
 	}
 
+	/** Write mode in a talk: write the changed line and answers to the dialogue file. */
+	async function saveTalk(edit: TalkEdit): Promise<string | null> {
+		const ws = workspace;
+		const view = session?.talkView;
+		if (!ws || !view) return 'No story is open.';
+		const path = ws.project.origins[`dialogue:${view.dialogue}`];
+		const file = path && ws.project.file(path);
+		if (!file) return 'The editor does not know the file of this dialogue.';
+		let text = file.text;
+		try {
+			if (edit.say !== view.say) text = writeScalar(text, ['nodes', view.node, 'say'], edit.say);
+			edit.options.forEach((say, i) => {
+				if (say !== view.options[i]?.say) text = writeScalar(text, ['nodes', view.node, 'options', i, 'say'], say);
+			});
+		} catch (e) {
+			return String(e instanceof Error ? e.message : e);
+		}
+		const problems = await ws.change(path, text);
+		return problems?.length ? problems.map((p) => p.message).join(' ') : null;
+	}
+
 	/** Write a change to the file of the fragment. Returns a problem text when the story does not build with it. */
 	async function saveFragment(at: WritingAt, change: (text: string, list: (string | number)[]) => string): Promise<string | null> {
 		const ws = workspace;
@@ -1269,6 +1320,26 @@
 	/>
 {/snippet}
 
+{#snippet dialogueSection()}
+	{#each dialoguesHere as d (d.outline.id)}
+		<DialogueOutline
+			outline={d.outline}
+			name={d.name}
+			file={workspace?.project.origins[`dialogue:${d.outline.id}`] ?? null}
+			current={session?.talk?.dialogue === d.outline.id ? session.talk.node : null}
+		/>
+	{/each}
+{/snippet}
+
+{#snippet talkWriter()}
+	{#if session?.talkView}
+		{@const view = session.talkView}
+		{#key `${view.dialogue}/${view.node}/${view.say}/${view.options.map((o) => o.say).join('|')}`}
+			<TalkEditor talk={view} onsave={saveTalk} oncancel={toggleWriting} />
+		{/key}
+	{/if}
+{/snippet}
+
 {#snippet sidePanel(phone: boolean)}
 	{#if session}
 		{@const s = session}
@@ -1296,6 +1367,8 @@
 				notesMeta={hereNotesMeta}
 				threads={threadChips}
 				onthread={() => openAtlas('threads')}
+				dialogue={dialoguesHere.length ? dialogueSection : undefined}
+				dialogueMeta={dialoguesHere.map((d) => `${d.name} · ${d.outline.nodes.length} nodes`).join(', ')}
 				ai={ai.reachable ? aiSection : undefined}
 				rules={s.rules.filter((r) => r.relevant)}
 				ruleCount={s.rules.length}
@@ -1313,6 +1386,7 @@
 				rules={s.rules.filter((r) => r.relevant)}
 				ruleCount={s.rules.length}
 				last={s.history.at(-1) ?? null}
+				talk={s.talkView}
 				onpreview={setPreview}
 				onreset={() => (previewValues = {})}
 				{onapply}
@@ -1620,6 +1694,7 @@
 				margin={writing ? marginInfo : null}
 				respond={respondable?.label ?? null}
 				onrespond={() => respondable && openPanel({ responding: respondable })}
+				talkwriter={writing && !sandbox && s.talkView ? talkWriter : undefined}
 			>
 				{#snippet writer()}
 					{#if writingAt?.fragment === -2 && creating}
@@ -1699,6 +1774,10 @@
 					onrun={() => s.runPending()}
 					oncancel={() => (s.draft = '')}
 					hint={!s.entries.some((e) => e.turn.blocks.some((b) => b.kind === 'command'))}
+					talkingTo={s.talk?.name ?? null}
+					choices={s.choices}
+					onchoose={(i) => s.choose(i)}
+					onleave={() => s.leave()}
 				/>
 			{:else}
 				<p id="command" tabindex="-1">The story has ended. <Button size="compact" onclick={() => s.restart()}>Play again</Button></p>

@@ -34,7 +34,11 @@ export type BlockKind =
 	/** A parser note about an action the game did by itself, for example "(first opening the door)". */
 	| 'note'
 	/** An author action from the command palette. It is not part of the game. */
-	| 'author';
+	| 'author'
+	/** The player's line in a talk. */
+	| 'said'
+	/** The line of the character the player talks to. */
+	| 'speech';
 
 export interface Block {
 	kind: BlockKind;
@@ -50,6 +54,85 @@ export interface Turn {
 	blocks: Block[];
 	ended: boolean;
 	log: LogEntry[];
+	/** The talk in progress after this turn. Absent outside a talk. */
+	talk?: TalkInfo;
+	/** The answers the player can choose now, during a talk. */
+	choices?: Choice[];
+}
+
+/** Who the player is talking to. */
+export interface TalkInfo {
+	dialogue: string;
+	/** The thing id. */
+	with: string;
+	/** Its current name, for example "Blackbeard". */
+	name: string;
+	/** The key of the current node. */
+	node: string;
+}
+
+/** An answer the player can choose. */
+export interface Choice {
+	/** The number to pass to `choose`, from 0. The player sees it plus 1. */
+	index: number;
+	text: string;
+}
+
+/** An option of the current node, for the inspector. */
+export interface TalkOptionView {
+	/** The index to choose it with, or null when its condition does not hold. */
+	choice: number | null;
+	say: string;
+	when?: string;
+	/** A node key, `end` or `back`. */
+	go: string;
+	outcomes: string[];
+}
+
+/** The talk in progress, for the inspector and the in-place editor. */
+export interface TalkView {
+	dialogue: string;
+	with: string;
+	name: string;
+	node: string;
+	/** The line as written. */
+	say: string;
+	when?: string;
+	outcomes: string[];
+	options: TalkOptionView[];
+	relations: [string, number][];
+	memories: string[];
+}
+
+/** A dialogue as an outline: nodes, their options, and where each option goes. */
+export interface DialogueOutline {
+	id: string;
+	/** The thing id. */
+	with: string;
+	start: string[];
+	nodes: OutlineNode[];
+}
+
+export interface OutlineNode {
+	key: string;
+	/** The place of the node in `start`, if it is a start node. */
+	start?: number;
+	when?: string;
+	say: string;
+	outcomes: string[];
+	options: OutlineOption[];
+	/** No start node leads here. */
+	unreachable: boolean;
+}
+
+export interface OutlineOption {
+	say: string;
+	when?: string;
+	/** A node key, `end` or `back`. */
+	go: string;
+	/** `go` names a node that does not exist. */
+	missing: boolean;
+	outcomes: string[];
 }
 
 export interface ThingInfo {
@@ -111,7 +194,9 @@ export interface FragmentView {
 
 export type Command =
 	| { type: 'verb'; verb: string; objects: string[] }
-	| { type: 'go'; direction: string };
+	| { type: 'go'; direction: string }
+	| { type: 'choose'; index: number }
+	| { type: 'leave' };
 
 export interface Diagnostic {
 	severity: 'error' | 'warning';

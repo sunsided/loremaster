@@ -1,6 +1,10 @@
 import {
 	Game,
 	type AuthorCommand,
+	type Choice,
+	type DialogueOutline,
+	type TalkInfo,
+	type TalkView,
 	type FrameUse,
 	type PhaseView,
 	type VarView,
@@ -35,6 +39,14 @@ export class Session {
 	vars = $state<VarView[]>([]);
 	/** The action frame used for the last action, or null. */
 	frame = $state<FrameUse | null>(null);
+	/** The talk in progress, or null. While it is open, only answers and Leave run. */
+	talk = $state<TalkInfo | null>(null);
+	/** The answers the player can choose now. */
+	choices = $state<Choice[]>([]);
+	/** The talk in progress for the inspector, with the hidden options. */
+	talkView = $state<TalkView | null>(null);
+	/** Every dialogue of the story, as an outline. */
+	dialogues = $state<DialogueOutline[]>([]);
 	phases: PhaseView[] = [];
 	/** The playthrough so far, one step per turn. */
 	history = $state<StoryStep[]>([]);
@@ -79,7 +91,8 @@ export class Session {
 	#push(turn: Turn) {
 		this.entries.push({ id: this.#next++, turn });
 		this.#refresh();
-		const command = turn.blocks.find((b) => b.kind === 'command' || b.kind === 'author');
+		// A chosen answer in a talk has no typed command: the answer is the command.
+		const command = turn.blocks.find((b) => b.kind === 'command' || b.kind === 'author' || b.kind === 'said');
 		this.history.push({
 			turn: this.scene.turns,
 			time: this.scene.time,
@@ -129,6 +142,12 @@ export class Session {
 		this.rules = this.game.rules();
 		this.vars = this.game.vars();
 		this.frame = this.game.lastFrame();
+		this.choices = this.game.choices();
+		this.talkView = this.game.talkView();
+		this.talk = this.talkView
+			? { dialogue: this.talkView.dialogue, with: this.talkView.with, name: this.talkView.name, node: this.talkView.node }
+			: null;
+		this.dialogues = this.game.dialogues();
 	}
 
 	input(text: string) {
@@ -145,6 +164,18 @@ export class Session {
 	act(command: Command) {
 		this.draft = '';
 		this.#push(this.game.act(command));
+	}
+
+	/** Choose an answer in the talk in progress. */
+	choose(index: number) {
+		this.draft = '';
+		this.#push(this.game.choose(index));
+	}
+
+	/** Leave the talk in progress. */
+	leave() {
+		this.draft = '';
+		this.#push(this.game.leave());
 	}
 
 	/** The verb that the draft names, if any. */

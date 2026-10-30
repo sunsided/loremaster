@@ -1,6 +1,7 @@
 <script lang="ts">
-	import type { MapView, RuleView } from '#lib/engine/types.ts';
+	import type { MapView, RuleView, TalkView } from '#lib/engine/types.ts';
 	import PanelSection from '../molecules/PanelSection.svelte';
+	import TalkInspector from '../molecules/TalkInspector.svelte';
 	import StateSwitches from '../molecules/StateSwitches.svelte';
 	import MapPanel from './MapPanel.svelte';
 	import type { RoomSwitch, StoryStep } from '../types.ts';
@@ -28,18 +29,40 @@
 		onrule: (id: string) => void;
 		/** Open a full view: map, story, rules or explore. */
 		onopen: (view: 'map' | 'story' | 'rules' | 'explore') => void;
+		/** The talk in progress, or null. It shows first. */
+		talk?: TalkView | null;
 	}
 
-	let { map, switches, texts = 0, preview = {}, rules, ruleCount, last = null, onpreview, onreset, onapply, onrule, onopen }: Props = $props();
+	let {
+		map,
+		switches,
+		texts = 0,
+		preview = {},
+		rules,
+		ruleCount,
+		last = null,
+		onpreview,
+		onreset,
+		onapply,
+		onrule,
+		onopen,
+		talk = null
+	}: Props = $props();
 </script>
 
 <!--
 	The Here panel in play mode: a playtest inspector for the current room. It has sections that fold, not tabs:
+	the talk in progress (only during a talk),
 	the rooms around, the values that the room text depends on (with a preview), the rules that matter here,
 	and what the last turn changed. The tools of the author are in the room desk of write mode.
 	The whole world is one step away in the Atlas.
 -->
 <div class="here" aria-label="Here and now" role="region">
+	{#if talk}
+		<PanelSection id="here-talk" title="Talk" meta="with {talk.name}">
+			<TalkInspector {talk} />
+		</PanelSection>
+	{/if}
 	{#if map}
 		<PanelSection id="here-map" title="Around you">
 			{#snippet actions()}<button type="button" class="link" onclick={() => onopen('map')}>Map ↗</button>{/snippet}

@@ -311,3 +311,18 @@ export function setField(text: string, key: string, value: string): string {
 	else doc.set(key, value);
 	return serialize(doc);
 }
+
+/**
+ * Set the text at a path, for example `['nodes', 'meet', 'options', 1, 'say']` in a dialogue.
+ * The quoting of the old value stays when it can hold the new one.
+ */
+export function writeScalar(text: string, path: YamlPath, value: string): string {
+	const doc = parse(text);
+	const node = doc.getIn(path, true);
+	if (isScalar(node)) {
+		if (node.type === Scalar.QUOTE_SINGLE && value.includes("'") && value.includes('"')) node.type = Scalar.QUOTE_DOUBLE;
+		setScalar(node, value);
+	} else if (node === undefined) throw new EditError(`Nothing to change at ${path.join('.')}.`);
+	else doc.setIn(path, quoted(value));
+	return serialize(doc);
+}
