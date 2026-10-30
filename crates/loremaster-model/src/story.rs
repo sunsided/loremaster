@@ -1,4 +1,6 @@
-use crate::{ClockConfig, Fragment, Frames, Id, Note, Room, Rule, Thing, Thread, Value, VerbDef};
+use crate::{
+    ClockConfig, Dialogue, Fragment, Frames, Id, Note, Room, Rule, Thing, Thread, Value, VerbDef,
+};
 use serde::{Deserialize, Serialize};
 
 /// The type of a story variable.
@@ -42,6 +44,12 @@ pub struct Story {
     pub things: Vec<Thing>,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    /// Relation axes between the player and the characters, such as `trust`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relations: Vec<Id>,
+    /// Conversations with things, from `dialogues/`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dialogues: Vec<Dialogue>,
     /// Author text around the responses to verbs, for the whole story.
     #[serde(default, skip_serializing_if = "Frames::is_empty")]
     pub frames: Frames,
@@ -67,6 +75,11 @@ impl Story {
 
     pub fn thread(&self, id: &str) -> Option<&Thread> {
         self.threads.iter().find(|t| t.id.as_str() == id)
+    }
+
+    /// The dialogue of a thing, if it has one.
+    pub fn dialogue_with(&self, thing: &str) -> Option<&Dialogue> {
+        self.dialogues.iter().find(|d| d.with.as_str() == thing)
     }
 
     pub fn var(&self, id: &str) -> Option<&VarDef> {

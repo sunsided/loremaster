@@ -1,6 +1,6 @@
 use crate::{Diagnostic, Severity};
 use loremaster_model::{
-    ClockConfig, Fragment, Id, Note, Room, Rule, Story, Thing, Thread, VarDef, VerbDef,
+    ClockConfig, Dialogue, Fragment, Id, Note, Room, Rule, Story, Thing, Thread, VarDef, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -44,6 +44,8 @@ struct StoryFile {
     #[serde(default)]
     verbs: Vec<VerbDef>,
     #[serde(default)]
+    relations: Vec<Id>,
+    #[serde(default)]
     frames: loremaster_model::Frames,
     #[serde(default)]
     seed: u64,
@@ -61,6 +63,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut things = Vec::new();
     let mut rules = Vec::new();
     let mut threads = Vec::new();
+    let mut dialogues = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -96,6 +99,15 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                     Ok(t) => {
                         origins.insert(format!("thread:{}", t.id), path.to_string());
                         threads.push(t);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                }
+            }
+            "dialogues" => {
+                match serde_saphyr::from_str::<Dialogue>(&with_default_id(&file.text, stem)) {
+                    Ok(d) => {
+                        origins.insert(format!("dialogue:{}", d.id), path.to_string());
+                        dialogues.push(d);
                     }
                     Err(e) => errors.push(parse_err(e)),
                 }
@@ -146,6 +158,8 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         rooms,
         things,
         rules,
+        relations: header.relations,
+        dialogues,
         frames: header.frames,
         seed: header.seed,
         notes: header.notes,

@@ -186,6 +186,8 @@ pub enum Operand {
     Derived(Derived),
     /// The current name of a thing, in a form.
     ThingName(Id, NameForm),
+    /// The player's relation to a thing on an axis: `blackbeard.trust`.
+    Relation(Id, String),
 }
 
 /// How to write a thing's name.

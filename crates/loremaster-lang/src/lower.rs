@@ -1,5 +1,7 @@
 use crate::{CmpOp, Derived, Expr, LangError, NameForm, Operand, Scope, Span, Ty, parse_expr};
-use dramaturge_model::{Condition, FactId, FactScope, FactValue};
+use dramaturge_model::{
+    Condition, FactId, FactScope, FactValue, MemoryQuery, MemoryTag, RelationshipAxisId,
+};
 use loremaster_model::Id;
 
 /// Parse, type-check and lower a condition to a dramaturge condition tree.
@@ -25,6 +27,7 @@ pub(crate) fn lower_bool(expr: &Expr, scope: &Scope) -> Result<Condition, LangEr
                 .map(|e| lower_bool(e, scope))
                 .collect::<Result<_, _>>()?,
         )),
+        Expr::Call(name, args, span) if name == "remembers" => remembers(args, span, scope),
         Expr::Call(name, args, span) if name == "in" => {
             let room = room_arg(args, span, scope)?;
             Ok(Derived::Here.to_condition(CmpOp::Eq, FactValue::Text(room.to_string())))
@@ -48,7 +51,7 @@ pub(crate) fn lower_bool(expr: &Expr, scope: &Scope) -> Result<Condition, LangEr
                     expr.span(),
                 ));
             }
-            Ok(compare(&operand, CmpOp::Eq, FactValue::Bool(true)))
+            Ok(compare(&operand, CmpOp::Eq, FactValue::Bool(true), scope))
         }
         Expr::Cmp(lhs, op, rhs, _) => {
             let (operand, ty, op, literal) = match resolve(lhs, scope) {
@@ -68,7 +71,7 @@ pub(crate) fn lower_bool(expr: &Expr, scope: &Scope) -> Result<Condition, LangEr
                     expr.span(),
                 ));
             }
-            Ok(compare(&operand, op, value))
+            Ok(compare(&operand, op, value, scope))
         }
         Expr::Int(_, span) | Expr::Str(_, span) => Err(LangError::new(
             "a value on its own is not a condition",
@@ -82,10 +85,38 @@ fn is_literal(expr: &Expr) -> bool {
         || matches!(expr, Expr::Path(parts, _) if parts.len() == 1)
 }
 
-fn compare(operand: &Operand, op: CmpOp, value: FactValue) -> Condition {
+fn compare(operand: &Operand, op: CmpOp, value: FactValue, scope: &Scope) -> Condition {
     match operand {
         Operand::Derived(d) => d.to_condition(op, value),
         Operand::ThingName(..) => Condition::Never,
+        Operand::Relation(thing, axis) => {
+            let (Some(target), FactValue::Int(n)) = (scope.entity(thing.as_str()), value) else {
+                return Condition::Never;
+            };
+            let n = i32::try_from(n).unwrap_or(if n < 0 { i32::MIN } else { i32::MAX });
+            let source = scope.player();
+            let axis = RelationshipAxisId::new(axis.as_str());
+            let at_least = |value| Condition::RelationshipAtLeast {
+                source,
+                target,
+                axis: axis.clone(),
+                value,
+            };
+            let at_most = |value| Condition::RelationshipAtMost {
+                source,
+                target,
+                axis: axis.clone(),
+                value,
+            };
+            match op {
+                CmpOp::Eq => Condition::all(vec![at_least(n), at_most(n)]),
+                CmpOp::Ne => Condition::negate(Condition::all(vec![at_least(n), at_most(n)])),
+                CmpOp::Ge => at_least(n),
+                CmpOp::Gt => at_least(n.saturating_add(1)),
+                CmpOp::Le => at_most(n),
+                CmpOp::Lt => at_most(n.saturating_sub(1)),
+            }
+        }
         Operand::Fact(id) => {
             let fact = |value| Condition::FactEquals {
                 scope: FactScope::World,
@@ -128,7 +159,7 @@ pub(crate) fn resolve(expr: &Expr, scope: &Scope) -> Result<(Operand, Ty), LangE
                 other => {
                     return Err(LangError::new(
                         format!(
-                            "unknown function `{other}`; try visited, visits, carried, present or in"
+                            "unknown function `{other}`; try visited, visits, carried, present, in or remembers"
                         ),
                         span.clone(),
                     ));
@@ -187,6 +218,9 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
                 "A" => Ok((Operand::ThingName(id, NameForm::ACap), Ty::Text)),
                 "interactions" => derived(Derived::Interactions(id), Ty::Int),
                 "talked" => derived(Derived::Talked(id), Ty::Int),
+                axis if scope.relations.contains(axis) => {
+                    Ok((Operand::Relation(id, axis.to_string()), Ty::Int))
+                }
                 _ => match scope.things[*thing].get(*prop) {
                     Some(ty) => Ok((Operand::Fact(format!("{thing}.{prop}")), ty.clone())),
                     None => {
@@ -196,6 +230,7 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
                         ];
                         let hint = props
                             .keys()
+                            .chain(scope.relations.iter())
                             .map(String::as_str)
                             .chain(known)
                             .map(|p| (p, crate::scope::edit_distance(p, prop)))
@@ -223,6 +258,39 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
         }
         [] => Err(LangError::new("empty name", span.clone())),
     }
+}
+
+/// `remembers(thing, memory)`: the thing keeps a memory that a dialogue gave it.
+///
+/// dramaturge finds memories by query, not by id, so the memory key is also
+/// the memory's tag, and the query asks for the tag.
+fn remembers(args: &[Expr], span: &Span, scope: &Scope) -> Result<Condition, LangError> {
+    let [thing, memory] = args else {
+        return Err(LangError::new(
+            "expected a thing and a memory: remembers(thing, memory)",
+            span.clone(),
+        ));
+    };
+    let thing = thing_arg(std::slice::from_ref(thing), span, scope)?;
+    let memory = single_ident(std::slice::from_ref(memory), span)?;
+    if !scope.memories.contains(memory) {
+        return Err(LangError::new(
+            format!("no dialogue remembers `{memory}`"),
+            args[1].span(),
+        ));
+    }
+    let owner = scope
+        .entity(thing.as_str())
+        .ok_or_else(|| LangError::new(format!("unknown thing `{thing}`"), args[0].span()))?;
+    Ok(Condition::HasMemory {
+        owner,
+        query: MemoryQuery::by_tag(MemoryTag::Custom(memory.into())),
+    })
+}
+
+/// The tag of a memory key, as [`remembers`] queries it.
+pub fn memory_tag(key: &str) -> MemoryTag {
+    MemoryTag::Custom(key.into())
 }
 
 fn single_ident<'a>(args: &'a [Expr], span: &Span) -> Result<&'a str, LangError> {
