@@ -80,6 +80,11 @@ impl Workspace {
         ws
     }
 
+    /// End a play session. Returns false when there is no such session.
+    pub fn end_session(&mut self, name: &str) -> bool {
+        self.sessions.remove(name).is_some()
+    }
+
     /// Replace the project files. Sessions keep their state where the new
     /// world still has the rooms, things and variables they refer to. A reload
     /// to a project with errors keeps the sessions for the next good reload.

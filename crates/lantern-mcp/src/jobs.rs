@@ -167,8 +167,11 @@ impl Jobs {
                 }
             }
             let err = err_text.join().unwrap_or_default();
-            let child = children.lock().unwrap().remove(&job);
-            let success = child
+            // Hold the children lock until the status is final, so that a
+            // cancel() in between does not see a job that runs but has no child.
+            let mut children = children.lock().unwrap();
+            let success = children
+                .remove(&job)
                 .and_then(|mut c| c.wait().ok())
                 .is_some_and(|s| s.success());
             if let Some(j) = jobs.lock().unwrap().get_mut(&job)
@@ -194,8 +197,11 @@ impl Jobs {
         self.jobs.lock().unwrap().get(id).cloned()
     }
 
+    /// All jobs, oldest first.
     pub fn list(&self) -> Vec<Job> {
-        self.jobs.lock().unwrap().values().cloned().collect()
+        let mut list: Vec<Job> = self.jobs.lock().unwrap().values().cloned().collect();
+        list.sort_by_key(|j| j.id[1..].parse::<u64>().unwrap_or(u64::MAX));
+        list
     }
 
     /// Stop a running job. Proposals it made stay.
@@ -265,8 +271,11 @@ impl StreamReader {
             }
             Some("user") => {
                 for c in content.into_iter().flatten() {
-                    let call = c.get("tool_use_id").and_then(Value::as_str);
-                    if call.and_then(|id| self.calls.get(id)).map(String::as_str) != Some("propose")
+                    let call = c
+                        .get("tool_use_id")
+                        .and_then(Value::as_str)
+                        .and_then(|id| self.calls.remove(id));
+                    if call.as_deref() != Some("propose")
                         || c.get("is_error").and_then(Value::as_bool) == Some(true)
                     {
                         continue;
@@ -387,12 +396,25 @@ mod tests {
     }
 
     #[test]
+    fn the_list_is_in_creation_order() {
+        let jobs = Jobs::new(Agent::from_env(), "http://127.0.0.1:1/mcp");
+        for n in [10, 2, 1] {
+            let mut j = job();
+            j.id = format!("j{n}");
+            jobs.jobs.lock().unwrap().insert(j.id.clone(), j);
+        }
+        let ids: Vec<String> = jobs.list().into_iter().map(|j| j.id).collect();
+        assert_eq!(ids, ["j1", "j2", "j10"]);
+    }
+
+    #[test]
     fn a_fake_agent_runs_to_the_end() {
         let dir = std::env::temp_dir().join(format!("lantern-job-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("fake-claude");
         let result = json!({ "type": "result", "result": "done" }).to_string();
-        std::fs::write(&script, format!("#!/bin/sh\necho '{result}'\n")).unwrap();
+        // A quoted heredoc passes the JSON as it is, also with quotes in it.
+        std::fs::write(&script, format!("#!/bin/sh\ncat <<'EOF'\n{result}\nEOF\n")).unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

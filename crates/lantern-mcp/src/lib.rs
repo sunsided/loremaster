@@ -85,6 +85,11 @@ impl Server {
         result.map_err(|e| e.0)
     }
 
+    /// End a play session, for example the session of a job that did not start.
+    pub fn end_session(&mut self, name: &str) -> bool {
+        self.ws.end_session(name)
+    }
+
     /// The summaries and notes of rejected proposals, newest last, at most `limit`.
     pub fn rejected(&self, limit: usize) -> Vec<String> {
         let log = self.root.join(".lantern").join("rejected.jsonl");
@@ -93,8 +98,11 @@ impl Server {
             .lines()
             .filter_map(|l| serde_json::from_str::<Value>(l).ok())
             .map(|v| {
-                let summary = v.get("summary").and_then(Value::as_str).unwrap_or_default();
-                match v.get("note").and_then(Value::as_str) {
+                // One line for each proposal, also when the note has line breaks.
+                let one_line = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+                let summary =
+                    one_line(v.get("summary").and_then(Value::as_str).unwrap_or_default());
+                match v.get("note").and_then(Value::as_str).map(one_line) {
                     Some(note) => format!("- {summary} (rejected: {note})"),
                     None => format!("- {summary}"),
                 }
@@ -401,6 +409,17 @@ mod tests {
 
     fn send(s: &mut Server, msg: Value) -> Option<Value> {
         s.handle_line(&msg.to_string())
+    }
+
+    #[test]
+    fn a_rejected_note_stays_on_one_line() {
+        let dir = std::env::temp_dir().join(format!("lantern-rejected-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join(".lantern")).unwrap();
+        let entry = json!({ "summary": "A pier", "note": "too\nmodern" });
+        std::fs::write(dir.join(".lantern/rejected.jsonl"), format!("{entry}\n")).unwrap();
+        let s = Server::new(dir.clone()).unwrap();
+        assert_eq!(s.rejected(20), ["- A pier (rejected: too modern)"]);
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]

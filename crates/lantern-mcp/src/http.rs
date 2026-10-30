@@ -152,12 +152,9 @@ fn start_job(server: &mut Server, jobs: &mut Jobs, body: &str) -> Result<String,
     if !args.is_object() {
         return Err("`args` must be an object.".into());
     }
-    if let Some(state) = req.get("state") {
-        let session = format!("job-{}", jobs.next_id());
-        server.call_tool(
-            "session_start",
-            json!({ "session": session, "state": state }),
-        )?;
+    let state = req.get("state");
+    let session = format!("job-{}", jobs.next_id());
+    if state.is_some() {
         args["session"] = json!(session);
     }
     if task == "imagine_exit" && args.get("rejected").is_none() {
@@ -166,8 +163,19 @@ fn start_job(server: &mut Server, jobs: &mut Jobs, body: &str) -> Result<String,
             args["rejected"] = json!(rejected.join("\n"));
         }
     }
+    // Render first, so that a bad task or argument leaves no session behind.
     let prompt = render_prompt(task, &args).map_err(|e| e.0)?;
-    jobs.start(task, args, &prompt)
+    if let Some(state) = state {
+        server.call_tool(
+            "session_start",
+            json!({ "session": session, "state": state }),
+        )?;
+    }
+    jobs.start(task, args, &prompt).inspect_err(|_| {
+        if state.is_some() {
+            server.end_session(&session);
+        }
+    })
 }
 
 /// A boolean field of a JSON body; false when the body or the field is missing.
