@@ -25,6 +25,8 @@
 - In write mode the card sits in the margin next to its ghost text. In Atlas › Proposals it is \`full\`: it also lists the changes and the problems.
 - Accept is off while the proposal has problems. Accept applies the proposal to the working copy of the editor (only when the files did not change since the proposal), then tells the server.
 - Reject asks for an optional note first ("Why?"). The server keeps the note, and the AI does not offer the idea again.
+- **Walk in** (when \`onwalk\` is set) plays the story with the proposal in a sandbox first. The status line says SANDBOX, with Accept and Leave; Escape leaves. Nothing in the sandbox is saved.
+- Keys: with the focus in the card, A accepts, R rejects and W walks in. Alt+P moves the focus to the next proposal card on the page.
 - A problem from the last action shows in the card, for example "The file rooms/shore.yaml changed after the proposal was made".`
 				}
 			}
@@ -34,5 +36,6 @@
 
 <Story name="Checked" />
 <Story name="Full" args={{ full: true }} />
+<Story name="With Walk in" args={{ full: true, onwalk: fn() }} />
 <Story name="With problems" args={{ proposal: { ...proposal, ok: false, problems: ['unknown name `gull`'] }, full: true }} />
 <Story name="Stale" args={{ proposal: { ...proposal, stale: true }, problem: 'The file rooms/shore.yaml changed after the proposal was made.' }} />

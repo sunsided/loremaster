@@ -2,6 +2,7 @@
 // The editor reads them from the local server, shows them as ghost text, and applies an accepted
 // proposal to its own working copy. Then it tells the server, so the server drops the proposal.
 
+import type { ReviewFinding } from '#lib/design/types.ts';
 import { keepLines } from './yaml-edit.ts';
 import type { Workspace } from './workspace.svelte.ts';
 
@@ -69,6 +70,27 @@ export interface SyncState {
 	differ: string[];
 	/** The number of files that the check compared by content. */
 	checked: number;
+}
+
+/**
+ * The findings of a `review_room` job, from its reply: one line each, in the form
+ * `- high | room:shore #2 | the problem | the fix`. Lines in another form are left out.
+ */
+export function parseFindings(job: string, reply: string): ReviewFinding[] {
+	const out: ReviewFinding[] = [];
+	for (const line of reply.split('\n')) {
+		const m = line.match(/^\s*(?:[-*]|\d+\.)?\s*\**\s*(high|medium|low)\s*\**\s*\|\s*`?([^|#`]+?)`?\s*(?:#\s*(\d+))?\s*\|\s*(.+?)\s*\|\s*(.+?)\s*$/i);
+		if (!m) continue;
+		out.push({
+			key: `${job}#${out.length}`,
+			severity: m[1].toLowerCase() as ReviewFinding['severity'],
+			owner: m[2].trim(),
+			fragment: m[3] === undefined ? null : Number(m[3]),
+			problem: m[4],
+			fix: m[5]
+		});
+	}
+	return out;
 }
 
 async function sha256(text: string): Promise<string> {
@@ -257,13 +279,16 @@ export class AiLink {
 	 * the new rooms. The seed of a new story does this: the server's folder is the editor's story.
 	 */
 	async #accept(view: ProposalView, workspace: Workspace, serverWrites = false): Promise<string | null> {
-		const changes: { path: string; text: string }[] = [];
+		const changes: { path: string; text: string | null }[] = [];
 		for (const f of view.files) {
 			const now = workspace.project.file(f.path)?.text ?? null;
 			if (f.base_sha !== null && (now === null || (await sha256(now)) !== f.base_sha))
 				return `The file ${f.path} changed after the proposal was made. Reject it, or ask for a new one.`;
 			if (f.base_sha === null && now !== null) return `The file ${f.path} exists now. The proposal wanted to make it.`;
-			if (f.after === null) return `The proposal deletes ${f.path}. The editor cannot delete files yet; accept it in the server.`;
+			if (f.after === null) {
+				changes.push({ path: f.path, text: null });
+				continue;
+			}
 			// Keep the lines that the proposal did not change byte for byte.
 			changes.push({ path: f.path, text: now === null ? f.after : keepLines(now, f.after) });
 		}

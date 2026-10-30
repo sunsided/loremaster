@@ -3,6 +3,7 @@
 	import Button from '../atoms/Button.svelte';
 	import Heading from '../atoms/Heading.svelte';
 	import RadioGroup from '../molecules/RadioGroup.svelte';
+	import { aiNote, endLine } from '../map-geometry.ts';
 
 	interface Props {
 		map: MapView;
@@ -98,6 +99,8 @@
 	const BOX_W = 168;
 	const BOX_H = 44;
 	const PAD = 24;
+	/** Room around the map for the marks of message exits, which reach out of the room boxes. */
+	const pad = $derived(map.ends?.length ? PAD + 36 : PAD);
 
 	const bounds = $derived.by(() => {
 		const ps = [...layout.values()];
@@ -112,14 +115,14 @@
 	});
 	// Extra room on the right for exit labels such as "through the mirror".
 	const LABEL_ROOM = 120;
-	const width = $derived((bounds.maxX - bounds.minX) * CELL_X + BOX_W + 2 * PAD + LABEL_ROOM);
-	const height = $derived((bounds.maxY - bounds.minY) * CELL_Y + BOX_H + 2 * PAD);
+	const width = $derived((bounds.maxX - bounds.minX) * CELL_X + BOX_W + 2 * pad + LABEL_ROOM);
+	const height = $derived((bounds.maxY - bounds.minY) * CELL_Y + BOX_H + 2 * pad);
 
 	/** A long name is cut to fit the box. The full name is in the title and in the list for screen readers. */
 	const short = (name: string) => (name.length > 21 ? `${name.slice(0, 20).trimEnd()}…` : name);
 	const at = (r: MapRoom) => layout.get(r.id) ?? { x: r.x, y: r.y };
-	const cx = (r: MapRoom) => (at(r).x - bounds.minX) * CELL_X + PAD + BOX_W / 2;
-	const cy = (r: MapRoom) => (at(r).y - bounds.minY) * CELL_Y + PAD + BOX_H / 2;
+	const cx = (r: MapRoom) => (at(r).x - bounds.minX) * CELL_X + pad + BOX_W / 2;
+	const cy = (r: MapRoom) => (at(r).y - bounds.minY) * CELL_Y + pad + BOX_H / 2;
 	/** In the stacked view, the levels next to the shown one sit a little up and right (above) or down and left (below). */
 	const GHOST = 14;
 	const room = (id: string) => map.rooms.find((r) => r.id === id);
@@ -169,13 +172,16 @@
 		return `M${cx(a)} ${cy(a)}L${end.x} ${end.y}`;
 	}
 
+	const ends = $derived((map.ends ?? []).filter((e) => layout.has(e.room) && (!(multi && view === 'stacked') || (e.direction !== 'up' && e.direction !== 'down'))));
+	const hasProposals = $derived(map.rooms.some((r) => r.proposed || r.removed) || map.links.some((l) => l.proposed || l.removed) || (map.ends ?? []).some((e) => e.proposed || e.removed));
+
 	function describe(link: MapLink): string {
 		const from = room(link.from)?.name ?? link.from;
 		const to = room(link.to)?.name ?? link.to;
 		const parts = [`${from} ${link.one_way ? 'to' : 'and'} ${to}, ${link.direction}`];
 		if (link.one_way) parts.push('one way');
 		if (!link.visible) parts.push('hidden now');
-		return parts.join(', ');
+		return parts.join(', ') + aiNote(link);
 	}
 </script>
 
@@ -213,8 +219,8 @@
 			</marker>
 		</defs>
 		{#each ghosts as { r, d } (r.id)}
-			{@const gx = (r.x - bounds.minX) * CELL_X + PAD + d * GHOST}
-			{@const gy = (r.y - bounds.minY) * CELL_Y + PAD - d * GHOST}
+			{@const gx = (r.x - bounds.minX) * CELL_X + pad + d * GHOST}
+			{@const gy = (r.y - bounds.minY) * CELL_Y + pad - d * GHOST}
 			<rect class="ghost" class:above={d > 0} x={gx} y={gy} width={BOX_W} height={BOX_H}><title>{r.name}, level {r.level}</title></rect>
 		{/each}
 		{#each map.links.filter(drawn) as link (link.from + link.to + link.direction)}
@@ -227,6 +233,8 @@
 					class="link"
 					class:stair={link.direction === 'up' || link.direction === 'down'}
 					class:hidden-link={!link.visible}
+					class:proposed={!!link.proposed}
+					class:removed={!!link.removed}
 					marker-end={link.one_way ? `url(#${uid}-arrow)` : undefined}
 				/>
 				{@const text = multi && view === 'unfolded' ? null : label(link)}
@@ -235,14 +243,26 @@
 				{/if}
 			{/if}
 		{/each}
+		{#each ends as e (e.room + '>' + e.direction)}
+			{@const r = room(e.room)}
+			{#if r}
+				{@const l = endLine(cx(r), cy(r), BOX_W, BOX_H, e.direction)}
+				<g class="end" class:hidden-link={!e.visible} class:proposed={!!e.proposed} class:removed={!!e.removed}>
+					<line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} />
+					<path d={l.bar} />
+					<title>{e.direction}: only a message</title>
+				</g>
+			{/if}
+		{/each}
 		{#each placed as r (r.id)}
 			{@const st = multi ? stairs(r) : { up: false, down: false }}
-			<g class="room" class:current={r.current} class:unvisited={!r.visited}>
+			<g class="room" class:current={r.current} class:unvisited={!r.visited} class:proposed={!!r.proposed} class:removed={!!r.removed}>
 				<rect x={cx(r) - BOX_W / 2} y={cy(r) - BOX_H / 2} width={BOX_W} height={BOX_H} />
 				{#if r.current}
 					<rect class="tint" x={cx(r) - BOX_W / 2} y={cy(r) - BOX_H / 2} width={BOX_W} height={BOX_H} />
 				{/if}
-				<text x={cx(r)} y={cy(r) + 4} text-anchor="middle">{short(r.name)}<title>{r.name}</title></text>
+				<text x={cx(r)} y={cy(r) + 4} text-anchor="middle">{r.proposed ? '✦ ' : ''}{short(r.name)}<title>{r.name}{aiNote(r)}</title></text>
+				{#if r.removed}<line class="strike" x1={cx(r) - BOX_W / 2} y1={cy(r)} x2={cx(r) + BOX_W / 2} y2={cy(r)} />{/if}
 				{#if st.up || st.down}
 					<text x={cx(r) + BOX_W / 2 - 6} y={cy(r) - BOX_H / 2 + 13} text-anchor="end" class="stairs"
 						>{st.up ? '▲' : ''}{st.down ? '▼' : ''}</text
@@ -257,19 +277,24 @@
 		<span><i class="swatch current-swatch"></i>you are here</span>
 		<span><i class="swatch visited-swatch"></i>visited</span>
 		<span><i class="swatch unvisited-swatch"></i>not visited yet</span>
+		{#if ends.length}<span><i class="end-swatch"></i>only a message</span>{/if}
+		{#if hasProposals}<span><i class="swatch proposed-swatch"></i>✦ proposed by AI</span>{/if}
 	</div>
 
 	<div class="visually-hidden">
 		<h3>Rooms</h3>
 		<ul>
 			{#each map.rooms as r (r.id)}
-				<li>{r.name}{multi ? `, level ${r.level}` : ''}{r.current ? ', you are here' : r.visited ? ', visited' : ', not visited yet'}</li>
+				<li>{r.name}{multi ? `, level ${r.level}` : ''}{r.current ? ', you are here' : r.visited ? ', visited' : ', not visited yet'}{aiNote(r)}</li>
 			{/each}
 		</ul>
 		<h3>Connections</h3>
 		<ul>
 			{#each map.links as link (link.from + link.to + link.direction)}
 				<li>{describe(link)}</li>
+			{/each}
+			{#each map.ends ?? [] as e (e.room + '>' + e.direction)}
+				<li>{room(e.room)?.name ?? e.room}, {e.direction}: only a message{e.visible ? '' : ', hidden now'}{aiNote(e)}</li>
 			{/each}
 		</ul>
 	</div>
@@ -388,6 +413,41 @@
 		fill: var(--color-text-accent);
 		font-weight: var(--font-weight-strong);
 	}
+	.end line,
+	.end path {
+		stroke: var(--color-border-control);
+		stroke-width: 1.5;
+	}
+	/* AI proposals: the ghost colour and a long dash; the name has a ✦, so the colour is not the only cue. */
+	.link.proposed,
+	.end.proposed line,
+	.end.proposed path {
+		stroke: var(--color-ghost);
+		stroke-width: 1.5;
+		stroke-dasharray: 6 4;
+	}
+	.room.proposed rect {
+		fill: var(--map-bg);
+		stroke: var(--color-ghost);
+		stroke-width: 1.5;
+		stroke-dasharray: 6 4;
+	}
+	.room.proposed text {
+		fill: var(--color-ghost);
+		font-style: italic;
+	}
+	/* What a proposal removes: the warning colour and a line through it. */
+	.link.removed,
+	.end.removed line,
+	.end.removed path,
+	.room.removed rect,
+	.room .strike {
+		stroke: var(--color-warning);
+	}
+	.room.removed text {
+		fill: var(--color-text-warning);
+		text-decoration: line-through;
+	}
 	.legend[hidden] {
 		display: none;
 	}
@@ -415,6 +475,17 @@
 	}
 	.unvisited-swatch {
 		border-style: dashed;
+	}
+	.proposed-swatch {
+		border-color: var(--color-ghost);
+		border-style: dashed;
+	}
+	.end-swatch {
+		display: inline-block;
+		width: 14px;
+		height: 10px;
+		border-right: 2px solid var(--color-border-control);
+		background: linear-gradient(var(--color-border-control), var(--color-border-control)) left center / 100% 1.5px no-repeat;
 	}
 	.visually-hidden {
 		position: absolute;

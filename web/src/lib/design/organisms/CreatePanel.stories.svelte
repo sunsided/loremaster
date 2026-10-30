@@ -1,6 +1,6 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
-	import { fn } from 'storybook/test';
+	import { fn, userEvent, within } from 'storybook/test';
 	import CreatePanel from './CreatePanel.svelte';
 
 	const { Story } = defineMeta({
@@ -24,7 +24,7 @@
 				description: {
 					component: `The create panel is a small form in the story text, for something new. It opens in write mode, at the end of the newest turn.
 
-- **Exit**: the direction, and where the exit leads: a new room (with its name) or an existing room. "with the way back" also adds the opposite exit. The panel opens when the player walks where there is no exit, with that direction. After "Create" the player walks through the new exit, and the writer opens for the text of a new room.
+- **Exit**: the direction, and where the exit leads: a new room (with its name), an existing room, or nowhere ("nowhere, only a message": the text that a move in that direction prints, for example "Cold surf breaks over the rocks."). "with the way back" also adds the opposite exit. The panel opens when the player walks where there is no exit, with that direction. After "Create" the player walks through the new exit, and the writer opens for the text of a new room.
 - **Thing**: the name, and "the player can take it". After "Create" the writer opens for the presence text of the thing.
 - **Character**: the name, and "proper name, without "the"".
 
@@ -41,5 +41,11 @@ The ids come from the names, for example "The Beach" becomes \`the_beach\`. Ente
 <Story name="New exit" />
 <Story name="New thing" args={{ kind: 'thing', name: 'brass key' }} />
 <Story name="New character" args={{ kind: 'character' }} />
+<Story
+	name="New message exit"
+	play={async ({ canvasElement }) => {
+		await userEvent.selectOptions(within(canvasElement).getByLabelText('Leads to'), 'message');
+	}}
+/>
 <Story name="New exit, with AI" args={{ ondraft: fn() }} />
 <Story name="Refused" args={{ onsubmit: fn(async () => 'There is already a room `the_beach`.') }} />

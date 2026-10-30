@@ -241,9 +241,10 @@ pub fn render_prompt_with_context(
                  3. For the clear fixes, make one proposal with `propose`. It must have `ok: true`. {edits}\n\
                  4. Do not change the session `{session}`.\n\
                  \n\
-                 Reply with a list of findings. Each finding has: the fragment (owner and index, for example `room:{room}` #2), how serious it is (high, medium or low), the problem, and the fix. Then give the id of your proposal, if you made one.{terse_review}{context}",
+                 Reply with a list of findings, one line each, in this form (the editor shows them next to the text):\n\
+                 `- high | room:{room} #2 | the problem | the fix`\n\
+                 The first part is how serious it is: high, medium or low. The second part is the fragment: its owner and its index in the list, counting from 0 as `get_entity` lists it. Leave out the index for a finding about the whole room. Do not use `|` in the problem or the fix. Then give the id of your proposal, if you made one.{context}",
                 edits = EDITS,
-                terse_review = " Write each finding in one line.",
                 context = with_context(context),
             ))
         }
@@ -319,6 +320,17 @@ mod tests {
                 .iter()
                 .any(|c| c.1 == "scene" && c.2["session"] == crate::DEFAULT_SESSION)
         );
+    }
+
+    #[test]
+    fn review_room_asks_for_one_finding_per_line_flush_left() {
+        let text = render_prompt("review_room", &json!({ "room": "shore" })).unwrap();
+        assert!(
+            text.lines()
+                .any(|l| l == "`- high | room:shore #2 | the problem | the fix`"),
+            "{text}"
+        );
+        assert!(text.lines().all(|l| !l.starts_with(' ')), "{text}");
     }
 
     #[test]

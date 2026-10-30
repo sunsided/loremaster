@@ -137,7 +137,8 @@ export interface WriterTools {
 
 /** What the author asks to create in the game. */
 export type CreateRequest =
-	| { kind: 'exit'; direction: string; to: { name: string } | { id: string }; back: boolean }
+	/** `to`: a new room by name, a room by id, or no room: a message exit that only prints `message`. */
+	| { kind: 'exit'; direction: string; to: { name: string } | { id: string } | { message: string }; back: boolean }
 	| { kind: 'thing' | 'character'; name: string; portable: boolean; proper: boolean };
 
 /** An action in a MenuButton. */
@@ -171,6 +172,19 @@ export interface MarginInfo {
 	/** The number of things and of exits that the generated layers come from. */
 	things: number;
 	exits: number;
+}
+
+/** One finding of an AI review of a room, for a note in the margin. */
+export interface ReviewFinding {
+	/** A key to dismiss it, for example `j3#1`. */
+	key: string;
+	severity: 'high' | 'medium' | 'low';
+	/** The owner of the fragment, for example `room:shore`. */
+	owner: string;
+	/** The fragment index, counting from 0. Null: a finding about the whole room. */
+	fragment: number | null;
+	problem: string;
+	fix: string;
 }
 
 /** One open AI proposal, in short, for a card. */

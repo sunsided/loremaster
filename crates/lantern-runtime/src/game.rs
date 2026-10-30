@@ -109,11 +109,23 @@ pub struct MapLink {
     pub one_way: bool,
 }
 
+/// An exit that leads nowhere and only prints a message, for its own mark on the map.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MapEnd {
+    pub room: String,
+    pub direction: String,
+    /// False while the exit is hidden from the player.
+    pub visible: bool,
+}
+
 /// The whole map, for the map panel.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapView {
     pub rooms: Vec<MapRoom>,
     pub links: Vec<MapLink>,
+    /// The message exits.
+    #[serde(default)]
+    pub ends: Vec<MapEnd>,
 }
 
 /// One line of the generated objects or exits layer, for the assembly panel.
@@ -1222,10 +1234,17 @@ impl Game {
             })
             .collect();
         let mut links: Vec<MapLink> = Vec::new();
+        let mut ends: Vec<MapEnd> = Vec::new();
         for (ri, room) in story.rooms.iter().enumerate() {
             for (ei, exit) in room.exits.iter().enumerate() {
-                // A message exit is no edge of the map.
+                let visible = ev.holds_opt(&self.world.rooms[ri].exits[ei].visible);
+                // A message exit is no edge of the map: it gets its own mark.
                 let Some(to) = &exit.to else {
+                    ends.push(MapEnd {
+                        room: room.id.to_string(),
+                        direction: exit.direction.name().to_string(),
+                        visible,
+                    });
                     continue;
                 };
                 let back = story
@@ -1242,12 +1261,12 @@ impl Game {
                     from: room.id.to_string(),
                     to: to.to_string(),
                     direction: exit.direction.name().to_string(),
-                    visible: ev.holds_opt(&self.world.rooms[ri].exits[ei].visible),
+                    visible,
                     one_way: !back,
                 });
             }
         }
-        MapView { rooms, links }
+        MapView { rooms, links, ends }
     }
 
     /// The things and exits that make the objects and exits layers of the

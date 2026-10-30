@@ -93,6 +93,17 @@ export class Project {
 		if (this.storage === 'folder' && this.#folder) await store.writeFile(this.#folder, path, text);
 	}
 
+	/** Remove a file: from memory, from the working copy and from the linked folder. */
+	async remove(path: string) {
+		this.files = this.files.filter((f) => f.path !== path);
+		this.edited = !same(this.files, this.#bundled);
+		if (this.storage !== 'memory') {
+			if (this.#hasCopy) await store.removeWorkingFile(this.name, path);
+			else this.#hasCopy = await store.saveWorkingCopy(this.name, this.files);
+		}
+		if (this.storage === 'folder' && this.#folder) await store.removeFile(this.#folder, path);
+	}
+
 	/**
 	 * Link a folder on disk. A folder with a story in it becomes the source; an empty folder gets the current files.
 	 * Returns the files to load.

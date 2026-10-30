@@ -67,6 +67,11 @@ export class Game {
 		this.#engine = engine;
 	}
 
+	/** Give the memory of the engine back. Do not use the game after this. */
+	free(): void {
+		this.#engine.free();
+	}
+
 	static async open(files: SourceFile[]): Promise<Game> {
 		await loadEngine();
 		try {

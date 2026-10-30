@@ -5,6 +5,13 @@ import { Session } from '#lib/player/session.svelte.ts';
 import { Project } from './project.svelte.ts';
 import { fromZip } from './store.ts';
 
+/** The files with some files changed, added or removed (`text: null`). */
+export function applyChanges(files: SourceFile[], changes: { path: string; text: string | null }[]): SourceFile[] {
+	const paths = new Set(changes.map((c) => c.path));
+	const changed = changes.filter((c): c is SourceFile => c.text !== null);
+	return [...files.filter((f) => !paths.has(f.path)), ...changed].sort((a, b) => a.path.localeCompare(b.path));
+}
+
 export class Workspace {
 	readonly project: Project;
 	session = $state.raw<Session | null>(null);
@@ -53,13 +60,17 @@ export class Workspace {
 		return this.changeMany([{ path, text }]);
 	}
 
-	/** Change or add several files at once, for example a new room and the exit to it. */
-	async changeMany(changes: SourceFile[]): Promise<Diagnostic[] | null> {
-		let files = this.project.files;
-		for (const c of changes) files = [...files.filter((f) => f.path !== c.path), c];
-		const game = await this.#build(files);
+	/**
+	 * Change or add several files at once, for example a new room and the exit to it.
+	 * A change with `text: null` removes the file.
+	 */
+	async changeMany(changes: { path: string; text: string | null }[]): Promise<Diagnostic[] | null> {
+		const game = await this.#build(applyChanges(this.project.files, changes));
 		if (!game) return this.problems;
-		for (const c of changes) await this.project.write(c.path, c.text);
+		for (const c of changes) {
+			if (c.text === null) await this.project.remove(c.path);
+			else await this.project.write(c.path, c.text);
+		}
 		this.project.origins = game.origins();
 		this.session?.carryOver(game);
 		return null;

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Workspace } from '#lib/project/workspace.svelte.ts';
-	import { AiLink, type ProposalView } from '#lib/project/proposals.svelte.ts';
+	import { AiLink, parseFindings, type ProposalView } from '#lib/project/proposals.svelte.ts';
 	import ProposalCard from '#lib/design/molecules/ProposalCard.svelte';
 	import AiStatus from '#lib/design/molecules/AiStatus.svelte';
 	import { canLinkFolder } from '#lib/project/store.ts';
@@ -12,17 +12,20 @@
 	import { inMarkup } from '#lib/project/transform.ts';
 	import { tick, untrack } from 'svelte';
 	import CreatePanel from '#lib/design/organisms/CreatePanel.svelte';
-	import { addExit, addResponseRule, directionOf, directions, opposite, roomFile, slug, step, thingFile, type Direction } from '#lib/project/create.ts';
+	import { addExit, addMessageExit, addResponseRule, directionOf, directions, opposite, roomFile, slug, step, thingFile, type Direction } from '#lib/project/create.ts';
 	import type { CreateRequest } from '#lib/design/types.ts';
 	import type { Source } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
-	import { newStory, notesOf, threadsOf, type NoteRef, type ThreadView } from '#lib/engine/index.ts';
+	import { Game, newStory, notesOf, threadsOf, type NoteRef, type ThreadView } from '#lib/engine/index.ts';
+	import type { AtlasRoom, MapView } from '#lib/engine/types.ts';
+	import { changesWorld, filesAfter, mapWithProposals } from '#lib/project/proposal-world.ts';
+	import type { Session } from '#lib/player/session.svelte.ts';
 	import ThreadsView from '#lib/design/organisms/ThreadsView.svelte';
 	import ThreadTag from '#lib/design/molecules/ThreadTag.svelte';
 	import NotesList from '#lib/design/organisms/NotesList.svelte';
 	import RadioGroup from '#lib/design/molecules/RadioGroup.svelte';
-	import type { NoteItem, ThreadItem } from '#lib/design/types.ts';
+	import type { NoteItem, ReviewFinding, ThreadItem } from '#lib/design/types.ts';
 	import { addNote, pathOf, removeNote, setField, setNoteDone } from '#lib/project/yaml-edit.ts';
 	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
 	import NewStoryDialog from '#lib/design/organisms/NewStoryDialog.svelte';
@@ -52,7 +55,9 @@
 	import type { GhostLine, MenuItem, PaletteItem, ProposalSummary } from '#lib/design/types.ts';
 
 	let workspace: Workspace | undefined = $state();
-	const session = $derived(workspace?.session ?? undefined);
+	/** Walk in: a proposal played in a sandbox, before the author accepts it. Nothing in it is saved. */
+	let sandbox = $state.raw<{ proposal: string; summary: string; session: Session } | null>(null);
+	const session = $derived(sandbox?.session ?? workspace?.session ?? undefined);
 	const STORY_KEY = 'lantern.story';
 	let mine = $state<StoryEntry[]>(myStories());
 	let storyName = $state(readStory());
@@ -407,6 +412,93 @@
 	}
 	const runningJob = $derived(aiJobs.find((j) => j.status === 'running'));
 
+	// The worlds after the proposals that add or remove rooms and exits: the ghosts on the maps.
+	// A world is built again only when the files of the editor change.
+	let proposalGames = $state.raw<Map<string, Game>>(new Map());
+	let builtFor: { files: unknown; games: Map<string, Game> } = { files: null, games: new Map() };
+	$effect(() => {
+		const files = workspace?.project.files;
+		const views = ai.proposals.filter(changesWorld);
+		if (!files) return;
+		let current = true;
+		(async () => {
+			const old = builtFor.files === files ? builtFor.games : new Map<string, Game>();
+			const games = new Map<string, Game>();
+			for (const v of views) {
+				const known = old.get(v.id);
+				if (known) games.set(v.id, known);
+				else
+					try {
+						games.set(v.id, await Game.open(filesAfter(files, v)));
+					} catch {
+						// A proposal that does not build has no ghosts; its card shows the problems.
+					}
+			}
+			if (!current) {
+				for (const [id, g] of games) if (!old.has(id)) g.free();
+				return;
+			}
+			// The worlds of proposals that went, or of older files, are not needed any more.
+			for (const [id, g] of builtFor.games) if (games.get(id) !== g) g.free();
+			builtFor = { files, games };
+			proposalGames = games;
+		})();
+		return () => {
+			current = false;
+		};
+	});
+	/** The map of the game with the ghosts of the proposals. In the sandbox, the map of the sandbox. */
+	const shownMap = $derived.by<MapView>(() => {
+		const s = session;
+		if (!s) return { rooms: [], links: [] };
+		if (sandbox || !proposalGames.size) return s.map;
+		return mapWithProposals(s.map, [...proposalGames].map(([id, g]) => ({ id, map: g.map() })));
+	});
+	const proposalSummary = (id: string | undefined) => (id ? ai.proposals.find((p) => p.id === id)?.summary : undefined);
+
+	/** Walk in: play the proposal in a sandbox, from the state of the game now, or from one of its rooms. */
+	async function walkIn(id: string, room?: string) {
+		const view = ai.proposals.find((p) => p.id === id);
+		const ws = workspace;
+		const base = ws?.session;
+		if (!view || !ws || !base) return;
+		let game: Game;
+		try {
+			game = await Game.open(filesAfter(ws.project.files, view));
+		} catch {
+			failure = 'The proposal does not build, so it cannot be played.';
+			return;
+		}
+		if (writing) toggleWriting();
+		const play = base.sandbox(game);
+		if (room && room !== play.scene.room) play.author({ type: 'goto', room });
+		leaveSandbox();
+		sandbox = { proposal: id, summary: view.summary, session: play };
+		closeAtlas();
+		await tick();
+		prompt?.focus();
+	}
+	/** Leave the sandbox: the game is as it was before Walk in. */
+	function leaveSandbox() {
+		const old = sandbox;
+		sandbox = null;
+		// The sandbox has its own engine; give its memory back.
+		old?.session.game.free();
+	}
+	// The sandbox ends when its proposal goes: accepted, rejected or withdrawn.
+	$effect(() => {
+		if (sandbox && !ai.proposals.some((p) => p.id === sandbox?.proposal)) leaveSandbox();
+	});
+
+	// The findings of the last AI review of the current room, as notes in the margin of write mode.
+	let dismissed = $state<Set<string>>(new Set());
+	const reviewFindings = $derived.by<ReviewFinding[]>(() => {
+		const s = session;
+		if (!s || sandbox) return [];
+		const job = ai.jobs.findLast((j) => j.task === 'review_room' && j.status === 'done' && j.args.room === s.scene.room && j.result);
+		return job ? parseFindings(job.id, job.result ?? '').filter((f) => !dismissed.has(f.key)) : [];
+	});
+
 	/** The ghost lines of the proposals that change the text of the current room. */
 	const ghostsHere = $derived.by<GhostLine[]>(() => {
 		const s = session;
@@ -449,11 +541,25 @@
 			proposalBusy.delete(id);
 		}
 	}
-	const atlasRooms = $derived.by(() => {
+	const atlasRooms = $derived.by<AtlasRoom[]>(() => {
 		const s = session;
 		if (!s || !atlasOpen) return [];
 		s.entries.length;
-		return s.game.atlas();
+		const rooms: AtlasRoom[] = s.game.atlas();
+		if (sandbox) return rooms;
+		// The rooms of the proposals, and the rooms that they remove.
+		const ids = new Set(rooms.map((r) => r.id));
+		const out = rooms.map((r) => {
+			const removed = shownMap.rooms.find((m) => m.id === r.id)?.removed;
+			return removed ? { ...r, removed } : r;
+		});
+		for (const [id, g] of proposalGames)
+			for (const r of g.atlas())
+				if (!ids.has(r.id)) {
+					ids.add(r.id);
+					out.push({ ...r, current: false, visited: false, proposed: id });
+				}
+		return out;
 	});
 
 	function openAtlas(tab: typeof atlasTab = atlasTab) {
@@ -634,6 +740,24 @@
 				return;
 			}
 		}
+		// Alt+P: the focus goes to the next proposal card on the page, in the margin or in Atlas › Proposals.
+		if (event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyP') {
+			const cards = [...document.querySelectorAll<HTMLElement>('[data-proposal]')];
+			if (cards.length) {
+				event.preventDefault();
+				const at = cards.findIndex((c) => c.contains(document.activeElement));
+				cards[(at + 1) % cards.length].focus();
+				return;
+			}
+		}
+		if (event.key === 'Escape' && sandbox && !atlasOpen && !showPalette && !showSettings) {
+			const t = event.target as HTMLElement | null;
+			if (!(t && t.tagName === 'INPUT' && (t as HTMLInputElement).value)) {
+				event.preventDefault();
+				leaveSandbox();
+				return;
+			}
+		}
 		if (event.key === '/' && atlasOpen && atlasTab === 'map' && !(event.target instanceof HTMLInputElement)) {
 			event.preventDefault();
 			document.getElementById('atlas-search')?.focus();
@@ -654,6 +778,8 @@
 	let writingVariant = $state(0);
 
 	function toggleWriting() {
+		// The sandbox plays other files than the editor's: write there after Accept.
+		if (sandbox && !writing) return;
 		writing = !writing;
 		writingAt = null;
 		creating = null;
@@ -788,6 +914,15 @@
 		const hereFile = ws.project.listOf(`room:${here}`)?.file;
 		const hereText = hereFile && ws.project.file(hereFile)?.text;
 		if (!hereFile || !hereText) return 'The editor does not know the file of this room.';
+		if (request.kind === 'exit' && 'message' in request.to) {
+			const dir = request.direction as Direction;
+			const problems = await ws.change(hereFile, addMessageExit(hereText, dir, request.to.message));
+			if (problems?.length) return problems.map((p) => p.message).join(' ');
+			// Try it: the move prints the message.
+			s.input(dir);
+			creating = null;
+			return null;
+		}
 		if (request.kind === 'exit') {
 			const dir = request.direction as Direction;
 			const changes: { path: string; text: string }[] = [];
@@ -802,7 +937,7 @@
 					text: roomFile({ name: request.to.name, position, exits: request.back ? [{ direction: opposite(dir), to: here }] : [] })
 				});
 			} else {
-				to = request.to.id;
+				to = (request.to as { id: string }).id;
 				if (request.back) {
 					const file = ws.project.listOf(`room:${to}`)?.file;
 					const text = file && ws.project.file(file)?.text;
@@ -927,18 +1062,17 @@
 	// The Here panel.
 	/** The rooms next to the current room on its level, for the small map. */
 	const hereMap = $derived.by(() => {
-		const s = session;
-		if (!s) return { rooms: [], links: [] };
-		const me = s.map.rooms.find((r) => r.current);
-		if (!me) return s.map;
+		const map = shownMap;
+		const me = map.rooms.find((r) => r.current);
+		if (!me) return map;
 		const near = new Set([me.id]);
-		for (const l of s.map.links) {
+		for (const l of map.links) {
 			if (l.from === me.id) near.add(l.to);
 			if (l.to === me.id) near.add(l.from);
 		}
-		const rooms = s.map.rooms.filter((r) => near.has(r.id) && r.level === me.level);
+		const rooms = map.rooms.filter((r) => near.has(r.id) && r.level === me.level);
 		const ids = new Set(rooms.map((r) => r.id));
-		return { rooms, links: s.map.links.filter((l) => ids.has(l.from) && ids.has(l.to)) };
+		return { rooms, links: map.links.filter((l) => ids.has(l.from) && ids.has(l.to)), ends: (map.ends ?? []).filter((e) => e.room === me.id) };
 	});
 	/** The values that the room text depends on, with the values now. */
 	const hereStates = $derived.by(() => {
@@ -1055,6 +1189,10 @@
 			onlink={canLinkFolder() ? () => fileAction(() => workspace!.linkFolder()) : undefined}
 			onproposals={() => openAtlas('proposals')}
 			onagain={seedAgain}
+			findings={reviewFindings.length}
+			onfindings={() => {
+				if (!writing) toggleWriting();
+			}}
 		/>
 	{/if}
 {/snippet}
@@ -1136,7 +1274,7 @@
 			/>
 		{/snippet}
 				{#if atlasTab === 'map'}
-					<AtlasMap map={s.map} rooms={atlasRooms} bind:selected={atlasRoom} onselect={(id) => (atlasRoom = id)} />
+					<AtlasMap map={shownMap} rooms={atlasRooms} bind:selected={atlasRoom} onselect={(id) => (atlasRoom = id)} />
 				{:else if atlasTab === 'story'}
 					<StoryTimeline steps={s.history} />
 				{:else if atlasTab === 'checks'}
@@ -1208,6 +1346,7 @@
 								problem={proposalProblems[p.id] ?? null}
 								onaccept={() => onProposal(p.id, 'accept')}
 								onreject={(note) => onProposal(p.id, 'reject', note)}
+								onwalk={() => walkIn(p.id)}
 							/>
 						{:else}
 							<p class="muted-line">No open proposals. An assistant makes them through lantern serve.</p>
@@ -1246,6 +1385,11 @@
 			{#if atlasTab === 'map' && card}
 				<RoomCard
 					room={card}
+					proposal={card.proposed ? { id: card.proposed, summary: proposalSummary(card.proposed) ?? '' } : null}
+					removedBy={card.removed ? (proposalSummary(card.removed) ?? card.removed) : null}
+					onwalk={card.proposed ? () => walkIn(card.proposed!, card.id) : undefined}
+					onaccept={card.proposed ? () => onProposal(card.proposed!, 'accept') : undefined}
+					onreject={card.proposed ? () => onProposal(card.proposed!, 'reject') : undefined}
 					rules={s.rules.filter((r) => r.when.includes(card.id) || (r.condition ?? '').includes(card.id))}
 					ongo={() => {
 						s.author({ type: 'goto', room: card.id });
@@ -1272,13 +1416,15 @@
 		{#snippet header()}
 			<AppHeader
 				title={s.game.title}
-				saved={aiDiffers ? `${storageLabel} · AI sees other files` : storageLabel}
+				saved={sandbox ? 'sandbox · nothing is saved' : aiDiffers ? `${storageLabel} · AI sees other files` : storageLabel}
 				savedState={workspace?.project.storage === 'folder-locked' || aiDiffers ? 'attention' : 'ok'}
 				{projectItems}
 				mode={writing ? 'write' : 'play'}
-				onmode={(m) => {
-					if ((m === 'write') !== writing) toggleWriting();
-				}}
+				onmode={sandbox
+					? undefined
+					: (m) => {
+							if ((m === 'write') !== writing) toggleWriting();
+						}}
 				settingsOpen={showSettings}
 				onsettings={() => (showSettings = true)}
 				onpalette={() => (showPalette = true)}
@@ -1296,6 +1442,10 @@
 				onroom={() => openAtlas('map')}
 			>
 				{#snippet marks()}
+					{#if sandbox}<span class="sandbox-mark" title={sandbox.summary}
+							>SANDBOX ✦ <button type="button" class="job-chip" onclick={() => sandbox && onProposal(sandbox.proposal, 'accept')}>Accept</button>
+							<button type="button" class="job-chip" onclick={leaveSandbox} aria-keyshortcuts="Escape">Leave (Esc)</button></span
+						>{/if}
 					{#if openTodos.length}<button type="button" class="job-chip" onclick={() => openAtlas('todos')}
 							>{openTodos.length} TODO</button
 						>{/if}
@@ -1334,6 +1484,9 @@
 				ghosts={ghostsHere}
 				proposals={proposalSummaries.filter((p) => ghostsHere.some((g) => g.proposal === p.id))}
 				onproposal={onProposal}
+				onwalk={walkIn}
+				findings={reviewFindings}
+				ondismiss={(key) => (dismissed = new Set([...dismissed, key]))}
 				{proposalProblems}
 				margin={writing ? marginInfo : null}
 				respond={respondable?.label ?? null}
@@ -1423,7 +1576,7 @@
 			{/if}
 		{/snippet}
 		{#snippet map()}
-			<MapPanel map={s.map} framed />
+			<MapPanel map={shownMap} framed />
 		{/snippet}
 		{#snippet panel()}
 			{#if sideBySide && draft && writingAt && writingAt.fragment >= -1}
@@ -1449,7 +1602,7 @@
 					onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
 					onthing={(id, name) => s.pickThing(id, name)}
 					onexit={(dir) => s.pickExit(dir)}
-					ai={ai.reachable ? aiSection : undefined}
+					ai={ai.reachable && !sandbox ? aiSection : undefined}
 					notes={notesSection}
 					notesMeta={hereNotesMeta}
 				/>
@@ -1475,7 +1628,7 @@
 						onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
 						onthing={(id, name) => s.pickThing(id, name)}
 						onexit={(dir) => s.pickExit(dir)}
-						ai={ai.reachable ? aiSection : undefined}
+						ai={ai.reachable && !sandbox ? aiSection : undefined}
 					notes={notesSection}
 					notesMeta={hereNotesMeta}
 					/>
@@ -1619,7 +1772,8 @@
 		letter-spacing: var(--letter-spacing-caps);
 		font-size: var(--font-size-xs);
 	}
-	.preview-mark {
+	.preview-mark,
+	.sandbox-mark {
 		padding: 0 var(--space-3);
 		background: var(--color-status-text);
 		color: var(--color-status-bg);

@@ -574,7 +574,14 @@ fn a_message_exit_prints_its_text_and_leads_nowhere() {
 
     let scene = game.scene();
     assert!(scene.exits.iter().all(|e| e.direction != "west"));
-    assert!(game.map().links.iter().all(|l| l.direction != "west"));
+    let map = game.map();
+    assert!(map.links.iter().all(|l| l.direction != "west"));
+    // The map marks it on its own: a way that ends at the room.
+    assert!(
+        map.ends
+            .iter()
+            .any(|e| e.room == "shore" && e.direction == "west" && e.visible)
+    );
     let inspect = game.inspect_exit("west").unwrap();
     assert_eq!(inspect.facts[0].1, "nowhere: a message exit");
 }

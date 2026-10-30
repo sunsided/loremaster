@@ -144,7 +144,7 @@ An exit without `to` is a message exit. It goes to no room. When the player goes
 - `blocked` is markup, as in all exits. It can have conditions, for example `"{night: The surf is black. | Cold surf breaks over the rocks.}"`.
 - `visible` works as in other exits. When it is false, the player gets the default response.
 - A message exit does not use `door`, `passable` or `traversal`. The check gives a warning for them.
-- The map, the scene, the verb bar and the room brief do not show message exits, because they go to no room.
+- The scene, the verb bar and the room brief do not show message exits, because they go to no room. The map shows a message exit as a short line out of the room that ends in a bar.
 - In write mode, a new exit in the direction of a message exit replaces the message exit.
 
 ## Author notes and threads
@@ -342,7 +342,7 @@ In write mode, the game helps you make what is not there yet:
 
 | You do | The game shows | It makes |
 | --- | --- | --- |
-| Walk in a direction that has no exit, for example `s`. | A form for a new exit. | The exit, a new room or a link to an existing room, and the way back. You walk into the new room, and the writer opens for its text. |
+| Walk in a direction that has no exit, for example `s`. | A form for a new exit. | The exit, a new room or a link to an existing room, and the way back. You walk into the new room, and the writer opens for its text. For "nowhere, only a message", write the text that a move in that direction shows: the editor makes a message exit, and you try it at once. |
 | Write a name that the story does not know, for example `{brass_key.The}`. | "Create thing brass_key" under the problem. | A thing in the current room. The writer stays open. |
 | Give a command that gets the default response, for example `push brass key`. | "+ Write a response for “push brass key”". | A rule in `rules/<room>.yaml` that answers the command with your text. |
 | Ctrl+K, "Create a thing", "Create a character" or "Create an exit". | The same form. | A thing or a character in the current room (the writer then opens for its presence text), or an exit. |
@@ -355,11 +355,14 @@ When `lantern serve` runs for the story (read `docs/ai-tools.md`), the editor re
 
 - The status line shows "✦ N proposals". Select it to open Atlas › Proposals, with each proposal, its changes and its problems.
 - In write mode, a proposal that changes the text of the current room shows as ghost text (italics, a dotted line and ✦) under the fragment that it changes, with its card in the margin.
-- "Accept" writes the proposal into the working copy of the editor, then tells the server. The editor refuses a proposal when a file that it changes is different now. "Reject…" asks why (optional) and tells the server to drop it. The AI reads the note and does not offer the idea again.
+- A proposal that adds or removes rooms or exits shows on the maps: on the Atlas map, on the map of the Here panel and in the list view. What it adds is dashed in the ghost colour, and a new room has ✦ before its name. What it removes is in the warning colour, and a removed room is struck through. Select a proposed room on the Atlas map: its room card has "Walk in", "Accept" and "Reject".
+- "Walk in" plays the story with the proposal in a sandbox, from the game state now (or from the proposed room). The status line shows "SANDBOX" with "Accept" and "Leave". Press Escape to leave. The editor does not save the sandbox, and write mode and AI jobs are off in it.
+- "Accept" writes the proposal into the working copy of the editor, then tells the server. A proposal can also delete files; the editor then deletes them from the working copy and from the linked folder. The editor refuses a proposal when a file that it changes is different now. "Reject…" asks why (optional) and tells the server to drop it. The AI reads the note and does not offer the idea again.
+- Keys: when the focus is in a proposal card, A accepts, R rejects and W walks in. Alt+P moves the focus to the next proposal card.
 
 The Here panel has an "✦ AI" section while the server runs:
 
-- "Review this room" asks the AI to read the room in all its states and to propose fixes.
+- "Review this room" asks the AI to read the room in all its states and to propose fixes. When the review is done, "N findings ↗" opens write mode. Each finding is a note in the margin, next to its fragment, with its severity (HIGH, MEDIUM or LOW), the problem and the fix. A finding about the whole room, or about a fragment that does not show now, is under the room text. Select × to dismiss a finding.
 - In write mode, a direction without an exit offers "✦ Draft … with AI" next to the form: the AI proposes some exits or things for that direction.
 - The running jobs show with their time, their proposals and their cost, and you can cancel them. The status line shows "✦ drafting… 12 s".
 - The server reads the story folder on disk, and the editor keeps a working copy in the browser. When the two differ, the section and the header warn you. Open the story folder (Chromium browsers), so that both use the same files.
