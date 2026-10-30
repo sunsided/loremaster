@@ -13,13 +13,16 @@ The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge
 | `crates/lantern-project` | The project folder format (one YAML file for each entity) and the checker. |
 | `crates/lantern-runtime` | The runtime: state, text assembly, rules and parser. It has no input or output of its own. |
 | `crates/lantern-wasm` | The WebAssembly bindings for the web app. Trunk builds them. |
-| `crates/lantern-cli` | The terminal player: `lantern play` and `lantern check`. |
+| `crates/lantern-cli` | The terminal player: `lantern play` and `lantern check`. Also `lantern mcp`. |
+| `crates/lantern-tools` | The operations that an AI assistant can do on a project: read, play and verify. It has no input or output of its own. |
+| `crates/lantern-mcp` | The MCP server for one project: `lantern mcp <project-folder>`. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
 | `examples/cantina` | A small story with a character whose name changes. |
 | `examples/zork1` | Zork I, imported from its ZIL source. A large map for tests. Read `examples/zork1/README.md`. |
 | `examples/tower` | A spiral tower on four levels, for the level map. |
 | `crates/lantern-zil` | The importer for ZIL games: `lantern-zil <zil-folder> <project-folder>`. |
 | `docs/writing-stories.md` | How to write a story: files, fragments, markup, conditions, frames, name stages, levels, and how to write in the game. |
+| `docs/ai-tools.md` | How to connect an AI assistant to a project with MCP. |
 | `web/` | The SvelteKit app and the design system with its Storybook. |
 
 ## Commands
@@ -62,6 +65,10 @@ These rules apply to all web work:
 ## Documentation
 
 Write all documentation in ASD-STE100 Simplified Technical English. The "Foundations/Writing documentation" page in Storybook gives the rules.
+
+## Contributing
+
+lantern uses GitHub Flow: `main` and short-lived `feature/` branches. Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
