@@ -623,3 +623,22 @@ fn a_preview_does_not_change_the_game() {
     );
     assert_eq!(game.scene().phase, "dusk");
 }
+
+#[test]
+fn back_goes_the_way_the_player_came() {
+    let mut game = lighthouse();
+    game.start();
+    let turn = game.input("back");
+    assert!(
+        turn.plain_text().contains("can't go back"),
+        "{}",
+        turn.plain_text()
+    );
+    game.input("n");
+    assert_eq!(game.scene().room, "cottage");
+    game.input("go back");
+    assert_eq!(game.scene().room, "shore");
+    game.input("n");
+    game.input("return");
+    assert_eq!(game.scene().room, "shore");
+}

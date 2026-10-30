@@ -29,6 +29,8 @@ pub struct Game {
 pub struct VerbInfo {
     pub id: String,
     pub label: String,
+    /// The words that the parser accepts for the verb, for example `take` and `pick up`.
+    pub words: Vec<String>,
     pub slots: VerbSlots,
     pub preposition: Option<String>,
     pub bar: bool,
@@ -330,6 +332,7 @@ impl Game {
             action: None,
             last_command: None,
             repeat: 0,
+            previous: None,
             action_counts: Default::default(),
             interactions: Default::default(),
             talked: Default::default(),
@@ -1060,6 +1063,12 @@ impl Game {
                     (e.direction.name().to_string(), name)
                 })
                 .collect(),
+            back: self.state.previous.as_ref().and_then(|prev| {
+                self.visible_exits()
+                    .iter()
+                    .find(|(_, e)| e.to.as_ref() == Some(prev))
+                    .map(|(_, e)| e.direction.name().to_string())
+            }),
         }
     }
 
@@ -1764,6 +1773,7 @@ impl Game {
             .map(|v| VerbInfo {
                 id: v.id.to_string(),
                 label: v.label.clone(),
+                words: v.words.clone(),
                 slots: v.slots,
                 preposition: v.preposition.clone(),
                 bar: v.bar,
@@ -1893,6 +1903,7 @@ impl Game {
 
     fn move_player(&mut self, turn: &mut Turn, to: Id, depth: u8) {
         let from = self.state.room.clone();
+        self.state.previous = Some(from.clone());
         self.fire(
             turn,
             |r| matches!(&r.on, EventPattern::Leave(id) if *id == from),

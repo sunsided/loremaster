@@ -80,6 +80,8 @@ export interface Scene {
 export interface VerbInfo {
 	id: string;
 	label: string;
+	/** The words that the parser accepts, for example `take` and `pick up`. */
+	words: string[];
 	slots: 'none' | 'one' | 'two';
 	preposition: string | null;
 	bar: boolean;
