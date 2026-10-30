@@ -259,11 +259,13 @@
 			event.preventDefault();
 			if (!showSettings) showPalette = !showPalette;
 		}
-		// W toggles write mode, but not while the author types somewhere.
-		const t = event.target as HTMLElement | null;
-		const typing = !!t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
-		if (event.key.toLowerCase() === 'w' && !event.ctrlKey && !event.metaKey && !event.altKey && !typing && !showPalette && !showSettings) {
+		// Ctrl+E (Cmd+E on a Mac) toggles write mode, also while the author types.
+		// Not Ctrl+W: browsers close the tab on it, and a page can not stop that.
+		// In the fragment editor the key is left alone, so an open draft is not closed by accident.
+		const inEditor = event.target instanceof Element && !!event.target.closest('.cm-editor');
+		if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'e' && !showSettings && !inEditor) {
 			event.preventDefault();
+			showPalette = false;
 			toggleWriting();
 		}
 	}

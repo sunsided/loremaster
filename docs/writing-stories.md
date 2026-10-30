@@ -173,7 +173,7 @@ In the web app, "Replay this path" starts the game again and plays the command l
 
 You can change the story while you play it. The game keeps its state after each change.
 
-1. Select "Write" in the header, or push W.
+1. Select "Write" in the header, or push Ctrl+E (Cmd+E on a Mac). The shortcut also works while you type.
 2. In the newest room text, select a fragment. The writer opens in place of the fragment.
 3. Change the text, the condition ("When"), the layer or the mode. "Now it reads" shows the text as the player reads it now.
 4. Push Enter to save. Push Shift+Enter for a line break. Push Escape to cancel.

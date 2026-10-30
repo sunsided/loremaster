@@ -50,8 +50,8 @@
 			{#each now as fact, i (i)}<Tag>{fact}</Tag>{/each}
 		{/if}
 		{#if onwrite}
-			<Button size="compact" variant={writing ? 'primary' : 'secondary'} pressed={writing} aria-keyshortcuts="W" onclick={onwrite}
-				>Write <kbd>W</kbd></Button
+			<Button size="compact" variant={writing ? 'primary' : 'secondary'} pressed={writing} aria-keyshortcuts="Control+E Meta+E" onclick={onwrite}
+				>Write <kbd>Ctrl E</kbd></Button
 			>
 		{/if}
 		{#if onpalette}
