@@ -87,10 +87,12 @@ export class AiLink {
 	sync = $state<SyncState | null>(null);
 	#timer: ReturnType<typeof setTimeout> | null = null;
 	#started = new Map<string, number>();
-	#stopped = false;
+	#stopped = true;
+	#polling = false;
 
 	/** Read the proposals now, then again after a pause: often while the server answers, rarely when it does not. */
 	start() {
+		if (!this.#stopped) return;
 		this.#stopped = false;
 		void this.#poll();
 	}
@@ -100,21 +102,35 @@ export class AiLink {
 		if (this.#timer) clearTimeout(this.#timer);
 	}
 
+	/** Read now, unless a read runs already. Then schedule the next read; only one timer is pending. */
 	async #poll() {
+		if (this.#polling) return;
+		this.#polling = true;
+		if (this.#timer) clearTimeout(this.#timer);
+		this.#timer = null;
 		try {
 			const res = await fetch(`${SERVE}/proposals`);
 			if (!res.ok) throw new Error(String(res.status));
 			this.proposals = (await res.json()) as ProposalView[];
-			const jobs = await fetch(`${SERVE}/jobs`);
-			if (jobs.ok)
-				this.jobs = ((await jobs.json()) as JobView[]).map((j) => ({ ...j, started: this.#started.get(j.id) ?? Date.now() }));
 			this.reachable = true;
 		} catch {
 			this.reachable = false;
 			this.proposals = [];
 			this.jobs = [];
 		}
+		if (this.reachable) {
+			// A failed jobs read keeps the proposals and the last known jobs.
+			try {
+				const jobs = await fetch(`${SERVE}/jobs`);
+				if (jobs.ok)
+					this.jobs = ((await jobs.json()) as JobView[]).map((j) => ({ ...j, started: this.#started.get(j.id) ?? Date.now() }));
+			} catch {
+				// Read the jobs again at the next poll.
+			}
+		}
+		this.#polling = false;
 		const running = this.jobs.some((j) => j.status === 'running');
+		if (this.#timer) clearTimeout(this.#timer);
 		if (!this.#stopped) this.#timer = setTimeout(() => this.#poll(), !this.reachable ? 20000 : running ? 1500 : 4000);
 	}
 
@@ -127,7 +143,9 @@ export class AiLink {
 		});
 		const body = await res.json();
 		if (body.error || body.result?.isError) throw new Error(body.error?.message ?? body.result?.content?.[0]?.text ?? 'tool error');
-		return body.result.content[0].text as string;
+		const text = body.result?.content?.[0]?.text;
+		if (typeof text !== 'string') throw new Error(`The tool ${name} gave no text result.`);
+		return text;
 	}
 
 	/**
@@ -195,6 +213,14 @@ export class AiLink {
 	 */
 	async accept(view: ProposalView, workspace: Workspace): Promise<string | null> {
 		if (!view.ok) return 'The proposal has problems. Fix or reject it.';
+		try {
+			return await this.#accept(view, workspace);
+		} catch (e) {
+			return `The editor could not apply the proposal: ${e instanceof Error ? e.message : String(e)}`;
+		}
+	}
+
+	async #accept(view: ProposalView, workspace: Workspace): Promise<string | null> {
 		const changes: { path: string; text: string }[] = [];
 		for (const f of view.files) {
 			const now = workspace.project.file(f.path)?.text ?? null;
