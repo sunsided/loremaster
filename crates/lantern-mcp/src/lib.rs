@@ -13,6 +13,8 @@
 
 pub mod http;
 pub mod jobs;
+#[cfg(feature = "embed-ui")]
+mod ui;
 
 use lantern_project::read_dir;
 use lantern_tools::{

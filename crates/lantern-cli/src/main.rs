@@ -1,5 +1,5 @@
 //! `lantern new <dir> [--title T] [--idea I]`, `lantern play <dir>`, `lantern check <dir> [--todos]`,
-//! `lantern explore <dir>`, `lantern mcp <dir>` and `lantern serve <dir | --bootstrap> [--port N]`.
+//! `lantern explore <dir>`, `lantern mcp <dir>` and `lantern serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
 use lantern_project::{Project, Severity, check, load, open_todos, read_dir};
 use lantern_runtime::{BlockKind, Budget, Game, Turn, World};
@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       lantern check <project-folder> --todos\n       lantern serve <project-folder | --bootstrap> [--port N]";
+const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       lantern check <project-folder> --todos\n       lantern serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -46,20 +46,36 @@ fn main() -> ExitCode {
         };
     }
     if cmd == "serve" {
-        let port = match args.get(2).map(String::as_str) {
-            None => lantern_mcp::http::DEFAULT_PORT,
-            Some("--port") => match args.get(3).and_then(|p| p.parse().ok()) {
-                Some(p) => p,
-                None => {
+        let mut options = lantern_mcp::http::Options::default();
+        let mut rest = args[2..].iter();
+        while let Some(flag) = rest.next() {
+            match flag.as_str() {
+                "--port" => match rest.next().and_then(|p| p.parse().ok()) {
+                    Some(p) => options.port = p,
+                    None => {
+                        eprintln!("{USAGE}");
+                        return ExitCode::from(2);
+                    }
+                },
+                "--allow-origin" => match rest.next().map(|u| (u, lantern_mcp::http::origin_of(u)))
+                {
+                    Some((_, Some(o))) => options.allow_origins.push(o),
+                    Some((u, None)) => {
+                        eprintln!("error: {u} is not an origin, for example https://example.com");
+                        return ExitCode::from(2);
+                    }
+                    None => {
+                        eprintln!("{USAGE}");
+                        return ExitCode::from(2);
+                    }
+                },
+                "--no-open" => options.open = false,
+                _ => {
                     eprintln!("{USAGE}");
                     return ExitCode::from(2);
                 }
-            },
-            Some(_) => {
-                eprintln!("{USAGE}");
-                return ExitCode::from(2);
             }
-        };
+        }
         // `--bootstrap`: a new folder in the temporary directory, for a story that starts in the editor.
         let folder = if dir == "--bootstrap" {
             std::env::temp_dir().join(format!("lantern-bootstrap-{}", std::process::id()))
@@ -70,7 +86,7 @@ fn main() -> ExitCode {
             eprintln!("error: cannot make {}: {e}", folder.display());
             return ExitCode::FAILURE;
         }
-        return match lantern_mcp::http::serve_http(&folder, port) {
+        return match lantern_mcp::http::serve_http(&folder, &options) {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 eprintln!("error: {e}");

@@ -126,6 +126,20 @@ tasks:
     cmds:
       - pnpm build
 
+  build:local:
+    desc: Build the lantern binary with the web editor in it (target/release/lantern)
+    deps:
+      - web:build
+    cmds:
+      - "{{.CARGO}} build --release -p lantern-cli --features embed-ui"
+
+  serve:local:
+    desc: Build the local binary, then serve the lighthouse example with the editor
+    deps:
+      - build:local
+    cmds:
+      - target/release/lantern serve examples/lighthouse {{.CLI_ARGS}}
+
   verify:
     desc: Formatting, clippy and tests
     deps:

@@ -13,11 +13,15 @@
 //! | `GET /jobs`, `GET /jobs/<id>` | The jobs, with status, progress events, result and proposals. |
 //! | `POST /jobs/<id>/cancel` | Stop a running job. |
 //! | `POST /bootstrap` | Start a new story from an idea: `{ "title": "...", "idea": "...", "rooms": 3 }`. Writes the new story, then starts a `seed_story` job. 409 when the folder has a story. |
+//! | `GET /health` | `{ "lantern": "<version>", "ui": true }`. The editor uses it to find the server. |
+//!
+//! Each endpoint is also at `/api/...`, for example `GET /api/proposals`. With the
+//! feature `embed-ui`, all other `GET` paths give the web editor.
 //!
 //! A web page on any other site must not use these endpoints. So the server
-//! accepts a request with an `Origin` header only from `localhost` or
-//! `127.0.0.1`, and a `POST` only with `Content-Type: application/json`,
-//! which makes a browser ask first (CORS preflight).
+//! accepts a request with an `Origin` header only from `localhost`,
+//! `127.0.0.1` or an origin in `--allow-origin`, and a `POST` only with
+//! `Content-Type: application/json`, which makes a browser ask first (CORS preflight).
 
 use crate::jobs::{Agent, Jobs};
 use crate::{Refusal, Server};
@@ -30,25 +34,74 @@ use tiny_http::{Header, Method, Request, Response};
 /// The port when the command line gives none.
 pub const DEFAULT_PORT: u16 = 4710;
 
+/// How `lantern serve` runs.
+#[derive(Debug, Clone)]
+pub struct Options {
+    pub port: u16,
+    /// More origins that may call the endpoints, for example `https://sunsided.github.io`.
+    pub allow_origins: Vec<String>,
+    /// Open the web editor in the browser. Only with the feature `embed-ui`.
+    pub open: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            port: DEFAULT_PORT,
+            allow_origins: Vec::new(),
+            open: true,
+        }
+    }
+}
+
+/// True when the binary has the web editor in it (the feature `embed-ui`).
+pub const HAS_UI: bool = cfg!(feature = "embed-ui");
+
 /// Serve the project in `root` on `127.0.0.1:<port>` until the process stops.
-pub fn serve_http(root: &Path, port: u16) -> io::Result<()> {
+pub fn serve_http(root: &Path, options: &Options) -> io::Result<()> {
+    let port = options.port;
     let mut server = Server::new(root.to_path_buf())?;
     let mut jobs = Jobs::new(Agent::from_env(), &format!("http://127.0.0.1:{port}/mcp"));
     let http = tiny_http::Server::http(("127.0.0.1", port)).map_err(io::Error::other)?;
-    eprintln!(
-        "lantern: serving {} on http://127.0.0.1:{port} (MCP at /mcp)",
-        root.display()
-    );
+    let url = format!("http://127.0.0.1:{port}/");
+    eprintln!("lantern: serving {} on {url} (MCP at /mcp)", root.display());
+    if HAS_UI {
+        eprintln!("lantern: the editor is at {url}");
+        if options.open {
+            open_browser(&url);
+        }
+    }
     for request in http.incoming_requests() {
-        handle(&mut server, &mut jobs, request);
+        handle(&mut server, &mut jobs, &options.allow_origins, request);
     }
     Ok(())
 }
 
-fn handle(server: &mut Server, jobs: &mut Jobs, mut request: Request) {
+/// Open `url` in the default browser. A failure only prints a note.
+fn open_browser(url: &str) {
+    let program = if cfg!(target_os = "macos") {
+        ("open", vec![url])
+    } else if cfg!(windows) {
+        ("cmd", vec!["/C", "start", "", url])
+    } else {
+        ("xdg-open", vec![url])
+    };
+    if std::process::Command::new(program.0)
+        .args(program.1)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .is_err()
+    {
+        eprintln!("lantern: open {url} in your browser");
+    }
+}
+
+fn handle(server: &mut Server, jobs: &mut Jobs, allowed: &[String], mut request: Request) {
     let origin = header(&request, "Origin");
     if let Some(o) = &origin
         && !local_origin(o)
+        && !allowed.iter().any(|a| a == o)
     {
         let _ = request.respond(Response::from_string("Forbidden origin").with_status_code(403));
         return;
@@ -84,8 +137,13 @@ fn handle(server: &mut Server, jobs: &mut Jobs, mut request: Request) {
     }
     let url = request.url().to_string();
     let path = url.split('?').next().unwrap_or_default();
-    let parts: Vec<&str> = path.trim_matches('/').split('/').collect();
+    let mut parts: Vec<&str> = path.trim_matches('/').split('/').collect();
+    let api = parts.first() == Some(&"api");
+    if api {
+        parts.remove(0);
+    }
     let response = match (is_post, parts.as_slice()) {
+        (false, ["health"]) => ok(json!({ "lantern": env!("CARGO_PKG_VERSION"), "ui": HAS_UI })),
         (true, ["mcp"]) => match server.handle_line(&body) {
             Some(reply) => ok(reply),
             None => Response::from_data(Vec::new()).with_status_code(202),
@@ -138,6 +196,13 @@ fn handle(server: &mut Server, jobs: &mut Jobs, mut request: Request) {
         (true, ["jobs", id, "cancel"]) => match jobs.cancel(id) {
             true => ok(json!({ "cancelled": id })),
             false => error(404, "There is no running job with this id."),
+        },
+        #[cfg(feature = "embed-ui")]
+        (false, _) if !api => match crate::ui::file(path) {
+            Some((bytes, kind)) => {
+                Response::from_data(bytes.to_vec()).with_header(h("Content-Type", kind))
+            }
+            None => error(404, "Not found."),
         },
         _ => error(404, "Not found."),
     };
@@ -223,6 +288,16 @@ fn flag(body: &str, name: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// The origin of a URL as a browser sends it in `Origin`: scheme, host and port, no path.
+/// `https://example.com/app/` gives `https://example.com`. None when there is no `http` or `https` scheme or no host.
+pub fn origin_of(url: &str) -> Option<String> {
+    let (scheme, rest) = url.trim().split_once("://")?;
+    let scheme = scheme.to_ascii_lowercase();
+    let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    (matches!(scheme.as_str(), "http" | "https") && !host.is_empty() && !host.contains('@'))
+        .then(|| format!("{scheme}://{}", host.to_ascii_lowercase()))
+}
+
 /// True for `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port.
 fn local_origin(origin: &str) -> bool {
     let Some(rest) = origin.strip_prefix("http://") else {
@@ -268,7 +343,33 @@ fn error(status: u16, message: &str) -> Response<io::Cursor<Vec<u8>>> {
 
 #[cfg(test)]
 mod tests {
-    use super::local_origin;
+    use super::{local_origin, origin_of};
+
+    #[test]
+    fn origin_of_drops_the_path() {
+        for (url, origin) in [
+            (
+                "https://sunsided.github.io/lantern/",
+                "https://sunsided.github.io",
+            ),
+            ("https://example.com", "https://example.com"),
+            (
+                "HTTPS://Example.com:8443/app?x=1",
+                "https://example.com:8443",
+            ),
+            ("http://[::1]:5173/", "http://[::1]:5173"),
+        ] {
+            assert_eq!(origin_of(url).as_deref(), Some(origin), "{url}");
+        }
+        for url in [
+            "example.com",
+            "ftp://example.com",
+            "https://",
+            "https://user@evil.example",
+        ] {
+            assert_eq!(origin_of(url), None, "{url}");
+        }
+    }
 
     #[test]
     fn only_local_origins_pass() {
