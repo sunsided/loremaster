@@ -1,4 +1,5 @@
-//! `lantern play <dir>` and `lantern check <dir>`.
+//! `lantern play <dir>`, `lantern check <dir>`, `lantern explore <dir>` and
+//! `lantern mcp <dir>`.
 
 use lantern_project::{Project, Severity, check, load, read_dir};
 use lantern_runtime::{BlockKind, Budget, Game, Turn, World};
@@ -7,7 +8,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: lantern <play|check|explore> <project-folder>";
+const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -15,6 +16,16 @@ fn main() -> ExitCode {
         eprintln!("{USAGE}");
         return ExitCode::from(2);
     };
+    // The MCP server owns stdout and also serves a project with errors, so it skips `open`.
+    if cmd == "mcp" {
+        return match lantern_mcp::serve_stdio(Path::new(dir)) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     let Some(project) = open(Path::new(dir)) else {
         return ExitCode::FAILURE;
     };

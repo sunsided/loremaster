@@ -12,6 +12,7 @@ name = "lantern"
 path = "src/main.rs"
 
 [dependencies]
+lantern-mcp.workspace = true
 lantern-project.workspace = true
 lantern-runtime.workspace = true
 

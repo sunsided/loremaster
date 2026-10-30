@@ -3,9 +3,11 @@ resolver = "3"
 members = [
     "crates/lantern-cli",
     "crates/lantern-lang",
+    "crates/lantern-mcp",
     "crates/lantern-model",
     "crates/lantern-project",
     "crates/lantern-runtime",
+    "crates/lantern-tools",
     "crates/lantern-wasm",
     "crates/lantern-zil",
 ]
@@ -22,6 +24,8 @@ lantern-lang = { path = "crates/lantern-lang" }
 lantern-model = { path = "crates/lantern-model" }
 lantern-project = { path = "crates/lantern-project" }
 lantern-runtime = { path = "crates/lantern-runtime" }
+lantern-tools = { path = "crates/lantern-tools" }
+lantern-mcp = { path = "crates/lantern-mcp" }
 dramaturge-model = "0.1.0"
 dramaturge-runtime = "0.1.0"
 serde = { version = "1", features = ["derive", "rc"] }
