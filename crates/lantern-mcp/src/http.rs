@@ -288,6 +288,16 @@ fn flag(body: &str, name: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// The origin of a URL as a browser sends it in `Origin`: scheme, host and port, no path.
+/// `https://example.com/app/` gives `https://example.com`. None when there is no `http` or `https` scheme or no host.
+pub fn origin_of(url: &str) -> Option<String> {
+    let (scheme, rest) = url.trim().split_once("://")?;
+    let scheme = scheme.to_ascii_lowercase();
+    let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    (matches!(scheme.as_str(), "http" | "https") && !host.is_empty() && !host.contains('@'))
+        .then(|| format!("{scheme}://{}", host.to_ascii_lowercase()))
+}
+
 /// True for `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port.
 fn local_origin(origin: &str) -> bool {
     let Some(rest) = origin.strip_prefix("http://") else {
@@ -333,7 +343,33 @@ fn error(status: u16, message: &str) -> Response<io::Cursor<Vec<u8>>> {
 
 #[cfg(test)]
 mod tests {
-    use super::local_origin;
+    use super::{local_origin, origin_of};
+
+    #[test]
+    fn origin_of_drops_the_path() {
+        for (url, origin) in [
+            (
+                "https://sunsided.github.io/lantern/",
+                "https://sunsided.github.io",
+            ),
+            ("https://example.com", "https://example.com"),
+            (
+                "HTTPS://Example.com:8443/app?x=1",
+                "https://example.com:8443",
+            ),
+            ("http://[::1]:5173/", "http://[::1]:5173"),
+        ] {
+            assert_eq!(origin_of(url).as_deref(), Some(origin), "{url}");
+        }
+        for url in [
+            "example.com",
+            "ftp://example.com",
+            "https://",
+            "https://user@evil.example",
+        ] {
+            assert_eq!(origin_of(url), None, "{url}");
+        }
+    }
 
     #[test]
     fn only_local_origins_pass() {

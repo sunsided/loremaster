@@ -57,10 +57,13 @@ fn main() -> ExitCode {
                         return ExitCode::from(2);
                     }
                 },
-                "--allow-origin" => match rest.next() {
-                    Some(o) => options
-                        .allow_origins
-                        .push(o.trim_end_matches('/').to_string()),
+                "--allow-origin" => match rest.next().map(|u| (u, lantern_mcp::http::origin_of(u)))
+                {
+                    Some((_, Some(o))) => options.allow_origins.push(o),
+                    Some((u, None)) => {
+                        eprintln!("error: {u} is not an origin, for example https://example.com");
+                        return ExitCode::from(2);
+                    }
                     None => {
                         eprintln!("{USAGE}");
                         return ExitCode::from(2);
