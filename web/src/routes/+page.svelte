@@ -168,7 +168,7 @@
 	const promptNouns = $derived.by(() => {
 		const s = session;
 		if (!s) return [];
-		return [...s.scene.things.map((t) => t.name), ...s.scene.inventory.map((t) => t.name), ...s.scene.exits.map((e) => e.direction)];
+		return [...s.scene.things.map((t) => t.name), ...s.scene.inventory.map((t) => t.name), ...s.scene.exits.map((e) => e.direction), 'back'];
 	});
 
 	// Author notes and TODOs, read from the files after each change.
