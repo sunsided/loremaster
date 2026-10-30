@@ -100,6 +100,7 @@ These environment variables change the agent:
 | --- | --- |
 | `LANTERN_CLAUDE` | The `claude` program. The default is `claude` on the `PATH`. |
 | `LANTERN_CLAUDE_MODEL` | The model, for example `sonnet`. If you do not set it, Claude Code uses its default model. |
+| `LANTERN_CLAUDE_EFFORT` | The effort level of Claude Code: `low`, `medium`, `high`, `xhigh` or `max`. The default is `low`, because the agent then writes its proposals sooner. Set it to an empty value to use the default of Claude Code. |
 
 The body of `POST /jobs` has these fields:
 
@@ -147,6 +148,16 @@ If the project has errors, the read tools and `check` still work. The play tools
 
 A proposal is a change that an assistant suggests. It contains whole files: new or changed files with their full text, and the paths of files to delete. It can only touch `story.yaml` and the files in `rooms/`, `things/` and `rules/`.
 
+`propose` takes the changes in two forms:
+
+| Field | Contents |
+| --- | --- |
+| `files` | New files, or files that the assistant replaces as a whole: `{ path, text }`. |
+| `edits` | Changes to files that exist: `{ path, old, new }`. The server replaces `old` with `new` in the text of the file. `old` must occur one time in the file. Edits of one file apply in order. A file cannot be in `files` and in `edits`. |
+| `delete` | The paths of files to delete. |
+
+The server makes whole files from the edits. Thus a proposal always contains whole files. Edits are much shorter than whole files, and the assistant writes them faster.
+
 The server checks a proposal against the project as it is now. The result is a proposal view:
 
 | Field | Contents |
@@ -160,7 +171,7 @@ The server checks a proposal against the project as it is now. The result is a p
 | `rooms` | The text of each new or changed room in all its states: `{ room, texts: [{ text, combinations, example, warnings }] }`. |
 | `files` | Each touched file: `{ path, base_sha, before, after }`. `base_sha` is the SHA-256 of the file when the proposal was made, or `null` for a new file. `before` is the text on disk now. `after` is the text after the proposal, or `null` when the proposal deletes the file. |
 
-The `after` text is the text that the assistant gave. The server does not format it again. The tool tells the assistant to keep the lines that it does not change.
+The `after` text is the text that the assistant gave, or the file with the edits. The server does not format it again.
 
 Each item of `changes` has a `kind`, an `entity` (for example `room:shore`, `thing:lamp`, `rule:find_key` or `story`) and a `file`:
 

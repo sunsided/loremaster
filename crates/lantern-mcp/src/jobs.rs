@@ -46,7 +46,8 @@ pub struct Job {
     pub proposals: Vec<String>,
     /// The agent's session, to continue it later.
     pub agent_session: Option<String>,
-    /// The model the job asked for; `None` for the agent's default.
+    /// The model of the job: the `model` of the request, or else `LANTERN_CLAUDE_MODEL`.
+    /// `None` when neither is set, so that Claude Code uses its default model.
     pub model: Option<String>,
     pub cost_usd: Option<f64>,
 }
@@ -59,14 +60,22 @@ const BUILT_IN_TOOLS: &str = "ToolSearch,ListMcpResourcesTool,ReadMcpResourceToo
 pub struct Agent {
     pub program: String,
     pub model: Option<String>,
+    /// Claude Code's `--effort`. Low effort thinks less, and a job writes its
+    /// proposals sooner.
+    pub effort: Option<String>,
 }
 
 impl Agent {
-    /// Claude Code, from `LANTERN_CLAUDE` and `LANTERN_CLAUDE_MODEL`.
+    /// Claude Code, from `LANTERN_CLAUDE`, `LANTERN_CLAUDE_MODEL` and
+    /// `LANTERN_CLAUDE_EFFORT` (default `low`; empty for Claude Code's default).
     pub fn from_env() -> Self {
         Self {
             program: std::env::var("LANTERN_CLAUDE").unwrap_or_else(|_| "claude".into()),
             model: std::env::var("LANTERN_CLAUDE_MODEL").ok(),
+            effort: match std::env::var("LANTERN_CLAUDE_EFFORT") {
+                Ok(e) => Some(e).filter(|e| !e.trim().is_empty()),
+                Err(_) => Some("low".into()),
+            },
         }
     }
 
@@ -85,8 +94,11 @@ impl Agent {
                 "--allowedTools",
                 &format!("mcp__lantern__*,{BUILT_IN_TOOLS}"),
             ]);
-        if let Some(model) = model.or(self.model.as_deref()) {
+        if let Some(model) = pick_model(model, self.model.as_deref()) {
             cmd.args(["--model", model]);
+        }
+        if let Some(effort) = &self.effort {
+            cmd.args(["--effort", effort]);
         }
         // Load the lantern tools at the start, without a ToolSearch round trip.
         cmd.env("ENABLE_TOOL_SEARCH", "false");
@@ -95,6 +107,13 @@ impl Agent {
             .stderr(Stdio::piped());
         cmd
     }
+}
+
+/// The model of a job: the request's, else the agent's. An empty name counts as none,
+/// so that no `--model ""` reaches Claude Code.
+fn pick_model<'a>(job: Option<&'a str>, agent: Option<&'a str>) -> Option<&'a str> {
+    let named = |m: Option<&'a str>| m.map(str::trim).filter(|m| !m.is_empty());
+    named(job).or(named(agent))
 }
 
 /// All jobs of one server.
@@ -156,7 +175,7 @@ impl Jobs {
                 result: None,
                 proposals: Vec::new(),
                 agent_session: None,
-                model: model.or(self.agent.model.as_deref()).map(str::to_string),
+                model: pick_model(model, self.agent.model.as_deref()).map(str::to_string),
                 cost_usd: None,
             },
         );
@@ -392,6 +411,7 @@ mod tests {
         let agent = Agent {
             program: "claude".into(),
             model: Some("haiku".into()),
+            effort: Some("low".into()),
         };
         let cmd = agent.command("hello", "{}", None);
         let args: Vec<_> = cmd.get_args().map(|a| a.to_string_lossy()).collect();
@@ -405,6 +425,12 @@ mod tests {
         );
         assert!(after("--allowedTools").starts_with("mcp__lantern__*,"));
         assert_eq!(after("--model"), "haiku");
+        assert_eq!(after("--effort"), "low");
+        let own = agent.command("hello", "{}", Some("sonnet"));
+        assert!(own.get_args().any(|a| a == "sonnet"));
+        let blank = agent.command("hello", "{}", Some(" "));
+        assert!(blank.get_args().any(|a| a == "haiku"));
+        assert_eq!(pick_model(Some(""), Some("")), None);
         assert!(args.iter().any(|a| a == "--strict-mcp-config"));
     }
 
@@ -436,6 +462,7 @@ mod tests {
         let agent = Agent {
             program: script.to_string_lossy().into(),
             model: None,
+            effort: None,
         };
         let mut jobs = Jobs::new(agent, "http://127.0.0.1:1/mcp");
         let id = jobs.start("review_room", json!({}), "hello", None).unwrap();

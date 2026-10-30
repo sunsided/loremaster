@@ -451,6 +451,21 @@ mod tests {
     }
 
     #[test]
+    fn the_prompt_context_has_the_room_file_the_tool_results_and_the_guide() {
+        let mut s = server();
+        let ctx = s.prompt_context(
+            "imagine_exit",
+            &json!({ "room": "shore", "direction": "down" }),
+        );
+        assert!(
+            ctx.contains("## The room file\n\n`rooms/shore.yaml`:\n\n```yaml\nname: The Shore\n")
+        );
+        assert!(ctx.contains("## The scene of the session\n\n```json\n{"));
+        assert!(ctx.contains("## The writing guide\n\n# Writing stories"));
+        assert!(!ctx.contains("failed:"), "{ctx}");
+    }
+
+    #[test]
     fn a_rejected_note_stays_on_one_line() {
         let dir = std::env::temp_dir().join(format!("lantern-rejected-{}", std::process::id()));
         std::fs::create_dir_all(dir.join(".lantern")).unwrap();

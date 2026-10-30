@@ -161,7 +161,7 @@ pub fn tools() -> Vec<ToolDef> {
         // Propose.
         def(
             "propose",
-            "Suggest a change to the project. Give whole files: each new or changed file with its complete YAML text, and the paths of files to delete. In a changed file, keep every line you do not change byte for byte (read it with `read_file` first), so that the person sees only your change. Nothing changes until a person accepts it. Returns the proposal id and its check: the problems it adds, the changes per entity and fragment, and the text of each changed room in every state. Fix the problems with a new proposal, then `withdraw_proposal` the old one.",
+            "Suggest a change to the project. For a file that exists, give `edits`: each replaces one exact piece of the current text (`old`, which must occur once in the file) with `new`. For a new file, give its whole YAML text in `files`. List the files to delete in `delete`. Keep the edits small, so that the person sees only your change. Nothing changes until a person accepts it. Returns the proposal id and its check: the problems it adds, the changes per entity and fragment, and the text of each changed room in every state. Fix the problems with a new proposal, then `withdraw_proposal` the old one.",
             schema(
                 json!({
                     "summary": { "type": "string", "description": "One line: what the change does and why." },
@@ -172,7 +172,16 @@ pub fn tools() -> Vec<ToolDef> {
                             "properties": { "path": { "type": "string" }, "text": { "type": "string" } },
                             "required": ["path", "text"]
                         },
-                        "description": "For example [{\"path\":\"rooms/pier.yaml\",\"text\":\"name: The Pier\\n...\"}]."
+                        "description": "New files, or files that you replace as a whole. For example [{\"path\":\"rooms/pier.yaml\",\"text\":\"name: The Pier\\n...\"}]."
+                    },
+                    "edits": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": { "path": { "type": "string" }, "old": { "type": "string" }, "new": { "type": "string" } },
+                            "required": ["path", "old", "new"]
+                        },
+                        "description": "Changes to files that exist, applied in order. For example [{\"path\":\"rooms/shore.yaml\",\"old\":\"  - { direction: north, to: cottage }\\n\",\"new\":\"  - { direction: north, to: cottage }\\n  - { direction: down, to: pier }\\n\"}]."
                     },
                     "delete": { "type": "array", "items": { "type": "string" } }
                 }),
@@ -401,7 +410,9 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
             Ok(turn_json(&turn, game))
         }
         "propose" => {
-            let files: Vec<SourceFile> = a.opt_value("files")?.unwrap_or_default();
+            let mut files: Vec<SourceFile> = a.opt_value("files")?.unwrap_or_default();
+            let edits: Vec<Edit> = a.opt_value("edits")?.unwrap_or_default();
+            apply_edits(ws, &mut files, &edits)?;
             let delete: Vec<String> = a.opt_value("delete")?.unwrap_or_default();
             let id = ws.add_proposal(a.str("summary")?.to_string(), files, delete)?;
             json(&ws.view_proposal(&id)?)
@@ -619,4 +630,69 @@ fn neighbors(ws: &Workspace, room: &str, hops: usize) -> ToolResult {
         })
         .collect();
     Ok(json!({ "room": room, "neighbors": rooms }))
+}
+
+/// One find-and-replace in a file of a proposal.
+#[derive(serde::Deserialize)]
+struct Edit {
+    path: String,
+    old: String,
+    new: String,
+}
+
+/// Turn `edits` into whole files, so that a proposal always holds whole files.
+/// An edit applies to the file of the project, or to the result of an earlier
+/// edit of the same file. Its `old` text must occur exactly once.
+fn apply_edits(
+    ws: &Workspace,
+    files: &mut Vec<SourceFile>,
+    edits: &[Edit],
+) -> Result<(), crate::ToolError> {
+    let given: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
+    for e in edits {
+        if given.contains(&e.path) {
+            return Err(err(format!(
+                "`{}` is in `files` and in `edits`. Give it in one of them.",
+                e.path
+            )));
+        }
+        let at = match files.iter().position(|f| f.path == e.path) {
+            Some(i) => i,
+            None => {
+                let text = ws
+                    .files
+                    .iter()
+                    .find(|f| f.path == e.path)
+                    .map(|f| f.text.clone())
+                    .ok_or_else(|| {
+                        err(format!(
+                            "There is no file `{}` to edit. Give a new file in `files`.",
+                            e.path
+                        ))
+                    })?;
+                files.push(SourceFile {
+                    path: e.path.clone(),
+                    text,
+                });
+                files.len() - 1
+            }
+        };
+        let text = &mut files[at].text;
+        match text.matches(e.old.as_str()).count() {
+            1 => *text = text.replacen(e.old.as_str(), &e.new, 1),
+            0 => {
+                return Err(err(format!(
+                    "The `old` text of an edit is not in `{}`. Copy it exactly from the file.",
+                    e.path
+                )));
+            }
+            n => {
+                return Err(err(format!(
+                    "The `old` text of an edit occurs {n} times in `{}`. Give more of the text around it.",
+                    e.path
+                )));
+            }
+        }
+    }
+    Ok(())
 }
