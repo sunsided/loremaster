@@ -1,0 +1,10 @@
+# Imported from ZIL: MINE-ENTRANCE (1dungeon.zil)
+name: "Mine Entrance"
+tags: [dark]
+position: [-4, -13]
+description:
+  - "You are standing at the entrance of what might have been a coal mine. The shaft enters the west wall, and there is another exit on the south end of the room."
+exits:
+  - { direction: south, to: slide_room }
+  - { direction: in, to: squeeky_room }
+  - { direction: west, to: squeeky_room }

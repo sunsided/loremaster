@@ -1,0 +1,15 @@
+# Imported from ZIL: WEST-OF-HOUSE (1dungeon.zil)
+name: "West of House"
+position: [0, 0]
+description:
+  - "You are standing in an open field west of a white house, with a boarded front door."
+  - when: "won_flag"
+    text: "A secret path leads southwest into the forest."
+exits:
+  - { direction: north, to: north_of_house }
+  - { direction: south, to: south_of_house }
+  - { direction: northeast, to: north_of_house }
+  - { direction: southeast, to: south_of_house }
+  - { direction: west, to: forest_1 }
+  - { direction: southwest, to: stone_barrow, visible: "won_flag" }
+  - { direction: in, to: stone_barrow, visible: "won_flag" }

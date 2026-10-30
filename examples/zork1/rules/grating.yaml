@@ -1,0 +1,15 @@
+- id: move_leaves
+  # Hand-ported from LEAVES-APPEAR (1actions.zil).
+  on: { verb: [push, leaves] }
+  when: not grate_revealed and not grate.open
+  instead: true
+  then:
+    - set: { grate_revealed: true }
+    - say: "In disturbing the pile of leaves, a grating is revealed."
+
+- id: take_leaves
+  on: { verb: [take, leaves] }
+  when: not grate_revealed and not grate.open
+  then:
+    - set: { grate_revealed: true }
+    - say: "In disturbing the pile of leaves, a grating is revealed."

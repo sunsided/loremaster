@@ -1,0 +1,6 @@
+# Imported from ZIL: MACHINE (1dungeon.zil)
+name: "machine"
+aliases: ["pdp10", "dryer", "lid"]
+location: { room: machine_room }
+listed: false
+props: { open: false }

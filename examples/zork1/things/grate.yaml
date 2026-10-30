@@ -1,0 +1,7 @@
+# Imported from ZIL: GRATE (1dungeon.zil)
+name: "grating"
+aliases: ["grate"]
+location: { room: grating_clearing }
+key: keys
+listed: false
+props: { open: false, locked: true }

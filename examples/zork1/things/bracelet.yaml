@@ -1,0 +1,5 @@
+# Imported from ZIL: BRACELET (1dungeon.zil)
+name: "sapphire-encrusted bracelet"
+aliases: ["bracelet", "jewel", "sapphire", "treasure"]
+location: { room: gas_room }
+portable: true

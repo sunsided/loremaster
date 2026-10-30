@@ -1,0 +1,10 @@
+# Imported from ZIL: RUSTY-KNIFE (1dungeon.zil)
+name: "rusty knife"
+aliases: ["knives", "knife"]
+location: { room: maze_5 }
+portable: true
+presence:
+  - when: "rusty_knife.interactions == 0"
+    text: "Beside the skeleton is a rusty knife."
+  - when: "rusty_knife.interactions > 0"
+    text: "There is {rusty_knife.a} here."

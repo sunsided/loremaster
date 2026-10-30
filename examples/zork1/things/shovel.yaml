@@ -1,0 +1,5 @@
+# Imported from ZIL: SHOVEL (1dungeon.zil)
+name: "shovel"
+aliases: ["tool", "tools"]
+location: { room: sandy_beach }
+portable: true

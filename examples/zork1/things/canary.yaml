@@ -1,0 +1,10 @@
+# Imported from ZIL: CANARY (1dungeon.zil)
+name: "golden clockwork canary"
+aliases: ["canary", "treasure"]
+location: { room: up_a_tree }
+portable: true
+presence:
+  - when: "canary.interactions == 0"
+    text: "There is a golden clockwork canary nestled in the egg. It has ruby eyes and a silver beak. Through a crystal window below its left wing you can see intricate machinery inside. It appears to have wound down."
+  - when: "canary.interactions > 0"
+    text: "There is {canary.a} here."

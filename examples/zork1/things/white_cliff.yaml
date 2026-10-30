@@ -1,0 +1,5 @@
+# Imported from ZIL: WHITE-CLIFF (1dungeon.zil)
+name: "white cliffs"
+aliases: ["cliff", "cliffs"]
+location: { room: white_cliffs_north }
+listed: false

@@ -1,0 +1,9 @@
+# Imported from ZIL: LADDER-TOP (1dungeon.zil)
+name: "Ladder Top"
+tags: [dark]
+position: [-4, -11]
+description:
+  - "This is a very small room. In the corner is a rickety wooden ladder, leading downward. It might be safe to descend. There is also a staircase leading upward."
+exits:
+  - { direction: down, to: ladder_bottom }
+  - { direction: up, to: mine_4 }

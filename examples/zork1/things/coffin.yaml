@@ -1,0 +1,8 @@
+# Imported from ZIL: COFFIN (1dungeon.zil)
+name: "gold coffin"
+aliases: ["coffin", "casket", "treasure"]
+location: { room: egypt_room }
+portable: true
+props: { open: false }
+presence:
+  - "The solid-gold coffin used for the burial of Ramses II is here."

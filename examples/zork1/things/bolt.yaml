@@ -1,0 +1,5 @@
+# Imported from ZIL: BOLT (1dungeon.zil)
+name: "bolt"
+aliases: ["nut"]
+location: { room: dam_room }
+listed: false

@@ -1,0 +1,5 @@
+# Imported from ZIL: BAUBLE (1dungeon.zil)
+name: "beautiful brass bauble"
+aliases: ["bauble", "treasure"]
+location: nowhere
+portable: true

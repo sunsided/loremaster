@@ -1,0 +1,9 @@
+# Imported from ZIL: BAT-ROOM (1dungeon.zil)
+name: "Bat Room"
+tags: [dark]
+position: [-2, -13]
+description:
+  - "You are in a small room which has doors only to the east and south."
+exits:
+  - { direction: south, to: squeeky_room }
+  - { direction: east, to: shaft_room }

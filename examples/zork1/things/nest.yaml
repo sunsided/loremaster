@@ -1,0 +1,11 @@
+# Imported from ZIL: NEST (1dungeon.zil)
+name: "bird's nest"
+aliases: ["nest"]
+location: { room: up_a_tree }
+portable: true
+props: { open: true }
+presence:
+  - when: "nest.interactions == 0"
+    text: "Beside you on the branch is a small bird's nest."
+  - when: "nest.interactions > 0"
+    text: "There is {nest.a} here."

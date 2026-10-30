@@ -1,0 +1,4 @@
+# Imported from ZIL: BAT (1dungeon.zil)
+name: "bat"
+aliases: ["vampire"]
+location: { room: bat_room }

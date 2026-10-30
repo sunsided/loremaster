@@ -1,0 +1,11 @@
+# Imported from ZIL: ENTRANCE-TO-HADES (1dungeon.zil)
+name: "Entrance to Hades"
+position: [-6, -4]
+description:
+  - "You are outside a large gateway, on which is inscribed Abandon every hope all ye who enter here! The gate is open; through it you can see a desolation, with a pile of mangled bodies in one corner. Thousands of voices, lamenting some hideous fate, can be heard."
+  - when: "(not lld_flag) and (not dead)"
+    text: "The way through the gate is barred by evil spirits, who jeer at your attempts to pass."
+exits:
+  - { direction: up, to: tiny_cave }
+  - { direction: in, to: land_of_living_dead, passable: "lld_flag", blocked: "Some invisible force prevents you from passing through the gate." }
+  - { direction: south, to: land_of_living_dead, passable: "lld_flag", blocked: "Some invisible force prevents you from passing through the gate." }

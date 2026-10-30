@@ -1,0 +1,6 @@
+# Imported from ZIL: BARROW-DOOR (1dungeon.zil)
+name: "stone door"
+aliases: ["door"]
+location: { room: stone_barrow }
+listed: false
+props: { open: true }

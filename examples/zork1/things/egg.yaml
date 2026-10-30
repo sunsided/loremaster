@@ -1,0 +1,11 @@
+# Imported from ZIL: EGG (1dungeon.zil)
+name: "jewel-encrusted egg"
+aliases: ["egg", "treasure"]
+location: { room: up_a_tree }
+portable: true
+props: { open: false }
+presence:
+  - when: "egg.interactions == 0"
+    text: "In the bird's nest is a large egg encrusted with precious jewels, apparently scavenged by a childless songbird. The egg is covered with fine gold inlay, and ornamented in lapis lazuli and mother-of-pearl. Unlike most eggs, this one is hinged and closed with a delicate looking clasp. The egg appears extremely fragile."
+  - when: "egg.interactions > 0"
+    text: "There is {egg.a} here."

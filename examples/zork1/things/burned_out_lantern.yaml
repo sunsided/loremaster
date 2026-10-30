@@ -1,0 +1,10 @@
+# Imported from ZIL: BURNED-OUT-LANTERN (1dungeon.zil)
+name: "burned-out lantern"
+aliases: ["lantern", "lamp"]
+location: { room: maze_5 }
+portable: true
+presence:
+  - when: "burned_out_lantern.interactions == 0"
+    text: "The deceased adventurer's useless lantern is here."
+  - when: "burned_out_lantern.interactions > 0"
+    text: "There is {burned_out_lantern.a} here."

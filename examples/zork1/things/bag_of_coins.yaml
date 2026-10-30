@@ -1,0 +1,7 @@
+# Imported from ZIL: BAG-OF-COINS (1dungeon.zil)
+name: "leather bag of coins"
+aliases: ["bag", "coins", "treasure"]
+location: { room: maze_5 }
+portable: true
+presence:
+  - "An old leather bag, bulging with coins, is here."

@@ -1,0 +1,5 @@
+# Imported from ZIL: COAL (1dungeon.zil)
+name: "small pile of coal"
+aliases: ["coal", "pile", "heap"]
+location: { room: dead_end_5 }
+portable: true

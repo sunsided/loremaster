@@ -1,0 +1,8 @@
+# Imported from ZIL: WHITE-CLIFFS-SOUTH (1dungeon.zil)
+name: "White Cliffs Beach"
+tags: [dark]
+position: [1, -5]
+description:
+  - "You are on a rocky, narrow strip of beach beside the Cliffs. A narrow path leads north along the shore."
+exits:
+  - { direction: north, to: white_cliffs_north, passable: "deflate", blocked: "The path is too narrow." }

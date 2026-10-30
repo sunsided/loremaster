@@ -1,0 +1,5 @@
+# Imported from ZIL: YELLOW-BUTTON (1dungeon.zil)
+name: "yellow button"
+aliases: ["button", "switch"]
+location: { room: maintenance_room }
+listed: false

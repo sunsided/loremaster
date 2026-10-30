@@ -1,0 +1,6 @@
+# Imported from ZIL: TROPHY-CASE (1dungeon.zil)
+name: "trophy case"
+aliases: ["case"]
+location: { room: living_room }
+listed: false
+props: { open: false }

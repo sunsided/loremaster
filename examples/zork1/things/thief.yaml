@@ -1,0 +1,7 @@
+# Imported from ZIL: THIEF (1dungeon.zil)
+name: "thief"
+aliases: ["robber", "man", "person"]
+location: nowhere
+props: { open: true }
+presence:
+  - "There is a suspicious-looking individual, holding a large bag, leaning against one wall. He is armed with a deadly stiletto."

@@ -1,0 +1,4 @@
+# Imported from ZIL: SLIDE (1dungeon.zil)
+name: "chute"
+aliases: ["ramp", "slide"]
+location: { room: cellar }

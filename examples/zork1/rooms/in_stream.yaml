@@ -1,0 +1,10 @@
+# Imported from ZIL: IN-STREAM (1dungeon.zil)
+name: "Stream"
+tags: [dark]
+position: [-3, -8]
+description:
+  - "You are on the gently flowing stream. The upstream route is too narrow to navigate, and the downstream route is invisible due to twisting walls. There is a narrow beach to land on."
+exits:
+  - { direction: land, to: stream_view }
+  - { direction: down, to: reservoir }
+  - { direction: east, to: reservoir }

@@ -1,0 +1,13 @@
+# Imported from ZIL: MAZE-9 (1dungeon.zil)
+name: "Maze"
+tags: [dark]
+position: [-3, 4]
+description:
+  - "This is part of a maze of twisty little passages, all alike."
+exits:
+  - { direction: north, to: maze_6 }
+  - { direction: down, to: maze_11, traversal: "You won't be able to get back up to the tunnel you are going through when it gets to the next room." }
+  - { direction: east, to: maze_10 }
+  - { direction: south, to: maze_13 }
+  - { direction: west, to: maze_12 }
+  - { direction: northwest, to: maze_9 }

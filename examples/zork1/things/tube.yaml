@@ -1,0 +1,10 @@
+# Imported from ZIL: TUBE (1dungeon.zil)
+name: "tube"
+aliases: ["tooth", "paste"]
+location: { room: maintenance_room }
+portable: true
+props: { open: false }
+description:
+  - "---> Frobozz Magic Gunk Company <--- All-Purpose Gunk"
+presence:
+  - "There is an object which looks like a tube of toothpaste here."

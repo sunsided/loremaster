@@ -1,0 +1,8 @@
+# Imported from ZIL: BROKEN-EGG (1dungeon.zil)
+name: "broken jewel-encrusted egg"
+aliases: ["egg", "treasure"]
+location: nowhere
+portable: true
+props: { open: true }
+presence:
+  - "There is a somewhat ruined egg here."

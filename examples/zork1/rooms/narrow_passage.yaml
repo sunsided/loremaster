@@ -1,0 +1,9 @@
+# Imported from ZIL: NARROW-PASSAGE (1dungeon.zil)
+name: "Narrow Passage"
+tags: [dark]
+position: [-4, -4]
+description:
+  - "This is a long and narrow corridor where a long north-south passageway briefly narrows even further."
+exits:
+  - { direction: north, to: round_room }
+  - { direction: south, to: mirror_room_2 }

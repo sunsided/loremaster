@@ -1,0 +1,8 @@
+# Imported from ZIL: GALLERY (1dungeon.zil)
+name: "Gallery"
+position: [1, 2]
+description:
+  - "This is an art gallery. Most of the paintings have been stolen by vandals with exceptional taste. The vandals left through either the north or west exits."
+exits:
+  - { direction: west, to: east_of_chasm }
+  - { direction: north, to: studio }

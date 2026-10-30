@@ -1,0 +1,10 @@
+# Imported from ZIL: KNIFE (1dungeon.zil)
+name: "nasty knife"
+aliases: ["knives", "knife", "blade"]
+location: { room: attic }
+portable: true
+presence:
+  - when: "knife.interactions == 0"
+    text: "On a table is a nasty-looking knife."
+  - when: "knife.interactions > 0"
+    text: "There is {knife.a} here."

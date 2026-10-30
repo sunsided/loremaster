@@ -1,0 +1,8 @@
+# Imported from ZIL: CANYON-BOTTOM (1dungeon.zil)
+name: "Canyon Bottom"
+position: [3, 2]
+description:
+  - "You are beneath the walls of the river canyon which may be climbable here. The lesser part of the runoff of Aragain Falls flows by below. To the north is a narrow path."
+exits:
+  - { direction: up, to: cliff_middle }
+  - { direction: north, to: end_of_rainbow }

@@ -1,0 +1,8 @@
+# Imported from ZIL: RIVER-5 (1dungeon.zil)
+name: "Frigid River"
+position: [5, 8]
+description:
+  - "The sound of rushing water is nearly unbearable here. On the east shore is a large landing area."
+exits:
+  - { direction: east, to: shore }
+  - { direction: land, to: shore }

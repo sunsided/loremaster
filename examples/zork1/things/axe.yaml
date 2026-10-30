@@ -1,0 +1,6 @@
+# Imported from ZIL: AXE (1dungeon.zil)
+name: "bloody axe"
+aliases: ["axe", "ax"]
+location: { room: troll_room }
+portable: true
+listed: false

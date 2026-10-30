@@ -1,0 +1,9 @@
+# Imported from ZIL: LIVING-ROOM (1dungeon.zil)
+name: "Living Room"
+position: [-1, -2]
+description:
+  - "You are in the living room. There is a doorway to the east{magic_flag ? . To the west is a cyclops-shaped opening in an old wooden door, above which is some strange gothic lettering, | , a wooden door with strange gothic lettering to the west, which appears to be nailed shut,} a trophy case, {rug_moved and trap_door.open ? and a rug lying beside an open trap door. | {rug_moved ? and a closed trap door at your feet. | {trap_door.open ? and an open trap door at your feet. | and a large oriental rug in the center of the room.}}}"
+exits:
+  - { direction: east, to: kitchen }
+  - { direction: west, to: strange_passage, passable: "magic_flag", blocked: "The door is nailed shut." }
+  - { direction: down, to: cellar, visible: "rug_moved", door: trap_door }

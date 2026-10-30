@@ -36,6 +36,13 @@ tasks:
     cmds:
       - "{{.CARGO}} run -q -p lantern-cli -- play examples/lighthouse"
 
+  import:zork:
+    desc: Import Zork I from its MIT-licensed ZIL source into examples/zork1
+    cmds:
+      - test -d target/zil/zork1 || git clone --depth 1 https://github.com/historicalsource/zork1 target/zil/zork1
+      - "{{.CARGO}} run -q -p lantern-zil -- target/zil/zork1 examples/zork1"
+      - "{{.CARGO}} run -q -p lantern-cli -- check examples/zork1"
+
   check:story:
     desc: Check the lighthouse example for problems
     cmds:

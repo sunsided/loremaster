@@ -1,0 +1,5 @@
+# Imported from ZIL: LADDER (1dungeon.zil)
+name: "wooden ladder"
+aliases: ["ladder"]
+location: { room: ladder_top }
+listed: false

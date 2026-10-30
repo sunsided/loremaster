@@ -1,0 +1,7 @@
+# Imported from ZIL: LEAVES (1dungeon.zil)
+name: "pile of leaves"
+aliases: ["leaves", "leaf", "pile"]
+location: { room: grating_clearing }
+portable: true
+presence:
+  - "On the ground is a pile of leaves."

@@ -1,0 +1,11 @@
+# Imported from ZIL: MIRROR-ROOM-2 (1dungeon.zil)
+name: "Mirror Room"
+position: [-5, -5]
+description:
+  - "You are in a large square room with tall ceilings. On the south wall is an enormous mirror which fills the entire wall. There are exits on the other three sides of the room."
+  - when: "mirror_mung"
+    text: "Unfortunately, the mirror has been destroyed by your recklessness."
+exits:
+  - { direction: west, to: winding_passage }
+  - { direction: north, to: narrow_passage }
+  - { direction: east, to: tiny_cave }

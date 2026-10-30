@@ -1,0 +1,8 @@
+# Imported from ZIL: DEAD-END-2 (1dungeon.zil)
+name: "Dead End"
+tags: [dark]
+position: [-4, 5]
+description:
+  - "You have come to a dead end in the maze."
+exits:
+  - { direction: west, to: maze_5 }

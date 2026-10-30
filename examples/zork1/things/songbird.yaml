@@ -1,0 +1,5 @@
+# Imported from ZIL: SONGBIRD (1dungeon.zil)
+name: "songbird"
+aliases: ["bird"]
+location: { room: forest_1 }
+listed: false

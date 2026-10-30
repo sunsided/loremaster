@@ -1,0 +1,11 @@
+# Imported from ZIL: MAZE-11 (1dungeon.zil)
+name: "Maze"
+tags: [dark]
+position: [-3, 2]
+description:
+  - "This is part of a maze of twisty little passages, all alike."
+exits:
+  - { direction: northeast, to: grating_room }
+  - { direction: down, to: maze_10 }
+  - { direction: northwest, to: maze_13 }
+  - { direction: southwest, to: maze_12 }

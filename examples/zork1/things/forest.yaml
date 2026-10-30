@@ -1,0 +1,5 @@
+# Imported from ZIL: FOREST (1dungeon.zil)
+name: "forest"
+aliases: ["trees", "pines", "hemlocks"]
+location: { room: west_of_house }
+listed: false

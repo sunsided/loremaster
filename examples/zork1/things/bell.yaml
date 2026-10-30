@@ -1,0 +1,5 @@
+# Imported from ZIL: BELL (1dungeon.zil)
+name: "brass bell"
+aliases: ["bell"]
+location: { room: north_temple }
+portable: true

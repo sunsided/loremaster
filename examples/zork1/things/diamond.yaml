@@ -1,0 +1,7 @@
+# Imported from ZIL: DIAMOND (1dungeon.zil)
+name: "huge diamond"
+aliases: ["diamond", "treasure"]
+location: nowhere
+portable: true
+presence:
+  - "There is an enormous diamond (perfectly cut) here."

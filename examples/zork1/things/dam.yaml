@@ -1,0 +1,5 @@
+# Imported from ZIL: DAM (1dungeon.zil)
+name: "dam"
+aliases: ["gate", "gates", "fcd#3"]
+location: { room: dam_room }
+listed: false

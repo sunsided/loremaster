@@ -1,0 +1,9 @@
+# Imported from ZIL: WINDING-PASSAGE (1dungeon.zil)
+name: "Winding Passage"
+tags: [dark]
+position: [-7, -6]
+description:
+  - "This is a winding passage. It seems that there are only exits on the east and north."
+exits:
+  - { direction: north, to: mirror_room_2 }
+  - { direction: east, to: tiny_cave }

@@ -1,0 +1,4 @@
+# Imported from ZIL: RIVER (1dungeon.zil)
+name: "river"
+location: { room: dam_base }
+listed: false

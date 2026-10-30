@@ -1,0 +1,8 @@
+# Imported from ZIL: CLIFF-MIDDLE (1dungeon.zil)
+name: "Rocky Ledge"
+position: [4, 0]
+description:
+  - "You are on a ledge about halfway up the wall of the river canyon. You can see from here that the main flow from Aragain Falls twists along a passage which it is impossible for you to enter. Below you is the canyon bottom. Above you is more cliff, which appears climbable."
+exits:
+  - { direction: up, to: canyon_view }
+  - { direction: down, to: canyon_bottom }

@@ -1,0 +1,7 @@
+# Imported from ZIL: RAISED-BASKET (1dungeon.zil)
+name: "basket"
+aliases: ["cage", "dumbwaiter"]
+location: { room: shaft_room }
+props: { open: true }
+presence:
+  - "At the end of the chain is a basket."

@@ -1,0 +1,8 @@
+# Imported from ZIL: DEAD-END-5 (1dungeon.zil)
+name: "Dead End"
+tags: [dark]
+position: [-5, -8]
+description:
+  - "You have come to a dead end in the mine."
+exits:
+  - { direction: north, to: ladder_bottom }

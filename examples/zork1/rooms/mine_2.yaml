@@ -1,0 +1,10 @@
+# Imported from ZIL: MINE-2 (1dungeon.zil)
+name: "Coal Mine"
+tags: [dark]
+position: [-2, -15]
+description:
+  - "This is a nondescript part of a coal mine."
+exits:
+  - { direction: north, to: mine_2 }
+  - { direction: south, to: mine_1 }
+  - { direction: southeast, to: mine_3 }

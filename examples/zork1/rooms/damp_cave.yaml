@@ -1,0 +1,9 @@
+# Imported from ZIL: DAMP-CAVE (1dungeon.zil)
+name: "Damp Cave"
+tags: [dark]
+position: [-1, -4]
+description:
+  - "This cave has exits to the west and east, and narrows to a crack toward the south. The earth is particularly damp here."
+exits:
+  - { direction: west, to: loud_room }
+  - { direction: east, to: white_cliffs_north }

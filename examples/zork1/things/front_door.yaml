@@ -1,0 +1,5 @@
+# Imported from ZIL: FRONT-DOOR (1dungeon.zil)
+name: "door"
+location: { room: west_of_house }
+listed: false
+props: { open: false }

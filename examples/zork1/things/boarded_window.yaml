@@ -1,0 +1,5 @@
+# Imported from ZIL: BOARDED-WINDOW (1dungeon.zil)
+name: "boarded window"
+aliases: ["window"]
+location: { room: north_of_house }
+listed: false

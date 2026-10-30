@@ -1,0 +1,9 @@
+# Imported from ZIL: EGYPT-ROOM (1dungeon.zil)
+name: "Egyptian Room"
+tags: [dark]
+position: [2, 1]
+description:
+  - "This is a room which looks like an Egyptian tomb. There is an ascending staircase to the west."
+exits:
+  - { direction: west, to: north_temple }
+  - { direction: up, to: north_temple }

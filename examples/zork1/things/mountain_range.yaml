@@ -1,0 +1,5 @@
+# Imported from ZIL: MOUNTAIN-RANGE (1dungeon.zil)
+name: "mountain range"
+aliases: ["mountain", "range"]
+location: { room: mountains }
+listed: false

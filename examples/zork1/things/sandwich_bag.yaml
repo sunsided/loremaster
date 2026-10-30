@@ -1,0 +1,11 @@
+# Imported from ZIL: SANDWICH-BAG (1dungeon.zil)
+name: "brown sack"
+aliases: ["bag", "sack"]
+location: { room: kitchen }
+portable: true
+props: { open: false }
+presence:
+  - when: "sandwich_bag.interactions == 0"
+    text: "On the table is an elongated brown sack, smelling of hot peppers."
+  - when: "sandwich_bag.interactions > 0"
+    text: "There is {sandwich_bag.a} here."

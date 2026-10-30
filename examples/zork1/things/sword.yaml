@@ -1,0 +1,10 @@
+# Imported from ZIL: SWORD (1dungeon.zil)
+name: "sword"
+aliases: ["orcrist", "glamdring", "blade"]
+location: { room: living_room }
+portable: true
+presence:
+  - when: "sword.interactions == 0"
+    text: "Above the trophy case hangs an elvish sword of great antiquity."
+  - when: "sword.interactions > 0"
+    text: "There is {sword.a} here."

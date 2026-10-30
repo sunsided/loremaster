@@ -1,0 +1,10 @@
+# Imported from ZIL: NS-PASSAGE (1dungeon.zil)
+name: "North-South Passage"
+tags: [dark]
+position: [-3, -5]
+description:
+  - "This is a high north-south passage, which forks to the northeast."
+exits:
+  - { direction: north, to: chasm_room }
+  - { direction: northeast, to: deep_canyon }
+  - { direction: south, to: round_room }

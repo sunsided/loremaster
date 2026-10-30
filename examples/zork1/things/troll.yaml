@@ -1,0 +1,5 @@
+# Imported from ZIL: TROLL (1dungeon.zil)
+name: "troll"
+location: { room: troll_room }
+presence:
+  - "A nasty-looking troll, brandishing a bloody axe, blocks all passages out of the room."

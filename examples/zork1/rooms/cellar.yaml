@@ -1,0 +1,10 @@
+# Imported from ZIL: CELLAR (1dungeon.zil)
+name: "Cellar"
+tags: [dark]
+position: [-2, 0]
+description:
+  - "You are in a dark and damp cellar with a narrow passageway leading north, and a crawlway to the south. On the west is the bottom of a steep metal ramp which is unclimbable."
+exits:
+  - { direction: north, to: troll_room }
+  - { direction: south, to: east_of_chasm }
+  - { direction: up, to: living_room, door: trap_door }

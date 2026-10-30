@@ -1,0 +1,11 @@
+# Imported from ZIL: CANDLES (1dungeon.zil)
+name: "pair of candles"
+aliases: ["candles", "pair"]
+location: { room: south_temple }
+portable: true
+props: { lit: true }
+presence:
+  - when: "candles.interactions == 0"
+    text: "On the two ends of the altar are burning candles."
+  - when: "candles.interactions > 0"
+    text: "There is {candles.a} here."

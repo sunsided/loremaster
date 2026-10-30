@@ -1,0 +1,5 @@
+# Imported from ZIL: STAIRS (gglobals.zil)
+name: "stairs"
+aliases: ["steps", "staircase", "stairway"]
+location: { room: kitchen }
+listed: false

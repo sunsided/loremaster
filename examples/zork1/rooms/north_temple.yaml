@@ -1,0 +1,12 @@
+# Imported from ZIL: NORTH-TEMPLE (1dungeon.zil)
+name: "Temple"
+position: [3, -1]
+description:
+  - "This is the north end of a large temple. On the east wall is an ancient inscription, probably a prayer in a long-forgotten language. Below the prayer is a staircase leading down. The west wall is solid granite. The exit to the north end of the room is through huge marble pillars."
+exits:
+  - { direction: down, to: egypt_room }
+  - { direction: east, to: egypt_room }
+  - { direction: north, to: torch_room }
+  - { direction: out, to: torch_room }
+  - { direction: up, to: torch_room }
+  - { direction: south, to: south_temple }

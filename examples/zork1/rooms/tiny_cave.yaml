@@ -1,0 +1,10 @@
+# Imported from ZIL: TINY-CAVE (1dungeon.zil)
+name: "Cave"
+tags: [dark]
+position: [-5, -6]
+description:
+  - "This is a tiny cave with entrances west and north, and a dark, forbidding staircase leading down."
+exits:
+  - { direction: north, to: mirror_room_2 }
+  - { direction: west, to: winding_passage }
+  - { direction: down, to: entrance_to_hades }

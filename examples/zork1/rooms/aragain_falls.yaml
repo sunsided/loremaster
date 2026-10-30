@@ -1,0 +1,13 @@
+# Imported from ZIL: ARAGAIN-FALLS (1dungeon.zil)
+name: "Aragain Falls"
+position: [5, -1]
+description:
+  - "You are at the top of Aragain Falls, an enormous waterfall with a drop of about 450 feet. The only path here is on the north end."
+  - when: "rainbow_flag"
+    text: "A solid rainbow spans the falls."
+  - when: "not rainbow_flag"
+    text: "A beautiful rainbow can be seen over the falls and to the west."
+exits:
+  - { direction: west, to: on_rainbow, visible: "rainbow_flag" }
+  - { direction: north, to: shore }
+  - { direction: up, to: on_rainbow, visible: "rainbow_flag" }

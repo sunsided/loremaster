@@ -1,0 +1,6 @@
+# Imported from ZIL: LOWERED-BASKET (1dungeon.zil)
+name: "basket"
+aliases: ["cage", "dumbwaiter"]
+location: { room: lower_shaft }
+presence:
+  - "From the chain is suspended a basket."

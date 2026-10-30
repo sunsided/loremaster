@@ -1,0 +1,6 @@
+# Imported from ZIL: HOT-BELL (1dungeon.zil)
+name: "red hot brass bell"
+aliases: ["bell"]
+location: nowhere
+presence:
+  - "On the ground is a red hot bell."

@@ -1,0 +1,11 @@
+# Imported from ZIL: PATH (1dungeon.zil)
+name: "Forest Path"
+position: [0, -2]
+description:
+  - "This is a path winding through a dimly lit forest. The path heads north-south here. One particularly large tree with some low branches stands at the edge of the path."
+exits:
+  - { direction: up, to: up_a_tree }
+  - { direction: north, to: grating_clearing }
+  - { direction: east, to: forest_2 }
+  - { direction: south, to: north_of_house }
+  - { direction: west, to: forest_1 }

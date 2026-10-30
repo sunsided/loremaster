@@ -1,0 +1,5 @@
+# Imported from ZIL: MIRROR-1 (1dungeon.zil)
+name: "mirror"
+aliases: ["reflection", "enormous"]
+location: { room: mirror_room_1 }
+listed: false

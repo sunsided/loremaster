@@ -1,0 +1,11 @@
+# Imported from ZIL: DOME-ROOM (1dungeon.zil)
+name: "Dome Room"
+tags: [dark]
+position: [1, -3]
+description:
+  - "You are at the periphery of a large dome, which forms the ceiling of another room below. Protecting you from a precipitous drop is a wooden railing which circles the dome."
+  - when: "dome_flag"
+    text: "Hanging down from the railing is a rope which ends about ten feet from the floor below."
+exits:
+  - { direction: west, to: engravings_cave }
+  - { direction: down, to: torch_room, passable: "dome_flag", blocked: "You cannot go down without fracturing many bones." }

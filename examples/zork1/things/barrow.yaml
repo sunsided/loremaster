@@ -1,0 +1,5 @@
+# Imported from ZIL: BARROW (1dungeon.zil)
+name: "stone barrow"
+aliases: ["barrow", "tomb"]
+location: { room: stone_barrow }
+listed: false

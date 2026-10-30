@@ -1,0 +1,20 @@
+# Imported from ZIL: CYCLOPS-ROOM (1dungeon.zil)
+name: "Cyclops Room"
+tags: [dark]
+position: [-3, -2]
+description:
+  - "This room has an exit on the northwest, and a staircase leading up."
+  - when: "cyclops_flag and (not magic_flag)"
+    text: "The cyclops is sleeping blissfully at the foot of the stairs."
+  - when: "(not (cyclops_flag and (not magic_flag))) and magic_flag"
+    text: "The east wall, previously solid, now has a cyclops-sized opening in it."
+  - when: "(not (cyclops_flag and (not magic_flag))) and (not magic_flag) and (cyclowrath == 0)"
+    text: "A cyclops, who looks prepared to eat horses (much less mere adventurers), blocks the staircase. From his state of health, and the bloodstains on the walls, you gather that he is not very friendly, though he likes people."
+  - when: "(not (cyclops_flag and (not magic_flag))) and (not magic_flag) and (not (cyclowrath == 0)) and (cyclowrath > 0)"
+    text: "The cyclops is standing in the corner, eyeing you closely. I don't think he likes you very much. He looks extremely hungry, even for a cyclops."
+  - when: "(not (cyclops_flag and (not magic_flag))) and (not magic_flag) and (not (cyclowrath == 0)) and (not (cyclowrath > 0)) and (cyclowrath < 0)"
+    text: "The cyclops, having eaten the hot peppers, appears to be gasping. His enflamed tongue protrudes from his man-sized mouth."
+exits:
+  - { direction: northwest, to: maze_15 }
+  - { direction: east, to: strange_passage, passable: "magic_flag", blocked: "The east wall is solid rock." }
+  - { direction: up, to: treasure_room, passable: "cyclops_flag", blocked: "The cyclops doesn't look like he'll let you past." }

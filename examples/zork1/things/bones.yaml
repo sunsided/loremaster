@@ -1,0 +1,5 @@
+# Imported from ZIL: BONES (1dungeon.zil)
+name: "skeleton"
+aliases: ["bones", "body"]
+location: { room: maze_5 }
+listed: false

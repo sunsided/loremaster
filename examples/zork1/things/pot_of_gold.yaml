@@ -1,0 +1,10 @@
+# Imported from ZIL: POT-OF-GOLD (1dungeon.zil)
+name: "pot of gold"
+aliases: ["pot", "gold", "treasure"]
+location: nowhere
+portable: true
+presence:
+  - when: "pot_of_gold.interactions == 0"
+    text: "At the end of the rainbow is a pot of gold."
+  - when: "pot_of_gold.interactions > 0"
+    text: "There is {pot_of_gold.a} here."

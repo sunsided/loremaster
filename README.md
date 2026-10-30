@@ -16,6 +16,8 @@ The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge
 | `crates/lantern-cli` | The terminal player: `lantern play` and `lantern check`. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
 | `examples/cantina` | A small story with a character whose name changes. |
+| `examples/zork1` | Zork I, imported from its ZIL source. A large map for tests. Read `examples/zork1/README.md`. |
+| `crates/lantern-zil` | The importer for ZIL games: `lantern-zil <zil-folder> <project-folder>`. |
 | `docs/writing-stories.md` | How to write a story: files, fragments, markup, conditions, frames and name stages. |
 | `web/` | The SvelteKit app and the design system with its Storybook. |
 
@@ -26,6 +28,7 @@ Install [go-task](https://taskfile.dev), Trunk, Node.js and pnpm before you star
 | Command | What it does |
 | --- | --- |
 | `task play` | Plays the example in the terminal. |
+| `task import:zork` | Imports Zork I again from its ZIL source into `examples/zork1`. |
 | `task web:install` | Installs the web dependencies. Do this one time. |
 | `task dev` | Builds the WebAssembly package, then runs `trunk watch` and the Vite dev server. |
 | `task storybook` | Starts Storybook on port 6006. |

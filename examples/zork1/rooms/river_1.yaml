@@ -1,0 +1,9 @@
+# Imported from ZIL: RIVER-1 (1dungeon.zil)
+name: "Frigid River"
+position: [9, 0]
+description:
+  - "You are on the Frigid River in the vicinity of the Dam. The river flows quietly here. There is a landing on the west shore."
+exits:
+  - { direction: west, to: dam_base }
+  - { direction: land, to: dam_base }
+  - { direction: down, to: river_2 }

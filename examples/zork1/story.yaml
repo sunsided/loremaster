@@ -1,0 +1,27 @@
+title: "Zork I: The Great Underground Empire"
+author: "Tim Anderson, Marc Blank, Bruce Daniels and Dave Lebling (Infocom). Imported from ZIL with lantern-zil."
+start: west_of_house
+
+vars:
+  - { id: coffin_cure, type: bool, initial: false }
+  - { id: cyclops_flag, type: bool, initial: false }
+  - { id: cyclowrath, type: int, initial: 0 }
+  - { id: dead, type: bool, initial: false }
+  - { id: deflate, type: bool, initial: false }
+  - { id: dome_flag, type: bool, initial: false }
+  - { id: empty_handed, type: bool, initial: false }
+  - { id: false_flag, type: bool, initial: false }
+  - { id: gate_flag, type: bool, initial: false }
+  - { id: gates_open, type: bool, initial: false }
+  - { id: grate_revealed, type: bool, initial: false }
+  - { id: grunlock, type: bool, initial: false }
+  - { id: lld_flag, type: bool, initial: false }
+  - { id: loud_flag, type: bool, initial: false }
+  - { id: low_tide, type: bool, initial: false }
+  - { id: magic_flag, type: bool, initial: false }
+  - { id: mirror_mung, type: bool, initial: false }
+  - { id: player, type: bool, initial: false }
+  - { id: rainbow_flag, type: bool, initial: false }
+  - { id: rug_moved, type: bool, initial: false }
+  - { id: troll_flag, type: bool, initial: false }
+  - { id: won_flag, type: bool, initial: false }

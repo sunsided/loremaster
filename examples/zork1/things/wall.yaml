@@ -1,0 +1,4 @@
+# Imported from ZIL: WALL (1dungeon.zil)
+name: "surrounding wall"
+aliases: ["wall", "walls"]
+location: nowhere

@@ -1,0 +1,12 @@
+# Imported from ZIL: ROUND-ROOM (1dungeon.zil)
+name: "Round Room"
+tags: [dark]
+position: [-2, -3]
+description:
+  - "This is a circular stone room with passages in all directions. Several of them have unfortunately been blocked by cave-ins."
+exits:
+  - { direction: east, to: loud_room }
+  - { direction: west, to: ew_passage }
+  - { direction: north, to: ns_passage }
+  - { direction: south, to: narrow_passage }
+  - { direction: southeast, to: engravings_cave }
