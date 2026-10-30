@@ -10,6 +10,8 @@ Try it in the browser: [sunsided.github.io/lantern](https://sunsided.github.io/l
 
 ![Write mode: the same room. Each text fragment shows its layer and its condition in the margin, and the room desk shows the file, notes and rules.](docs/images/write.png)
 
+![The Atlas map of Zork I, imported from its ZIL source: 110 rooms on six floors, with the rooms of the current floor and the details of the selected room.](docs/images/atlas.png)
+
 ## Layout
 
 | Path | Contents |
