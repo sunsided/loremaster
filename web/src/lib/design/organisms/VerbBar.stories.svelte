@@ -34,6 +34,9 @@ To use it:
 A click on a thing with no verb looks at the thing.
 A verb without things, such as "Look around", runs at once.
 
+The look is quiet: the verbs are text in a grid of four columns (three on narrow screens), and the things in reach are on the right (under the verbs on narrow screens). The selected verb is in inverse video, like the status line; the hinted verb is underlined in the accent colour. Each verb is a toggle button with \`aria-pressed\`.
+The help line shows only while \`hint\` is true. The app sets it until the player gives the first command.
+
 The verb bar and the command prompt use the same text. When the player types, the runtime reads the partial command:
 - The verb that the text names is pressed. "look " selects "Look at".
 - The things that the text names, or could still name, are marked. "look lighth" marks "lighthouse door".

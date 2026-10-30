@@ -25,6 +25,8 @@
 		onexit: (direction: string) => void;
 		onrun?: () => void;
 		oncancel?: () => void;
+		/** Show the help line when no verb is selected. The app shows it until the first command. */
+		hint?: boolean;
 	}
 
 	let {
@@ -42,7 +44,8 @@
 		onthing,
 		onexit,
 		onrun,
-		oncancel
+		oncancel,
+		hint = true
 	}: Props = $props();
 
 	const selectedVerb = $derived(verbs.find((v) => v.id === selected));
@@ -50,17 +53,19 @@
 </script>
 
 <!--
-	The SCUMM-style controls. The player selects a verb, then clicks a thing.
+	The SCUMM-style controls, quiet: the verbs are text in a grid of four columns, and the things in reach are
+	on the right. The selected verb is in inverse video. The player selects a verb, then clicks a thing.
 	A click on a thing with no verb looks at it.
 -->
 <div class="verb-bar">
 	<div class="verbs" role="group" aria-label="Verbs">
 		{#each verbs as verb (verb.id)}
-			<Button
-				block
-				pressed={verb.id === selected}
-				marked={verb.id === hintedVerb && verb.id !== selected}
-				onclick={() => onverb(verb)}>{verb.label}</Button
+			<button
+				type="button"
+				class="verb"
+				aria-pressed={verb.id === selected}
+				class:hinted={verb.id === hintedVerb && verb.id !== selected}
+				onclick={() => onverb(verb)}>{verb.label}</button
 			>
 		{/each}
 	</div>
@@ -87,7 +92,7 @@
 				<Button size="compact" variant="quiet" onclick={() => onrun?.()}>just {selectedVerb.label.toLowerCase()} it</Button>
 			{/if}
 			<Button size="compact" variant="quiet" onclick={() => oncancel?.()}>cancel</Button>
-		{:else}
+		{:else if hint}
 			<span class="hint">Select a verb, or type one. Then click or type a thing. A click on a thing with no verb looks at it.</span>
 		{/if}
 	</div>
@@ -95,34 +100,89 @@
 
 <style>
 	.verb-bar {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-5);
-		padding-top: var(--space-6);
+		display: grid;
+		grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
+		grid-template-areas:
+			'verbs reach'
+			'sentence sentence';
+		gap: var(--space-4) var(--space-8);
+		padding-top: var(--space-5);
 		border-top: var(--size-border) solid var(--color-border-subtle);
+		font-family: var(--font-ui);
 	}
 	.verbs {
+		grid-area: verbs;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-		gap: var(--space-3);
-		max-width: 820px;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0 var(--space-4);
+		align-content: start;
+	}
+	.verb {
+		min-height: var(--size-target-compact);
+		padding: 0 var(--space-2);
+		margin-left: calc(-1 * var(--space-2));
+		border: 0;
+		background: none;
+		color: var(--color-text-muted);
+		font: inherit;
+		text-align: left;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.verb:hover {
+		color: var(--color-text-strong);
+	}
+	.verb.hinted {
+		color: var(--color-text-accent);
+		text-decoration: underline;
+		text-underline-offset: 3px;
+	}
+	.verb[aria-pressed='true'] {
+		background: var(--color-accent);
+		color: var(--color-text-on-accent);
+		font-weight: var(--font-weight-strong);
+	}
+	.verb:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 1px;
 	}
 	.reach {
+		grid-area: reach;
 		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-4) var(--space-7);
+		flex-direction: column;
+		gap: var(--space-3);
+		min-width: 0;
 	}
 	.sentence {
+		grid-area: sentence;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--space-3);
 		min-height: var(--size-target-compact);
+		font-size: var(--font-size-sm);
+	}
+	.sentence:empty {
+		display: none;
 	}
 	.text {
 		color: var(--color-text-warning);
 	}
 	.hint {
 		color: var(--color-text-muted);
+	}
+	/* Narrow: the verbs over the things, three columns. */
+	@media (max-width: 719px) {
+		.verb-bar {
+			grid-template-columns: minmax(0, 1fr);
+			grid-template-areas:
+				'verbs'
+				'reach'
+				'sentence';
+		}
+		.verbs {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
 	}
 </style>

@@ -724,6 +724,7 @@
 					onexit={(dir) => s.pickExit(dir)}
 					onrun={() => s.runPending()}
 					oncancel={() => (s.draft = '')}
+					hint={!s.entries.some((e) => e.turn.blocks.some((b) => b.kind === 'command'))}
 				/>
 			{:else}
 				<p id="command" tabindex="-1">The story has ended. <Button size="compact" onclick={() => s.restart()}>Play again</Button></p>
