@@ -303,10 +303,16 @@ impl Checker<'_> {
     /// Notes name known threads; an open thread that is set up gets paid off.
     fn threads(&mut self) {
         let mut seen = BTreeSet::new();
-        for t in &self.story().threads.clone() {
-            if !seen.insert(t.id.to_string()) {
-                let file = self.file_of(&format!("thread:{}", t.id));
-                self.error(&file, "id", format!("thread `{}` is defined twice", t.id));
+        let ids: Vec<String> = self
+            .story()
+            .threads
+            .iter()
+            .map(|t| t.id.to_string())
+            .collect();
+        for id in ids {
+            if !seen.insert(id.clone()) {
+                let file = self.file_of(&format!("thread:{id}"));
+                self.error(&file, "id", format!("thread `{id}` is defined twice"));
             }
         }
         for n in crate::notes(self.project) {

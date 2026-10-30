@@ -119,3 +119,17 @@ fn a_bad_note_does_not_load() {
     ];
     check!(load(files).is_err());
 }
+
+#[test]
+fn a_note_line_skips_the_same_text_in_the_story_text() {
+    let files = vec![
+        file("story.yaml", "title: x\nstart: a\n"),
+        file(
+            "rooms/a.yaml",
+            "name: A\ndescription:\n  - \"Fix the door.\"\nnotes:\n  - Fix the door.\n  - todo: Fix the door.\n",
+        ),
+    ];
+    let p = load(files).unwrap();
+    let lines: Vec<_> = lantern_project::notes(&p).iter().map(|n| n.line).collect();
+    check!(lines == [Some(5), Some(6)]);
+}
