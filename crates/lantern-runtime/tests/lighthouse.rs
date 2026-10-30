@@ -629,7 +629,11 @@ fn back_goes_the_way_the_player_came() {
     let mut game = lighthouse();
     game.start();
     let turn = game.input("back");
-    assert!(turn.plain_text().contains("can't go back"), "{}", turn.plain_text());
+    assert!(
+        turn.plain_text().contains("can't go back"),
+        "{}",
+        turn.plain_text()
+    );
     game.input("n");
     assert_eq!(game.scene().room, "cottage");
     game.input("go back");
