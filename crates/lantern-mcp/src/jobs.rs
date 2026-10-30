@@ -46,6 +46,8 @@ pub struct Job {
     pub proposals: Vec<String>,
     /// The agent's session, to continue it later.
     pub agent_session: Option<String>,
+    /// The model the job asked for; `None` for the agent's default.
+    pub model: Option<String>,
     pub cost_usd: Option<f64>,
 }
 
@@ -73,7 +75,7 @@ impl Agent {
     /// `--tools` turns off the built-in tools (Read, Grep, Bash and the others)
     /// except the three that the lantern server needs: the MCP resources (the
     /// writing guide) and the search for deferred tools.
-    fn command(&self, prompt: &str, mcp_config: &str) -> Command {
+    fn command(&self, prompt: &str, mcp_config: &str, model: Option<&str>) -> Command {
         let mut cmd = Command::new(&self.program);
         cmd.args(["-p", prompt])
             .args(["--output-format", "stream-json", "--verbose"])
@@ -83,7 +85,7 @@ impl Agent {
                 "--allowedTools",
                 &format!("mcp__lantern__*,{BUILT_IN_TOOLS}"),
             ]);
-        if let Some(model) = &self.model {
+        if let Some(model) = model.or(self.model.as_deref()) {
             cmd.args(["--model", model]);
         }
         // Load the lantern tools at the start, without a ToolSearch round trip.
@@ -126,12 +128,19 @@ impl Jobs {
     }
 
     /// Start a job with a rendered prompt. Returns its id.
-    pub fn start(&mut self, task: &str, args: Value, prompt: &str) -> Result<String, String> {
+    /// `model` overrides the agent's model for this job.
+    pub fn start(
+        &mut self,
+        task: &str,
+        args: Value,
+        prompt: &str,
+        model: Option<&str>,
+    ) -> Result<String, String> {
         let id = self.next_id();
         self.next += 1;
         let mut child = self
             .agent
-            .command(prompt, &self.mcp_config)
+            .command(prompt, &self.mcp_config, model)
             .spawn()
             .map_err(|e| format!("cannot start {}: {e}", self.agent.program))?;
         let stdout = child.stdout.take().expect("piped");
@@ -147,6 +156,7 @@ impl Jobs {
                 result: None,
                 proposals: Vec::new(),
                 agent_session: None,
+                model: model.or(self.agent.model.as_deref()).map(str::to_string),
                 cost_usd: None,
             },
         );
@@ -333,6 +343,7 @@ mod tests {
             result: None,
             proposals: Vec::new(),
             agent_session: None,
+            model: None,
             cost_usd: None,
         }
     }
@@ -382,7 +393,7 @@ mod tests {
             program: "claude".into(),
             model: Some("haiku".into()),
         };
-        let cmd = agent.command("hello", "{}");
+        let cmd = agent.command("hello", "{}", None);
         let args: Vec<_> = cmd.get_args().map(|a| a.to_string_lossy()).collect();
         let after = |flag: &str| {
             let i = args.iter().position(|a| a == flag).unwrap();
@@ -427,7 +438,7 @@ mod tests {
             model: None,
         };
         let mut jobs = Jobs::new(agent, "http://127.0.0.1:1/mcp");
-        let id = jobs.start("review_room", json!({}), "hello").unwrap();
+        let id = jobs.start("review_room", json!({}), "hello", None).unwrap();
         for _ in 0..100 {
             if jobs.get(&id).unwrap().status != JobStatus::Running {
                 break;

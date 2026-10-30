@@ -108,8 +108,11 @@ The body of `POST /jobs` has these fields:
 | `task` | The name of a task prompt, for example `imagine_exit`. |
 | `args` | The arguments of the prompt, as an object. |
 | `state` | Optional. A state that the editor saved. The server starts a new session `job-<id>` from this state, and the job uses that session. |
+| `model` | Optional. The model for this job, for example `sonnet`. It replaces `LANTERN_CLAUDE_MODEL`. |
 
 For `imagine_exit`, if `args` has no `rejected`, the server adds the last 20 rejected proposals from `.lantern/rejected.jsonl`.
+
+Before the server starts the agent, it gets the context of the task and puts it in the prompt: `story.yaml`, the room file, the neighbours (1 hop) and the scene of the session. For `imagine_exit` it also gives the variables. For `review_room` it also gives the room matrix. The writing guide is in the prompt too. Thus the agent does not use turns to get them. An MCP client that uses `prompts/get` does not get this context. The prompt then tells the assistant to get it with the tools.
 
 The reply is `{ "id": "j1" }` with status 202. A job has these fields:
 
@@ -121,7 +124,10 @@ The reply is `{ "id": "j1" }` with status 202. A job has these fields:
 | `result` | The last reply of the agent, or `null`. |
 | `proposals` | The ids of the proposals that the agent made and did not withdraw. |
 | `agent_session` | The Claude Code session id. |
-| `cost_usd` | The cost that Claude Code gave for the job. |
+| `model` | The model that the job asked for, or `null` for the default model. |
+| `cost_usd` | The cost that Claude Code gave for the job. With a Claude plan login, this is an estimate, not a charge. |
+
+The server adds each proposal to `proposals` when the agent makes it. Thus the editor can show the first proposal before the job is done.
 
 When you cancel a job, the proposals that it made stay.
 

@@ -16,7 +16,9 @@ mod prompts;
 mod proposal;
 mod tools;
 
-pub use prompts::{PromptDef, prompts, prompts_json, render_prompt};
+pub use prompts::{
+    PromptDef, prompt_context, prompts, prompts_json, render_prompt, render_prompt_with_context,
+};
 pub use proposal::{Change, FileChange, PreviewText, Proposal, ProposalView, RoomPreview, sha256};
 
 pub use tools::{ToolDef, tools};

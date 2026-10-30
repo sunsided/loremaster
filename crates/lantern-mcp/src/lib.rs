@@ -15,7 +15,7 @@ pub mod http;
 pub mod jobs;
 
 use lantern_project::read_dir;
-use lantern_tools::{Proposal, Workspace, prompts_json, render_prompt, tools};
+use lantern_tools::{Proposal, Workspace, prompt_context, prompts_json, render_prompt, tools};
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -83,6 +83,45 @@ impl Server {
         let result = self.ws.call(name, args);
         self.save_proposals();
         result.map_err(|e| e.0)
+    }
+
+    /// The context of a task prompt as Markdown: the results of its context
+    /// calls, then the writing guide. A file comes as a YAML block, so that the
+    /// assistant can copy its lines byte for byte.
+    pub fn prompt_context(&mut self, task: &str, args: &Value) -> String {
+        let mut out = String::new();
+        for (title, tool, call) in prompt_context(task, args) {
+            let body = match self.call_tool(tool, call) {
+                Ok(mut v) => match v.get("text").and_then(Value::as_str).map(str::to_string) {
+                    Some(text) if v.get("path").is_some() => {
+                        let path = v["path"].as_str().unwrap_or_default().to_string();
+                        if let Some(o) = v.as_object_mut() {
+                            o.remove("text");
+                            o.remove("path");
+                        }
+                        let rest = match v.as_object() {
+                            Some(o) if !o.is_empty() => {
+                                format!(
+                                    "\n```json\n{}\n```",
+                                    serde_json::to_string(&v).unwrap_or_default()
+                                )
+                            }
+                            _ => String::new(),
+                        };
+                        format!("`{path}`:\n\n```yaml\n{}\n```{rest}", text.trim_end())
+                    }
+                    _ => format!(
+                        "```json\n{}\n```",
+                        serde_json::to_string(&v).unwrap_or_default()
+                    ),
+                },
+                Err(e) => format!("(`{tool}` failed: {e})"),
+            };
+            out.push_str(&format!("## {title}\n\n{body}\n\n"));
+        }
+        out.push_str("## The writing guide\n\n");
+        out.push_str(GUIDE);
+        out
     }
 
     /// End a play session, for example the session of a job that did not start.

@@ -20,7 +20,7 @@
 
 use crate::jobs::{Agent, Jobs};
 use crate::{Refusal, Server};
-use lantern_tools::render_prompt;
+use lantern_tools::{render_prompt, render_prompt_with_context};
 use serde_json::{Value, json};
 use std::io;
 use std::path::Path;
@@ -163,15 +163,19 @@ fn start_job(server: &mut Server, jobs: &mut Jobs, body: &str) -> Result<String,
             args["rejected"] = json!(rejected.join("\n"));
         }
     }
-    // Render first, so that a bad task or argument leaves no session behind.
-    let prompt = render_prompt(task, &args).map_err(|e| e.0)?;
+    let model = req.get("model").and_then(Value::as_str);
+    // Check the task and its arguments first, so that a bad request leaves no session behind.
+    render_prompt(task, &args).map_err(|e| e.0)?;
     if let Some(state) = state {
         server.call_tool(
             "session_start",
             json!({ "session": session, "state": state }),
         )?;
     }
-    jobs.start(task, args, &prompt).inspect_err(|_| {
+    // The server gives the context in the prompt: that saves the agent several turns.
+    let context = server.prompt_context(task, &args);
+    let prompt = render_prompt_with_context(task, &args, Some(&context)).map_err(|e| e.0)?;
+    jobs.start(task, args, &prompt, model).inspect_err(|_| {
         if state.is_some() {
             server.end_session(&session);
         }
