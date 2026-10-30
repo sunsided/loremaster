@@ -9,13 +9,18 @@
 //! | `GET /proposals/<id>` | One proposal, checked. |
 //! | `POST /proposals/<id>/accept` | Write the proposal into the project files. Body: `{ "applied": true }` when the editor wrote the change itself, `{ "force": true }` to write a stale proposal. |
 //! | `POST /proposals/<id>/reject` | Remove the proposal. Body: `{ "note": "why" }`, optional. |
+//! | `POST /jobs` | Start a job: `{ "task": "imagine_exit", "args": { "room": "shore", "direction": "down" }, "state": { ... } }`. |
+//! | `GET /jobs`, `GET /jobs/<id>` | The jobs, with status, progress events, result and proposals. |
+//! | `POST /jobs/<id>/cancel` | Stop a running job. |
 //!
 //! A web page on any other site must not use these endpoints. So the server
 //! accepts a request with an `Origin` header only from `localhost` or
 //! `127.0.0.1`, and a `POST` only with `Content-Type: application/json`,
 //! which makes a browser ask first (CORS preflight).
 
+use crate::jobs::{Agent, Jobs};
 use crate::{Refusal, Server};
+use lantern_tools::render_prompt;
 use serde_json::{Value, json};
 use std::io;
 use std::path::Path;
@@ -27,18 +32,19 @@ pub const DEFAULT_PORT: u16 = 4710;
 /// Serve the project in `root` on `127.0.0.1:<port>` until the process stops.
 pub fn serve_http(root: &Path, port: u16) -> io::Result<()> {
     let mut server = Server::new(root.to_path_buf())?;
+    let mut jobs = Jobs::new(Agent::from_env(), &format!("http://127.0.0.1:{port}/mcp"));
     let http = tiny_http::Server::http(("127.0.0.1", port)).map_err(io::Error::other)?;
     eprintln!(
         "lantern: serving {} on http://127.0.0.1:{port} (MCP at /mcp)",
         root.display()
     );
     for request in http.incoming_requests() {
-        handle(&mut server, request);
+        handle(&mut server, &mut jobs, request);
     }
     Ok(())
 }
 
-fn handle(server: &mut Server, mut request: Request) {
+fn handle(server: &mut Server, jobs: &mut Jobs, mut request: Request) {
     let origin = header(&request, "Origin");
     if let Some(o) = &origin
         && !local_origin(o)
@@ -115,9 +121,53 @@ fn handle(server: &mut Server, mut request: Request) {
                 Err(e) => refused(&e),
             }
         }
+        (true, ["jobs"]) => match start_job(server, jobs, &body) {
+            Ok(id) => ok(json!({ "id": id })).with_status_code(202),
+            Err(e) => error(400, &e),
+        },
+        (false, ["jobs"]) => ok(serde_json::to_value(jobs.list()).unwrap_or(Value::Null)),
+        (false, ["jobs", id]) => match jobs.get(id) {
+            Some(j) => ok(serde_json::to_value(j).unwrap_or(Value::Null)),
+            None => error(404, "There is no such job."),
+        },
+        (true, ["jobs", id, "cancel"]) => match jobs.cancel(id) {
+            true => ok(json!({ "cancelled": id })),
+            false => error(404, "There is no running job with this id."),
+        },
         _ => error(404, "Not found."),
     };
     let _ = request.respond(cors(response));
+}
+
+/// Start a job from a body `{ "task": "imagine_exit", "args": { ... }, "state": { ... } }`.
+/// With `state` (the editor's save), the job plays in its own session from that state.
+fn start_job(server: &mut Server, jobs: &mut Jobs, body: &str) -> Result<String, String> {
+    let req: Value =
+        serde_json::from_str(body).map_err(|e| format!("The body is not JSON: {e}"))?;
+    let task = req
+        .get("task")
+        .and_then(Value::as_str)
+        .ok_or("The body needs `task`.")?;
+    let mut args = req.get("args").cloned().unwrap_or_else(|| json!({}));
+    if !args.is_object() {
+        return Err("`args` must be an object.".into());
+    }
+    if let Some(state) = req.get("state") {
+        let session = format!("job-{}", jobs.next_id());
+        server.call_tool(
+            "session_start",
+            json!({ "session": session, "state": state }),
+        )?;
+        args["session"] = json!(session);
+    }
+    if task == "imagine_exit" && args.get("rejected").is_none() {
+        let rejected = server.rejected(20);
+        if !rejected.is_empty() {
+            args["rejected"] = json!(rejected.join("\n"));
+        }
+    }
+    let prompt = render_prompt(task, &args).map_err(|e| e.0)?;
+    jobs.start(task, args, &prompt)
 }
 
 /// A boolean field of a JSON body; false when the body or the field is missing.
