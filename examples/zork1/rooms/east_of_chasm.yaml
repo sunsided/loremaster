@@ -7,3 +7,4 @@ description:
 exits:
   - { direction: north, to: cellar }
   - { direction: east, to: gallery }
+  - { direction: down, blocked: "The chasm probably leads straight to the infernal regions." }

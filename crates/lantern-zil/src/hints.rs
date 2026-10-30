@@ -40,7 +40,7 @@ pub fn per_exit_flags(routine: &str) -> &'static [&'static str] {
 /// An exit for a `(DIRECTION PER ROUTINE)` exit of a room.
 pub fn per_exit(room: &str, routine: &str) -> Option<ExitOut> {
     let to = |to: &str| ExitOut {
-        to: to.to_string(),
+        to: Some(to.to_string()),
         ..Default::default()
     };
     match (routine, room) {

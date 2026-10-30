@@ -231,10 +231,13 @@ fn exit(
     match (words.as_slice(), args) {
         // (EAST "The door is boarded.") and (EAST SORRY "...")
         (_, [Node::Str(msg)]) | ([Some("SORRY"), _], [_, Node::Str(msg)]) => {
-            report
-                .message_exits
-                .push(note(format!("\"{}\"", text(msg).trim())));
-            None
+            let msg = text(msg).trim().to_string();
+            report.message_exits.push(note(format!("\"{msg}\"")));
+            Some(ExitOut {
+                direction: direction.clone(),
+                blocked: Some(msg),
+                ..Default::default()
+            })
         }
         ([Some("PER"), Some(routine)], _) => match hints::per_exit(room, routine) {
             Some(mut e) => {
@@ -242,9 +245,10 @@ fn exit(
                     t.flag(flag);
                 }
                 e.direction = direction.clone();
-                report
-                    .hinted_exits
-                    .push(note(format!("PER {routine}, to {}", e.to)));
+                report.hinted_exits.push(note(format!(
+                    "PER {routine}, to {}",
+                    e.to.as_deref().unwrap_or("-")
+                )));
                 Some(e)
             }
             None => {
@@ -255,7 +259,7 @@ fn exit(
         ([Some("TO"), Some(to), rest @ ..], _) if t.src.room(to).is_some() => {
             let mut e = ExitOut {
                 direction: direction.clone(),
-                to: id(to),
+                to: Some(id(to)),
                 ..Default::default()
             };
             let cond = &args[2..];
@@ -495,15 +499,19 @@ fn layout(rooms: &[RoomOut], start: &str) -> BTreeMap<String, (i32, i32)> {
         let mut queue = VecDeque::from([seed]);
         while let Some(from) = queue.pop_front() {
             let (fx, fy) = pos[from];
-            for e in &by_id[from].exits {
-                if pos.contains_key(e.to.as_str()) || !by_id.contains_key(e.to.as_str()) {
+            for (e, to) in by_id[from]
+                .exits
+                .iter()
+                .filter_map(|e| Some((e, e.to.as_deref()?)))
+            {
+                if pos.contains_key(to) || !by_id.contains_key(to) {
                     continue;
                 }
                 let (dx, dy) = step(&e.direction);
                 let p = free(&used, (fx + dx, fy + dy));
-                pos.insert(e.to.clone(), p);
+                pos.insert(to.to_string(), p);
                 used.insert(p);
-                queue.push_back(by_id[e.to.as_str()].id.as_str());
+                queue.push_back(by_id[to].id.as_str());
             }
         }
     }
@@ -561,11 +569,13 @@ mod tests {
         let field = &w.rooms[0];
         check!(field.tags.is_empty());
         check!(w.rooms[1].tags == vec!["dark".to_string()]);
-        check!(field.exits.len() == 3);
+        check!(field.exits.len() == 4);
         check!(field.exits[0].door.as_deref() == Some("door"));
-        check!(field.exits[1].visible.as_deref() == Some("won_flag"));
-        check!(field.exits[2].passable.as_deref() == Some("troll_flag"));
-        check!(field.exits[2].blocked.as_deref() == Some("The troll stops you."));
+        check!(field.exits[1].to.is_none());
+        check!(field.exits[1].blocked.as_deref() == Some("The house is in the way."));
+        check!(field.exits[2].visible.as_deref() == Some("won_flag"));
+        check!(field.exits[3].passable.as_deref() == Some("troll_flag"));
+        check!(field.exits[3].blocked.as_deref() == Some("The troll stops you."));
         check!(w.report.message_exits.len() == 1);
         check!(w.report.exits.is_empty());
         check!(w.story.vars.len() == 2);

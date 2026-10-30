@@ -9,3 +9,4 @@ exits:
   - { direction: northeast, to: east_of_house }
   - { direction: northwest, to: west_of_house }
   - { direction: south, to: forest_3 }
+  - { direction: north, blocked: "The windows are all boarded." }

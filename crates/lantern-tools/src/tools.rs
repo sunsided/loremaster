@@ -480,10 +480,11 @@ fn overview(ws: &Workspace) -> ToolResult {
         .rooms
         .iter()
         .map(|r| {
-            let exits: BTreeMap<String, &str> = r
+            // A message exit (no `to`) shows as `null`.
+            let exits: BTreeMap<String, Option<&str>> = r
                 .exits
                 .iter()
-                .map(|e| (e.direction.to_string(), e.to.as_str()))
+                .map(|e| (e.direction.to_string(), e.to.as_ref().map(|to| to.as_str())))
                 .collect();
             json!({ "id": r.id, "name": r.name, "region": r.region, "tags": r.tags, "exits": exits })
         })
@@ -575,12 +576,13 @@ fn neighbors(ws: &Workspace, room: &str, hops: usize) -> ToolResult {
     let mut forward: BTreeMap<&str, Vec<(String, &str)>> = BTreeMap::new();
     let mut backward: BTreeMap<&str, Vec<(String, &str)>> = BTreeMap::new();
     for r in &story.rooms {
-        for e in &r.exits {
+        // A message exit leads nowhere, so it is no step of a path.
+        for (e, to) in r.exits.iter().filter_map(|e| Some((e, e.to.as_ref()?))) {
             forward
                 .entry(r.id.as_str())
                 .or_default()
-                .push((e.direction.to_string(), e.to.as_str()));
-            backward.entry(e.to.as_str()).or_default().push((
+                .push((e.direction.to_string(), to.as_str()));
+            backward.entry(to.as_str()).or_default().push((
                 format!("from {}: {} leads here", r.id, e.direction),
                 r.id.as_str(),
             ));

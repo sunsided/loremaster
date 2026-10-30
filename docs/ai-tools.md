@@ -70,6 +70,8 @@ The file `lantern-mcp.json` contains:
 
 The server also gives this guide as a resource: `lantern://guide/writing-stories`.
 
+In `overview`, a message exit (an exit without `to`) has the value `null`. `neighbors` and `map` do not show message exits, because they go to no room.
+
 ## Task prompts
 
 A task prompt is a request for one task. The editor and MCP clients use the same prompts. Thus a task works the same in the editor and in an assistant.

@@ -7,5 +7,6 @@ description:
   - when: "dome_flag"
     text: "A piece of rope descends from the railing above, ending some five feet above your head."
 exits:
+  - { direction: up, blocked: "You cannot reach the rope." }
   - { direction: south, to: north_temple }
   - { direction: down, to: north_temple }

@@ -10,7 +10,7 @@ lantern-zil makes this file. Do not edit it. Run the importer again to make it n
 | Room descriptions that are not imported | 1 |
 | Exits | 315 |
 | Exits from hints | 7 |
-| Exits that only show a message (not imported) | 37 |
+| Message exits (only show a message) | 37 |
 | Other exits that are not imported | 0 |
 | Things | 131 |
 | Things in a different place | 54 |
@@ -162,9 +162,9 @@ The original prints these descriptions from code that the importer can not trans
 | --- | --- |
 | `up_a_tree` | TREE-ROOM: condition `<SET F <FIRST? ,PATH>>` |
 
-## Exits that only show a message
+## Message exits
 
-In the original, these directions show a message and do not move the player. A lantern exit must have a destination, so the importer does not make them. The player gets the default response.
+In the original, these directions show a message and do not move the player. The importer makes them as message exits: exits with `blocked` and no `to`.
 
 | Room | Direction and message |
 | --- | --- |

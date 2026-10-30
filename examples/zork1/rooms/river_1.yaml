@@ -4,6 +4,8 @@ position: [9, 0]
 description:
   - "You are on the Frigid River in the vicinity of the Dam. The river flows quietly here. There is a landing on the west shore."
 exits:
+  - { direction: up, blocked: "You cannot go upstream due to strong currents." }
   - { direction: west, to: dam_base }
   - { direction: land, to: dam_base }
   - { direction: down, to: river_2 }
+  - { direction: east, blocked: "The White Cliffs prevent your landing here." }

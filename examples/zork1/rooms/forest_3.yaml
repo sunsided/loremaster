@@ -4,6 +4,9 @@ position: [0, 2]
 description:
   - "This is a dimly lit forest, with large trees all around."
 exits:
+  - { direction: up, blocked: "There is no tree here suitable for climbing." }
   - { direction: north, to: clearing }
+  - { direction: east, blocked: "The rank undergrowth prevents eastward movement." }
+  - { direction: south, blocked: "Storm-tossed trees block your way." }
   - { direction: west, to: forest_1 }
   - { direction: northwest, to: south_of_house }

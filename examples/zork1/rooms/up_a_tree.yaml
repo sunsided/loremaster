@@ -5,3 +5,4 @@ description:
   - "[Up a Tree: the original prints this description from the routine TREE-ROOM. It is not imported yet.]"
 exits:
   - { direction: down, to: path }
+  - { direction: up, blocked: "You cannot climb any higher." }

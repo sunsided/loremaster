@@ -9,3 +9,4 @@ exits:
   - { direction: southwest, to: ew_passage }
   - { direction: up, to: ew_passage }
   - { direction: south, to: ns_passage }
+  - { direction: down, blocked: "Are you out of your mind?" }

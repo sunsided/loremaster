@@ -4,6 +4,8 @@ position: [2, -2]
 description:
   - "The forest thins out, revealing impassable mountains."
 exits:
+  - { direction: up, blocked: "The mountains are impassable." }
   - { direction: north, to: forest_2 }
+  - { direction: east, blocked: "The mountains are impassable." }
   - { direction: south, to: forest_2 }
   - { direction: west, to: forest_2 }

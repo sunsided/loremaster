@@ -7,3 +7,4 @@ description:
 exits:
   - { direction: west, to: loud_room }
   - { direction: east, to: white_cliffs_north }
+  - { direction: south, blocked: "It is too narrow for most insects." }

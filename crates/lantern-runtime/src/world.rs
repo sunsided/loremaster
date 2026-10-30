@@ -323,7 +323,7 @@ fn levels(story: &Story) -> Vec<i32> {
     while let Some(i) = queue.pop_front() {
         let here = level[i].unwrap_or(0);
         for exit in &story.rooms[i].exits {
-            let Some(&j) = index.get(&exit.to) else {
+            let Some(&j) = exit.to.as_ref().and_then(|to| index.get(to)) else {
                 continue;
             };
             if level[j].is_some() {

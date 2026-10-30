@@ -34,6 +34,5 @@ Most of the behaviour of the original is in ZIL routines: the troll and the thie
 
 - Containers. Things in a container are in the room of the container.
 - Scenery in more than one room. The importer puts it in the first room only.
-- Exits that only show a message, such as "The door is boarded".
 - Timers, characters that move on their own, and random events.
 - The score.

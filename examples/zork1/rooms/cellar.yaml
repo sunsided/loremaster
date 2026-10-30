@@ -8,3 +8,4 @@ exits:
   - { direction: north, to: troll_room }
   - { direction: south, to: east_of_chasm }
   - { direction: up, to: living_room, door: trap_door }
+  - { direction: west, blocked: "You try to ascend the ramp, but it is impossible, and you slide back down." }

@@ -5,6 +5,8 @@ position: [6, 6]
 description:
   - "The river is running faster here and the sound ahead appears to be that of rushing water. On the east shore is a sandy beach. A small area of beach can also be seen below the cliffs on the west shore."
 exits:
+  - { direction: up, blocked: "You cannot go upstream due to strong currents." }
   - { direction: down, to: river_5 }
+  - { direction: land, blocked: "You can land either to the east or the west." }
   - { direction: west, to: white_cliffs_south }
   - { direction: east, to: sandy_beach }
