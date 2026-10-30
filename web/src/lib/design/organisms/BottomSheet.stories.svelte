@@ -10,7 +10,7 @@
 			layout: 'fullscreen',
 			docs: {
 				description: {
-					component: `On a phone (below 900px) the Here panel is a bottom sheet.
+					component: `On a phone (below 900px) the side panel is a bottom sheet: "Here" in play mode, "Desk" in write mode.
 
 - It **peeks** with one line: the title and a summary, for example "2 exits · dusk_falls fires in 30 minutes".
 - A tap on the grab bar moves to the next height: peek, half, full, then peek again. A drag up or down opens or closes it.

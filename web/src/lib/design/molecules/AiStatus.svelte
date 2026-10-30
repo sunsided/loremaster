@@ -19,22 +19,17 @@
 		jobs: Job[];
 		/** Files that the AI server reads and that differ from the files of the editor. Null: not checked. */
 		differ?: string[] | null;
-		/** Ask the AI to review the current room. */
-		onreview: () => void;
 		oncancel: (id: string) => void;
 		/** Link the story folder, so that the editor and the AI server use the same files. Leave it out where the browser cannot. */
 		onlink?: () => void;
-		/** Open the proposals. */
-		onproposals: () => void;
+		/** Open the jobs and proposals in the Atlas. Leave it out in the Atlas itself. */
+		onproposals?: () => void;
 		/** Run a job again for another version. The old proposals stay. */
 		onagain?: (id: string) => void;
-		/** The number of findings of the last review of this room. */
-		findings?: number;
-		/** Show the findings: write mode, where they are notes in the margin. */
-		onfindings?: () => void;
 	}
 
-	let { jobs, differ = null, onreview, oncancel, onlink, onproposals, onagain, findings = 0, onfindings }: Props = $props();
+	let { jobs, differ = null, oncancel, onlink, onproposals, onagain }: Props = $props();
+	const cost = $derived(jobs.reduce((sum, j) => sum + (j.cost ?? 0), 0));
 	const names: Record<string, string> = {
 		imagine_exit: 'Draft an exit',
 		review_room: 'Review the room',
@@ -43,8 +38,9 @@
 </script>
 
 <!--
-	The AI part of the Here panel, while `lantern serve` runs: the jobs (what Claude Code does now), a button to
-	review the current room, and a warning when the server reads other files than the editor.
+	The AI jobs of the session, while `lantern serve` runs: what Claude Code does now and did, with the cost,
+	and a warning when the server reads other files than the editor. It shows in the AI tray of the status line
+	and in Atlas › AI. The help for the current room is in the room desk (AiHere).
 -->
 <div class="ai-status">
 	{#if differ && differ.length}
@@ -58,13 +54,6 @@
 			{#if onlink}<Button size="compact" onclick={onlink}>Open the story folder</Button>{/if}
 		</div>
 	{/if}
-	<div class="row">
-		<Button size="compact" onclick={onreview}>✦ Review this room</Button>
-		<Button size="compact" variant="quiet" onclick={onproposals}>Proposals ↗</Button>
-		{#if findings && onfindings}<Button size="compact" variant="quiet" onclick={onfindings}
-				>{findings} {findings === 1 ? 'finding' : 'findings'} ↗</Button
-			>{/if}
-	</div>
 	{#if jobs.length}
 		<ul class="jobs">
 			{#each jobs as j (j.id)}
@@ -85,7 +74,13 @@
 				</li>
 			{/each}
 		</ul>
+	{:else}
+		<p class="muted">No jobs yet. Start one from the room desk in write mode, or from an exit.</p>
 	{/if}
+	<div class="row">
+		{#if cost > 0}<span class="muted">${cost.toFixed(2)} for {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'}</span>{/if}
+		{#if onproposals}<Button size="compact" variant="quiet" onclick={onproposals}>All jobs and proposals ↗</Button>{/if}
+	</div>
 </div>
 
 <style>
@@ -113,7 +108,12 @@
 	.row {
 		display: flex;
 		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
 		gap: var(--space-3);
+	}
+	.muted {
+		color: var(--color-text-muted);
 	}
 	.jobs {
 		display: flex;

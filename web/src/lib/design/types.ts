@@ -238,3 +238,32 @@ export interface ThreadItem {
 	warnings: string[];
 	beats: NoteItem[];
 }
+
+/** A value that the room text depends on, for the switches of the Here panel and the room desk. */
+export interface RoomSwitch {
+	name: string;
+	/** The value in the game now. */
+	value: string;
+	options: string[];
+}
+
+/** A beat of a thread in the current room, for the chips of the room desk. */
+export interface ThreadChip {
+	/** The thread id. */
+	thread: string;
+	/** The thread name. */
+	name: string;
+	/** The role of the beat here. "missing" is a thread with a setup here and no payoff anywhere. */
+	role: 'setup' | 'payoff' | 'mention' | 'missing';
+}
+
+/** What the last explorer run found about the current room. */
+export interface RoomReach {
+	reached: boolean;
+	/** The number of states that the explorer walked. */
+	states: number;
+	/** True when the walk stopped early. */
+	truncated: boolean;
+	/** Fragments of this room that never showed, as "#2". */
+	neverShown: string[];
+}

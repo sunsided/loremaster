@@ -41,6 +41,10 @@
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
 	import HerePanel from '#lib/design/organisms/HerePanel.svelte';
+	import RoomDesk from '#lib/design/organisms/RoomDesk.svelte';
+	import AiHere from '#lib/design/molecules/AiHere.svelte';
+	import StatusTray from '#lib/design/molecules/StatusTray.svelte';
+	import StateSwitches from '#lib/design/molecules/StateSwitches.svelte';
 	import BottomSheet from '#lib/design/organisms/BottomSheet.svelte';
 	import StateSwitch from '#lib/design/atoms/StateSwitch.svelte';
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
@@ -52,7 +56,7 @@
 	import AtlasLayout from '#lib/design/templates/AtlasLayout.svelte';
 	import type { Exploration } from '#lib/engine/types.ts';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
-	import type { GhostLine, MenuItem, PaletteItem, ProposalSummary } from '#lib/design/types.ts';
+	import type { GhostLine, MenuItem, PaletteItem, ProposalSummary, RoomReach, ThreadChip } from '#lib/design/types.ts';
 
 	let workspace: Workspace | undefined = $state();
 	/** Walk in: a proposal played in a sandbox, before the author accepts it. Nothing in it is saved. */
@@ -241,6 +245,29 @@
 		const todos = hereNotes.filter((n) => n.todo && !n.done).length;
 		return hereNotes.length ? `${hereNotes.length}${todos ? ` · ${todos} TODO` : ''}` : 'none';
 	});
+	/** The beats of threads in the current room and its things, for the chips of the room desk. */
+	const threadChips = $derived.by<ThreadChip[]>(() => {
+		const s = session;
+		if (!s) return [];
+		const here = new Set([`room:${s.scene.room}`, ...s.scene.things.map((t) => `thing:${t.id}`)]);
+		const out: ThreadChip[] = [];
+		const seen = new Set<string>();
+		for (const n of allNotes) {
+			const id = n.note.thread;
+			if (!id || !here.has(n.entity)) continue;
+			const t = allThreads.find((x) => x.id === id);
+			const role = n.note.role ?? 'mention';
+			const add = (r: ThreadChip['role']) => {
+				if (seen.has(`${id}:${r}`)) return;
+				seen.add(`${id}:${r}`);
+				out.push({ thread: id, name: t?.name ?? id, role: r });
+			};
+			add(role);
+			// A setup here for an open thread with no payoff anywhere.
+			if (role === 'setup' && t && t.status === 'open' && t.payoffs === 0) add('missing');
+		}
+		return out;
+	});
 
 	/** Change the file of a note. A problem shows as the failure line. */
 	async function editNote(file: string, edit: (text: string) => string) {
@@ -328,7 +355,7 @@
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'proposals'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
 	let atlasRoom = $state<string | null>(null);
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
@@ -338,11 +365,11 @@
 		{ id: 'checks', label: 'Checks' },
 		{ id: 'todos', label: `TODOs ${openTodos.length}` },
 		{ id: 'threads', label: `Threads ${allThreads.length}` },
-		...(ai.reachable ? [{ id: 'proposals', label: `Proposals ${ai.proposals.length}` }] : [])
+		...(ai.reachable ? [{ id: 'ai', label: `AI ${ai.proposals.length}` }] : [])
 	]);
-	// The Proposals tab goes away when the server stops; show the map in its place.
+	// The AI tab goes away when the server stops; show the map in its place.
 	$effect(() => {
-		if (atlasTab === 'proposals' && !ai.reachable) atlasTab = 'map';
+		if (atlasTab === 'ai' && !ai.reachable) atlasTab = 'map';
 	});
 
 	let proposalProblems = $state<Record<string, string>>({});
@@ -411,6 +438,9 @@
 		if (problem) failure = problem;
 	}
 	const runningJob = $derived(aiJobs.find((j) => j.status === 'running'));
+	/** The cost of all jobs of this session, for the AI tray. */
+	const aiCost = $derived(aiJobs.reduce((sum, j) => sum + (j.cost ?? 0), 0));
+	let aiTrayOpen = $state(false);
 
 	// The worlds after the proposals that add or remove rooms and exits: the ghosts on the maps.
 	// A world is built again only when the files of the editor change.
@@ -497,6 +527,14 @@
 		if (!s || sandbox) return [];
 		const job = ai.jobs.findLast((j) => j.task === 'review_room' && j.status === 'done' && j.args.room === s.scene.room && j.result);
 		return job ? parseFindings(job.id, job.result ?? '').filter((f) => !dismissed.has(f.key)) : [];
+	});
+
+	/** The number of open proposals that change the current room: its text, or its rooms and exits on the map. */
+	const proposalsHere = $derived.by(() => {
+		const s = session;
+		if (!s) return 0;
+		const owner = `room:${s.scene.room}`;
+		return ai.proposals.filter((v) => v.changes.some((c) => (c.kind === 'fragment' ? c.owner : c.entity) === owner)).length;
 	});
 
 	/** The ghost lines of the proposals that change the text of the current room. */
@@ -1049,6 +1087,8 @@
 			const notes = allNotes.filter((n) => n.entity === owner && n.at.startsWith(`description[${f.index}].notes[`));
 			if (notes.length) parts.push(`✎ ${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`);
 			for (const n of notes) if (n.note.thread) parts.push(`${n.note.role ?? 'beat'} of ${n.note.thread}`);
+			if (exploration?.never_shown.some((x) => x.startsWith(`${owner}#${f.index + 1}:`)))
+				parts.push(`▲ never shows in ${exploration.states} explored states`);
 			return parts.join(' · ');
 		};
 		return {
@@ -1087,10 +1127,31 @@
 			texts: new Set(m.cells.map((c) => c.text)).size
 		};
 	});
-	/** The line of the bottom sheet on phones: exits, and the next rule that matters. */
+	/** What the last explorer run found about the current room, for the room desk. */
+	const roomReach = $derived.by<RoomReach | null>(() => {
+		const s = session;
+		const e = exploration;
+		if (!s || !e) return null;
+		const owner = `room:${s.scene.room}`;
+		return {
+			reached: e.rooms.find((r) => r.id === s.scene.room)?.reached ?? false,
+			states: e.states,
+			truncated: e.truncated,
+			neverShown: e.never_shown.filter((x) => x.startsWith(`${owner}#`)).map((x) => x.slice(owner.length, x.indexOf(':', owner.length)))
+		};
+	});
+	/** The line of the bottom sheet on phones. Play: exits, and the next rule that matters. Write: notes, TODOs and findings. */
 	const sheetSummary = $derived.by(() => {
 		const s = session;
 		if (!s) return '';
+		if (writing) {
+			const todos = hereNotes.filter((n) => n.todo && !n.done).length;
+			const parts = [`${hereNotes.length} ${hereNotes.length === 1 ? 'note' : 'notes'}`];
+			if (todos) parts.push(`${todos} TODO`);
+			if (reviewFindings.length) parts.push(`${reviewFindings.length} ${reviewFindings.length === 1 ? 'finding' : 'findings'}`);
+			if (Object.keys(previewValues).length) parts.unshift('PREVIEW');
+			return parts.join(' · ');
+		}
 		const parts = [`${s.scene.exits.length} ${s.scene.exits.length === 1 ? 'exit' : 'exits'}`];
 		const rule = s.rules.find((r) => r.relevant);
 		if (rule) parts.push(`${rule.id} ${rule.relevant}`);
@@ -1181,19 +1242,84 @@
 {#snippet aiSection()}
 	{#if session}
 		{@const s = session}
-		<AiStatus
-			jobs={aiJobs}
-			differ={aiDiffers ? (ai.sync?.differ ?? []) : null}
+		{@const review = aiJobs.find((j) => j.status === 'running' && j.task === 'review_room' && j.about === s.scene.room)}
+		<AiHere
 			onreview={() => aiJob('review_room', { room: s.scene.room })}
-			oncancel={(id) => ai.cancelJob(id)}
-			onlink={canLinkFolder() ? () => fileAction(() => workspace!.linkFolder()) : undefined}
-			onproposals={() => openAtlas('proposals')}
-			onagain={seedAgain}
+			reviewing={review ? review.seconds : null}
 			findings={reviewFindings.length}
-			onfindings={() => {
-				if (!writing) toggleWriting();
-			}}
+			proposals={proposalsHere}
+			onproposals={() => openAtlas('ai')}
 		/>
+	{/if}
+{/snippet}
+
+{#snippet aiJobsList(inAtlas: boolean)}
+	<AiStatus
+		jobs={aiJobs}
+		differ={aiDiffers ? (ai.sync?.differ ?? []) : null}
+		oncancel={(id) => ai.cancelJob(id)}
+		onlink={canLinkFolder() ? () => fileAction(() => workspace!.linkFolder()) : undefined}
+		onproposals={inAtlas
+			? undefined
+			: () => {
+					aiTrayOpen = false;
+					openAtlas('ai');
+				}}
+		onagain={seedAgain}
+	/>
+{/snippet}
+
+{#snippet sidePanel(phone: boolean)}
+	{#if session}
+		{@const s = session}
+		{@const onapply = () => {
+			s.author({ type: 'situation', room: s.scene.room, values: Object.entries(previewValues) });
+			previewValues = {};
+		}}
+		{#if writing && !sandbox}
+			<RoomDesk
+				room={s.scene.room_name}
+				file={workspace?.project.origins[`room:${s.scene.room}`] ?? null}
+				level={new Set(s.map.rooms.map((r) => r.level)).size > 1 ? (s.map.rooms.find((r) => r.current)?.level ?? null) : null}
+				reach={roomReach}
+				onexplore={() => {
+					if (!exploration) runExplorer();
+					else openAtlas('checks');
+				}}
+				switches={hereStates.switches}
+				texts={hereStates.texts}
+				preview={previewValues}
+				onpreview={setPreview}
+				onreset={() => (previewValues = {})}
+				{onapply}
+				notes={notesSection}
+				notesMeta={hereNotesMeta}
+				threads={threadChips}
+				onthread={() => openAtlas('threads')}
+				ai={ai.reachable ? aiSection : undefined}
+				rules={s.rules.filter((r) => r.relevant)}
+				ruleCount={s.rules.length}
+				onrule={showRule}
+				map={ultrawide ? null : hereMap}
+				onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
+				tabs={phone}
+			/>
+		{:else}
+			<HerePanel
+				map={ultrawide ? null : hereMap}
+				switches={hereStates.switches}
+				texts={hereStates.texts}
+				preview={previewValues}
+				rules={s.rules.filter((r) => r.relevant)}
+				ruleCount={s.rules.length}
+				last={s.history.at(-1) ?? null}
+				onpreview={setPreview}
+				onreset={() => (previewValues = {})}
+				{onapply}
+				onrule={showRule}
+				onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
+			/>
+		{/if}
 	{/if}
 {/snippet}
 
@@ -1204,17 +1330,7 @@
 			<!-- The room stays pinned while the author writes: a value change shows in the fragment in the game text. -->
 			<section class="pinned" aria-label="{session.scene.room_name}, pinned">
 				<p class="pinned-head"><span>{session.scene.room_name}</span><span class="muted">pinned</span></p>
-				<div class="pinned-switches">
-					{#each hereStates.switches as sw (sw.name)}
-						<StateSwitch
-							name={sw.name}
-							value={previewValues[sw.name] ?? sw.value}
-							options={sw.options.includes(sw.value) ? sw.options : [sw.value, ...sw.options]}
-							changed={sw.name in previewValues}
-							onchange={(v) => setPreview(sw.name, v)}
-						/>
-					{/each}
-				</div>
+				<StateSwitches switches={hereStates.switches} preview={previewValues} onpreview={setPreview} hint={false} />
 			</section>
 		{/if}
 		{#key draftKey}
@@ -1337,8 +1453,11 @@
 							onexplore={runExplorer}
 						/>
 					</section>
-				{:else if atlasTab === 'proposals'}
-					<section class="proposals-view" aria-label="Proposals">
+				{:else if atlasTab === 'ai'}
+					<section class="proposals-view" aria-label="AI jobs and proposals">
+						<h2 class="view-head">Jobs</h2>
+						{@render aiJobsList(true)}
+						<h2 class="view-head">Proposals</h2>
 						{#each proposalSummaries as p (p.id)}
 							<ProposalCard
 								proposal={p}
@@ -1449,11 +1568,21 @@
 					{#if openTodos.length}<button type="button" class="job-chip" onclick={() => openAtlas('todos')}
 							>{openTodos.length} TODO</button
 						>{/if}
-					{#if runningJob}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
-							>✦ {runningJob.task === 'review_room' ? 'reviewing' : 'drafting'}… {runningJob.seconds} s</button
-						>{:else if ai.reachable && ai.proposals.length}<button type="button" class="job-chip" onclick={() => openAtlas('proposals')}
-							>✦ {ai.proposals.length} {ai.proposals.length === 1 ? 'proposal' : 'proposals'}</button
-						>{/if}
+					{#if ai.reachable && !sandbox}
+						<StatusTray
+							bind:open={aiTrayOpen}
+							hint="Show the AI jobs."
+							title="AI · lantern serve"
+							meta={aiCost > 0 ? `$${aiCost.toFixed(2)}` : undefined}
+						>
+							{#snippet chip()}✦ {runningJob
+									? `${runningJob.task === 'review_room' ? 'reviewing' : 'drafting'}… ${runningJob.seconds} s`
+									: ai.proposals.length
+										? `${ai.proposals.length} ${ai.proposals.length === 1 ? 'proposal' : 'proposals'}`
+										: 'AI'}{aiDiffers ? ' ▲' : ''}{/snippet}
+							{@render aiJobsList(false)}
+						</StatusTray>
+					{/if}
 					{#if Object.keys(previewValues).length}<span class="preview-mark"
 							>PREVIEW · {Object.values(previewValues).join(', ')}</span
 						>{/if}
@@ -1582,56 +1711,10 @@
 			{#if sideBySide && draft && writingAt && writingAt.fragment >= -1}
 				<div class="side-writer">{@render fragmentWriterView()}</div>
 			{:else if sideBySide}
-				<HerePanel
-					map={hereMap}
-					switches={hereStates.switches}
-					texts={hereStates.texts}
-					preview={previewValues}
-					rules={s.rules.filter((r) => r.relevant)}
-					ruleCount={s.rules.length}
-					last={s.history.at(-1) ?? null}
-					things={s.scene.things}
-					exits={s.scene.exits}
-					onpreview={setPreview}
-					onreset={() => (previewValues = {})}
-					onapply={() => {
-						s.author({ type: 'situation', room: s.scene.room, values: Object.entries(previewValues) });
-						previewValues = {};
-					}}
-					onrule={showRule}
-					onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
-					onthing={(id, name) => s.pickThing(id, name)}
-					onexit={(dir) => s.pickExit(dir)}
-					ai={ai.reachable && !sandbox ? aiSection : undefined}
-					notes={notesSection}
-					notesMeta={hereNotesMeta}
-				/>
+				{@render sidePanel(false)}
 			{:else}
-				<BottomSheet title="Here" summary={sheetSummary}>
-					<HerePanel
-						map={hereMap}
-						switches={hereStates.switches}
-						texts={hereStates.texts}
-						preview={previewValues}
-						rules={s.rules.filter((r) => r.relevant)}
-						ruleCount={s.rules.length}
-						last={s.history.at(-1) ?? null}
-						things={s.scene.things}
-						exits={s.scene.exits}
-						onpreview={setPreview}
-						onreset={() => (previewValues = {})}
-						onapply={() => {
-							s.author({ type: 'situation', room: s.scene.room, values: Object.entries(previewValues) });
-							previewValues = {};
-						}}
-						onrule={showRule}
-						onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
-						onthing={(id, name) => s.pickThing(id, name)}
-						onexit={(dir) => s.pickExit(dir)}
-						ai={ai.reachable && !sandbox ? aiSection : undefined}
-					notes={notesSection}
-					notesMeta={hereNotesMeta}
-					/>
+				<BottomSheet title={writing ? 'Desk' : 'Here'} summary={sheetSummary}>
+					{@render sidePanel(true)}
 				</BottomSheet>
 			{/if}
 		{/snippet}
@@ -1717,11 +1800,6 @@
 	.pinned-head .muted {
 		color: var(--color-text-muted);
 	}
-	.pinned-switches {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-2);
-	}
 	.job-chip {
 		min-height: 1.6em;
 		padding: 0 var(--space-3);
@@ -1746,6 +1824,19 @@
 		grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
 		gap: var(--space-4);
 		padding: var(--space-5) var(--space-6);
+	}
+	.proposals-view > .view-head,
+	.proposals-view > :global(.ai-status) {
+		grid-column: 1 / -1;
+		max-width: 48rem;
+	}
+	.view-head {
+		margin: 0;
+		color: var(--color-text-strong);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-xs);
+		letter-spacing: var(--letter-spacing-caps);
+		text-transform: uppercase;
 	}
 	.muted-line {
 		color: var(--color-text-muted);

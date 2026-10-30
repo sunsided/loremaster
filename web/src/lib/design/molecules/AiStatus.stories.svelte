@@ -12,16 +12,19 @@
 		title: 'Molecules/AiStatus',
 		component: AiStatus,
 		tags: ['autodocs'],
-		args: { jobs, differ: null, onreview: fn(), oncancel: fn(), onlink: fn(), onproposals: fn(), onagain: fn() },
+		args: { jobs, differ: null, oncancel: fn(), onlink: fn(), onproposals: fn(), onagain: fn() },
 		parameters: {
 			docs: {
 				description: {
-					component: `The AI section of the Here panel. It shows only while \`lantern serve\` runs.
+					component: `The AI jobs of the session. It shows only while \`lantern serve\` runs. It is the content of the AI tray of the status line (StatusTray), and it is at the top of Atlas › AI.
 
-- **Review this room** starts the job \`review_room\` for the current room. The job plays from the state of the editor.
 - **The jobs**: what Claude Code does now ("Draft an exit", "Review the room", "Draft the first rooms"), what for, the time, the proposals it made and the cost. A running job has Cancel.
+- **The cost**: the sum of the cost of all jobs of the session.
 - **Another take**: the draft of a new story can run again while its proposal is open. The button shows the cost of the last job, so that the author decides.
-- **A warning** when the server reads other files than the editor (the editor keeps a working copy in the browser; the server reads the folder on disk). Proposals for those files cannot be accepted. "Open the story folder" links the folder, so both use the same files.`
+- **A warning** when the server reads other files than the editor (the editor keeps a working copy in the browser; the server reads the folder on disk). Proposals for those files cannot be accepted. "Open the story folder" links the folder, so both use the same files.
+- **All jobs and proposals ↗** opens Atlas › AI. Leave out \`onproposals\` in the Atlas itself.
+
+The help for the current room ("Review this room", findings, proposals here) is in the room desk (AiHere).`
 				}
 			}
 		}
@@ -46,5 +49,5 @@
 		]
 	}}
 />
-<Story name="With review findings" args={{ findings: 3, onfindings: fn() }} />
+<Story name="No jobs yet" args={{ jobs: [] }} />
 <Story name="Files differ" args={{ jobs: [], differ: ['rooms/shore.yaml'] }} />

@@ -86,6 +86,7 @@
 
 	/* Layers */
 	--z-content: 1;
+	--z-status: 2; /* The status line: over the player text, so that its menus and trays cover the text. */
 	--z-texture: 2;
 	--z-scanlines: 3;
 	--z-vignette: 4;
