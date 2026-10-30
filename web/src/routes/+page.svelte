@@ -434,7 +434,12 @@
 						// A proposal that does not build has no ghosts; its card shows the problems.
 					}
 			}
-			if (!current) return;
+			if (!current) {
+				for (const [id, g] of games) if (!old.has(id)) g.free();
+				return;
+			}
+			// The worlds of proposals that went, or of older files, are not needed any more.
+			for (const [id, g] of builtFor.games) if (games.get(id) !== g) g.free();
 			builtFor = { files, games };
 			proposalGames = games;
 		})();
