@@ -29,6 +29,8 @@ export class FragmentDraft {
 	target = $state<{ view: 'prose' | 'source'; from: number; to: number; n: number } | null>(null);
 	/** Changes when Ctrl+. asks for the selection toolbar. */
 	toolsFocus = $state(0);
+	/** Show the text with its markup in the fragment panel (Ctrl+/). */
+	showMarkup = $state(false);
 
 	constructor(fragment: WriterFragment, variant = 0) {
 		this.variants = [...fragment.variants];

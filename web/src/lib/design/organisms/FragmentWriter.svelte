@@ -3,6 +3,7 @@
 	import Button from '../atoms/Button.svelte';
 	import Checkbox from '../atoms/Checkbox.svelte';
 	import Select from '../atoms/Select.svelte';
+	import RadioGroup from '../molecules/RadioGroup.svelte';
 	import Tag from '../atoms/Tag.svelte';
 	import MarkupEditor from '../molecules/MarkupEditor.svelte';
 	import SelectionTools from '../molecules/SelectionTools.svelte';
@@ -35,6 +36,11 @@
 		draft?: FragmentDraft;
 		/** "Make it a thing" for selected words. When set, the selection toolbar offers it. */
 		onthing?: (name: string) => void;
+		/**
+		 * True when the text is edited in the game text (a prose view with the same draft). Then the writer is a
+		 * slim fragment panel: properties, and how the text reads in other states. The markup is one key away.
+		 */
+		prose?: boolean;
 	}
 
 	let {
@@ -49,8 +55,11 @@
 		kind = 'fragment',
 		oncreate,
 		draft: given,
-		onthing
+		onthing,
+		prose = false
 	}: Props = $props();
+
+
 
 	// The draft starts as a copy of the fragment and is not changed from outside.
 	const draft = untrack(() => given ?? new FragmentDraft($state.snapshot(fragment), variant));
@@ -130,9 +139,9 @@
 	}
 
 	/** The text in each combination of the values that it depends on, one entry for each different text. */
-	let showOther = $state(false);
+	let showOther = $state(untrack(() => prose));
 	const other = $derived.by(() => {
-		if (!showOther || check.problem || condition.problem || !tools.textMatrix) return null;
+		if (!(showOther || prose) || check.problem || condition.problem || !tools.textMatrix) return null;
 		const m = tools.textMatrix(text, draft.when.trim() || null);
 		if (!m) return null;
 		const groups = new Map<string, string[][]>();
@@ -153,6 +162,23 @@
 		};
 	});
 
+	/**
+	 * The part of a text that differs from the text now, with "…" for the rest: for the slim panel, where the
+	 * game text already shows the whole text. The cut is at word boundaries.
+	 */
+	function difference(other: string, now: string): string {
+		if (!prose || !now || other === now) return other;
+		let a = 0;
+		while (a < other.length && a < now.length && other[a] === now[a]) a++;
+		let b = 0;
+		while (b < other.length - a && b < now.length - a && other[other.length - 1 - b] === now[now.length - 1 - b]) b++;
+		let start = other.lastIndexOf(' ', a - 1) + 1;
+		let end = other.indexOf(' ', other.length - b);
+		if (end < 0) end = other.length;
+		start = Math.max(0, start);
+		return `${start > 0 ? '…' : ''}${other.slice(start, end).trim()}${end < other.length ? '…' : ''}`;
+	}
+
 	/** `*word*` in story text is emphasis. */
 	function emphasis(text: string): { text: string; em: boolean }[] {
 		return text.split('*').map((t, i) => ({ text: t, em: i % 2 === 1 }));
@@ -160,7 +186,8 @@
 
 	let section: HTMLElement | undefined = $state();
 	$effect(() => {
-		section?.scrollIntoView({ block: 'nearest' });
+		// With a prose view the author types in the game text, so the panel does not scroll the page.
+		if (!prose) section?.scrollIntoView({ block: 'nearest' });
 	});
 
 	/** Save the draft. The prose view in the game text calls it on Enter too. */
@@ -186,7 +213,11 @@
 		<h2 id="{id}-title">{title}</h2>
 		{#if kind === 'fragment'}
 			<Select label="Layer" bind:value={draft.layer} options={layers} />
-			<Select label="Shows" bind:value={draft.mode} options={modes} />
+			{#if prose}
+				<RadioGroup legend="Shows" name="{id}-mode" look="pills" options={modes} bind:value={draft.mode} />
+			{:else}
+				<Select label="Shows" bind:value={draft.mode} options={modes} />
+			{/if}
 			<Checkbox bind:checked={draft.replaces}>replaces earlier text in its layer</Checkbox>
 		{/if}
 	</div>
@@ -231,8 +262,15 @@
 		</div>
 	{/if}
 
+	{#if prose}
+		<div class="markup-toggle">
+			<Button size="compact" variant="quiet" pressed={draft.showMarkup} aria-keyshortcuts="Control+/" onclick={() => (draft.showMarkup = !draft.showMarkup)}
+				>&lt;/&gt; {draft.showMarkup ? 'Hide' : 'Show'} markup</Button
+			>
+		</div>
+	{/if}
 	{#key draft.current}
-		<div class="text">
+		<div class="text" hidden={prose && !draft.showMarkup}>
 		<MarkupEditor
 			bind:value={draft.variants[draft.current]}
 			label="Text, with markup{draft.variants.length > 1 ? `, variant ${draft.current + 1}` : ''}"
@@ -260,7 +298,7 @@
 						>Create thing {textNew.id}</Button
 					>{/if}
 			</p>
-		{:else if text.trim()}
+		{:else if text.trim() && !prose}
 			<p><span class="label">Now it reads</span> {#each emphasis(check.text) as p, i (i)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</p>
 		{/if}
 		{#if saveProblem}<p class="problem" role="alert">{saveProblem}</p>{/if}
@@ -268,7 +306,7 @@
 
 	{#if tools.textMatrix}
 		<details class="other" bind:open={showOther}>
-			<summary>Other values: how this text reads in other states</summary>
+			<summary>Reads in other states</summary>
 			{#if other}
 				{#if other.names.length === 0}
 					<p class="muted">The text does not depend on a value. It always reads the same.</p>
@@ -284,7 +322,7 @@
 						{#each other.groups as g, i (i)}
 							<li>
 								<span class="muted">{g.when.length ? `When ${g.when.join(', ')}` : `In ${g.count} combinations`}:</span>
-								{#if g.text}{#each emphasis(g.text) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}{:else}<span
+								{#if g.text}{#each emphasis(difference(g.text, check.text)) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}{:else}<span
 										class="muted">(does not show)</span
 									>{/if}
 							</li>
@@ -357,6 +395,9 @@
 	}
 	.text {
 		font-size: var(--font-size-prose);
+	}
+	.text[hidden] {
+		display: none;
 	}
 	.reads {
 		font-size: var(--font-size-prose);

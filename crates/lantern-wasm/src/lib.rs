@@ -243,6 +243,21 @@ impl Engine {
         to_js(&utf16_error(text, self.game.try_markup(text)))
     }
 
+    /// Check fragment text and render it as it would read in other values. Error offsets are UTF-16.
+    #[wasm_bindgen(js_name = tryMarkupIn)]
+    pub fn try_markup_in(
+        &self,
+        room: &str,
+        values: JsValue,
+        text: &str,
+    ) -> Result<JsValue, JsValue> {
+        let values: Vec<(String, String)> = from_js(values)?;
+        to_js(&utf16_error(
+            text,
+            self.game.try_markup_situation(room, &values, text),
+        ))
+    }
+
     /// Check a condition and tell whether it holds now. Error offsets are UTF-16.
     #[wasm_bindgen(js_name = tryCondition)]
     pub fn try_condition(&self, text: &str) -> Result<JsValue, JsValue> {

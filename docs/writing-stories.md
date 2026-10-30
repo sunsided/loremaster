@@ -209,7 +209,7 @@ You can change the story while you play it. The game keeps its state after each 
 1. Select "Write" in the header, or push Ctrl+E (Cmd+E on a Mac). The shortcut also works while you type.
 2. In the newest room text, select a fragment. It opens for editing in place, and it still reads as the player reads it.
 3. Type in the game text. Markup shows as a chip with the text that it gives now; select a chip to see and change its markup.
-4. The writer has the same text with all its markup, and the condition ("When"), the layer, the mode and the variants. On a screen from 900px wide, the writer is next to the game text. On a narrow screen, it is under the paragraph. You can type in both places: they show the same text.
+4. The fragment panel has the properties: the mode ("Shows"), the condition ("When"), the layer and the variants. "Reads in other states" shows how the text reads in other values. "</> Show markup" (Ctrl+/) shows the text with all its markup; you can type in both places. On a screen from 900px wide, the panel is next to the game text, with the room pinned on top: change a value there to see the fragment in the game text in that value. On a narrow screen, the panel is under the paragraph.
 5. Push Enter to save. Push Shift+Enter for a line break. Push Escape to cancel.
 
 ### Type first, tune later

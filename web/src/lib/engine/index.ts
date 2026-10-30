@@ -159,6 +159,11 @@ export class Game {
 		return this.#engine.tryMarkup(text);
 	}
 
+	/** Check fragment text and render it as it would read in other values. It does not change the game. */
+	tryMarkupIn(room: string, values: [string, string][], text: string): MarkupCheck {
+		return this.#engine.tryMarkupIn(room, values, text);
+	}
+
 	/** Check a condition and tell whether it holds now. */
 	tryCondition(text: string): MarkupCheck {
 		return this.#engine.tryCondition(text);

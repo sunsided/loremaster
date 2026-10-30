@@ -26,6 +26,7 @@
 	import VerbBar from '#lib/design/organisms/VerbBar.svelte';
 	import PlayerLayout from '#lib/design/templates/PlayerLayout.svelte';
 	import HerePanel from '#lib/design/organisms/HerePanel.svelte';
+	import StateSwitch from '#lib/design/atoms/StateSwitch.svelte';
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
@@ -297,7 +298,8 @@
 			textMatrix: (text, when) => game.textMatrix(text, when),
 			tokenize: (text, condition) => game.tokens(text, condition) as ReturnType<WriterTools['tokenize']>,
 			tryMarkup: (text) => {
-				const c = game.tryMarkup(text);
+				const values = Object.entries(previewValues);
+				const c = values.length ? game.tryMarkupIn(s.scene.room, values, text) : game.tryMarkup(text);
 				return { problem: problem(c.error), text: c.text, pieces: c.pieces };
 			},
 			tryCondition: (text) => {
@@ -332,7 +334,9 @@
 
 	/** How a piece of markup reads now, for the chips in the prose view. */
 	function renderMarkup(markup: string): string | null {
-		const c = session?.game.tryMarkup(markup);
+		const s = session;
+		const values = Object.entries(previewValues);
+		const c = s && values.length ? s.game.tryMarkupIn(s.scene.room, values, markup) : s?.game.tryMarkup(markup);
 		return !c || c.error ? null : c.text;
 	}
 
@@ -562,7 +566,7 @@
 	/** The values that the room text depends on, with the values now. */
 	const hereStates = $derived.by(() => {
 		const s = session;
-		if (!s || inspector !== 'here') return { switches: [], texts: 0 };
+		if (!s || (inspector !== 'here' && !writing)) return { switches: [], texts: 0 };
 		s.entries.length;
 		const m = s.game.roomMatrix(s.scene.room);
 		if (!m) return { switches: [], texts: 0 };
@@ -580,10 +584,19 @@
 		session?.scene.room;
 		previewValues = {};
 	});
+	function setPreview(name: string, value: string) {
+		const current = hereStates.switches.find((w) => w.name === name)?.value;
+		const next = { ...previewValues };
+		if (value === current) delete next[name];
+		else next[name] = value;
+		previewValues = next;
+	}
+
+	/** The preview of the room text. While the author writes, the fragment in the game text shows the preview instead. */
 	const previewTurn = $derived.by(() => {
 		const s = session;
 		const entries = Object.entries(previewValues);
-		return s && entries.length ? s.game.previewSituation(s.scene.room, entries) : null;
+		return s && entries.length && !writing ? s.game.previewSituation(s.scene.room, entries) : null;
 	});
 
 	function runExplorer() {
@@ -641,8 +654,25 @@
 </svelte:head>
 
 {#snippet fragmentWriterView()}
-	{#if writingAt && writingAt.fragment >= -1 && writerFragment && writerTools && draft}
+	{#if writingAt && writingAt.fragment >= -1 && writerFragment && writerTools && draft && session}
 		{@const at = writingAt}
+		{#if hereStates.switches.length}
+			<!-- The room stays pinned while the author writes: a value change shows in the fragment in the game text. -->
+			<section class="pinned" aria-label="{session.scene.room_name}, pinned">
+				<p class="pinned-head"><span>{session.scene.room_name}</span><span class="muted">pinned</span></p>
+				<div class="pinned-switches">
+					{#each hereStates.switches as sw (sw.name)}
+						<StateSwitch
+							name={sw.name}
+							value={previewValues[sw.name] ?? sw.value}
+							options={sw.options.includes(sw.value) ? sw.options : [sw.value, ...sw.options]}
+							changed={sw.name in previewValues}
+							onchange={(v) => setPreview(sw.name, v)}
+						/>
+					{/each}
+				</div>
+			</section>
+		{/if}
 		{#key draftKey}
 			<FragmentWriter
 				bind:this={fragmentWriter}
@@ -660,6 +690,7 @@
 				onremove={() => saveFragment(at, (text, list) => removeFragment(text, list, at.fragment))}
 				oncreate={createNamed}
 				onthing={makeThing}
+				prose
 			/>
 		{/key}
 	{/if}
@@ -759,12 +790,14 @@
 								bind:value={d.variants[d.current]}
 								label="{writingAt ? writerTitle(writingAt) : 'Text'}, as the player reads it"
 								render={renderMarkup}
+								stamp={`${JSON.stringify(previewValues)}#${s.entries.length}`}
 								placeholder="Write what the player reads…"
 								onsubmit={() => fragmentWriter?.save()}
 								oncancel={closeWriter}
 								onselection={(from, to, rect) =>
 									(d.selection = rect && !inMarkup(d.text, from, to) ? { view: 'prose', from, to, rect } : null)}
 								ontools={() => d.toolsFocus++}
+								onmarkup={() => (d.showMarkup = !d.showMarkup)}
 								target={d.target?.view === 'prose' ? d.target : null}
 								autofocus
 							/>
@@ -817,13 +850,7 @@
 					last={s.history.at(-1) ?? null}
 					things={s.scene.things}
 					exits={s.scene.exits}
-					onpreview={(name, value) => {
-						const current = hereStates.switches.find((w) => w.name === name)?.value;
-						const next = { ...previewValues };
-						if (value === current) delete next[name];
-						else next[name] = value;
-						previewValues = next;
-					}}
+					onpreview={setPreview}
 					onreset={() => (previewValues = {})}
 					onapply={() => {
 						s.author({ type: 'situation', room: s.scene.room, values: Object.entries(previewValues) });
@@ -921,6 +948,33 @@
 		padding: var(--space-9);
 	}
 	/* The writer next to the game text, in the place of the inspector. */
+	.pinned {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		margin-bottom: var(--space-4);
+		padding: var(--space-3) var(--space-4);
+		border: var(--size-border) solid var(--color-border-subtle);
+		background: var(--color-surface-control);
+		font-family: var(--font-ui);
+	}
+	.pinned-head {
+		display: flex;
+		justify-content: space-between;
+		margin: 0 0 var(--space-2);
+		font-size: var(--font-size-xs);
+		text-transform: uppercase;
+		letter-spacing: var(--letter-spacing-caps);
+		color: var(--color-text-strong);
+	}
+	.pinned-head .muted {
+		color: var(--color-text-muted);
+	}
+	.pinned-switches {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
 	.full-view {
 		position: relative;
 		box-sizing: border-box;

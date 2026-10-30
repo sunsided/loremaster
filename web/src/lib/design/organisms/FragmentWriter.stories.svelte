@@ -39,6 +39,8 @@ With \`oncreate\`, an unknown name in the text gets a "Create thing …" button,
 
 **Two views, one draft.** Give the writer a \`draft\` (a \`FragmentDraft\`) and give the same draft to a ProseEditor in the game text: both views edit one text. In the app, on screens from 900px, the writer sits next to the game text in place of the inspector, and the author types in the game text or in the writer. On narrow screens the writer shows under the paragraph.
 
+**Fragment panel.** With \`prose\`, the text is edited in the game text, so the writer is a slim panel: the properties (the mode as pills), "Reads in other states" (open, with only the part of each text that differs from the text now), and the actions. "</> Show markup" (Ctrl+/ in the game text) shows the text with its markup. The panel does not scroll the page when it opens. In the app, the room is pinned above the panel: its value switches show a preview in the fragment in the game text.
+
 **Type first, tune later.** Selected text in either view gets the selection toolbar (SelectionTools): use the name, make it a thing (\`onthing\`), only the first time, only when, make variants.
 
 The writer uses the interface font for its controls and the prose font for the text, so the text looks as it does in the game.`
@@ -49,6 +51,7 @@ The writer uses the interface font for its controls and the prose font for the t
 </script>
 
 <Story name="Room text" />
+<Story name="Fragment panel, next to the game text" args={{ prose: true }} />
 <Story name="Variants and a condition" args={{ fragment: waveFragment, variant: 1, title: 'Room text of The Shore, fragment 3' }} />
 <Story
 	name="New fragment"

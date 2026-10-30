@@ -17,6 +17,10 @@
 		onselection?: (from: number, to: number, rect: { left: number; top: number; bottom: number } | null) => void;
 		/** Ctrl+. : open the tools for the selection. */
 		ontools?: () => void;
+		/** Ctrl+/ : show or hide the markup in the fragment panel. */
+		onmarkup?: () => void;
+		/** Change it to render the chips again, for example when the values of a preview change. */
+		stamp?: unknown;
 		/** A cursor or selection to take; it applies when `n` changes. */
 		target?: { from: number; to: number; n: number } | null;
 		autofocus?: boolean;
@@ -32,6 +36,8 @@
 		oncancel,
 		onselection,
 		ontools,
+		onmarkup,
+		stamp,
 		target = null,
 		autofocus = false,
 		describedby
@@ -153,6 +159,13 @@
 						return true;
 					}
 				},
+				{
+					key: 'Mod-/',
+					run: () => {
+						onmarkup?.();
+						return !!onmarkup;
+					}
+				},
 				...historyKeymap,
 				...defaultKeymap
 			]),
@@ -200,6 +213,7 @@
 		}
 		// The chips read the state of the game: render them again when it changes.
 		render;
+		stamp;
 		view?.dispatch({ effects: refresh.of(null) });
 	});
 

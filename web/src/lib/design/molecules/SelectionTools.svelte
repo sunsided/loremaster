@@ -6,7 +6,7 @@
 	}
 
 	interface Props {
-		/** The screen rectangle of the selection. The toolbar shows above it, or under it near the top. */
+		/** The screen rectangle of the selection. The toolbar shows under it, or above it near the bottom of the window. */
 		rect: { left: number; top: number; bottom: number };
 		actions: Action[];
 		/** Escape: close the toolbar and go back to the text. */
@@ -24,7 +24,8 @@
 	}
 	let bar: HTMLElement | undefined = $state();
 
-	const top = $derived(rect.top > 56 ? rect.top - 44 : rect.bottom + 8);
+	// Under the selection, so the selected words and the lines above them stay visible. Above it near the bottom.
+	const top = $derived(typeof window !== 'undefined' && rect.bottom + 52 > window.innerHeight ? rect.top - 44 : rect.bottom + 8);
 	const left = $derived(Math.max(8, Math.min(rect.left, (typeof window === 'undefined' ? 1200 : window.innerWidth) - 360)));
 
 	$effect(() => {

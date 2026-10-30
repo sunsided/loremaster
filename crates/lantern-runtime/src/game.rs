@@ -645,6 +645,18 @@ impl Game {
         crate::matrix::apply_cell(&mut copy, room, values).then(|| copy.describe_preview())
     }
 
+    /// Check fragment text and render it as it would read in other values, without changing the game.
+    pub fn try_markup_situation(
+        &self,
+        room: &str,
+        values: &[(String, String)],
+        src: &str,
+    ) -> MarkupCheck {
+        let mut copy = self.clone();
+        crate::matrix::apply_cell(&mut copy, room, values);
+        copy.try_markup(src)
+    }
+
     /// The room description as it would show now, without changing the game.
     pub fn describe_preview(&self) -> Turn {
         let mut copy = self.clone();
