@@ -16,13 +16,14 @@ export default defineConfig({
 			paths: { base },
 			// Prerendered pages get the policy as a meta tag. The app talks only to its own origin, to
 			// `lantern serve` on this computer and to the Anthropic API. WASM needs 'wasm-unsafe-eval'.
+			// The fonts are self-hosted (src/lib/design/tokens/fonts.css); Vite inlines the small ones as data URLs.
 			csp: {
 				mode: 'hash',
 				directives: {
 					'default-src': ['self'],
 					'script-src': ['self', 'wasm-unsafe-eval'],
-					'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
-					'font-src': ['self', 'https://fonts.gstatic.com'],
+					'style-src': ['self', 'unsafe-inline'],
+					'font-src': ['self', 'data:'],
 					'img-src': ['self', 'data:', 'blob:'],
 					'connect-src': ['self', 'http://127.0.0.1:4710', 'https://api.anthropic.com'],
 					'worker-src': ['self', 'blob:'],
