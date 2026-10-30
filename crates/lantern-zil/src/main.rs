@@ -45,7 +45,10 @@ fn run(zil: &Path, project: &Path) -> std::io::Result<()> {
     let mut rules = String::new();
     if let Ok(entries) = fs::read_dir(project.join("rules")) {
         for entry in entries.filter_map(Result::ok) {
-            rules.push_str(&fs::read_to_string(entry.path()).unwrap_or_default());
+            let path = entry.path();
+            if path.extension().is_some_and(|x| x == "yaml" || x == "yml") {
+                rules.push_str(&fs::read_to_string(&path)?);
+            }
         }
     }
 

@@ -357,6 +357,10 @@ fn place(o: &Entity, src: &Source, report: &mut Report) -> Option<String> {
         chain.push(id(&holder.name));
         here = holder.atom("IN")?;
     }
+    note(format!(
+        "inside {}: too deep, or a loop; placed nowhere",
+        chain.join(" in ")
+    ));
     None
 }
 
@@ -380,9 +384,10 @@ fn thing(
     }
 
     let mut aliases: Vec<String> = Vec::new();
+    let lower = name.to_lowercase();
     for word in o.atoms("SYNONYM") {
         let word = word.to_lowercase();
-        if word != name.to_lowercase() && !aliases.contains(&word) {
+        if word != lower && !aliases.contains(&word) {
             aliases.push(word);
         }
     }
