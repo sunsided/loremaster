@@ -183,6 +183,7 @@
 		background: transparent;
 		color: var(--color-text-strong);
 		caret-color: var(--color-accent);
+		caret-shape: var(--caret-shape, auto);
 		font: inherit;
 	}
 	.buttons {

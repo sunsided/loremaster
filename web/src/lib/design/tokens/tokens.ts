@@ -55,7 +55,8 @@ export const sizeTokens: TokenInfo[] = [
 	{ name: '--width-dialog', use: 'Maximum width of a dialog.' },
 	{ name: '--width-map', use: 'Maximum width of the map on ultrawide screens.' },
 	{ name: '--width-player-max', use: 'Maximum width of the player on ultrawide screens.' },
-	{ name: '--width-content-max', use: 'Maximum width of all content. Wider screens center it.' }
+	{ name: '--width-content-max', use: 'Maximum width of all content. Wider screens center it.' },
+	{ name: '--caret-shape', use: 'Shape of the text cursor in inputs: a block in the phosphor theme, the thin cursor in the others.' }
 ];
 
 export const motionTokens: TokenInfo[] = [

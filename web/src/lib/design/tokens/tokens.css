@@ -97,6 +97,8 @@
 /* ---- Theme: phosphor (default) ---- */
 :root,
 [data-theme='phosphor'] {
+	/* The text cursor of the inputs: a block, as on a CRT terminal. Browsers without caret-shape show the thin one. */
+	--caret-shape: block;
 	--color-surface-outer: #070a08;
 	--color-surface: #0b0f0c;
 	--color-surface-raised: #0e1410;
@@ -139,6 +141,7 @@
 
 /* ---- Theme: night ---- */
 [data-theme='night'] {
+	--caret-shape: auto;
 	--color-surface-outer: #0f1115;
 	--color-surface: #14161b;
 	--color-surface-raised: #181b21;
@@ -181,6 +184,7 @@
 
 /* ---- Theme: paper (quiet: near-neutral tones, light texture) ---- */
 [data-theme='paper'] {
+	--caret-shape: auto;
 	--color-surface-outer: #e7e4dd;
 	--color-surface: #f2f0eb;
 	--color-surface-raised: #f8f7f4;
