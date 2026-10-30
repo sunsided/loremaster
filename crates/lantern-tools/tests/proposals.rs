@@ -115,7 +115,15 @@ fn a_changed_fragment_is_one_change() {
     assert!(changes.len() == 1, "{changes:#?}");
     let c = &changes[0];
     assert!(c["kind"] == "fragment");
-    assert!(c["field"] == "description");
+    assert!(c["field"] == json!(["description"]));
+    assert!(c["owner"] == "room:shore");
+    assert!(
+        c["after_fragment"]["variants"][0]
+            .as_str()
+            .unwrap()
+            .starts_with("Wet shingle")
+    );
+    assert!(c["after_fragment"]["layer"] == "base");
     assert!(c["before_index"] == 0 && c["after_index"] == 0);
     assert!(c["after"].to_string().contains("Wet shingle"));
 }
@@ -209,4 +217,66 @@ fn applying_gives_the_new_files() {
     let applied = ws.apply_proposal(&id).unwrap();
     assert!(applied.iter().any(|f| f.path == "rooms/pier.yaml"));
     assert!(applied.len() == files().len() + 1);
+}
+
+#[test]
+fn frame_fragments_have_the_runtime_owner() {
+    let mut ws = Workspace::new(files());
+    let story = text("story.yaml").replace(
+        "text: \"You look around.\"",
+        "text: \"You take in the view.\"",
+    );
+    let v = call(
+        &mut ws,
+        "propose",
+        json!({ "summary": "frame", "files": [{ "path": "story.yaml", "text": story }] }),
+    );
+    let changes = v["changes"].as_array().unwrap();
+    assert!(changes.len() == 1, "{changes:#?}");
+    assert!(changes[0]["owner"] == "story/frames/look/before");
+    assert!(changes[0]["field"] == json!(["frames", "look", "before"]));
+    assert!(changes[0]["after_fragment"]["when"] == "action.repeat == 1");
+}
+
+#[test]
+fn files_carry_both_texts_and_a_base_hash() {
+    let mut ws = Workspace::new(files());
+    let old = text("rooms/shore.yaml");
+    let new = old.replace("Shingle", "Grey shingle");
+    let v = call(
+        &mut ws,
+        "propose",
+        json!({
+            "summary": "grey",
+            "files": [{ "path": "rooms/shore.yaml", "text": new }, { "path": "rooms/pier.yaml", "text": PIER }],
+            "delete": ["rooms/pier.yaml"]
+        }),
+    );
+    let f = &v["files"][0];
+    assert!(f["path"] == "rooms/shore.yaml");
+    assert!(f["before"] == old.as_str());
+    assert!(f["after"] == new.as_str());
+    assert!(f["base_sha"] == lantern_tools::sha256(&old).as_str());
+    assert!(v["files"][1]["base_sha"].is_null());
+    assert!(v["files"][2]["after"].is_null());
+    assert!(v["stale"] == false);
+}
+
+#[test]
+fn a_proposal_goes_stale_when_its_file_changes() {
+    let mut ws = Workspace::new(files());
+    let new = text("rooms/shore.yaml").replace("Shingle", "Grey shingle");
+    call(
+        &mut ws,
+        "propose",
+        json!({ "summary": "grey", "files": [{ "path": "rooms/shore.yaml", "text": new }] }),
+    );
+    let mut changed = files();
+    let shore = changed
+        .iter_mut()
+        .find(|f| f.path == "rooms/shore.yaml")
+        .unwrap();
+    shore.text = shore.text.replace("crunches", "grinds");
+    ws.reload(changed);
+    assert!(call(&mut ws, "get_proposal", json!({ "id": "p1" }))["stale"] == true);
 }

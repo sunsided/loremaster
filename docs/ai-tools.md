@@ -89,11 +89,14 @@ The server checks a proposal against the project as it is now. The result is a p
 | --- | --- |
 | `id`, `summary` | The id, for example `p3`, and one line about the change. |
 | `ok` | `true` when the project with the proposal has no errors. |
+| `stale` | `true` when a file that the proposal touches changed after the proposal was made. |
 | `check` | All problems of the project with the proposal. |
 | `new_problems` | The problems that the proposal adds. |
 | `changes` | The changes, one item for each entity, field or fragment. See below. |
 | `rooms` | The text of each new or changed room in all its states: `{ room, texts: [{ text, combinations, example, warnings }] }`. |
-| `files`, `delete` | The paths that the proposal writes and deletes. |
+| `files` | Each touched file: `{ path, base_sha, before, after }`. `base_sha` is the SHA-256 of the file when the proposal was made, or `null` for a new file. `before` is the text on disk now. `after` is the text after the proposal, or `null` when the proposal deletes the file. |
+
+The `after` text is the text that the assistant gave. The server does not format it again. The tool tells the assistant to keep the lines that it does not change.
 
 Each item of `changes` has a `kind`, an `entity` (for example `room:shore`, `thing:lamp`, `rule:find_key` or `story`) and a `file`:
 
@@ -101,8 +104,19 @@ Each item of `changes` has a `kind`, an `entity` (for example `room:shore`, `thi
 | --- | --- |
 | `added` | `after`: the new entity. |
 | `removed` | `before`: the old entity. |
-| `field` | `field`, `before`, `after`: a field that is not a fragment list, for example `exits`. |
-| `fragment` | `field` (`description`, `presence` or `intro`), `fragment_id` if the fragment has an id, `before_index`, `after_index`, `before`, `after`. An added fragment has no `before`. A removed fragment has no `after`. |
+| `field` | `field`, `before`, `after`: a field that is not a fragment list or a frame, for example `exits`. |
+| `fragment` | See below. |
+
+A `fragment` change has these fields:
+
+| Field | Contents |
+| --- | --- |
+| `owner` | The owner of the fragment list, as the runtime writes it in `Source.owner`. Examples: `room:shore`, `thing:lamp`, `thing:lamp/presence`, `story:intro`, `room:shore/frames/look/before`, `story/frames/look/before`. |
+| `field` | The YAML path of the list in its entity, for example `["description"]` or `["frames", "look", "before"]`. |
+| `fragment_id` | The `id` of the fragment, if it has one. |
+| `before_index`, `after_index` | The index of the fragment in the list before and after. Together with `owner`, an index finds the runs in the transcript. |
+| `before`, `after` | The fragment as YAML gives it: a string or a map. An added fragment has no `before`. A removed fragment has no `after`. |
+| `before_fragment`, `after_fragment` | The same fragments in one form: `{ id, variants, when, mode, layer, replaces }`. |
 
 The values are the YAML values as JSON.
 
@@ -119,7 +133,7 @@ To play a proposal before you accept it, use `session_start` with `proposal`.
 | `POST /mcp` | Sends one MCP message. The reply is JSON. |
 | `GET /proposals` | Gives the views of all open proposals. |
 | `GET /proposals/<id>` | Gives the view of one proposal. |
-| `POST /proposals/<id>/accept` | Writes the proposal into the project files, then removes the proposal. A proposal with errors is refused (status 409). |
+| `POST /proposals/<id>/accept` | Writes the proposal into the project files, then removes the proposal. A proposal with errors is refused (status 409). A stale proposal is refused too, unless the body is `{ "force": true }`. If the editor wrote the change itself, send `{ "applied": true }`: the server then only removes the proposal. |
 | `POST /proposals/<id>/reject` | Removes the proposal. The body `{ "note": "why" }` is optional. The server adds the note to `.lantern/rejected.jsonl`. |
 
 The server accepts requests only from `127.0.0.1`. A request from a browser must come from a page on `localhost`, `127.0.0.1` or `[::1]`. A `POST` must have `Content-Type: application/json`.

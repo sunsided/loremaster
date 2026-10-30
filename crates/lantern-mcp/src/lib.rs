@@ -250,19 +250,31 @@ impl Server {
         Ok(())
     }
 
-    /// Write the files of a proposal into the project and remove the proposal.
-    /// Returns the paths written and deleted.
-    pub fn accept(&mut self, id: &str) -> Result<Vec<String>, String> {
+    /// Accept a proposal: write its files into the project and remove it.
+    /// With `applied`, the caller (the editor) already wrote the change itself,
+    /// so only the proposal goes. A stale proposal, whose files changed since it
+    /// was made, is refused unless `force`. Returns the paths written and deleted.
+    pub fn accept(&mut self, id: &str, applied: bool, force: bool) -> Result<Vec<String>, String> {
         self.refresh();
         let p = self
             .ws
             .proposal(id)
             .cloned()
             .ok_or_else(|| format!("There is no proposal `{id}`."))?;
+        if applied {
+            self.ws.remove_proposal(id);
+            self.save_proposals();
+            return Ok(Vec::new());
+        }
         let view = self.ws.view_proposal(id).map_err(|e| e.0)?;
         if !view.ok {
             return Err(format!(
                 "Proposal `{id}` has errors. Fix them before you accept it."
+            ));
+        }
+        if view.stale && !force {
+            return Err(format!(
+                "Proposal `{id}` is stale: a file it changes was changed after it was made. Accept with force to write it anyway."
             ));
         }
         let mut touched = Vec::new();

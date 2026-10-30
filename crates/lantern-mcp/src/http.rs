@@ -7,7 +7,7 @@
 //! | `POST /mcp` | One MCP JSON-RPC message. The reply is JSON (streamable HTTP without streams). |
 //! | `GET /proposals` | All open proposals, each checked against the project now. |
 //! | `GET /proposals/<id>` | One proposal, checked. |
-//! | `POST /proposals/<id>/accept` | Write the proposal into the project files. |
+//! | `POST /proposals/<id>/accept` | Write the proposal into the project files. Body: `{ "applied": true }` when the editor wrote the change itself, `{ "force": true }` to write a stale proposal. |
 //! | `POST /proposals/<id>/reject` | Remove the proposal. Body: `{ "note": "why" }`, optional. |
 //!
 //! A web page on any other site must not use these endpoints. So the server
@@ -100,10 +100,12 @@ fn handle(server: &mut Server, mut request: Request) {
                 Err(e) => error(404, &e.0),
             }
         }
-        (true, ["proposals", id, "accept"]) => match server.accept(id) {
-            Ok(files) => ok(json!({ "accepted": id, "files": files })),
-            Err(e) => error(409, &e),
-        },
+        (true, ["proposals", id, "accept"]) => {
+            match server.accept(id, flag(&body, "applied"), flag(&body, "force")) {
+                Ok(files) => ok(json!({ "accepted": id, "files": files })),
+                Err(e) => error(409, &e),
+            }
+        }
         (true, ["proposals", id, "reject"]) => {
             let note: Option<String> = serde_json::from_str::<Value>(&body)
                 .ok()
@@ -116,6 +118,14 @@ fn handle(server: &mut Server, mut request: Request) {
         _ => error(404, "Not found."),
     };
     let _ = request.respond(cors(response));
+}
+
+/// A boolean field of a JSON body; false when the body or the field is missing.
+fn flag(body: &str, name: &str) -> bool {
+    serde_json::from_str::<Value>(body)
+        .ok()
+        .and_then(|v| v.get(name)?.as_bool())
+        .unwrap_or(false)
 }
 
 /// True for `http://localhost`, `http://127.0.0.1` and `http://[::1]` on any port.

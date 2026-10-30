@@ -15,7 +15,7 @@
 mod proposal;
 mod tools;
 
-pub use proposal::{Change, PreviewText, Proposal, ProposalView, RoomPreview};
+pub use proposal::{Change, FileChange, PreviewText, Proposal, ProposalView, RoomPreview, sha256};
 
 pub use tools::{ToolDef, tools};
 

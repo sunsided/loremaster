@@ -161,7 +161,7 @@ pub fn tools() -> Vec<ToolDef> {
         // Propose.
         def(
             "propose",
-            "Suggest a change to the project. Give whole files: each new or changed file with its complete YAML text, and the paths of files to delete. Nothing changes until a person accepts it. Returns the proposal id and its check: the problems it adds, the changes per entity and fragment, and the text of each changed room in every state. Fix the problems with a new proposal, then `withdraw_proposal` the old one.",
+            "Suggest a change to the project. Give whole files: each new or changed file with its complete YAML text, and the paths of files to delete. In a changed file, keep every line you do not change byte for byte (read it with `read_file` first), so that the person sees only your change. Nothing changes until a person accepts it. Returns the proposal id and its check: the problems it adds, the changes per entity and fragment, and the text of each changed room in every state. Fix the problems with a new proposal, then `withdraw_proposal` the old one.",
             schema(
                 json!({
                     "summary": { "type": "string", "description": "One line: what the change does and why." },

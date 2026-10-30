@@ -29,6 +29,31 @@ pub struct Proposal {
     /// Paths of files to delete.
     #[serde(default)]
     pub delete: Vec<String>,
+    /// The SHA-256 of each touched file when the proposal was made; `None` for
+    /// a file that did not exist. A file that changed since makes the proposal stale.
+    #[serde(default)]
+    pub base: BTreeMap<String, Option<String>>,
+}
+
+/// One touched file: its text before and after the proposal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FileChange {
+    pub path: String,
+    /// The SHA-256 of the file when the proposal was made, or null for a new file.
+    pub base_sha: Option<String>,
+    /// The text on disk now, or null when the file does not exist.
+    pub before: Option<String>,
+    /// The text after the proposal, or null when the proposal deletes the file.
+    pub after: Option<String>,
+}
+
+/// The SHA-256 of a text, as lowercase hex.
+pub fn sha256(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(text.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// A proposal as checked against the project now.
@@ -38,6 +63,8 @@ pub struct ProposalView {
     pub summary: String,
     /// True when the project with the proposal has no errors.
     pub ok: bool,
+    /// True when a touched file changed after the proposal was made.
+    pub stale: bool,
     /// All problems of the project with the proposal.
     pub check: Vec<Diagnostic>,
     /// The problems that the proposal adds.
@@ -45,8 +72,8 @@ pub struct ProposalView {
     pub changes: Vec<Change>,
     /// The text of each new or changed room in every state, when the proposal has no errors.
     pub rooms: Vec<RoomPreview>,
-    pub files: Vec<String>,
-    pub delete: Vec<String>,
+    /// Each touched file with its whole text before and after.
+    pub files: Vec<FileChange>,
 }
 
 /// One change, at the smallest level that has meaning for the editor.
@@ -76,10 +103,18 @@ pub enum Change {
     },
     /// One fragment of a fragment list such as `description`. An added
     /// fragment has no `before`, a removed one has no `after`.
+    ///
+    /// `owner` is the runtime's `Source.owner` of the list, for example
+    /// `room:shore`, `thing:lamp/presence`, `room:shore/frames/look/before`,
+    /// `story:intro` or `story/frames/look/before`. With the index it finds the
+    /// runs of a transcript. `field` is the YAML path of the list in its entity.
+    /// `before_fragment` and `after_fragment` are the fragments in one form,
+    /// whether the YAML wrote them as a plain string or as a map.
     Fragment {
         entity: String,
         file: String,
-        field: String,
+        owner: String,
+        field: Vec<String>,
         /// The fragment's `id`, when it has one.
         #[serde(skip_serializing_if = "Option::is_none")]
         fragment_id: Option<String>,
@@ -87,6 +122,8 @@ pub enum Change {
         after_index: Option<usize>,
         before: Option<Value>,
         after: Option<Value>,
+        before_fragment: Option<Value>,
+        after_fragment: Option<Value>,
     },
 }
 
@@ -105,13 +142,6 @@ pub struct PreviewText {
     pub example: Vec<String>,
     pub warnings: Vec<String>,
 }
-
-/// Fields that hold fragment lists, per entity kind.
-const FRAGMENT_FIELDS: [(&str, &[&str]); 3] = [
-    ("room", &["description"]),
-    ("thing", &["description", "presence"]),
-    ("story", &["intro"]),
-];
 
 /// The project files with a proposal applied.
 pub(crate) fn overlay(base: &[SourceFile], p: &Proposal) -> Vec<SourceFile> {
@@ -158,11 +188,25 @@ impl Workspace {
         files: Vec<SourceFile>,
         delete: Vec<String>,
     ) -> Result<String, ToolError> {
+        let base = files
+            .iter()
+            .map(|f| &f.path)
+            .chain(&delete)
+            .map(|path| {
+                let sha = self
+                    .files
+                    .iter()
+                    .find(|f| &f.path == path)
+                    .map(|f| sha256(&f.text));
+                (path.clone(), sha)
+            })
+            .collect();
         let mut p = Proposal {
             id: String::new(),
             summary,
             files,
             delete,
+            base,
         };
         check_paths(&p)?;
         self.next_proposal = self.next_proposal.max(1);
@@ -255,16 +299,38 @@ impl Workspace {
             Some(world) => previews(world, &changes),
             None => Vec::new(),
         };
+        let current = |path: &str| {
+            self.files
+                .iter()
+                .find(|f| f.path == path)
+                .map(|f| f.text.clone())
+        };
+        let stale = p
+            .base
+            .iter()
+            .any(|(path, sha)| current(path).map(|t| sha256(&t)) != *sha);
+        let file_changes = p
+            .files
+            .iter()
+            .map(|f| (f.path.clone(), Some(f.text.clone())))
+            .chain(p.delete.iter().map(|d| (d.clone(), None)))
+            .map(|(path, after)| FileChange {
+                base_sha: p.base.get(&path).cloned().flatten(),
+                before: current(&path),
+                after,
+                path,
+            })
+            .collect();
         Ok(ProposalView {
             id: p.id.clone(),
             summary: p.summary.clone(),
             ok,
+            stale,
             check,
             new_problems,
             changes,
             rooms,
-            files: p.files.iter().map(|f| f.path.clone()).collect(),
-            delete: p.delete.clone(),
+            files: file_changes,
         })
     }
 
@@ -366,21 +432,27 @@ fn changes(before: &Project, after: &Project, p: &Proposal) -> Vec<Change> {
         if a == b {
             continue;
         }
-        let kind = key.split(':').next().unwrap_or_default();
-        let lists = FRAGMENT_FIELDS
-            .iter()
-            .find(|(k, _)| *k == kind)
-            .map_or(&[][..], |(_, f)| *f);
-        let (bm, am) = (as_map(b), as_map(a));
+        let (lb, la) = (fragment_lists(key, b), fragment_lists(key, a));
+        let mut seen = std::collections::BTreeSet::new();
+        for (owner, path) in lb.keys().chain(la.keys()) {
+            if !seen.insert((owner, path)) {
+                continue;
+            }
+            let k = (owner.clone(), path.clone());
+            let (fb, fa) = (lb.get(&k), la.get(&k));
+            if fb != fa {
+                let (fb, fa) = (
+                    fb.map_or(&[][..], Vec::as_slice),
+                    fa.map_or(&[][..], Vec::as_slice),
+                );
+                fragment_changes(key, &file, owner, path, fb, fa, &mut out);
+            }
+        }
+        let (bm, am) = (plain_fields(key, b), plain_fields(key, a));
         let fields: std::collections::BTreeSet<&String> = bm.keys().chain(am.keys()).collect();
         for field in fields {
             let (fb, fa) = (bm.get(field), am.get(field));
-            if fb == fa {
-                continue;
-            }
-            if lists.contains(&field.as_str()) {
-                fragment_changes(key, &file, field, list(fb), list(fa), &mut out);
-            } else {
+            if fb != fa {
                 out.push(Change::Field {
                     entity: key.clone(),
                     file: file.clone(),
@@ -394,12 +466,73 @@ fn changes(before: &Project, after: &Project, p: &Proposal) -> Vec<Change> {
     out
 }
 
-fn as_map(v: &Value) -> Map<String, Value> {
-    v.as_object().cloned().unwrap_or_default()
+/// The fields that hold fragment lists, per entity kind, with the runtime owner of each.
+fn list_fields(entity: &str) -> &'static [&'static str] {
+    match entity.split(':').next() {
+        Some("room") => &["description"],
+        Some("thing") => &["description", "presence"],
+        Some("story") => &["intro"],
+        _ => &[],
+    }
 }
 
-fn list(v: Option<&Value>) -> &[Value] {
-    v.and_then(Value::as_array).map_or(&[], Vec::as_slice)
+/// The runtime owner of a fragment list, as `Source.owner` names it.
+fn owner_of(entity: &str, path: &[&str]) -> String {
+    match path {
+        ["intro"] => "story:intro".into(),
+        ["description"] => entity.into(),
+        ["presence"] => format!("{entity}/presence"),
+        ["frames", verb, part] => format!("{entity}/frames/{verb}/{part}"),
+        _ => format!("{entity}/{}", path.join("/")),
+    }
+}
+
+/// Every fragment list of an entity, keyed by runtime owner and YAML path.
+fn fragment_lists(entity: &str, v: &Value) -> BTreeMap<(String, Vec<String>), Vec<Value>> {
+    let mut out = BTreeMap::new();
+    let list = |x: &Value| x.as_array().cloned().unwrap_or_default();
+    for field in list_fields(entity) {
+        if let Some(x) = v.get(field) {
+            out.insert(
+                (owner_of(entity, &[field]), vec![field.to_string()]),
+                list(x),
+            );
+        }
+    }
+    let frames = v.get("frames").and_then(Value::as_object);
+    for (verb, frame) in frames.into_iter().flatten() {
+        for part in ["before", "instead", "after"] {
+            if let Some(x) = frame.get(part) {
+                let path = vec!["frames".to_string(), verb.clone(), part.to_string()];
+                out.insert((owner_of(entity, &["frames", verb, part]), path), list(x));
+            }
+        }
+    }
+    out
+}
+
+/// The fields of an entity that are not fragment lists or frames.
+fn plain_fields(entity: &str, v: &Value) -> Map<String, Value> {
+    let mut map = v.as_object().cloned().unwrap_or_default();
+    for field in list_fields(entity).iter().chain(&["frames"]) {
+        map.remove(*field);
+    }
+    map
+}
+
+/// A fragment in one form, whether the YAML wrote it as a string or a map.
+fn normalised(v: &Value) -> Value {
+    match serde_json::from_value::<lantern_model::Fragment>(v.clone()) {
+        Ok(f) => serde_json::json!({
+            "id": f.id,
+            "variants": f.variants,
+            "when": f.when,
+            "mode": f.mode,
+            "layer": f.layer,
+            "replaces": f.replaces,
+        }),
+        Err(_) => Value::Null,
+    }
 }
 
 fn fragment_id(v: &Value) -> Option<String> {
@@ -411,7 +544,8 @@ fn fragment_id(v: &Value) -> Option<String> {
 fn fragment_changes(
     entity: &str,
     file: &str,
-    field: &str,
+    owner: &str,
+    field: &[String],
     b: &[Value],
     a: &[Value],
     out: &mut Vec<Change>,
@@ -430,7 +564,8 @@ fn fragment_changes(
     let change = |bi: Option<usize>, ai: Option<usize>| Change::Fragment {
         entity: entity.into(),
         file: file.into(),
-        field: field.into(),
+        owner: owner.into(),
+        field: field.to_vec(),
         fragment_id: ai
             .and_then(|i| fragment_id(&a[i]))
             .or_else(|| bi.and_then(|i| fragment_id(&b[i]))),
@@ -438,6 +573,8 @@ fn fragment_changes(
         after_index: ai,
         before: bi.map(|i| b[i].clone()),
         after: ai.map(|i| a[i].clone()),
+        before_fragment: bi.map(|i| normalised(&b[i])),
+        after_fragment: ai.map(|i| normalised(&a[i])),
     };
     // Walk the diff. Between two common fragments lies one run of removals and
     // additions; pair them up, and each pair is one changed fragment.
