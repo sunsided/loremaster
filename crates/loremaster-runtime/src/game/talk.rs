@@ -493,7 +493,7 @@ impl Game {
                 say: s.say.clone(),
                 when: s.when.clone(),
                 go: s.go.clone(),
-                outcomes: describe(&s.outcomes),
+                outcomes: crate::outline::describe(&s.outcomes),
             })
             .collect();
         let with = d.with.as_str();
@@ -517,7 +517,7 @@ impl Game {
             node: talk.node.clone(),
             say: src.say.clone(),
             when: src.when.clone(),
-            outcomes: describe(&src.outcomes),
+            outcomes: crate::outline::describe(&src.outcomes),
             options,
             relations,
             memories,
@@ -561,28 +561,4 @@ impl Game {
             }
         }
     }
-}
-
-/// Outcomes in short, for the inspector.
-fn describe(o: &loremaster_model::Outcomes) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    out.extend(o.set.iter().map(|(k, v)| format!("set {k} = {v}")));
-    out.extend(o.add.iter().map(|(k, n)| format!("add {k} {n:+}")));
-    out.extend(o.relation.iter().map(|(k, n)| format!("{k} {n:+}")));
-    out.extend(o.remember.iter().map(|k| format!("remember {k}")));
-    out.extend(o.then.iter().map(|e| match e {
-        loremaster_model::Effect::Move(m) => format!(
-            "move {}",
-            m.iter()
-                .map(|(t, to)| format!("{t} to {to}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-        loremaster_model::Effect::Goto(r) => format!("go to {r}"),
-        loremaster_model::Effect::End(_) => "end the story".into(),
-        loremaster_model::Effect::Say(_) => "say".into(),
-        loremaster_model::Effect::Set(_) => "set".into(),
-        loremaster_model::Effect::Add(_) => "add".into(),
-    }));
-    out
 }

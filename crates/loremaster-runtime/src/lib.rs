@@ -15,6 +15,7 @@ mod eval;
 mod explore;
 mod game;
 mod matrix;
+mod outline;
 mod output;
 mod parser;
 mod rng;
@@ -30,6 +31,7 @@ pub use game::{
     Scene, TalkOptionView, TalkView, TextError, ThingInfo, VarView, VerbInfo,
 };
 pub use matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix, room_matrix, text_matrix};
+pub use outline::{DialogueOutline, OutlineNode, OutlineOption};
 pub use output::{Block, BlockKind, Choice, Link, LinkKind, LogEntry, Run, Source, TalkInfo, Turn};
 pub use parser::{Command, Preview};
 pub use state::{FragmentProgress, State, Talk};
