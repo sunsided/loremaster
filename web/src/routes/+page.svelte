@@ -10,7 +10,7 @@
 	import ProseEditor from '#lib/design/molecules/ProseEditor.svelte';
 	import { FragmentDraft } from '#lib/design/fragment-draft.svelte.ts';
 	import { inMarkup } from '#lib/project/transform.ts';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import CreatePanel from '#lib/design/organisms/CreatePanel.svelte';
 	import { addExit, addResponseRule, directionOf, directions, opposite, roomFile, slug, step, thingFile, type Direction } from '#lib/project/create.ts';
 	import type { CreateRequest } from '#lib/design/types.ts';
@@ -77,6 +77,9 @@
 		const entry = addStory(title, Object.keys(examples));
 		mine = myStories();
 		await openStory(entry.name);
+		// The start room promises a blinking cursor: keep the promise, the command prompt gets the focus.
+		await tick();
+		prompt?.focus();
 		if (!idea) return;
 		// The server writes the same new story, then drafts the first rooms. The proposal shows when it is ready.
 		const problem = await ai.bootstrap(title, idea);
