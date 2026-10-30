@@ -295,3 +295,12 @@ function noteNode(note: NoteData) {
 	map.set('todo', quoted(note.text));
 	return map;
 }
+
+/** Set a top-level scalar, for example the `status` of a thread. The key is added when it is missing. */
+export function setField(text: string, key: string, value: string): string {
+	const doc = parse(text);
+	const node = doc.get(key, true);
+	if (isScalar(node)) setScalar(node, value);
+	else doc.set(key, value);
+	return serialize(doc);
+}
