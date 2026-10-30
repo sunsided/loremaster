@@ -35,6 +35,7 @@ Install [go-task](https://taskfile.dev), Trunk, Node.js and pnpm before you star
 | `task import:zork` | Imports Zork I again from its ZIL source into `examples/zork1`. |
 | `task web:install` | Installs the web dependencies. Do this one time. |
 | `task dev` | Builds the WebAssembly package, then runs `trunk watch` and the Vite dev server. |
+| `task build:static` | Builds the browser-only site for GitHub Pages into `web/build`, below `/lantern`. |
 | `task build:local` | Builds `target/release/lantern` with the web editor in it. |
 | `task serve:local` | Builds the local binary, then opens the example in the editor. |
 | `task storybook` | Starts Storybook on port 6006. |

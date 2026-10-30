@@ -126,6 +126,17 @@ tasks:
     cmds:
       - pnpm build
 
+  build:static:
+    desc: Build the browser-only site for GitHub Pages into web/build (below /lantern)
+    deps:
+      - wasm
+    dir: web
+    env:
+      BASE_PATH: /lantern
+      FALLBACK: 404.html
+    cmds:
+      - pnpm build
+
   build:local:
     desc: Build the lantern binary with the web editor in it (target/release/lantern)
     deps:

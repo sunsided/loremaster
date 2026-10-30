@@ -1,0 +1,66 @@
+name: Pages
+
+# The browser-only build at https://sunsided.github.io/lantern/, with Storybook at /lantern/storybook/.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+      - uses: jetli/trunk-action@v0.5.1
+        with:
+          version: v0.22.1
+      - name: Build the WASM package
+        working-directory: crates/lantern-wasm
+        run: trunk build --release
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Build the web app below /lantern
+        working-directory: web
+        env:
+          BASE_PATH: /lantern
+          FALLBACK: 404.html
+        run: pnpm build
+      - name: Build Storybook into the site
+        working-directory: web
+        run: pnpm build-storybook --output-dir build/storybook
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

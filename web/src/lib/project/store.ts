@@ -58,6 +58,18 @@ export async function removeFile(dir: FileSystemDirectoryHandle, path: string) {
 	}
 }
 
+let keepAsked = false;
+
+/**
+ * Ask the browser to keep the stored stories when the disk is full or after a long time without a visit.
+ * The first save asks, not the page load, because Firefox shows a prompt.
+ */
+function askToKeep() {
+	if (keepAsked) return;
+	keepAsked = true;
+	void navigator.storage?.persist?.().catch(() => false);
+}
+
 /** True when the browser has OPFS. */
 export async function available(): Promise<boolean> {
 	return (await root()) !== null;
@@ -85,6 +97,7 @@ export async function saveWorkingCopy(story: string, files: SourceFile[]): Promi
 	} catch {
 		// No working copy yet.
 	}
+	askToKeep();
 	const dir = await base.getDirectoryHandle(story, { create: true });
 	for (const f of files) await writeFile(dir, f.path, f.text);
 	return true;
@@ -94,6 +107,7 @@ export async function saveWorkingCopy(story: string, files: SourceFile[]): Promi
 export async function saveWorkingFile(story: string, path: string, text: string): Promise<boolean> {
 	const base = await root();
 	if (!base) return false;
+	askToKeep();
 	await writeFile(await base.getDirectoryHandle(story, { create: true }), path, text);
 	return true;
 }
