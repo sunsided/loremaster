@@ -1,0 +1,5 @@
+# Imported from ZIL: BUBBLE (1dungeon.zil)
+name: "green bubble"
+aliases: ["bubble"]
+location: { room: dam_room }
+listed: false

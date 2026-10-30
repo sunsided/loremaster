@@ -1,0 +1,5 @@
+# Imported from ZIL: SCARAB (1dungeon.zil)
+name: "beautiful jeweled scarab"
+aliases: ["scarab", "bug", "beetle", "treasure"]
+location: nowhere
+portable: true

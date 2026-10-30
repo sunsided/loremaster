@@ -1,0 +1,10 @@
+# Imported from ZIL: ROPE (1dungeon.zil)
+name: "rope"
+aliases: ["hemp", "coil"]
+location: { room: attic }
+portable: true
+presence:
+  - when: "rope.interactions == 0"
+    text: "A large coil of rope is lying in the corner."
+  - when: "rope.interactions > 0"
+    text: "There is {rope.a} here."

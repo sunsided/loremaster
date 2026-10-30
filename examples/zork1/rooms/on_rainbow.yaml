@@ -1,0 +1,8 @@
+# Imported from ZIL: ON-RAINBOW (1dungeon.zil)
+name: "On the Rainbow"
+position: [4, -1]
+description:
+  - "You are on top of a rainbow (I bet you never thought you would walk on a rainbow), with a magnificent view of the Falls. The rainbow travels east-west here."
+exits:
+  - { direction: west, to: end_of_rainbow }
+  - { direction: east, to: aragain_falls }

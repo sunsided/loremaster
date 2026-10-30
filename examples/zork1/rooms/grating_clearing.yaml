@@ -1,0 +1,14 @@
+# Imported from ZIL: GRATING-CLEARING (1dungeon.zil)
+name: "Clearing"
+position: [-1, -1]
+description:
+  - "You are in a clearing, with a forest surrounding you on all sides. A path leads south."
+  - when: "grate.open"
+    text: "There is an open grating, descending into darkness."
+  - when: "(not grate.open) and grate_revealed"
+    text: "There is a grating securely fastened into the ground."
+exits:
+  - { direction: east, to: forest_2 }
+  - { direction: west, to: forest_1 }
+  - { direction: south, to: path }
+  - { direction: down, to: grating_room, visible: "grate_revealed", door: grate }

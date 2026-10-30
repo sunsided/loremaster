@@ -1,0 +1,10 @@
+# Imported from ZIL: SCEPTRE (1dungeon.zil)
+name: "sceptre"
+aliases: ["scepter", "treasure"]
+location: { room: egypt_room }
+portable: true
+presence:
+  - when: "sceptre.interactions == 0"
+    text: "A sceptre, possibly that of ancient Egypt itself, is in the coffin. The sceptre is ornamented with colored enamel, and tapers to a sharp point."
+  - when: "sceptre.interactions > 0"
+    text: "An ornamented sceptre, tapering to a sharp point, is here."

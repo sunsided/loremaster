@@ -1,0 +1,5 @@
+# Imported from ZIL: MAILBOX (1dungeon.zil)
+name: "small mailbox"
+aliases: ["mailbox", "box"]
+location: { room: west_of_house }
+props: { open: false }

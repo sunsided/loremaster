@@ -1,0 +1,7 @@
+# Imported from ZIL: BAR (1dungeon.zil)
+name: "platinum bar"
+aliases: ["bar", "platinum", "treasure"]
+location: { room: loud_room }
+portable: true
+presence:
+  - "On the ground is a large platinum bar."

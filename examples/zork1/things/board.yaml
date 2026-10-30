@@ -1,0 +1,5 @@
+# Imported from ZIL: BOARD (1dungeon.zil)
+name: "board"
+aliases: ["boards"]
+location: { room: west_of_house }
+listed: false

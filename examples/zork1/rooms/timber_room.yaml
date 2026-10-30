@@ -1,0 +1,9 @@
+# Imported from ZIL: TIMBER-ROOM (1dungeon.zil)
+name: "Timber Room"
+tags: [dark]
+position: [-6, -9]
+description:
+  - "This is a long and narrow passage, which is cluttered with broken timbers. A wide passage comes from the east and turns at the west end of the room into a very narrow passageway. From the west comes a strong draft."
+exits:
+  - { direction: east, to: ladder_bottom }
+  - { direction: west, to: lower_shaft, passable: "empty_handed", blocked: "You cannot fit through this passage with that load." }

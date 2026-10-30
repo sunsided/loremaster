@@ -1,0 +1,5 @@
+# Imported from ZIL: RAILING (1dungeon.zil)
+name: "wooden railing"
+aliases: ["railing", "rail"]
+location: { room: dome_room }
+listed: false

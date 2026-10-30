@@ -1,0 +1,4 @@
+# Imported from ZIL: CHIMNEY (1dungeon.zil)
+name: "chimney"
+location: { room: kitchen }
+listed: false

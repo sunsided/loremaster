@@ -1,0 +1,10 @@
+# Imported from ZIL: PAINTING (1dungeon.zil)
+name: "painting"
+aliases: ["art", "canvas", "treasure"]
+location: { room: gallery }
+portable: true
+presence:
+  - when: "painting.interactions == 0"
+    text: "Fortunately, there is still one chance for you to be a vandal, for on the far wall is a painting of unparalleled beauty."
+  - when: "painting.interactions > 0"
+    text: "A painting by a neglected genius is here."

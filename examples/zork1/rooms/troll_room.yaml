@@ -1,0 +1,10 @@
+# Imported from ZIL: TROLL-ROOM (1dungeon.zil)
+name: "The Troll Room"
+tags: [dark]
+position: [-2, -1]
+description:
+  - "This is a small room with passages to the east and south and a forbidding hole leading west. Bloodstains and deep scratches (perhaps made by an axe) mar the walls."
+exits:
+  - { direction: south, to: cellar }
+  - { direction: east, to: ew_passage, passable: "troll_flag", blocked: "The troll fends you off with a menacing gesture." }
+  - { direction: west, to: maze_1, passable: "troll_flag", blocked: "The troll fends you off with a menacing gesture." }

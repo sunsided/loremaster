@@ -7,6 +7,7 @@ members = [
     "crates/lantern-project",
     "crates/lantern-runtime",
     "crates/lantern-wasm",
+    "crates/lantern-zil",
 ]
 
 [workspace.package]

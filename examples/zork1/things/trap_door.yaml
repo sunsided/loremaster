@@ -1,0 +1,6 @@
+# Imported from ZIL: TRAP-DOOR (1dungeon.zil)
+name: "trap door"
+aliases: ["door", "trapdoor", "trap-door", "cover"]
+location: { room: living_room }
+listed: false
+props: { open: false, locked: false }

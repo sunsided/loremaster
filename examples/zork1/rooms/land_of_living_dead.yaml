@@ -1,0 +1,8 @@
+# Imported from ZIL: LAND-OF-LIVING-DEAD (1dungeon.zil)
+name: "Land of the Dead"
+position: [-6, -3]
+description:
+  - "You have entered the Land of the Living Dead. Thousands of lost souls can be heard weeping and moaning. In the corner are stacked the remains of dozens of previous adventurers less fortunate than yourself. A passage exits to the north."
+exits:
+  - { direction: out, to: entrance_to_hades }
+  - { direction: north, to: entrance_to_hades }

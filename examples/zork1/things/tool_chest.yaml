@@ -1,0 +1,5 @@
+# Imported from ZIL: TOOL-CHEST (1dungeon.zil)
+name: "group of tool chests"
+aliases: ["chest", "chests", "group", "toolchests"]
+location: { room: maintenance_room }
+props: { open: true }

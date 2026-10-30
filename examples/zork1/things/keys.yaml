@@ -1,0 +1,5 @@
+# Imported from ZIL: KEYS (1dungeon.zil)
+name: "skeleton key"
+aliases: ["key"]
+location: { room: maze_5 }
+portable: true

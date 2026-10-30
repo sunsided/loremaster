@@ -1,0 +1,5 @@
+# Imported from ZIL: BROKEN-LAMP (1dungeon.zil)
+name: "broken lantern"
+aliases: ["lamp", "lantern"]
+location: nowhere
+portable: true

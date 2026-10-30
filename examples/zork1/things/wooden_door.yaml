@@ -1,0 +1,8 @@
+# Imported from ZIL: WOODEN-DOOR (1dungeon.zil)
+name: "wooden door"
+aliases: ["door", "lettering", "writing"]
+location: { room: living_room }
+listed: false
+props: { open: false }
+description:
+  - "The engravings translate to \"This space intentionally left blank.\""

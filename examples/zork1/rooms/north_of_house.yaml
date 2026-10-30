@@ -1,0 +1,11 @@
+# Imported from ZIL: NORTH-OF-HOUSE (1dungeon.zil)
+name: "North of House"
+position: [0, -1]
+description:
+  - "You are facing the north side of a white house. There is no door here, and all the windows are boarded up. To the north a narrow path winds through the trees."
+exits:
+  - { direction: southwest, to: west_of_house }
+  - { direction: southeast, to: east_of_house }
+  - { direction: west, to: west_of_house }
+  - { direction: east, to: east_of_house }
+  - { direction: north, to: path }

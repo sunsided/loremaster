@@ -1,0 +1,9 @@
+# Imported from ZIL: SQUEEKY-ROOM (1dungeon.zil)
+name: "Squeaky Room"
+tags: [dark]
+position: [-2, -12]
+description:
+  - "You are in a small room. Strange squeaky sounds may be heard coming from the passage at the north end. You may also escape to the east."
+exits:
+  - { direction: north, to: bat_room }
+  - { direction: east, to: mine_entrance }

@@ -1,0 +1,5 @@
+# Imported from ZIL: GHOSTS (1dungeon.zil)
+name: "number of ghosts"
+aliases: ["ghosts", "spirits", "fiends", "force"]
+location: { room: entrance_to_hades }
+listed: false

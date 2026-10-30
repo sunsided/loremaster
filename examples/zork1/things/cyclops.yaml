@@ -1,0 +1,5 @@
+# Imported from ZIL: CYCLOPS (1dungeon.zil)
+name: "cyclops"
+aliases: ["monster", "eye"]
+location: { room: cyclops_room }
+listed: false

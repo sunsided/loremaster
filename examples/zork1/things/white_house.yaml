@@ -1,0 +1,5 @@
+# Imported from ZIL: WHITE-HOUSE (1dungeon.zil)
+name: "white house"
+aliases: ["house"]
+location: { room: west_of_house }
+listed: false

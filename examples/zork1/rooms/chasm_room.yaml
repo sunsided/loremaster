@@ -1,0 +1,11 @@
+# Imported from ZIL: CHASM-ROOM (1dungeon.zil)
+name: "Chasm"
+tags: [dark]
+position: [-4, -1]
+description:
+  - "A chasm runs southwest to northeast and the path follows it. You are on the south side of the chasm, where a crack opens into a passage."
+exits:
+  - { direction: northeast, to: reservoir_south }
+  - { direction: southwest, to: ew_passage }
+  - { direction: up, to: ew_passage }
+  - { direction: south, to: ns_passage }

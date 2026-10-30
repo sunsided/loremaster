@@ -1,0 +1,5 @@
+# Imported from ZIL: PUMP (1dungeon.zil)
+name: "hand-held air pump"
+aliases: ["pump", "air-pump", "tool", "tools"]
+location: { room: reservoir_north }
+portable: true

@@ -1,0 +1,11 @@
+# Imported from ZIL: SOUTH-OF-HOUSE (1dungeon.zil)
+name: "South of House"
+position: [0, 1]
+description:
+  - "You are facing the south side of a white house. There is no door here, and all the windows are boarded."
+exits:
+  - { direction: west, to: west_of_house }
+  - { direction: east, to: east_of_house }
+  - { direction: northeast, to: east_of_house }
+  - { direction: northwest, to: west_of_house }
+  - { direction: south, to: forest_3 }

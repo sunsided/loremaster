@@ -1,0 +1,7 @@
+# Imported from ZIL: UP-A-TREE (1dungeon.zil)
+name: "Up a Tree"
+position: [1, -4]
+description:
+  - "[Up a Tree: the original prints this description from the routine TREE-ROOM. It is not imported yet.]"
+exits:
+  - { direction: down, to: path }

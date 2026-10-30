@@ -1,0 +1,8 @@
+# Imported from ZIL: SHORE (1dungeon.zil)
+name: "Shore"
+position: [5, -2]
+description:
+  - "You are on the east shore of the river. The water here seems somewhat treacherous. A path travels from north to south here, the south end quickly turning around a sharp corner."
+exits:
+  - { direction: north, to: sandy_beach }
+  - { direction: south, to: aragain_falls }

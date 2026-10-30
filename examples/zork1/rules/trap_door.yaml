@@ -1,0 +1,36 @@
+- id: move_rug
+  # Hand-ported from RUG-FCN and CELLAR-FCN (1actions.zil).
+  on: { verb: [push, rug] }
+  instead: true
+  then:
+    - say: "{rug_moved ? Having moved the carpet previously, you find it impossible to move it again. | With a great effort, the rug is moved to one side of the room, revealing the dusty cover of a closed trap door.}"
+    - set: { rug_moved: true }
+
+- id: rug_too_heavy
+  on: { verb: [take, rug] }
+  instead: true
+  then:
+    - say: "The rug is extremely heavy and cannot be carried."
+
+- id: trap_door_hidden
+  on: { verb: [open, trap_door] }
+  when: not rug_moved
+  instead: true
+  then:
+    - say: "You can't see any trap door here."
+
+# The first time the player goes down, someone bars the trap door from above.
+- id: trap_door_crashes_shut
+  on: { enter: cellar }
+  when: trap_door.open
+  once: true
+  then:
+    - set: { trap_door.open: false, trap_door.locked: true }
+    - say: "The trap door crashes shut, and you hear someone barring it."
+
+# The bar is on the living room side: from there the trap door opens again.
+- id: trap_door_unbarred
+  on: { enter: living_room }
+  when: trap_door.locked
+  then:
+    - set: { trap_door.locked: false }

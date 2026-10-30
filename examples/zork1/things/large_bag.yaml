@@ -1,0 +1,5 @@
+# Imported from ZIL: LARGE-BAG (1dungeon.zil)
+name: "large bag"
+aliases: ["bag"]
+location: { room: round_room }
+listed: false

@@ -1,0 +1,12 @@
+# Imported from ZIL: OWNERS-MANUAL (1dungeon.zil)
+name: "ZORK owner's manual"
+aliases: ["manual", "piece", "paper"]
+location: { room: studio }
+portable: true
+description:
+  - "Congratulations! You are the privileged owner of ZORK I: The Great Underground Empire, a self-contained and self-maintaining universe. If used and maintained in accordance with normal operating practices for small universes, ZORK will provide many months of trouble-free operation."
+presence:
+  - when: "owners_manual.interactions == 0"
+    text: "Loosely attached to a wall is a small piece of paper."
+  - when: "owners_manual.interactions > 0"
+    text: "There is {owners_manual.a} here."

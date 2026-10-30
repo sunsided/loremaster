@@ -1,0 +1,7 @@
+# Imported from ZIL: INFLATABLE-BOAT (1dungeon.zil)
+name: "pile of plastic"
+aliases: ["boat", "pile", "plastic", "valve"]
+location: { room: dam_base }
+portable: true
+presence:
+  - "There is a folded pile of plastic here which has a small valve attached."

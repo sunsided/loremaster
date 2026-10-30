@@ -1,0 +1,5 @@
+# Imported from ZIL: SCREWDRIVER (1dungeon.zil)
+name: "screwdriver"
+aliases: ["tool", "tools", "driver"]
+location: { room: maintenance_room }
+portable: true

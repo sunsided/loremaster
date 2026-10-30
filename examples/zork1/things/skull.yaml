@@ -1,0 +1,10 @@
+# Imported from ZIL: SKULL (1dungeon.zil)
+name: "crystal skull"
+aliases: ["skull", "head", "treasure"]
+location: { room: land_of_living_dead }
+portable: true
+presence:
+  - when: "skull.interactions == 0"
+    text: "Lying in one corner of the room is a beautifully carved crystal skull. It appears to be grinning at you rather nastily."
+  - when: "skull.interactions > 0"
+    text: "There is {skull.a} here."

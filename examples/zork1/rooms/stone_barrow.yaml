@@ -1,0 +1,7 @@
+# Imported from ZIL: STONE-BARROW (1dungeon.zil)
+name: "Stone Barrow"
+position: [-1, 1]
+description:
+  - "You are standing in front of a massive barrow of stone. In the east face is a huge stone door which is open. You cannot see into the dark of the tomb."
+exits:
+  - { direction: northeast, to: west_of_house }

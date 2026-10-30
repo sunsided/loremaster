@@ -1,0 +1,11 @@
+# Imported from ZIL: BUOY (1dungeon.zil)
+name: "red buoy"
+aliases: ["buoy"]
+location: { room: river_4 }
+portable: true
+props: { open: false }
+presence:
+  - when: "buoy.interactions == 0"
+    text: "There is a red buoy here (probably a warning)."
+  - when: "buoy.interactions > 0"
+    text: "There is {buoy.a} here."

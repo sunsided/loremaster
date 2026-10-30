@@ -1,0 +1,4 @@
+# Imported from ZIL: MACHINE-SWITCH (1dungeon.zil)
+name: "switch"
+location: { room: machine_room }
+listed: false

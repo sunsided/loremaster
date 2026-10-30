@@ -1,0 +1,10 @@
+# Imported from ZIL: RIVER-4 (1dungeon.zil)
+name: "Frigid River"
+tags: [dark]
+position: [6, 6]
+description:
+  - "The river is running faster here and the sound ahead appears to be that of rushing water. On the east shore is a sandy beach. A small area of beach can also be seen below the cliffs on the west shore."
+exits:
+  - { direction: down, to: river_5 }
+  - { direction: west, to: white_cliffs_south }
+  - { direction: east, to: sandy_beach }

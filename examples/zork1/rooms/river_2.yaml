@@ -1,0 +1,8 @@
+# Imported from ZIL: RIVER-2 (1dungeon.zil)
+name: "Frigid River"
+tags: [dark]
+position: [8, 2]
+description:
+  - "The river turns a corner here making it impossible to see the Dam. The White Cliffs loom on the east bank and large rocks prevent landing on the west."
+exits:
+  - { direction: down, to: river_3 }

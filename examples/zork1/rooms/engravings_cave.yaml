@@ -1,0 +1,9 @@
+# Imported from ZIL: ENGRAVINGS-CAVE (1dungeon.zil)
+name: "Engravings Cave"
+tags: [dark]
+position: [0, -3]
+description:
+  - "You have entered a low cave with passages leading northwest and east."
+exits:
+  - { direction: northwest, to: round_room }
+  - { direction: east, to: dome_room }

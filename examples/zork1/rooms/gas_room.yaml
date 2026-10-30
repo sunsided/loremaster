@@ -1,0 +1,9 @@
+# Imported from ZIL: GAS-ROOM (1dungeon.zil)
+name: "Gas Room"
+tags: [dark]
+position: [-3, -13]
+description:
+  - "This is a small room which smells strongly of coal gas. There is a short climb up some stairs and a narrow tunnel leading east."
+exits:
+  - { direction: up, to: smelly_room }
+  - { direction: east, to: mine_1 }

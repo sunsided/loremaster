@@ -1,0 +1,5 @@
+# Imported from ZIL: CONTROL-PANEL (1dungeon.zil)
+name: "control panel"
+aliases: ["panel"]
+location: { room: dam_room }
+listed: false

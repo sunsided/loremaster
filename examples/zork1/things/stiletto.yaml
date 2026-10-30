@@ -1,0 +1,5 @@
+# Imported from ZIL: STILETTO (1dungeon.zil)
+name: "stiletto"
+location: { room: round_room }
+portable: true
+listed: false

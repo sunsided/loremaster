@@ -1,0 +1,9 @@
+# Imported from ZIL: DAM-LOBBY (1dungeon.zil)
+name: "Dam Lobby"
+position: [-2, -6]
+description:
+  - "This room appears to have been the waiting room for groups touring the dam. There are open doorways here to the north and east marked \"Private\", and there is a path leading south over the top of the dam."
+exits:
+  - { direction: south, to: dam_room }
+  - { direction: north, to: maintenance_room }
+  - { direction: east, to: maintenance_room }

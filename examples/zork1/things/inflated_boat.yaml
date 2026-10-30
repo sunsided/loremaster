@@ -1,0 +1,5 @@
+# Imported from ZIL: INFLATED-BOAT (1dungeon.zil)
+name: "magic boat"
+aliases: ["boat", "raft"]
+location: nowhere
+portable: true

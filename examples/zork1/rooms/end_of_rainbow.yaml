@@ -1,0 +1,10 @@
+# Imported from ZIL: END-OF-RAINBOW (1dungeon.zil)
+name: "End of Rainbow"
+position: [3, 1]
+description:
+  - "You are on a small, rocky beach on the continuation of the Frigid River past the Falls. The beach is narrow due to the presence of the White Cliffs. The river canyon opens here and sunlight shines in from above. A rainbow crosses over the falls to the east and a narrow path continues to the southwest."
+exits:
+  - { direction: up, to: on_rainbow, visible: "rainbow_flag" }
+  - { direction: northeast, to: on_rainbow, visible: "rainbow_flag" }
+  - { direction: east, to: on_rainbow, visible: "rainbow_flag" }
+  - { direction: southwest, to: canyon_bottom }

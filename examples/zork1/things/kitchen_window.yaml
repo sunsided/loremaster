@@ -1,0 +1,6 @@
+# Imported from ZIL: KITCHEN-WINDOW (1dungeon.zil)
+name: "kitchen window"
+aliases: ["window"]
+location: { room: east_of_house }
+listed: false
+props: { open: false }

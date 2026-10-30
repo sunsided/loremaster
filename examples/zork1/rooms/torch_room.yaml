@@ -1,0 +1,11 @@
+# Imported from ZIL: TORCH-ROOM (1dungeon.zil)
+name: "Torch Room"
+tags: [dark]
+position: [2, -1]
+description:
+  - "This is a large room with a prominent doorway leading to a down staircase. Above you is a large dome. Up around the edge of the dome (20 feet up) is a wooden railing. In the center of the room sits a white marble pedestal."
+  - when: "dome_flag"
+    text: "A piece of rope descends from the railing above, ending some five feet above your head."
+exits:
+  - { direction: south, to: north_temple }
+  - { direction: down, to: north_temple }

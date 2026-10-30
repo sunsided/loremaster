@@ -1,0 +1,4 @@
+# Imported from ZIL: GLOBAL-WATER (1dungeon.zil)
+name: "water"
+aliases: ["quantity"]
+location: { room: reservoir_south }

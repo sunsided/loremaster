@@ -1,0 +1,11 @@
+# Imported from ZIL: SMALL-CAVE (1dungeon.zil)
+name: "Cave"
+tags: [dark]
+position: [-3, -10]
+description:
+  - "This is a tiny cave with entrances west and north, and a staircase leading down."
+exits:
+  - { direction: north, to: mirror_room_1 }
+  - { direction: down, to: atlantis_room }
+  - { direction: south, to: atlantis_room }
+  - { direction: west, to: twisting_passage }

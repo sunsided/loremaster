@@ -1,0 +1,5 @@
+# Imported from ZIL: WRENCH (1dungeon.zil)
+name: "wrench"
+aliases: ["tool", "tools"]
+location: { room: maintenance_room }
+portable: true

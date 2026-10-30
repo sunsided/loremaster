@@ -1,0 +1,10 @@
+# Imported from ZIL: RIVER-3 (1dungeon.zil)
+name: "Frigid River"
+tags: [dark]
+position: [7, 4]
+description:
+  - "The river descends here into a valley. There is a narrow beach on the west shore below the cliffs. In the distance a faint rumbling can be heard."
+exits:
+  - { direction: down, to: river_4 }
+  - { direction: land, to: white_cliffs_north }
+  - { direction: west, to: white_cliffs_north }

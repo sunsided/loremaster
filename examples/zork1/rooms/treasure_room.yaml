@@ -1,0 +1,8 @@
+# Imported from ZIL: TREASURE-ROOM (1dungeon.zil)
+name: "Treasure Room"
+tags: [dark]
+position: [-2, -4]
+description:
+  - "This is a large room, whose east wall is solid granite. A number of discarded bags, which crumble at your touch, are scattered about on the floor. There is an exit down a staircase."
+exits:
+  - { direction: down, to: cyclops_room }

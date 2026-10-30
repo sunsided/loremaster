@@ -1,0 +1,9 @@
+# Imported from ZIL: FOREST-2 (1dungeon.zil)
+name: "Forest"
+position: [1, -2]
+description:
+  - "This is a dimly lit forest, with large trees all around."
+exits:
+  - { direction: east, to: mountains }
+  - { direction: south, to: clearing }
+  - { direction: west, to: path }

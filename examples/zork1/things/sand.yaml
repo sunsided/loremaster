@@ -1,0 +1,4 @@
+# Imported from ZIL: SAND (1dungeon.zil)
+name: "sand"
+location: { room: sandy_cave }
+listed: false

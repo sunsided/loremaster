@@ -1,0 +1,20 @@
+# Imported from ZIL: RESERVOIR-SOUTH (1dungeon.zil)
+name: "Reservoir South"
+tags: [dark]
+position: [-3, -4]
+description:
+  - when: "low_tide and gates_open"
+    text: "You are in a long room, to the north of which was formerly a lake. However, with the water level lowered, there is merely a wide stream running through the center of the room."
+  - when: "(not (low_tide and gates_open)) and gates_open"
+    text: "You are in a long room. To the north is a large lake, too deep to cross. You notice, however, that the water level appears to be dropping at a rapid rate. Before long, it might be possible to cross to the other side from here."
+  - when: "(not (low_tide and gates_open)) and (not gates_open) and low_tide"
+    text: "You are in a long room, to the north of which is a wide area which was formerly a reservoir, but now is merely a stream. You notice, however, that the level of the stream is rising quickly and that before long it will be impossible to cross here."
+  - when: "(not (low_tide and gates_open)) and (not gates_open) and (not low_tide)"
+    text: "You are in a long room on the south shore of a large lake, far too deep and wide for crossing."
+  - "There is a path along the stream to the east or west, a steep pathway climbing southwest along the edge of a chasm, and a path leading into a canyon to the southeast."
+exits:
+  - { direction: southeast, to: deep_canyon }
+  - { direction: southwest, to: chasm_room }
+  - { direction: east, to: dam_room }
+  - { direction: west, to: stream_view }
+  - { direction: north, to: reservoir, passable: "low_tide", blocked: "You would drown." }

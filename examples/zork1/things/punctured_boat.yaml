@@ -1,0 +1,5 @@
+# Imported from ZIL: PUNCTURED-BOAT (1dungeon.zil)
+name: "punctured boat"
+aliases: ["boat", "pile", "plastic"]
+location: nowhere
+portable: true

@@ -1,0 +1,8 @@
+# Imported from ZIL: SANDY-CAVE (1dungeon.zil)
+name: "Sandy Cave"
+tags: [dark]
+position: [6, -4]
+description:
+  - "This is a sand-filled cave whose exit is to the southwest."
+exits:
+  - { direction: southwest, to: sandy_beach }

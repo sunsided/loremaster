@@ -1,0 +1,10 @@
+# Imported from ZIL: MAZE-4 (1dungeon.zil)
+name: "Maze"
+tags: [dark]
+position: [-5, -2]
+description:
+  - "This is part of a maze of twisty little passages, all alike."
+exits:
+  - { direction: west, to: maze_3 }
+  - { direction: north, to: maze_1 }
+  - { direction: east, to: dead_end_1 }

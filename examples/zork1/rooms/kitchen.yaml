@@ -1,0 +1,11 @@
+# Imported from ZIL: KITCHEN (1dungeon.zil)
+name: "Kitchen"
+position: [1, -1]
+description:
+  - "You are in the kitchen of the white house. A table seems to have been used recently for the preparation of food. A passage leads to the west and a dark staircase can be seen leading upward. A dark chimney leads down and to the east is a small window which is {kitchen_window.open ? open. | slightly ajar.}"
+exits:
+  - { direction: east, to: east_of_house, door: kitchen_window }
+  - { direction: west, to: living_room }
+  - { direction: out, to: east_of_house, door: kitchen_window }
+  - { direction: up, to: attic }
+  - { direction: down, to: studio, passable: "false_flag", blocked: "Only Santa Claus climbs down chimneys." }

@@ -1,0 +1,17 @@
+# Imported from ZIL: RESERVOIR-NORTH (1dungeon.zil)
+name: "Reservoir North"
+tags: [dark]
+position: [-4, -7]
+description:
+  - when: "low_tide and gates_open"
+    text: "You are in a large cavernous room, the south of which was formerly a lake. However, with the water level lowered, there is merely a wide stream running through there."
+  - when: "(not (low_tide and gates_open)) and gates_open"
+    text: "You are in a large cavernous area. To the south is a wide lake, whose water level appears to be falling rapidly."
+  - when: "(not (low_tide and gates_open)) and (not gates_open) and low_tide"
+    text: "You are in a cavernous area, to the south of which is a very wide stream. The level of the stream is rising rapidly, and it appears that before long it will be impossible to cross to the other side."
+  - when: "(not (low_tide and gates_open)) and (not gates_open) and (not low_tide)"
+    text: "You are in a large cavernous room, north of a large lake."
+  - "There is a slimy stairway leaving the room to the north."
+exits:
+  - { direction: north, to: atlantis_room }
+  - { direction: south, to: reservoir, passable: "low_tide", blocked: "You would drown." }

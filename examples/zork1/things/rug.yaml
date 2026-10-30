@@ -1,0 +1,5 @@
+# Imported from ZIL: RUG (1dungeon.zil)
+name: "carpet"
+aliases: ["rug"]
+location: { room: living_room }
+listed: false

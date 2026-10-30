@@ -1,0 +1,8 @@
+# Imported from ZIL: SOUTH-TEMPLE (1dungeon.zil)
+name: "Altar"
+position: [4, 1]
+description:
+  - "This is the south end of a large temple. In front of you is what appears to be an altar. In one corner is a small hole in the floor which leads into darkness. You probably could not get back up it."
+exits:
+  - { direction: north, to: north_temple }
+  - { direction: down, to: tiny_cave, passable: "coffin_cure", blocked: "You haven't a prayer of getting the coffin down there." }

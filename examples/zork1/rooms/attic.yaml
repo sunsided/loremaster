@@ -1,0 +1,8 @@
+# Imported from ZIL: ATTIC (1dungeon.zil)
+name: "Attic"
+tags: [dark]
+position: [2, -3]
+description:
+  - "This is the attic. The only exit is a stairway leading down."
+exits:
+  - { direction: down, to: kitchen }

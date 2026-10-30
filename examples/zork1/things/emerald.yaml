@@ -1,0 +1,5 @@
+# Imported from ZIL: EMERALD (1dungeon.zil)
+name: "large emerald"
+aliases: ["emerald", "treasure"]
+location: { room: river_4 }
+portable: true

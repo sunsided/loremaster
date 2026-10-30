@@ -1,0 +1,9 @@
+# Imported from ZIL: ATLANTIS-ROOM (1dungeon.zil)
+name: "Atlantis Room"
+tags: [dark]
+position: [-4, -8]
+description:
+  - "This is an ancient room, long under water. There is an exit to the south and a staircase leading up."
+exits:
+  - { direction: up, to: small_cave }
+  - { direction: south, to: reservoir_north }

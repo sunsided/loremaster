@@ -1,0 +1,6 @@
+# Imported from ZIL: KITCHEN-TABLE (1dungeon.zil)
+name: "kitchen table"
+aliases: ["table"]
+location: { room: kitchen }
+listed: false
+props: { open: true }

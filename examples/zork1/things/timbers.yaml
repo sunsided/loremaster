@@ -1,0 +1,5 @@
+# Imported from ZIL: TIMBERS (1dungeon.zil)
+name: "broken timber"
+aliases: ["timbers", "pile"]
+location: { room: timber_room }
+portable: true

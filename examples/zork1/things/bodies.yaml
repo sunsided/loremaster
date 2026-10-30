@@ -1,0 +1,5 @@
+# Imported from ZIL: BODIES (1dungeon.zil)
+name: "pile of bodies"
+aliases: ["bodies", "body", "remains", "pile"]
+location: { room: entrance_to_hades }
+listed: false

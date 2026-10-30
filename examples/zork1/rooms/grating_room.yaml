@@ -1,0 +1,15 @@
+# Imported from ZIL: GRATING-ROOM (1dungeon.zil)
+name: "Grating Room"
+tags: [dark]
+position: [-2, 1]
+description:
+  - "You are in a small room near the maze. There are twisty passages in the immediate vicinity."
+  - when: "grate.open"
+    text: "Above you is an open grating with sunlight pouring in."
+  - when: "(not grate.open) and grunlock"
+    text: "Above you is a grating."
+  - when: "(not grate.open) and (not grunlock)"
+    text: "Above you is a grating locked with a skull-and-crossbones lock."
+exits:
+  - { direction: southwest, to: maze_11 }
+  - { direction: up, to: grating_clearing, door: grate }

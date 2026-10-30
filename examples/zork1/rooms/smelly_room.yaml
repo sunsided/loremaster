@@ -1,0 +1,9 @@
+# Imported from ZIL: SMELLY-ROOM (1dungeon.zil)
+name: "Smelly Room"
+tags: [dark]
+position: [-1, -14]
+description:
+  - "This is a small nondescript room. However, from the direction of a small descending staircase a foul odor can be detected. To the south is a narrow tunnel."
+exits:
+  - { direction: down, to: gas_room }
+  - { direction: south, to: shaft_room }

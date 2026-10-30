@@ -1,0 +1,5 @@
+# Imported from ZIL: RED-BUTTON (1dungeon.zil)
+name: "red button"
+aliases: ["button", "switch"]
+location: { room: maintenance_room }
+listed: false

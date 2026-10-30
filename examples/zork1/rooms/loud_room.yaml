@@ -1,0 +1,14 @@
+# Imported from ZIL: LOUD-ROOM (1dungeon.zil)
+name: "Loud Room"
+tags: [dark]
+position: [-1, -3]
+description:
+  - "This is a large room with a ceiling which cannot be detected from the ground. There is a narrow passage from east to west and a stone stairway leading upward."
+  - when: "loud_flag or ((not gates_open) and low_tide)"
+    text: "The room is eerie in its quietness."
+  - when: "not (loud_flag or ((not gates_open) and low_tide))"
+    text: "The room is deafeningly loud with an undetermined rushing sound. The sound seems to reverberate from all of the walls, making it difficult even to think."
+exits:
+  - { direction: east, to: damp_cave }
+  - { direction: west, to: round_room }
+  - { direction: up, to: deep_canyon }

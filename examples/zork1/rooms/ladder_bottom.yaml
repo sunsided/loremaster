@@ -1,0 +1,10 @@
+# Imported from ZIL: LADDER-BOTTOM (1dungeon.zil)
+name: "Ladder Bottom"
+tags: [dark]
+position: [-5, -9]
+description:
+  - "This is a rather wide room. On one side is the bottom of a narrow wooden ladder. To the west and the south are passages leaving the room."
+exits:
+  - { direction: south, to: dead_end_5 }
+  - { direction: west, to: timber_room }
+  - { direction: up, to: ladder_top }

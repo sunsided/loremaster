@@ -1,0 +1,11 @@
+# Imported from ZIL: EW-PASSAGE (1dungeon.zil)
+name: "East-West Passage"
+tags: [dark]
+position: [-3, -3]
+description:
+  - "This is a narrow east-west passageway. There is a narrow stairway leading down at the north end of the room."
+exits:
+  - { direction: east, to: round_room }
+  - { direction: west, to: troll_room }
+  - { direction: down, to: chasm_room }
+  - { direction: north, to: chasm_room }

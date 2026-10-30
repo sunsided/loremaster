@@ -1,0 +1,5 @@
+# Imported from ZIL: CLIMBABLE-CLIFF (1dungeon.zil)
+name: "cliff"
+aliases: ["wall", "walls", "ledge"]
+location: { room: canyon_bottom }
+listed: false

@@ -1,0 +1,10 @@
+# Imported from ZIL: TRIDENT (1dungeon.zil)
+name: "crystal trident"
+aliases: ["trident", "fork", "treasure"]
+location: { room: atlantis_room }
+portable: true
+presence:
+  - when: "trident.interactions == 0"
+    text: "On the shore lies Poseidon's own crystal trident."
+  - when: "trident.interactions > 0"
+    text: "There is {trident.a} here."

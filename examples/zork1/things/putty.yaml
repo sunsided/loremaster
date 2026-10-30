@@ -1,0 +1,5 @@
+# Imported from ZIL: PUTTY (1dungeon.zil)
+name: "viscous material"
+aliases: ["material", "gunk"]
+location: { room: maintenance_room }
+portable: true

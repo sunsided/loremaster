@@ -1,0 +1,5 @@
+# Imported from ZIL: GUNK (1dungeon.zil)
+name: "small piece of vitreous slag"
+aliases: ["gunk", "piece", "slag"]
+location: nowhere
+portable: true

@@ -1,0 +1,11 @@
+# Imported from ZIL: LAMP (1dungeon.zil)
+name: "brass lantern"
+aliases: ["lamp", "lantern", "light"]
+location: { room: living_room }
+portable: true
+props: { lit: false }
+presence:
+  - when: "lamp.interactions == 0"
+    text: "A battery-powered brass lantern is on the trophy case."
+  - when: "lamp.interactions > 0"
+    text: "There is a brass lantern (battery-powered) here."

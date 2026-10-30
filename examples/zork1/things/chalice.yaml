@@ -1,0 +1,8 @@
+# Imported from ZIL: CHALICE (1dungeon.zil)
+name: "chalice"
+aliases: ["cup", "silver", "treasure"]
+location: { room: treasure_room }
+portable: true
+props: { open: false }
+presence:
+  - "There is a silver chalice, intricately engraved, here."

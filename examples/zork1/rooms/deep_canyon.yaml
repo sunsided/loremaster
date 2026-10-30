@@ -1,0 +1,15 @@
+# Imported from ZIL: DEEP-CANYON (1dungeon.zil)
+name: "Deep Canyon"
+tags: [dark]
+position: [0, -5]
+description:
+  - "You are on the south edge of a deep canyon. Passages lead off to the east, northwest and southwest. A stairway leads down."
+  - when: "gates_open and (not low_tide)"
+    text: "You can hear a loud roaring sound, like that of rushing water, from below."
+  - when: "(not (gates_open and (not low_tide))) and (not ((not gates_open) and low_tide))"
+    text: "You can hear the sound of flowing water from below."
+exits:
+  - { direction: northwest, to: reservoir_south }
+  - { direction: east, to: dam_room }
+  - { direction: southwest, to: ns_passage }
+  - { direction: down, to: loud_room }

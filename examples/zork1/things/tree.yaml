@@ -1,0 +1,5 @@
+# Imported from ZIL: TREE (1dungeon.zil)
+name: "tree"
+aliases: ["branch"]
+location: { room: forest_1 }
+listed: false

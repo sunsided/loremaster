@@ -1,0 +1,8 @@
+# Imported from ZIL: STREAM-VIEW (1dungeon.zil)
+name: "Stream View"
+tags: [dark]
+position: [-4, -5]
+description:
+  - "You are standing on a path beside a gently flowing stream. The path follows the stream, which flows from west to east."
+exits:
+  - { direction: east, to: reservoir_south }
