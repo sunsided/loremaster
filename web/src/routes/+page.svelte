@@ -138,6 +138,10 @@
 		{ id: 'checks', label: 'Checks' },
 		...(ai.reachable ? [{ id: 'proposals', label: `Proposals ${ai.proposals.length}` }] : [])
 	]);
+	// The Proposals tab goes away when the server stops; show the map in its place.
+	$effect(() => {
+		if (atlasTab === 'proposals' && !ai.reachable) atlasTab = 'map';
+	});
 
 	let proposalProblems = $state<Record<string, string>>({});
 
@@ -160,14 +164,13 @@
 	const proposalSummaries = $derived(ai.proposals.map(summarize));
 
 	// Compare the files of the AI server with the files of the editor, when the server comes up and after changes.
-	let syncTimer: ReturnType<typeof setTimeout> | null = null;
 	$effect(() => {
 		const ws = workspace;
 		const reachable = ai.reachable;
 		const files = ws?.project.files;
 		if (!ws || !reachable || !files) return;
-		if (syncTimer) clearTimeout(syncTimer);
-		syncTimer = setTimeout(() => void ai.compare(files, ws.project.editedPaths()), 800);
+		const syncTimer = setTimeout(() => void ai.compare(files, ws.project.editedPaths()), 800);
+		return () => clearTimeout(syncTimer);
 	});
 	const aiDiffers = $derived(ai.reachable && ai.sync !== null && !ai.sync.same);
 
@@ -218,13 +221,20 @@
 		return out;
 	});
 
+	// The proposals with an accept or a reject in progress. A second click on the same proposal does nothing.
+	const proposalBusy = new Set<string>();
 	async function onProposal(id: string, action: 'accept' | 'reject', note?: string) {
 		const view = ai.proposals.find((p) => p.id === id);
 		const ws = workspace;
-		if (!view || !ws) return;
-		const problem = action === 'accept' ? await ai.accept(view, ws) : await ai.reject(view, note);
-		proposalProblems = { ...proposalProblems, [id]: problem ?? '' };
-		if (!problem) delete proposalProblems[id];
+		if (!view || !ws || proposalBusy.has(id)) return;
+		proposalBusy.add(id);
+		try {
+			const problem = action === 'accept' ? await ai.accept(view, ws) : await ai.reject(view, note);
+			proposalProblems = { ...proposalProblems, [id]: problem ?? '' };
+			if (!problem) delete proposalProblems[id];
+		} finally {
+			proposalBusy.delete(id);
+		}
 	}
 	const atlasRooms = $derived.by(() => {
 		const s = session;
