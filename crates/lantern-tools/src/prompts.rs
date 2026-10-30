@@ -78,11 +78,13 @@ pub fn render_prompt(name: &str, args: &Value) -> Result<String, ToolError> {
             Ok(format!(
                 "In the room `{room}`, the player tried to go {dir}. There is no exit {dir}. Imagine what is there.\n\
                  \n\
-                 1. Look at the context: `overview`, `get_entity` for the room, `neighbors` with 2 hops, and `scene` and `vars` of the session `{session}`. Read the guide resource lantern://guide/writing-stories if you have not.\n\
-                 2. Make 3 proposals with `propose`, each of a different kind. Kinds to choose from: a new room with an exit pair and a map position; an exit to a room that exists; an exit that is hidden (`visible`) or blocked (`passable` and `blocked`); a scenery thing or a frame that answers the move with text only.\n\
+                 Work fast: the author waits for the reply. Use few tool calls and do not test how the engine works.\n\
+                 \n\
+                 1. Look at the context: `get_entity` for the room, `neighbors` with 1 hop, and `scene` of the session `{session}`. Read the guide resource lantern://guide/writing-stories if you have not.\n\
+                 2. Make 3 proposals with `propose`, each of a different kind. Kinds to choose from: a new room with an exit pair and a map position; an exit to a room that exists; an exit that is hidden (`visible`) or blocked (`passable` and `blocked`).\n\
                  3. Keep each proposal small and consistent with the tone, the period and the neighbours. In a changed file, keep the lines you do not change byte for byte.\n\
-                 4. A proposal must have `ok: true`. If it has problems, make a fixed one and withdraw the old one. Walk into a new room with `session_start` and `proposal` to see that it reads well.\n\
-                 5. Do not change the session `{session}`. Use your own session names for tests.\n\
+                 4. A proposal must have `ok: true`. If it has problems, make a fixed one and withdraw the old one. Do not play the proposals: the author does that.\n\
+                 5. Do not change the session `{session}`.\n\
                  {rejected}\n\
                  Reply with one line for each proposal: its id, then a pitch of at most 15 words."
             ))

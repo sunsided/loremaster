@@ -86,6 +86,8 @@ impl Agent {
         if let Some(model) = &self.model {
             cmd.args(["--model", model]);
         }
+        // Load the lantern tools at the start, without a ToolSearch round trip.
+        cmd.env("ENABLE_TOOL_SEARCH", "false");
         cmd.stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
