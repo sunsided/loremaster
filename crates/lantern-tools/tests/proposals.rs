@@ -280,3 +280,49 @@ fn a_proposal_goes_stale_when_its_file_changes() {
     ws.reload(changed);
     assert!(call(&mut ws, "get_proposal", json!({ "id": "p1" }))["stale"] == true);
 }
+
+#[test]
+fn an_edit_gives_the_same_proposal_as_the_whole_file() {
+    let mut ws = Workspace::new(files());
+    let v = call(
+        &mut ws,
+        "propose",
+        json!({
+            "summary": "Down from the shore to a pier",
+            "files": [{ "path": "rooms/pier.yaml", "text": PIER }],
+            "edits": [{ "path": "rooms/shore.yaml", "old": "exits:\n", "new": "exits:\n  - { direction: down, to: pier }\n" }]
+        }),
+    );
+    assert!(v["ok"] == true, "{v:#}");
+    let shore = v["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["path"] == "rooms/shore.yaml")
+        .unwrap();
+    assert!(shore["after"] == shore_with_pier().as_str());
+}
+
+#[test]
+fn an_edit_must_match_once() {
+    let mut ws = Workspace::new(files());
+    let missing = ws.call(
+        "propose",
+        json!({ "summary": "x", "edits": [{ "path": "rooms/shore.yaml", "old": "no such text", "new": "" }] }),
+    );
+    assert!(missing.unwrap_err().0.contains("is not in"));
+    let twice = ws.call(
+        "propose",
+        json!({ "summary": "x", "edits": [{ "path": "rooms/shore.yaml", "old": "direction", "new": "" }] }),
+    );
+    assert!(twice.unwrap_err().0.contains("times"));
+    let both = ws.call(
+        "propose",
+        json!({
+            "summary": "x",
+            "files": [{ "path": "rooms/shore.yaml", "text": "" }],
+            "edits": [{ "path": "rooms/shore.yaml", "old": "exits:", "new": "exits:" }]
+        }),
+    );
+    assert!(both.unwrap_err().0.contains("in one of them"));
+}
