@@ -37,6 +37,10 @@ Enter saves, Shift+Enter adds a line break, Escape cancels. Save is not availabl
 With \`kind: 'response'\` the writer is for the text of a rule that answers a command: it has the condition and the text only.
 With \`oncreate\`, an unknown name in the text gets a "Create thing …" button, so the author can make the thing without leaving the text.
 
+**Two views, one draft.** Give the writer a \`draft\` (a \`FragmentDraft\`) and give the same draft to a ProseEditor in the game text: both views edit one text. In the app, on screens from 900px, the writer sits next to the game text in place of the inspector, and the author types in the game text or in the writer. On narrow screens the writer shows under the paragraph.
+
+**Type first, tune later.** Selected text in either view gets the selection toolbar (SelectionTools): use the name, make it a thing (\`onthing\`), only the first time, only when, make variants.
+
 The writer uses the interface font for its controls and the prose font for the text, so the text looks as it does in the game.`
 				}
 			}

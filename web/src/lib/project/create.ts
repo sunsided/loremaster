@@ -112,10 +112,12 @@ export function addExit(text: string, direction: Direction, to: string): string 
 }
 
 /** A new thing file, in a room. */
-export function thingFile(o: { name: string; room: string; proper?: boolean; portable?: boolean; props?: Record<string, boolean | number | string> }): string {
+export function thingFile(o: { name: string; room: string; proper?: boolean; portable?: boolean; listed?: boolean; props?: Record<string, boolean | number | string> }): string {
 	const lines = [`name: ${JSON.stringify(o.name)}`, `location: { room: ${o.room} }`];
 	if (o.portable) lines.push('portable: true');
 	if (o.proper) lines.push('proper: true');
+	// A thing that the room text names is not listed again as "There is … here."
+	if (o.listed === false) lines.push('listed: false');
 	const props = Object.entries(o.props ?? {});
 	if (props.length) lines.push(`props: { ${props.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')} }`);
 	return `${lines.join('\n')}\n`;

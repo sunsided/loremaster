@@ -4,6 +4,10 @@
 	import { canLinkFolder } from '#lib/project/store.ts';
 	import { emptyFragment, insertFragment, removeFragment, writeFragment } from '#lib/project/yaml-edit.ts';
 	import FragmentWriter from '#lib/design/organisms/FragmentWriter.svelte';
+	import ProseEditor from '#lib/design/molecules/ProseEditor.svelte';
+	import { FragmentDraft } from '#lib/design/fragment-draft.svelte.ts';
+	import { inMarkup } from '#lib/project/transform.ts';
+	import { untrack } from 'svelte';
 	import CreatePanel from '#lib/design/organisms/CreatePanel.svelte';
 	import { addExit, addResponseRule, directionOf, directions, opposite, roomFile, slug, step, thingFile, type Direction } from '#lib/project/create.ts';
 	import type { CreateRequest } from '#lib/design/types.ts';
@@ -316,6 +320,30 @@
 		writingVariant = source.variant;
 	}
 
+	/**
+	 * The draft of the fragment under edit. The prose view in the game text and the writer edit it together.
+	 * It is made when the author opens a fragment, and it stays while the files change (for example a new thing).
+	 */
+	let draft = $state.raw<FragmentDraft | null>(null);
+	let draftKey = $state('');
+	$effect(() => {
+		const at = writingAt;
+		const key = at ? `${at.owner}#${at.fragment}` : '';
+		if (key === untrack(() => draftKey)) return;
+		draftKey = key;
+		const f = untrack(() => writerFragment);
+		draft = at && at.fragment >= -1 && f ? new FragmentDraft(f, untrack(() => writingVariant)) : null;
+	});
+	let fragmentWriter: FragmentWriter | undefined = $state();
+	/** On wide screens the writer sits next to the game text, in place of the inspector. */
+	let sideBySide = $state(false);
+
+	/** How a piece of markup reads now, for the chips in the prose view. */
+	function renderMarkup(markup: string): string | null {
+		const c = session?.game.tryMarkup(markup);
+		return !c || c.error ? null : c.text;
+	}
+
 	/** The fragment under edit, from the file; a new empty one for index -1. */
 	const writerFragment = $derived.by<WriterFragment | null>(() => {
 		const at = writingAt;
@@ -427,6 +455,15 @@
 		return null;
 	}
 
+	/** "Make it a thing": the selected words name a new thing in the room. The text says it, so it is not listed. */
+	async function makeThing(name: string) {
+		const ws = workspace;
+		const s = session;
+		if (!ws || !s) return;
+		const id = slug(name, new Set([...ids('thing'), ...ids('room')]));
+		await ws.changeMany([{ path: `things/${id}.yaml`, text: thingFile({ name: name.toLowerCase(), room: s.scene.room, listed: false }) }]);
+	}
+
 	/** Create a thing for an unknown name in the text, and keep the writer open. */
 	async function createNamed(id: string, property: string | null) {
 		const ws = workspace;
@@ -516,11 +553,17 @@
 		ultrawide = wide.matches;
 		const onWide = () => (ultrawide = wide.matches);
 		wide.addEventListener('change', onWide);
+		// Same width as --bp-stack in PlayerLayout: from here the inspector is next to the game text.
+		const side = window.matchMedia('(min-width: 900px)');
+		sideBySide = side.matches;
+		const onSide = () => (sideBySide = side.matches);
+		side.addEventListener('change', onSide);
 		const onVisibility = () => (hidden = document.hidden);
 		document.addEventListener('visibilitychange', onVisibility);
 		return () => {
 			document.removeEventListener('visibilitychange', onVisibility);
 			wide.removeEventListener('change', onWide);
+			side.removeEventListener('change', onSide);
 		};
 	});
 
@@ -542,6 +585,31 @@
 <svelte:head>
 	<title>{session ? `${session.game.title} · lantern` : 'lantern'}</title>
 </svelte:head>
+
+{#snippet fragmentWriterView()}
+	{#if writingAt && writingAt.fragment >= -1 && writerFragment && writerTools && draft}
+		{@const at = writingAt}
+		{#key draftKey}
+			<FragmentWriter
+				bind:this={fragmentWriter}
+				{draft}
+				fragment={writerFragment}
+				variant={writingVariant}
+				title={writerTitle(at)}
+				tools={writerTools}
+				fresh={at.fragment < 0}
+				onsave={(f) =>
+					saveFragment(at, (text, list) =>
+						at.fragment < 0 ? insertFragment(text, list, Number.MAX_SAFE_INTEGER, f) : writeFragment(text, list, at.fragment, f)
+					)}
+				oncancel={closeWriter}
+				onremove={() => saveFragment(at, (text, list) => removeFragment(text, list, at.fragment))}
+				oncreate={createNamed}
+				onthing={makeThing}
+			/>
+		{/key}
+	{/if}
+{/snippet}
 
 {#if session}
 	{@const s = session}
@@ -608,22 +676,26 @@
 							onsave={(f) => saveResponse(r, f)}
 							oncancel={closeWriter}
 						/>
-					{:else if writingAt && writerFragment && writerTools}
-						{@const at = writingAt}
-						{#key `${at.owner}#${at.fragment}`}
-							<FragmentWriter
-								fragment={writerFragment}
-								variant={writingVariant}
-								title={writerTitle(at)}
-								tools={writerTools}
-								fresh={at.fragment < 0}
-								onsave={(f) =>
-									saveFragment(at, (text, list) =>
-										at.fragment < 0 ? insertFragment(text, list, Number.MAX_SAFE_INTEGER, f) : writeFragment(text, list, at.fragment, f)
-									)}
+					{:else if !sideBySide}
+						{@render fragmentWriterView()}
+					{/if}
+				{/snippet}
+				{#snippet editor()}
+					{#if draft && writerTools}
+						{@const d = draft}
+						{#key draftKey}
+							<ProseEditor
+								bind:value={d.variants[d.current]}
+								label="{writingAt ? writerTitle(writingAt) : 'Text'}, as the player reads it"
+								render={renderMarkup}
+								placeholder="Write what the player reads…"
+								onsubmit={() => fragmentWriter?.save()}
 								oncancel={closeWriter}
-								onremove={() => saveFragment(at, (text, list) => removeFragment(text, list, at.fragment))}
-								oncreate={createNamed}
+								onselection={(from, to, rect) =>
+									(d.selection = rect && !inMarkup(d.text, from, to) ? { view: 'prose', from, to, rect } : null)}
+								ontools={() => d.toolsFocus++}
+								target={d.target?.view === 'prose' ? d.target : null}
+								autofocus
 							/>
 						{/key}
 					{/if}
@@ -659,6 +731,9 @@
 			<MapPanel map={s.map} framed />
 		{/snippet}
 		{#snippet panel()}
+			{#if sideBySide && draft && writingAt && writingAt.fragment >= -1}
+				<div class="side-writer">{@render fragmentWriterView()}</div>
+			{:else}
 			<InspectorPanel tabs={inspectorTabs} bind:selected={inspector}>
 				{#if inspector === 'map'}
 					<MapPanel map={s.map} />
@@ -702,6 +777,7 @@
 					/>
 				{/if}
 			</InspectorPanel>
+			{/if}
 		{/snippet}
 	</PlayerLayout>
 	<AuthorTooltip inspect={(kind, id) => s.game.inspect(kind, id)} enabled={settings.tooltips} />
@@ -755,6 +831,15 @@
 <style>
 	.message {
 		padding: var(--space-9);
+	}
+	/* The writer next to the game text, in the place of the inspector. */
+	.side-writer {
+		position: relative;
+		box-sizing: border-box;
+		height: 100%;
+		min-height: 0;
+		overflow-y: auto;
+		padding: var(--space-5);
 	}
 	.actions {
 		display: flex;

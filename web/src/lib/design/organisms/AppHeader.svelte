@@ -102,10 +102,11 @@
 	}
 	kbd {
 		padding: 0 var(--space-2);
-		border: var(--size-border) solid var(--color-border-subtle);
+		border: var(--size-border) solid currentColor;
 		font-family: var(--font-ui);
 		font-size: var(--font-size-xs);
-		color: var(--color-text-muted);
+		color: inherit;
+		opacity: 0.75;
 	}
 	.now-label {
 		color: var(--color-text-warning);

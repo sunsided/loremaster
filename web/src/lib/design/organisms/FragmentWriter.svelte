@@ -5,6 +5,9 @@
 	import Select from '../atoms/Select.svelte';
 	import Tag from '../atoms/Tag.svelte';
 	import MarkupEditor from '../molecules/MarkupEditor.svelte';
+	import SelectionTools from '../molecules/SelectionTools.svelte';
+	import { FragmentDraft } from '../fragment-draft.svelte.ts';
+	import { inMarkup } from '#lib/project/transform.ts';
 	import type { TextProblem, WriterFragment, WriterTools } from '../types.ts';
 
 	interface Props {
@@ -25,24 +28,38 @@
 		kind?: 'fragment' | 'response';
 		/** Create a thing for a name that the story does not know. When set, the writer offers it. */
 		oncreate?: (id: string, property: string | null) => void;
+		/**
+		 * The draft to edit. Give the same draft to a prose view in the game text, and both views edit one text.
+		 * Without it, the writer makes its own draft from `fragment`.
+		 */
+		draft?: FragmentDraft;
+		/** "Make it a thing" for selected words. When set, the selection toolbar offers it. */
+		onthing?: (name: string) => void;
 	}
 
-	let { fragment, variant = 0, title, tools, fresh = false, onsave, oncancel, onremove, kind = 'fragment', oncreate }: Props = $props();
+	let {
+		fragment,
+		variant = 0,
+		title,
+		tools,
+		fresh = false,
+		onsave,
+		oncancel,
+		onremove,
+		kind = 'fragment',
+		oncreate,
+		draft: given,
+		onthing
+	}: Props = $props();
 
 	// The draft starts as a copy of the fragment and is not changed from outside.
-	const start = untrack(() => $state.snapshot(fragment));
-	let variants = $state([...start.variants]);
-	let current = $state(untrack(() => Math.min(variant, start.variants.length - 1)));
-	let when = $state(start.when ?? '');
-	let layer = $state(start.layer);
-	let mode = $state(start.mode);
-	let replaces = $state(start.replaces);
+	const draft = untrack(() => given ?? new FragmentDraft($state.snapshot(fragment), variant));
 	let saving = $state(false);
 	let saveProblem = $state<string | null>(null);
 
-	const text = $derived(variants[current] ?? '');
+	const text = $derived(draft.text);
 	const check = $derived(tools.tryMarkup(text));
-	const condition = $derived(tools.tryCondition(when));
+	const condition = $derived(tools.tryCondition(draft.when));
 	const blocked = $derived(!!check.problem || !!condition.problem || saving);
 	const id = $props.id();
 
@@ -80,18 +97,43 @@
 	}
 	const textNew = $derived(oncreate ? newName(check.problem) : null);
 	const whenNew = $derived(oncreate ? newName(condition.problem) : null);
-	const whenFix = $derived(fixFor(when, condition.problem));
+	const whenFix = $derived(fixFor(draft.when, condition.problem));
 
 	function applyFix(fix: { from: number; to: number; name: string }, inWhen: boolean) {
-		if (inWhen) when = when.slice(0, fix.from) + fix.name + when.slice(fix.to);
-		else variants[current] = text.slice(0, fix.from) + fix.name + text.slice(fix.to);
+		if (inWhen) draft.when = draft.when.slice(0, fix.from) + fix.name + draft.when.slice(fix.to);
+		else draft.text = text.slice(0, fix.from) + fix.name + text.slice(fix.to);
+	}
+
+	/** The names of things as they read now, for "Use the name". */
+	const names = $derived(
+		tools.symbols.filter((s) => s.kind === 'name' && s.value).map((s) => ({ name: s.name, value: s.value as string }))
+	);
+	/** The actions for the selected text. */
+	const actions = $derived.by(() => {
+		const sel = draft.selection;
+		if (!sel) return [];
+		const words = text.slice(sel.from, sel.to).trim();
+		const out: { id: string; label: string; run: () => void }[] = [];
+		const named = draft.nameFor(names);
+		if (named) out.push({ id: 'name', label: 'Use the name', run: () => draft.useName(names) });
+		else if (onthing && /^[\p{L}][\p{L}\p{N} '-]{0,40}$/u.test(words))
+			out.push({ id: 'thing', label: 'Make it a thing', run: () => (onthing(words), (draft.selection = null)) });
+		out.push({ id: 'first', label: 'Only the first time', run: () => draft.onlyFirst() });
+		out.push({ id: 'when', label: 'Only when…', run: () => draft.onlyWhen() });
+		if (kind === 'fragment' && draft.split) out.push({ id: 'variants', label: 'Make variants', run: () => draft.makeVariants() });
+		return out;
+	});
+
+	/** Report a selection from the source view. */
+	function selectSource(from: number, to: number, rect: { left: number; top: number; bottom: number } | null) {
+		draft.selection = rect && !inMarkup(text, from, to) ? { view: 'source', from, to, rect } : null;
 	}
 
 	/** The text in each combination of the values that it depends on, one entry for each different text. */
 	let showOther = $state(false);
 	const other = $derived.by(() => {
 		if (!showOther || check.problem || condition.problem || !tools.textMatrix) return null;
-		const m = tools.textMatrix(text, when.trim() || null);
+		const m = tools.textMatrix(text, draft.when.trim() || null);
 		if (!m) return null;
 		const groups = new Map<string, string[][]>();
 		for (const c of m.cells) groups.set(c.text, [...(groups.get(c.text) ?? []), c.values]);
@@ -121,23 +163,12 @@
 		section?.scrollIntoView({ block: 'nearest' });
 	});
 
-	async function save() {
+	/** Save the draft. The prose view in the game text calls it on Enter too. */
+	export async function save() {
 		if (blocked) return;
 		saving = true;
-		saveProblem = await onsave({ variants: [...variants], when: when.trim() || null, layer, mode, replaces });
+		saveProblem = await onsave(draft.snapshot());
 		saving = false;
-	}
-
-	function addVariant() {
-		variants.push('');
-		current = variants.length - 1;
-		if (mode === 'always' || mode === 'first_visit' || mode === 'once') mode = 'cycle';
-	}
-
-	function removeVariant() {
-		if (variants.length < 2) return;
-		variants.splice(current, 1);
-		current = Math.min(current, variants.length - 1);
 	}
 </script>
 
@@ -146,13 +177,17 @@
 	The author types the text with its markup and sees at once how it reads now.
 	Enter saves, Shift+Enter adds a line break, Escape cancels.
 -->
+{#if draft.selection && actions.length}
+	<SelectionTools rect={draft.selection.rect} {actions} focus={draft.toolsFocus} onclose={() => (draft.target = { ...draft.selection!, view: draft.selection!.view, n: (draft.target?.n ?? 0) + 1 })} />
+{/if}
+
 <section class="writer" aria-labelledby="{id}-title" bind:this={section}>
 	<div class="head">
 		<h2 id="{id}-title">{title}</h2>
 		{#if kind === 'fragment'}
-			<Select label="Layer" bind:value={layer} options={layers} />
-			<Select label="Shows" bind:value={mode} options={modes} />
-			<Checkbox bind:checked={replaces}>replaces earlier text in its layer</Checkbox>
+			<Select label="Layer" bind:value={draft.layer} options={layers} />
+			<Select label="Shows" bind:value={draft.mode} options={modes} />
+			<Checkbox bind:checked={draft.replaces}>replaces earlier text in its layer</Checkbox>
 		{/if}
 	</div>
 
@@ -160,7 +195,7 @@
 		<span class="label" id="{id}-when-label">When</span>
 		<div class="when-editor">
 			<MarkupEditor
-				bind:value={when}
+				bind:value={draft.when}
 				label={kind === 'fragment'
 					? 'Condition: the fragment shows only when it holds. Empty means always.'
 					: 'Condition: the response applies only when it holds. Empty means always.'}
@@ -187,28 +222,31 @@
 		</span>
 	</div>
 
-	{#if variants.length > 1}
+	{#if draft.variants.length > 1}
 		<div class="variants" role="group" aria-label="Variants">
-			{#each variants as _, i (i)}
-				<Button size="compact" variant="quiet" pressed={i === current} onclick={() => (current = i)}>Variant {i + 1}</Button>
+			{#each draft.variants as _, i (i)}
+				<Button size="compact" variant="quiet" pressed={i === draft.current} onclick={() => (draft.current = i)}>Variant {i + 1}</Button>
 			{/each}
-			<Button size="compact" variant="quiet" onclick={removeVariant}>Remove this variant</Button>
+			<Button size="compact" variant="quiet" onclick={() => draft.removeVariant()}>Remove this variant</Button>
 		</div>
 	{/if}
 
-	{#key current}
+	{#key draft.current}
 		<div class="text">
 		<MarkupEditor
-			bind:value={variants[current]}
-			label="Text{variants.length > 1 ? `, variant ${current + 1}` : ''}"
+			bind:value={draft.variants[draft.current]}
+			label="Text, with markup{draft.variants.length > 1 ? `, variant ${draft.current + 1}` : ''}"
 			tokenize={(t) => tools.tokenize(t, false)}
 			problem={check.problem}
 			placeholder="Write what the player reads…"
 			symbols={tools.symbols}
 			onsubmit={save}
 			{oncancel}
-			autofocus
+			autofocus={!given}
 			describedby="{id}-reads"
+			onselection={selectSource}
+			ontools={() => draft.toolsFocus++}
+			target={draft.target?.view === 'source' ? draft.target : null}
 		/>
 		</div>
 	{/key}
@@ -260,7 +298,7 @@
 	<div class="actions">
 		<Button variant="primary" size="compact" onclick={save} disabled={blocked}>{fresh ? 'Add' : 'Save'}</Button>
 		<Button size="compact" onclick={oncancel}>Cancel</Button>
-		{#if kind === 'fragment'}<Button size="compact" variant="quiet" onclick={addVariant}>Add a variant</Button>{/if}
+		{#if kind === 'fragment'}<Button size="compact" variant="quiet" onclick={() => draft.addVariant()}>Add a variant</Button>{/if}
 		{#if onremove && !fresh}<Button size="compact" variant="quiet" onclick={onremove}>Remove this fragment</Button>{/if}
 		<span class="keys" aria-hidden="true">Enter saves · Shift+Enter new line · Esc cancels</span>
 	</div>

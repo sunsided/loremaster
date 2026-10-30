@@ -24,8 +24,10 @@
 		writable?: number | null;
 		/** The fragment that the writer edits now, or null. */
 		writing?: WritingAt | null;
-		/** The writer, shown in place of the fragment that it edits. */
+		/** The writer with all the tools. It shows after the paragraph of the fragment that it edits. Leave it out when the writer shows elsewhere, for example next to the game text. */
 		writer?: Snippet;
+		/** The prose view of the fragment under edit. It shows in place of the fragment, in the game text. */
+		editor?: Snippet;
 		/** Open the writer for a fragment. */
 		onwrite?: (source: Source) => void;
 		/** Open the writer for a new room fragment. */
@@ -49,6 +51,7 @@
 		writable = null,
 		writing = null,
 		writer,
+		editor,
 		onwrite,
 		onadd,
 		respond = null,
@@ -169,7 +172,7 @@
 	In write mode, each fragment of the room text is a button that opens the writer.
 	Links are plain text there: a click edits, it does not play.
 -->
-{#snippet writableRuns(block: Block)}{#each groups(block.runs) as g, gi (gi)}{#if same(g.source, writing)}<span class="being-written"
+{#snippet writableRuns(block: Block, part: 'all' | 'before' | 'after' = 'all')}{@const gs = groups(block.runs)}{@const cut = gs.findIndex((g) => same(g.source, writing))}{#each gs as g, gi (gi)}{#if (part === 'before' && gi >= cut) || (part === 'after' && gi <= cut)}{:else if same(g.source, writing)}<span class="being-written"
 				>{#each g.runs as run, i (i)}{run.text}{/each}</span
 			>{:else if g.source}{@const src = g.source}<button
 				type="button"
@@ -190,6 +193,15 @@
 			{@const writerAt = writeHere && writing ? writerAfter(entry.turn.blocks) : -1}
 			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere}>
 				{#each entry.turn.blocks as block, bi (bi)}
+					{@const inPlace = !!editor && writeHere && editable(block.kind) && block.runs.some((r) => same(r.source, writing))}
+					{#if inPlace}
+						<!-- The fragment under edit: the prose view in place, between the text before and after it. -->
+						<div class="block {block.kind} editing">
+							<span>{@render writableRuns(block, 'before')}</span>
+							{@render editor?.()}
+							<span>{@render writableRuns(block, 'after')}</span>
+						</div>
+					{:else}
 					<p
 						class="block {block.kind}"
 						class:fx-line={fresh && entry.id > 0 && !writeHere}
@@ -200,6 +212,11 @@
 						>{:else if block.kind === 'note'}<span class="visually-hidden">Parser note:</span>{/if}{#if writeHere && editable(block.kind)}{@render writableRuns(
 								block
 							)}{:else}{@render runs(block)}{/if}</p>
+					{/if}
+					{#if bi === writerAt && editor && writing && !entry.turn.blocks.some((b) => b.runs.some((r) => same(r.source, writing)))}
+						<!-- A new fragment, or one that does not show now: the prose view after the room text. -->
+						<div class="block prose editing">{@render editor()}</div>
+					{/if}
 					{#if bi === writerAt}{@render writer?.()}{/if}
 				{/each}
 				{#if writeHere && !writing && onadd}
@@ -340,6 +357,9 @@
 	.writable:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-focus);
 		outline-offset: 1px;
+	}
+	.editing > span:empty {
+		display: none;
 	}
 	.being-written {
 		color: var(--color-text-muted);

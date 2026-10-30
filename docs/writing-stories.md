@@ -174,9 +174,22 @@ In the web app, "Replay this path" starts the game again and plays the command l
 You can change the story while you play it. The game keeps its state after each change.
 
 1. Select "Write" in the header, or push Ctrl+E (Cmd+E on a Mac). The shortcut also works while you type.
-2. In the newest room text, select a fragment. The writer opens in place of the fragment.
-3. Change the text, the condition ("When"), the layer or the mode. "Now it reads" shows the text as the player reads it now.
-4. Push Enter to save. Push Shift+Enter for a line break. Push Escape to cancel.
+2. In the newest room text, select a fragment. It opens for editing in place, and it still reads as the player reads it.
+3. Type in the game text. Markup shows as a chip with the text that it gives now; select a chip to see and change its markup.
+4. The writer has the same text with all its markup, and the condition ("When"), the layer, the mode and the variants. On a screen from 900px wide, the writer is next to the game text. On a narrow screen, it is under the paragraph. You can type in both places: they show the same text.
+5. Push Enter to save. Push Shift+Enter for a line break. Push Escape to cancel.
+
+### Type first, tune later
+
+Select words in the game text or in the writer. A small toolbar shows (or push Ctrl+.):
+
+| Action | Result |
+| --- | --- |
+| Use the name | The selected name of a thing, for example "the oil lamp", becomes `{oil_lamp.the}`. Then the name changes with the thing. |
+| Make it a thing | The selected words become a new thing in the room. The text does not change. |
+| Only the first time | `{first: …}` goes around the selection. |
+| Only when… | `{ ? …}` goes around the selection. Write the condition before the `?`. |
+| Make variants | Write alternatives with " / " between them, for example `The wind howls / drops.`, and select them. Each alternative becomes a variant of the fragment. |
 
 More actions in write mode:
 

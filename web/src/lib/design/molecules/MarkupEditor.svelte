@@ -28,6 +28,12 @@
 		describedby?: string;
 		/** Names for completion (Ctrl+Space, or as you type) and for hover. */
 		symbols?: EditorSymbol[];
+		/** The selection changed. `rect` is null when nothing is selected. */
+		onselection?: (from: number, to: number, rect: { left: number; top: number; bottom: number } | null) => void;
+		/** Ctrl+. : open the tools for the selection. */
+		ontools?: () => void;
+		/** A cursor or selection to take; it applies when `n` changes. */
+		target?: { from: number; to: number; n: number } | null;
 	}
 
 	let {
@@ -41,8 +47,23 @@
 		oncancel,
 		autofocus = false,
 		describedby,
-		symbols = []
+		symbols = [],
+		onselection,
+		ontools,
+		target = null
 	}: Props = $props();
+
+	function report(v: EditorView) {
+		const { from, to } = v.state.selection.main;
+		if (from === to || !v.hasFocus) {
+			if (v.hasFocus) onselection?.(from, to, null);
+			return;
+		}
+		const a = v.coordsAtPos(from);
+		const b = v.coordsAtPos(to);
+		if (!a || !b) return;
+		onselection?.(from, to, { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), bottom: Math.max(a.bottom, b.bottom) });
+	}
 
 	/** True when the position is inside `{…}` markup. A condition editor is always "inside". */
 	function inMarkup(text: string, pos: number): boolean {
@@ -168,6 +189,13 @@
 				{ key: 'Enter', run: submit, shift: singleLine ? submit : insertNewline },
 				{ key: 'Mod-Enter', run: submit },
 				{
+					key: 'Mod-.',
+					run: () => {
+						ontools?.();
+						return !!ontools;
+					}
+				},
+				{
 					key: 'Escape',
 					run: () => {
 						oncancel?.();
@@ -188,6 +216,7 @@
 			}),
 			EditorView.updateListener.of((u) => {
 				if (u.docChanged) value = u.state.doc.toString();
+				if (onselection && (u.selectionSet || u.docChanged || u.focusChanged)) report(u.view);
 			})
 		];
 	}
@@ -210,6 +239,16 @@
 		if (view && v !== view.state.doc.toString()) {
 			view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: v } });
 		}
+	});
+
+	let lastTarget = 0;
+	$effect(() => {
+		const t = target;
+		if (!view || !t || t.n === lastTarget) return;
+		lastTarget = t.n;
+		const len = view.state.doc.length;
+		view.dispatch({ selection: { anchor: Math.min(t.from, len), head: Math.min(t.to, len) } });
+		view.focus();
 	});
 
 	$effect(() => {
