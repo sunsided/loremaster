@@ -136,6 +136,18 @@ An exit without `to` is a message exit. It goes to no room. When the player goes
 - The map, the scene, the verb bar and the room brief do not show message exits, because they go to no room.
 - In write mode, a new exit in the direction of a message exit replaces the message exit.
 
+## The Atlas
+
+The Atlas shows the whole world at full width. Push Ctrl+M, or select the room name in the status line. Push Escape, or select "Back to …", to go back to the game at the same turn.
+
+| View | What it shows |
+| --- | --- |
+| Map | The floors on the left. The map of a floor in the middle: drag or use the arrow keys to move, the wheel or + and − to zoom, F to see the whole floor. "/" finds a room or a thing. "List view" shows the rooms as a table. The room card on the right has "Go there", "Write here" and "Explore". |
+| Rules | All rules, with "Here and now", "Fired" and "All". |
+| State | All variables and properties, with their values now. A switch sets a value in the game. |
+| Story | The turns so far. |
+| Checks | The texts of the current room in all states, and the whole-game explorer. |
+
 ## Levels
 
 A room can be on a level, for towers and dungeons. Up exits go one level higher, down exits one level lower.
@@ -163,7 +175,7 @@ The example `examples/tower` ("The Spiral") is a tower with three floors of four
 The room matrix shows the text of one room in each combination of the values that the text depends on. It also shows combinations that the player can not reach. Use it to find a text that reads badly in one condition.
 
 1. In the web app, go to the room.
-2. In the Here panel, the section "Depends on" shows the values that the room text depends on. Change a value to preview the room text in place; the game does not move. "Make it so" sets the values in the game. "All texts ↗" opens the explorer with all the texts. "This room" is its default mode.
+2. In the Here panel, the section "Depends on" shows the values that the room text depends on. Change a value to preview the room text in place; the game does not move. "Make it so" sets the values in the game. "All texts ↗" opens Atlas › Checks with all the texts. "This room" is its default mode.
 
 The runtime finds the values in these locations:
 
@@ -188,7 +200,7 @@ After a "Whole game" run, each text has a mark: "seen in the whole-game run" or 
 
 The state explorer plays all ways through the story from the start. It stops at 2000 states or 40 commands.
 
-1. In the web app, open the explorer ("All texts ↗" in the Here panel, or "Show Explore" with Ctrl+K), select "Whole game", then select "Explore all states".
+1. In the web app, open Atlas › Checks (Ctrl+M, then "Checks"), select "Whole game", then select "Explore all states".
 2. Or, run `task explore` or `cargo run -p lantern-cli -- explore <folder>` in a terminal.
 
 The explorer shows:

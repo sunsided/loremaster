@@ -1,7 +1,7 @@
 // Sample data from the lighthouse example, for stories. The shapes are the
 // same as the runtime output.
 
-import type { Exploration, ExitInfo, RoomMatrix, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
+import type { AtlasRoom, Exploration, ExitInfo, RoomMatrix, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
 import type { MarkupToken, StoryStep, TranscriptEntry, WriterFragment, WriterTools } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
@@ -478,3 +478,15 @@ export const towerMap: MapView = {
 		])
 	]
 };
+
+/** The rooms of the spiral tower for the Atlas: what is in each room now. */
+export const towerRooms: AtlasRoom[] = towerMap.rooms.map((r) => ({
+	id: r.id,
+	name: r.name,
+	level: r.level,
+	visited: r.visited,
+	current: r.current,
+	things: r.id === 'bell_chamber' ? [{ id: 'bell', name: 'bronze bell' }] : [],
+	exits: towerMap.links.filter((l) => l.from === r.id).map((l) => [l.direction, l.to] as [string, string]),
+	fragments: 1
+}));

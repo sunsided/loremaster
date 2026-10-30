@@ -18,9 +18,11 @@
 		turnItems: MenuItem[];
 		/** Short marks after the room, for example a running AI job or a preview. */
 		marks?: Snippet;
+		/** A click on the room: open the world view (the Atlas). */
+		onroom?: () => void;
 	}
 
-	let { room, level = null, day, time, phase, turn, turnItems, marks }: Props = $props();
+	let { room, level = null, day, time, phase, turn, turnItems, marks, onroom }: Props = $props();
 </script>
 
 <!--
@@ -29,7 +31,9 @@
 	It is the one place for the state of the game. "Turn N ▾" opens the turn menu.
 -->
 <div class="status-line" role="group" aria-label="Game status">
-	<span class="room">{room}</span>
+	{#if onroom}<button type="button" class="room room-button" aria-keyshortcuts="Control+M" title="Open the Atlas (Ctrl+M)" onclick={onroom}
+			>{room}</button
+		>{:else}<span class="room">{room}</span>{/if}
 	{#if level !== null}<span class="level">level {level}</span>{/if}
 	{#if marks}<span class="marks">{@render marks()}</span>{/if}
 	<span class="right">
@@ -59,6 +63,21 @@
 		display: inline-flex;
 		align-items: center;
 	}
+	.room-button {
+		padding: 0 var(--space-2);
+		margin-left: calc(-1 * var(--space-2));
+		border: var(--size-border) solid transparent;
+		background: none;
+		color: inherit;
+		font: inherit;
+	}
+	.room-button:hover {
+		border-color: var(--color-status-text);
+	}
+	.room-button:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-status-text);
+		outline-offset: 1px;
+	}
 	.level {
 		font-weight: var(--font-weight-regular);
 	}
@@ -85,7 +104,22 @@
 			min-width: 0;
 		}
 		.wide,
-		.level {
+		.room-button {
+		padding: 0 var(--space-2);
+		margin-left: calc(-1 * var(--space-2));
+		border: var(--size-border) solid transparent;
+		background: none;
+		color: inherit;
+		font: inherit;
+	}
+	.room-button:hover {
+		border-color: var(--color-status-text);
+	}
+	.room-button:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-status-text);
+		outline-offset: 1px;
+	}
+	.level {
 			display: none;
 		}
 		.narrow {

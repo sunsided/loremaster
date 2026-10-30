@@ -31,9 +31,12 @@
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
 	import ExplorerView from '#lib/design/organisms/ExplorerView.svelte';
+	import AtlasMap from '#lib/design/organisms/AtlasMap.svelte';
+	import RoomCard from '#lib/design/molecules/RoomCard.svelte';
+	import AtlasLayout from '#lib/design/templates/AtlasLayout.svelte';
 	import type { Exploration } from '#lib/engine/types.ts';
 	import StoryTimeline from '#lib/design/organisms/StoryTimeline.svelte';
-	import type { MenuItem, PaletteItem, TabItem } from '#lib/design/types.ts';
+	import type { MenuItem, PaletteItem } from '#lib/design/types.ts';
 
 	let workspace: Workspace | undefined = $state();
 	const session = $derived(workspace?.session ?? undefined);
@@ -116,11 +119,40 @@
 		return kind === 'thing' || kind === 'exit' ? kind : null;
 	}
 
+	// The Atlas: the whole world at full width, in place of the player screen.
+	let atlasOpen = $state(false);
+	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks'>('map');
+	let atlasRoom = $state<string | null>(null);
+	const atlasTabs = [
+		{ id: 'map', label: 'Map' },
+		{ id: 'rules', label: 'Rules' },
+		{ id: 'state', label: 'State' },
+		{ id: 'story', label: 'Story' },
+		{ id: 'checks', label: 'Checks' }
+	];
+	const atlasRooms = $derived.by(() => {
+		const s = session;
+		if (!s || !atlasOpen) return [];
+		s.entries.length;
+		return s.game.atlas();
+	});
+
+	function openAtlas(tab: typeof atlasTab = atlasTab) {
+		atlasTab = tab;
+		atlasRoom = atlasRoom ?? session?.scene.room ?? null;
+		atlasOpen = true;
+	}
+
+	function closeAtlas() {
+		atlasOpen = false;
+		queueMicrotask(() => prompt?.focus());
+	}
+
 	/** A rule for the Rules tab to show and focus. */
 	let revealRule = $state<string | null>(null);
 
 	function showRule(id: string) {
-		inspector = 'rules';
+		openAtlas('rules');
 		revealRule = id;
 	}
 
@@ -155,8 +187,9 @@
 		const s = session;
 		if (!s) return [];
 		const items: PaletteItem[] = [];
-		for (const tab of inspectorTabs) {
-			items.push({ id: `tab-${tab.id}`, group: 'Inspector', label: `Show ${tab.label}`, run: () => (inspector = tab.id) });
+		items.push({ id: 'atlas', group: 'Atlas', label: atlasOpen ? 'Close the Atlas' : 'Open the Atlas', keywords: 'world map ctrl m', run: () => (atlasOpen ? closeAtlas() : openAtlas()) });
+		for (const tab of atlasTabs) {
+			items.push({ id: `atlas-${tab.id}`, group: 'Atlas', label: `Show ${tab.label} in the Atlas`, keywords: tab.id === 'checks' ? 'explore' : '', run: () => openAtlas(tab.id as typeof atlasTab) });
 		}
 		for (const room of s.map.rooms) {
 			items.push({
@@ -258,6 +291,26 @@
 		}
 		// Ctrl+E (Cmd+E on a Mac) toggles write mode, also while the author types.
 		// Not Ctrl+W: browsers close the tab on it, and a page can not stop that.
+		if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'm' && !showSettings) {
+			event.preventDefault();
+			showPalette = false;
+			if (atlasOpen) closeAtlas();
+			else openAtlas();
+			return;
+		}
+		if (event.key === 'Escape' && atlasOpen && !showPalette && !showSettings) {
+			const t = event.target as HTMLElement | null;
+			if (!(t && (t.tagName === 'INPUT' && (t as HTMLInputElement).value))) {
+				event.preventDefault();
+				closeAtlas();
+				return;
+			}
+		}
+		if (event.key === '/' && atlasOpen && atlasTab === 'map' && !(event.target instanceof HTMLInputElement)) {
+			event.preventDefault();
+			document.getElementById('atlas-search')?.focus();
+			return;
+		}
 		// In the fragment editor the key is left alone, so an open draft is not closed by accident.
 		const inEditor = event.target instanceof Element && !!event.target.closest('.cm-editor');
 		if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'e' && !showSettings && !inEditor) {
@@ -329,7 +382,7 @@
 		draft = at && at.fragment >= -1 && f ? new FragmentDraft(f, untrack(() => writingVariant)) : null;
 	});
 	let fragmentWriter: FragmentWriter | undefined = $state();
-	/** On wide screens the writer sits next to the game text, in place of the inspector. */
+	/** On wide screens the writer sits next to the game text, in place of the Here panel. */
 	let sideBySide = $state(false);
 
 	/** How a piece of markup reads now, for the chips in the prose view. */
@@ -507,24 +560,15 @@
 	}
 	let hidden = $state(false);
 
-	// On ultrawide screens the map has its own column, so the inspector does not repeat it.
+	// On ultrawide screens the map has its own column on the left.
 	let ultrawide = $state(false);
-	/** The side panel: the Here panel, or one full view with a way back. */
-	let inspector = $state('here');
-	const inspectorTabs = $derived<TabItem[]>([
-		{ id: 'here', label: 'Here' },
-		...(ultrawide ? [] : [{ id: 'map', label: 'Map' }]),
-		{ id: 'story', label: 'Story' },
-		{ id: 'rules', label: 'Rules' },
-		{ id: 'explore', label: 'Explore' }
-	]);
 
 	let exploration = $state<Exploration | null>(null);
 	let exploring = $state(false);
 	let exploreMode = $state<'room' | 'game'>('room');
 	/** The room matrix of the current room. It follows the state, so it shows only while the tab is open. */
 	const matrix = $derived(
-		session && inspector === 'explore' && exploreMode === 'room'
+		session && atlasOpen && atlasTab === 'checks' && exploreMode === 'room'
 			? (session.scene, session.game.roomMatrix(session.scene.room))
 			: null
 	);
@@ -566,7 +610,7 @@
 	/** The values that the room text depends on, with the values now. */
 	const hereStates = $derived.by(() => {
 		const s = session;
-		if (!s || (inspector !== 'here' && !writing)) return { switches: [], texts: 0 };
+		if (!s || atlasOpen) return { switches: [], texts: 0 };
 		s.entries.length;
 		const m = s.game.roomMatrix(s.scene.room);
 		if (!m) return { switches: [], texts: 0 };
@@ -609,9 +653,6 @@
 			exploring = false;
 		}, 30);
 	}
-	$effect(() => {
-		if (ultrawide && inspector === 'map') inspector = 'here';
-	});
 
 	onMount(() => {
 		openStory(storyName);
@@ -620,7 +661,7 @@
 		ultrawide = wide.matches;
 		const onWide = () => (ultrawide = wide.matches);
 		wide.addEventListener('change', onWide);
-		// Same width as --bp-stack in PlayerLayout: from here the inspector is next to the game text.
+		// Same width as --bp-stack in PlayerLayout: from here the side panel is next to the game text.
 		const side = window.matchMedia('(min-width: 900px)');
 		sideBySide = side.matches;
 		const onSide = () => (sideBySide = side.matches);
@@ -696,7 +737,99 @@
 	{/if}
 {/snippet}
 
-{#if session}
+{#if session && atlasOpen}
+	{@const s = session}
+	{@const card = atlasRooms.find((r) => r.id === atlasRoom)}
+	<AtlasLayout tabs={atlasTabs} selected={atlasTab} onselect={(id) => (atlasTab = id as typeof atlasTab)}>
+		{#snippet header()}
+			<AppHeader
+				title={s.game.title}
+				saved={storageLabel}
+				savedState={workspace?.project.storage === 'folder-locked' ? 'attention' : 'ok'}
+				{projectItems}
+				back={{ label: `Back to ${s.scene.room_name}`, run: closeAtlas }}
+				settingsOpen={showSettings}
+				onsettings={() => (showSettings = true)}
+				onpalette={() => (showPalette = true)}
+			/>
+		{/snippet}
+				{#if atlasTab === 'map'}
+					<AtlasMap map={s.map} rooms={atlasRooms} bind:selected={atlasRoom} onselect={(id) => (atlasRoom = id)} />
+				{:else if atlasTab === 'story'}
+					<StoryTimeline steps={s.history} />
+				{:else if atlasTab === 'checks'}
+					<ExplorerView
+						bind:mode={exploreMode}
+						{matrix}
+						roomName={s.scene.room_name}
+						ontry={(values) => {
+							s.author({ type: 'situation', room: s.scene.room, values });
+							prompt?.focus();
+						}}
+						result={exploration}
+						running={exploring}
+						onrun={runExplorer}
+						onreplay={(path) => {
+							s.replay(path);
+							prompt?.focus();
+						}}
+					/>
+				{:else if atlasTab === 'rules'}
+					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+				{:else if atlasTab === 'state'}
+					<section class="state-view" aria-label="State">
+						<table>
+							<caption class="visually-hidden">Variables and properties, with their values now</caption>
+							<thead><tr><th scope="col">Name</th><th scope="col">Value</th></tr></thead>
+							<tbody>
+								{#each s.vars as v (v.name)}
+									<tr>
+										<th scope="row"><code>{v.name}</code></th>
+										<td>
+											{#if v.options.length || typeof v.value === 'boolean'}
+												<StateSwitch
+													name={v.name}
+													value={String(v.value)}
+													options={v.options.length ? v.options : ['false', 'true']}
+													onchange={(val) =>
+														s.author({ type: 'set', name: v.name, value: typeof v.value === 'boolean' ? val === 'true' : val })}
+												/>
+											{:else}
+												{String(v.value)}
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</section>
+				{/if}
+
+		{#snippet aside()}
+			{#if atlasTab === 'map' && card}
+				<RoomCard
+					room={card}
+					rules={s.rules.filter((r) => r.when.includes(card.id) || (r.condition ?? '').includes(card.id))}
+					ongo={() => {
+						s.author({ type: 'goto', room: card.id });
+						closeAtlas();
+					}}
+					onwrite={() => {
+						if (!card.current) s.author({ type: 'goto', room: card.id });
+						closeAtlas();
+						if (!writing) toggleWriting();
+					}}
+					onexplore={() => {
+						if (!card.current) s.author({ type: 'goto', room: card.id });
+						atlasTab = 'checks';
+						exploreMode = 'room';
+					}}
+				/>
+			{/if}
+		{/snippet}
+	</AtlasLayout>
+{/if}
+{#if session && !atlasOpen}
 	{@const s = session}
 	<PlayerLayout {fxClass} {glow}>
 		{#snippet header()}
@@ -723,6 +856,7 @@
 				phase={s.scene.phase}
 				turn={s.scene.turns}
 				turnItems={[{ id: 'restart', label: 'Restart the game', run: () => s.restart() }]}
+				onroom={() => openAtlas('map')}
 			>
 				{#snippet marks()}
 					{#if Object.keys(previewValues).length}<span class="preview-mark"
@@ -839,7 +973,6 @@
 			{#if sideBySide && draft && writingAt && writingAt.fragment >= -1}
 				<div class="side-writer">{@render fragmentWriterView()}</div>
 			{:else}
-			{#if inspector === 'here'}
 				<HerePanel
 					map={hereMap}
 					switches={hereStates.switches}
@@ -857,45 +990,16 @@
 						previewValues = {};
 					}}
 					onrule={showRule}
-					onopen={(view) => (inspector = view)}
+					onopen={(view) => openAtlas(view === 'explore' ? 'checks' : view)}
 					onthing={(id, name) => s.pickThing(id, name)}
 					onexit={(dir) => s.pickExit(dir)}
 				/>
-			{:else}
-			<div class="full-view">
-				<div class="back">
-					<button type="button" class="back-button" onclick={() => (inspector = 'here')}>← Here</button>
-					<span>{inspectorTabs.find((t) => t.id === inspector)?.label}</span>
-				</div>
-				{#if inspector === 'map'}
-					<MapPanel map={s.map} />
-				{:else if inspector === 'story'}
-					<StoryTimeline steps={s.history} />
-				{:else if inspector === 'explore'}
-					<ExplorerView
-						bind:mode={exploreMode}
-						{matrix}
-						roomName={s.scene.room_name}
-						ontry={(values) => {
-							s.author({ type: 'situation', room: s.scene.room, values });
-							prompt?.focus();
-						}}
-						result={exploration}
-						running={exploring}
-						onrun={runExplorer}
-						onreplay={(path) => {
-							s.replay(path);
-							prompt?.focus();
-						}}
-					/>
-				{:else if inspector === 'rules'}
-					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
-				{/if}
-			</div>
-			{/if}
 			{/if}
 		{/snippet}
 	</PlayerLayout>
+{/if}
+{#if session}
+	{@const s = session}
 	<AuthorTooltip inspect={(kind, id) => s.game.inspect(kind, id)} enabled={settings.tooltips} />
 	<CommandPalette bind:open={showPalette} items={paletteItems} fallback={playFallback} />
 	<input
@@ -947,7 +1051,7 @@
 	.message {
 		padding: var(--space-9);
 	}
-	/* The writer next to the game text, in the place of the inspector. */
+	/* The writer next to the game text, in the place of the Here panel. */
 	.pinned {
 		position: sticky;
 		top: 0;
@@ -975,42 +1079,26 @@
 		flex-wrap: wrap;
 		gap: var(--space-2);
 	}
-	.full-view {
-		position: relative;
-		box-sizing: border-box;
-		height: 100%;
-		min-height: 0;
-		overflow-y: auto;
-		padding: 0 var(--space-5) var(--space-5);
-	}
-	.back {
-		position: sticky;
-		top: 0;
-		z-index: 1;
-		display: flex;
-		align-items: center;
-		gap: var(--space-4);
-		margin: 0 calc(-1 * var(--space-5)) var(--space-4);
-		padding: var(--space-2) var(--space-5);
-		border-bottom: var(--size-border) solid var(--color-border-subtle);
-		background: var(--color-surface-raised);
+	.state-view {
+		padding: var(--space-5) var(--space-6);
 		font-family: var(--font-ui);
-		font-size: var(--font-size-xs);
+		font-size: var(--font-size-sm);
+	}
+	.state-view table {
+		border-collapse: collapse;
+	}
+	.state-view th,
+	.state-view td {
+		padding: var(--space-2) var(--space-6) var(--space-2) 0;
+		border-bottom: var(--size-border) solid var(--color-border-subtle);
+		text-align: left;
+	}
+	.state-view thead th {
+		color: var(--color-text-muted);
+		font-weight: var(--font-weight-regular);
 		text-transform: uppercase;
 		letter-spacing: var(--letter-spacing-caps);
-		color: var(--color-text-strong);
-	}
-	.back-button {
-		min-height: var(--size-target-compact);
-		padding: 0 var(--space-3);
-		border: var(--size-border) solid var(--color-border-control);
-		background: none;
-		color: var(--color-text-accent);
-		font: inherit;
-	}
-	.back-button:focus-visible {
-		outline: var(--size-focus-ring) solid var(--color-focus);
-		outline-offset: 2px;
+		font-size: var(--font-size-xs);
 	}
 	.preview-mark {
 		padding: 0 var(--space-3);

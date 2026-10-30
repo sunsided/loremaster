@@ -197,6 +197,11 @@ impl Engine {
         }
     }
 
+    /// All rooms with what is in them now, for the Atlas.
+    pub fn atlas(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.atlas())
+    }
+
     /// All rules with their state now, for the rules view.
     pub fn rules(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.rules())

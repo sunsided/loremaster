@@ -20,6 +20,8 @@
 		onsettings: () => void;
 		/** Opens the command palette. When set, the header shows a button for it. */
 		onpalette?: () => void;
+		/** A way back, for example "Back to The Shore" from the Atlas. It shows in place of the mode switch. */
+		back?: { label: string; run: () => void };
 	}
 
 	let {
@@ -31,7 +33,8 @@
 		onmode,
 		settingsOpen = false,
 		onsettings,
-		onpalette
+		onpalette,
+		back
 	}: Props = $props();
 </script>
 
@@ -48,7 +51,9 @@
 		{#if saved}<span class="saved" class:attention={savedState === 'attention'} title={saved}><span class="saved-text">{saved}</span></span>{/if}
 	</div>
 	<div class="tools">
-		{#if onmode}<ModeSwitch value={mode} onchange={onmode} />{/if}
+		{#if back}
+			<button type="button" class="back" aria-keyshortcuts="Escape" onclick={back.run}>← {back.label} <kbd>Esc</kbd></button>
+		{:else if onmode}<ModeSwitch value={mode} onchange={onmode} />{/if}
 		{#if onpalette}
 			<IconButton label="Commands" shortcut="Ctrl K" aria-haspopup="dialog" onclick={onpalette}>⌘</IconButton>
 		{/if}
@@ -129,6 +134,28 @@
 		.title {
 			font-size: var(--font-size-sm);
 		}
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-3);
+		min-height: var(--size-target-compact);
+		padding: 0 var(--space-4);
+		border: var(--size-border) solid var(--color-accent);
+		background: none;
+		color: var(--color-text-accent);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+	}
+	.back:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
+	}
+	.back kbd {
+		padding: 0 var(--space-2);
+		border: var(--size-border) solid currentColor;
+		font: inherit;
+		font-size: var(--font-size-xs);
 	}
 	.tools {
 		display: flex;

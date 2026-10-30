@@ -1,6 +1,7 @@
 import init, { Engine as WasmEngine } from './pkg/lantern-wasm.js';
 import type {
 	AuthorCommand,
+	AtlasRoom,
 	Exploration,
 	RoomMatrix,
 	FrameUse,
@@ -182,6 +183,11 @@ export class Game {
 	/** The room description in other values. It does not change the game. Null for an unknown room. */
 	previewSituation(room: string, values: [string, string][]): Turn | null {
 		return this.#engine.previewSituation(room, values);
+	}
+
+	/** All rooms with what is in them now, for the Atlas. */
+	atlas(): AtlasRoom[] {
+		return this.#engine.atlas();
 	}
 
 	/** The save state, as JSON-compatible data. */

@@ -180,6 +180,22 @@ pub enum AuthorCommand {
     },
 }
 
+/// One room for the Atlas: where it is, what is in it now, and its exits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AtlasRoom {
+    pub id: String,
+    pub name: String,
+    pub level: i32,
+    pub visited: bool,
+    pub current: bool,
+    /// The things in the room now. Things that the room text names are here too.
+    pub things: Vec<ThingInfo>,
+    /// Each exit as its direction and the room it leads to (empty for an exit that only prints a message).
+    pub exits: Vec<(String, String)>,
+    /// The number of room fragments.
+    pub fragments: usize,
+}
+
 /// A name that conditions and markup can use.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Symbol {
@@ -455,6 +471,41 @@ impl Game {
             }
             Err(e) => MarkupCheck::failed(e),
         }
+    }
+
+    /// All rooms with what is in them now, for the Atlas.
+    pub fn atlas(&self) -> Vec<AtlasRoom> {
+        let story = &self.world.story;
+        let ev = self.eval();
+        story
+            .rooms
+            .iter()
+            .map(|r| AtlasRoom {
+                id: r.id.to_string(),
+                name: r.name.clone(),
+                level: self.world.level_of(r.id.as_str()),
+                visited: self.state.visits_to(r.id.as_str()) > 0,
+                current: r.id == self.state.room,
+                things: story
+                    .things
+                    .iter()
+                    .filter(|t| self.state.is_in_room(t.id.as_str(), r.id.as_str()))
+                    .map(|t| ThingInfo {
+                        id: t.id.to_string(),
+                        name: ev.thing_name(t.id.as_str(), lantern_lang::NameForm::Bare),
+                    })
+                    .collect(),
+                exits: r
+                    .exits
+                    .iter()
+                    .map(|e| {
+                        let to = e.to.as_ref().map(|t| t.to_string()).unwrap_or_default();
+                        (e.direction.name().to_string(), to)
+                    })
+                    .collect(),
+                fragments: r.description.len(),
+            })
+            .collect()
     }
 
     /// Every name that conditions and markup can use, for completion and hover in the editor.

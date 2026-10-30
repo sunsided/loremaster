@@ -308,3 +308,17 @@ export interface MarkupCheck {
 	/** For a condition: whether it holds now. */
 	holds: boolean | null;
 }
+
+/** One room for the Atlas: where it is, what is in it now, and its exits. */
+export interface AtlasRoom {
+	id: string;
+	name: string;
+	level: number;
+	visited: boolean;
+	current: boolean;
+	things: ThingInfo[];
+	/** Each exit as [direction, room id]. The room id is empty for an exit that only prints a message. */
+	exits: [string, string][];
+	/** The number of room fragments. */
+	fragments: number;
+}

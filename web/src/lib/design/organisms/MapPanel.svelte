@@ -10,9 +10,11 @@
 		framed?: boolean;
 		/** Only the drawing of the current level, without heading, view choice and legend. For a small map in a panel. */
 		compact?: boolean;
+		/** The view for a story on more than one level: one level, or all levels unfolded. */
+		view?: 'stacked' | 'unfolded';
 	}
 
-	let { map, framed = false, compact = false }: Props = $props();
+	let { map, framed = false, compact = false, view = $bindable('stacked') }: Props = $props();
 	const uid = $props.id();
 
 	// Levels: towers and dungeons. With more than one level, the map shows one level in full (stacked)
@@ -20,7 +22,6 @@
 	const levels = $derived([...new Set(map.rooms.map((r) => r.level))].sort((a, b) => a - b));
 	const multi = $derived(levels.length > 1);
 	const here = $derived(map.rooms.find((r) => r.current));
-	let view = $state<'stacked' | 'unfolded'>('stacked');
 	/** The level that the author picked. Null follows the player. */
 	let picked = $state<number | null>(null);
 	let lastLevel: number | undefined;
