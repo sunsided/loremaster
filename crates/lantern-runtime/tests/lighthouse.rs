@@ -558,3 +558,44 @@ fn levels_come_from_up_and_down_exits_when_rooms_do_not_say() {
         (0, 0, 1)
     );
 }
+
+#[test]
+fn a_message_exit_prints_its_text_and_leads_nowhere() {
+    let mut game = lighthouse();
+    game.start();
+    let turns = game.state().turns;
+    let text = game.input("w").plain_text();
+    assert!(text.contains("There is only the sea that way."), "{text}");
+    assert_eq!(game.state().room.as_str(), "shore");
+    // The turn counts like any other move that fails.
+    let failed = game.state().turns - turns;
+    game.input("s");
+    assert_eq!(game.state().turns - turns, 2 * failed);
+
+    let scene = game.scene();
+    assert!(scene.exits.iter().all(|e| e.direction != "west"));
+    assert!(game.map().links.iter().all(|l| l.direction != "west"));
+    let inspect = game.inspect_exit("west").unwrap();
+    assert_eq!(inspect.facts[0].1, "nowhere: a message exit");
+}
+
+#[test]
+fn an_exit_needs_a_room_or_a_text() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse");
+    let mut files = read_dir(&root).unwrap();
+    let shore = files
+        .iter_mut()
+        .find(|f| f.path == "rooms/shore.yaml")
+        .unwrap();
+    shore.text.push_str(
+        "  - { direction: down }\n  - { direction: up, blocked: \"No.\", door: cottage_door }\n",
+    );
+    let problems = check(&load(files).unwrap());
+    let messages: Vec<(&str, &str)> = problems
+        .iter()
+        .map(|d| (d.at.as_str(), d.message.as_str()))
+        .collect();
+    assert_eq!(problems.len(), 2, "{messages:#?}");
+    assert!(messages[0].0.ends_with("exits[3]") && messages[0].1.contains("needs `to`"));
+    assert!(messages[1].0.ends_with("exits[4].door"));
+}

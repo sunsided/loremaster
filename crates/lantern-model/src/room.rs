@@ -128,10 +128,14 @@ impl From<Direction> for String {
 }
 
 /// An exit: a first-class edge from one room to another.
+///
+/// An exit without `to` is a message exit: it leads nowhere, and a move in its
+/// direction only prints `blocked`, for example "The rocks drop sheer into the surf."
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Exit {
     pub direction: Direction,
-    pub to: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<Id>,
     /// The exit is only listed and usable while this holds (hidden until discovered).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visible: Option<String>,
@@ -146,4 +150,11 @@ pub struct Exit {
     /// Printed when the player goes through.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traversal: Option<String>,
+}
+
+impl Exit {
+    /// True for an exit that leads nowhere and only prints its `blocked` text.
+    pub fn is_message(&self) -> bool {
+        self.to.is_none()
+    }
 }

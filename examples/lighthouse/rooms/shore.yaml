@@ -19,3 +19,4 @@ description:
 exits:
   - { direction: north, to: cottage, door: cottage_door }
   - { direction: east, to: stairwell, door: lighthouse_door }
+  - { direction: west, blocked: "Cold surf breaks over the rocks. There is only the sea that way." }

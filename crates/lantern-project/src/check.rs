@@ -45,6 +45,17 @@ impl Checker<'_> {
         });
     }
 
+    fn warning(&mut self, file: &str, at: &str, message: impl Into<String>) {
+        self.out.push(Diagnostic {
+            severity: Severity::Warning,
+            file: file.to_string(),
+            at: at.to_string(),
+            message: message.into(),
+            line: None,
+            column: None,
+        });
+    }
+
     /// Report a language error, locating the source text inside the file.
     fn lang_error(&mut self, file: &str, at: &str, source: &str, err: LangError) {
         let (line, column) = self
@@ -154,7 +165,29 @@ impl Checker<'_> {
             self.frames(&file, "frames", &room.frames);
             for (i, exit) in room.exits.iter().enumerate() {
                 let at = format!("exits[{i}]");
-                self.room_ref(&file, &format!("{at}.to"), exit.to.as_str());
+                match &exit.to {
+                    Some(to) => self.room_ref(&file, &format!("{at}.to"), to.as_str()),
+                    None if exit.blocked.is_none() => self.error(
+                        &file,
+                        &at,
+                        "the exit needs `to` (the room it leads to) or `blocked` (the text of a message exit)",
+                    ),
+                    None => {
+                        for (field, set) in [
+                            ("door", exit.door.is_some()),
+                            ("passable", exit.passable.is_some()),
+                            ("traversal", exit.traversal.is_some()),
+                        ] {
+                            if set {
+                                self.warning(
+                                    &file,
+                                    &format!("{at}.{field}"),
+                                    format!("a message exit (no `to`) does not use `{field}`"),
+                                );
+                            }
+                        }
+                    }
+                }
                 if let Some(door) = &exit.door {
                     self.thing_ref(&file, &format!("{at}.door"), door.as_str());
                 }

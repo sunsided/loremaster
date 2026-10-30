@@ -982,12 +982,11 @@ impl Game {
                 .visible_exits()
                 .iter()
                 .map(|(_, e)| {
-                    let name = self
-                        .world
-                        .story
-                        .room(e.to.as_str())
-                        .map(|r| r.name.clone())
-                        .unwrap_or_default();
+                    let name =
+                        e.to.as_ref()
+                            .and_then(|to| self.world.story.room(to.as_str()))
+                            .map(|r| r.name.clone())
+                            .unwrap_or_default();
                     (e.direction.name().to_string(), name)
                 })
                 .collect(),
@@ -1019,18 +1018,22 @@ impl Game {
                 .filter(|id| self.state.is_carried(id.as_str()))
                 .map(info)
                 .collect(),
+            // A message exit leads nowhere, so the player does not see it as a way out.
             exits: self
                 .visible_exits()
                 .iter()
-                .map(|(_, e)| ExitInfo {
-                    direction: e.direction.name().to_string(),
-                    to: e.to.to_string(),
-                    to_name: self
-                        .world
-                        .story
-                        .room(e.to.as_str())
-                        .map(|r| r.name.clone())
-                        .unwrap_or_default(),
+                .filter_map(|(_, e)| {
+                    let to = e.to.as_ref()?;
+                    Some(ExitInfo {
+                        direction: e.direction.name().to_string(),
+                        to: to.to_string(),
+                        to_name: self
+                            .world
+                            .story
+                            .room(to.as_str())
+                            .map(|r| r.name.clone())
+                            .unwrap_or_default(),
+                    })
                 })
                 .collect(),
             ended: self.state.ended,
@@ -1136,19 +1139,23 @@ impl Game {
         let mut links: Vec<MapLink> = Vec::new();
         for (ri, room) in story.rooms.iter().enumerate() {
             for (ei, exit) in room.exits.iter().enumerate() {
+                // A message exit is no edge of the map.
+                let Some(to) = &exit.to else {
+                    continue;
+                };
                 let back = story
-                    .room(exit.to.as_str())
-                    .is_some_and(|t| t.exits.iter().any(|e| e.to == room.id));
+                    .room(to.as_str())
+                    .is_some_and(|t| t.exits.iter().any(|e| e.to.as_ref() == Some(&room.id)));
                 if back
                     && links
                         .iter()
-                        .any(|l| l.from == exit.to.as_str() && l.to == room.id.as_str())
+                        .any(|l| l.from == to.as_str() && l.to == room.id.as_str())
                 {
                     continue;
                 }
                 links.push(MapLink {
                     from: room.id.to_string(),
-                    to: exit.to.to_string(),
+                    to: to.to_string(),
                     direction: exit.direction.name().to_string(),
                     visible: ev.holds_opt(&self.world.rooms[ri].exits[ei].visible),
                     one_way: !back,
@@ -1232,9 +1239,12 @@ impl Game {
             .iter()
             .enumerate()
             .map(|(ei, e)| {
-                let to = story
-                    .room(e.to.as_str())
-                    .map_or(e.to.to_string(), |r| r.name.clone());
+                let to = match &e.to {
+                    Some(to) => story
+                        .room(to.as_str())
+                        .map_or(to.to_string(), |r| r.name.clone()),
+                    None => "nowhere (message exit)".to_string(),
+                };
                 let visible = ev.holds_opt(&self.world.rooms[ri].exits[ei].visible);
                 let door = e.door.as_ref().map(|d| {
                     let state = if self.state.flag(&format!("{d}.locked")) {
@@ -1437,11 +1447,14 @@ impl Game {
             .find(|(_, e)| e.direction.name() == direction)?;
         let ev = self.eval();
         let compiled = &self.world.rooms[ri].exits[ei];
-        let to = self
-            .world
-            .story
-            .room(exit.to.as_str())
-            .map_or(exit.to.to_string(), |r| format!("{} ({})", r.name, r.id));
+        let to = match &exit.to {
+            Some(to) => self
+                .world
+                .story
+                .room(to.as_str())
+                .map_or(to.to_string(), |r| format!("{} ({})", r.name, r.id)),
+            None => "nowhere: a message exit".to_string(),
+        };
         let mut facts = vec![("leads to".to_string(), to)];
         if let Some(door) = &exit.door {
             let state = if self.state.flag(&format!("{door}.locked")) {
@@ -1469,22 +1482,24 @@ impl Game {
             };
             facts.push(("passable when".into(), format!("{src} ({now})")));
         }
-        let back = self
-            .world
-            .story
-            .room(exit.to.as_str())
-            .is_some_and(|t| t.exits.iter().any(|e| e.to == room.id));
-        facts.push((
-            "way back".into(),
-            if back { "yes" } else { "no, one way" }.into(),
-        ));
+        if let Some(to) = &exit.to {
+            let back = self
+                .world
+                .story
+                .room(to.as_str())
+                .is_some_and(|t| t.exits.iter().any(|e| e.to.as_ref() == Some(&room.id)));
+            facts.push((
+                "way back".into(),
+                if back { "yes" } else { "no, one way" }.into(),
+            ));
+        }
         let target = exit.to.clone();
         let rules = self
             .world
             .story
             .rules
             .iter()
-            .filter(|r| matches!(&r.on, EventPattern::Enter(x) | EventPattern::Leave(x) if *x == target))
+            .filter(|r| matches!(&r.on, EventPattern::Enter(x) | EventPattern::Leave(x) if Some(x) == target.as_ref()))
             .map(|r| r.id.to_string())
             .collect();
         Some(Inspect {
@@ -1641,7 +1656,7 @@ impl Game {
             EventPattern::Enter(r) => {
                 let next_door = self
                     .room_def()
-                    .is_some_and(|room| room.exits.iter().any(|e| &e.to == r));
+                    .is_some_and(|room| room.exits.iter().any(|e| e.to.as_ref() == Some(r)));
                 next_door.then(|| "fires in a room next to this one".into())
             }
             EventPattern::Verb(parts) => {
@@ -1963,6 +1978,16 @@ impl Game {
             return;
         };
         let compiled = &world.rooms[ri].exits[ei];
+        let Some(to) = exit.to.clone() else {
+            // A message exit: the move only prints its text.
+            let text = compiled
+                .blocked
+                .as_ref()
+                .map(|b| self.render(b))
+                .unwrap_or_else(|| "You can't go that way.".into());
+            turn.say(BlockKind::Response, text);
+            return;
+        };
         if let Some(door) = &exit.door {
             let the = self.the(door, false);
             let the_cap = self.the(door, true);
@@ -1988,7 +2013,7 @@ impl Game {
             let text = self.render(t);
             turn.say(BlockKind::Response, text);
         }
-        self.move_player(turn, exit.to.clone(), 0);
+        self.move_player(turn, to, 0);
     }
 
     fn default_action(&mut self, turn: &mut Turn, verb: &str, objects: &[Id]) {

@@ -103,6 +103,39 @@ names:
 - Set `proper: true` for a proper name. A proper name gets no article.
 - The author tooltip shows all stages and the current stage.
 
+## Exits
+
+An exit is a way from one room to a different room. Write the exits of a room in its file, one on each line:
+
+```yaml
+# rooms/shore.yaml
+exits:
+  - { direction: north, to: cottage, door: cottage_door }
+  - { direction: east, to: stairwell, door: lighthouse_door }
+  - { direction: west, blocked: "Cold surf breaks over the rocks. There is only the sea that way." }
+```
+
+| Field | Contents |
+| --- | --- |
+| `direction` | `north`, `northeast`, `east`, `southeast`, `south`, `southwest`, `west`, `northwest`, `up`, `down`, `in`, `out`, or a name. |
+| `to` | The room that the exit goes to. |
+| `door` | A thing that must be open. The player opens a closed door first. A locked door stops the player. |
+| `visible` | A condition. When it is false, the exit is hidden and the player cannot use it. |
+| `passable` | A condition. When it is false, the player cannot go through, and the game shows `blocked`. |
+| `blocked` | Markup. The game shows it when the player cannot go through. |
+| `traversal` | Markup. The game shows it when the player goes through. |
+
+### Message exits
+
+An exit without `to` is a message exit. It goes to no room. When the player goes in its direction, the game shows `blocked`, and the player stays in the room. The move uses a turn, as a move that fails.
+
+- A message exit must have `blocked`. The check gives an error for an exit without `to` and without `blocked`.
+- `blocked` is markup, as in all exits. It can have conditions, for example `"{night: The surf is black. | Cold surf breaks over the rocks.}"`.
+- `visible` works as in other exits. When it is false, the player gets the default response.
+- A message exit does not use `door`, `passable` or `traversal`. The check gives a warning for them.
+- The map, the scene, the verb bar and the room brief do not show message exits, because they go to no room.
+- In write mode, a new exit in the direction of a message exit replaces the message exit.
+
 ## Levels
 
 A room can be on a level, for towers and dungeons. Up exits go one level higher, down exits one level lower.
