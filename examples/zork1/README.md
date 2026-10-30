@@ -6,7 +6,7 @@ This folder contains Zork I: The Great Underground Empire, by Tim Anderson, Marc
 
 The source is the ZIL code in [historicalsource/zork1](https://github.com/historicalsource/zork1), commit `97b7b3d`. Microsoft published it under the MIT License. The file `LICENSE` in this folder is a copy of that license. It applies to the text and data in this folder. Keep it with the files.
 
-The MIT License does not give rights to the name "Zork". Do not use the name for lantern itself.
+The MIT License does not give rights to the name "Zork". Do not use the name for loremaster itself.
 
 ## Files
 

@@ -1,4 +1,4 @@
-// Mirrors the serde types of lantern-runtime as they cross the WASM boundary.
+// Mirrors the serde types of loremaster-runtime as they cross the WASM boundary.
 
 export type Layer = 'base' | 'ambient' | 'event' | 'objects' | 'characters' | 'exits';
 export type FragmentMode = 'always' | 'first_visit' | 'once' | 'cycle' | 'shuffle' | 'sticky';

@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 
 // The build environment, without the Node type definitions.
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
-// A static host can serve the app below a path, for example `/lantern` on GitHub Pages.
+// A static host can serve the app below a path, for example `/loremaster` on GitHub Pages.
 const base = (env.BASE_PATH ?? '') as '' | `/${string}`;
 // GitHub Pages answers unknown paths with 404.html; other hosts use 200.html.
 const fallback = env.FALLBACK ?? '200.html';
@@ -15,7 +15,7 @@ export default defineConfig({
 			adapter: adapter({ fallback }),
 			paths: { base },
 			// Prerendered pages get the policy as a meta tag. The app talks only to its own origin, to
-			// `lantern serve` on this computer and to the Anthropic API. WASM needs 'wasm-unsafe-eval'.
+			// `loremaster serve` on this computer and to the Anthropic API. WASM needs 'wasm-unsafe-eval'.
 			// The fonts are self-hosted (src/lib/design/tokens/fonts.css); Vite inlines the small ones as data URLs.
 			csp: {
 				mode: 'hash',

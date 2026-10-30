@@ -1,12 +1,14 @@
 // The stories that the author made, by name. Each name has its own working copy, as the examples have.
 
+import '#lib/migrate.ts';
+
 export interface StoryEntry {
 	/** The working copy name, made from the title, for example `the_drowned_bell`. */
 	name: string;
 	title: string;
 }
 
-const KEY = 'lantern.myStories';
+const KEY = 'loremaster.myStories';
 
 /** The stories that the author made in this browser, newest first. */
 export function myStories(): StoryEntry[] {

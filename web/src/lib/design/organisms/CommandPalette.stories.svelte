@@ -15,7 +15,7 @@
 
 To use it:
 1. Push Ctrl+K.
-2. Type some words, for example "lantern" or "rule find".
+2. Type some words, for example "loremaster" or "rule find".
 3. Use the Up and Down arrow keys to select an action.
 4. Push Enter to run it. Push Escape to close the palette.
 

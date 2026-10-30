@@ -6,7 +6,7 @@
 	interface Props {
 		open?: boolean;
 		/**
-		 * Why the AI cannot seed the story now, for example "Start lantern serve to use AI.".
+		 * Why the AI cannot seed the story now, for example "Start loremaster serve to use AI.".
 		 * Null when it can. The idea field shows always, so that the author sees the option.
 		 */
 		aiUnavailable?: string | null;

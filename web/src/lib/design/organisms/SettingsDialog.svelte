@@ -16,9 +16,9 @@
 		reveal?: RevealMode;
 		/** True when the operating system asks for reduced motion. */
 		systemReduce?: boolean;
-		/** On a hosted page, its origin: the dialog then offers the link to `lantern serve`. Null on a local page. */
+		/** On a hosted page, its origin: the dialog then offers the link to `loremaster serve`. Null on a local page. */
 		hostedOrigin?: string | null;
-		/** Look for `lantern serve` on this computer. */
+		/** Look for `loremaster serve` on this computer. */
 		serveLink?: boolean;
 	}
 
@@ -82,9 +82,9 @@
 	<Checkbox bind:checked={tooltips}>Show author tooltips on things and exits</Checkbox>
 	{#if hostedOrigin}
 		<div class="group">
-			<Checkbox bind:checked={serveLink}>Use AI from lantern serve on this computer</Checkbox>
+			<Checkbox bind:checked={serveLink}>Use AI from loremaster serve on this computer</Checkbox>
 			<p class="note">
-				Start <code>lantern serve &lt;folder&gt; --allow-origin {hostedOrigin}</code>. The browser can ask for
+				Start <code>loremaster serve &lt;folder&gt; --allow-origin {hostedOrigin}</code>. The browser can ask for
 				permission to connect to your computer.
 			</p>
 		</div>

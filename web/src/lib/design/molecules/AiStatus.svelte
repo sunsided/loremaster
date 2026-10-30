@@ -38,7 +38,7 @@
 </script>
 
 <!--
-	The AI jobs of the session, while `lantern serve` runs: what Claude Code does now and did, with the cost,
+	The AI jobs of the session, while `loremaster serve` runs: what Claude Code does now and did, with the cost,
 	and a warning when the server reads other files than the editor. It shows in the AI tray of the status line
 	and in Atlas › AI. The help for the current room is in the room desk (AiHere).
 -->

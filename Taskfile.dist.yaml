@@ -34,7 +34,7 @@ tasks:
     aliases:
       - example
     cmds:
-      - "{{.CARGO}} run -q -p lantern-cli -- play examples/lighthouse"
+      - "{{.CARGO}} run -q -p loremaster-cli -- play examples/lighthouse"
 
   import:zork:
     desc: Import Zork I from its MIT-licensed ZIL source into examples/zork1
@@ -42,35 +42,35 @@ tasks:
       - test -d target/zil/zork1 || git clone -q https://github.com/historicalsource/zork1 target/zil/zork1
       # The commit that examples/zork1/README.md names.
       - git -C target/zil/zork1 checkout -q 97b7b3d68c075dd9af7da499c3e9690ada3471fd
-      - "{{.CARGO}} run -q -p lantern-zil -- target/zil/zork1 examples/zork1"
-      - "{{.CARGO}} run -q -p lantern-cli -- check examples/zork1"
+      - "{{.CARGO}} run -q -p loremaster-zil -- target/zil/zork1 examples/zork1"
+      - "{{.CARGO}} run -q -p loremaster-cli -- check examples/zork1"
 
   check:story:
     desc: Check the lighthouse example for problems
     cmds:
-      - "{{.CARGO}} run -q -p lantern-cli -- check examples/lighthouse"
+      - "{{.CARGO}} run -q -p loremaster-cli -- check examples/lighthouse"
 
   explore:
     desc: Walk all reachable states of the lighthouse example and report coverage
     cmds:
-      - "{{.CARGO}} run -q -p lantern-cli -- explore examples/lighthouse"
+      - "{{.CARGO}} run -q -p loremaster-cli -- explore examples/lighthouse"
 
   wasm:
     desc: Build the WASM package into the web app with Trunk (release)
-    dir: crates/lantern-wasm
+    dir: crates/loremaster-wasm
     sources:
       - ../**/*.rs
       - ../**/Cargo.toml
       - Trunk.toml
       - index.html
     generates:
-      - ../../web/src/lib/engine/pkg/lantern-wasm_bg.wasm
+      - ../../web/src/lib/engine/pkg/loremaster-wasm_bg.wasm
     cmds:
       - trunk build --release
 
   wasm:watch:
     desc: Rebuild the WASM package whenever Rust code changes
-    dir: crates/lantern-wasm
+    dir: crates/loremaster-wasm
     cmds:
       - trunk watch
 
@@ -127,29 +127,29 @@ tasks:
       - pnpm build
 
   build:static:
-    desc: Build the browser-only site for GitHub Pages into web/build (below /lantern)
+    desc: Build the browser-only site for GitHub Pages into web/build (below /loremaster)
     deps:
       - wasm
     dir: web
     env:
-      BASE_PATH: /lantern
+      BASE_PATH: /loremaster
       FALLBACK: 404.html
     cmds:
       - pnpm build
 
   build:local:
-    desc: Build the lantern binary with the web editor in it (target/release/lantern)
+    desc: Build the loremaster binary with the web editor in it (target/release/loremaster)
     deps:
       - web:build
     cmds:
-      - "{{.CARGO}} build --release -p lantern-cli --features embed-ui"
+      - "{{.CARGO}} build --release -p loremaster-cli --features embed-ui"
 
   serve:local:
     desc: Build the local binary, then serve the lighthouse example with the editor
     deps:
       - build:local
     cmds:
-      - target/release/lantern serve examples/lighthouse {{.CLI_ARGS}}
+      - target/release/loremaster serve examples/lighthouse {{.CLI_ARGS}}
 
   verify:
     desc: Formatting, clippy and tests

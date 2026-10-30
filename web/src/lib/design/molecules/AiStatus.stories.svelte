@@ -16,7 +16,7 @@
 		parameters: {
 			docs: {
 				description: {
-					component: `The AI jobs of the session. It shows only while \`lantern serve\` runs. It is the content of the AI tray of the status line (StatusTray), and it is at the top of Atlas › AI.
+					component: `The AI jobs of the session. It shows only while \`loremaster serve\` runs. It is the content of the AI tray of the status line (StatusTray), and it is at the top of Atlas › AI.
 
 - **The jobs**: what Claude Code does now ("Draft an exit", "Review the room", "Draft the first rooms"), what for, the time, the proposals it made and the cost. A running job has Cancel.
 - **The cost**: the sum of the cost of all jobs of the session.

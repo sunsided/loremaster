@@ -11,7 +11,7 @@
 			title: 'oil lamp',
 			facts: [
 				['id', 'oil_lamp'],
-				['also called', 'lamp, lantern'],
+				['also called', 'lamp, loremaster'],
 				['location', "Keeper's Cottage (cottage)"],
 				['kind', 'portable'],
 				['lit', 'false']

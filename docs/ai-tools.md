@@ -1,6 +1,6 @@
 # AI tools
 
-lantern has an MCP server. With it, an AI assistant can read, play and verify a project. Examples of assistants are Claude Code and Claude Desktop.
+loremaster has an MCP server. With it, an AI assistant can read, play and verify a project. Examples of assistants are Claude Code and Claude Desktop.
 
 The tools do not change project files. The assistant can only suggest changes, as proposals. You accept a proposal, or you reject it.
 
@@ -10,24 +10,24 @@ There are two servers. Both serve the same tools.
 
 | Command | Transport | Use it when |
 | --- | --- | --- |
-| `lantern mcp <project-folder>` | stdin and stdout | One assistant uses the project. The assistant starts the server. |
-| `lantern serve <project-folder> [--port N]` | HTTP on `127.0.0.1`, port 4710 by default | The editor and one or more assistants use the project at the same time. You start the server. |
-| `lantern serve --bootstrap [--port N]` | The same | You start a new story in the editor and want the AI to draft it. The server uses a new empty folder in the temporary directory. |
+| `loremaster mcp <project-folder>` | stdin and stdout | One assistant uses the project. The assistant starts the server. |
+| `loremaster serve <project-folder> [--port N]` | HTTP on `127.0.0.1`, port 4710 by default | The editor and one or more assistants use the project at the same time. You start the server. |
+| `loremaster serve --bootstrap [--port N]` | The same | You start a new story in the editor and want the AI to draft it. The server uses a new empty folder in the temporary directory. |
 
-If the folder does not exist, `lantern serve` makes it.
+If the folder does not exist, `loremaster serve` makes it.
 
 ```sh
-cargo build --release -p lantern-cli
-target/release/lantern serve examples/lighthouse
+cargo build --release -p loremaster-cli
+target/release/loremaster serve examples/lighthouse
 ```
 
 ### The editor in the binary
 
-Build the binary with the feature `embed-ui`. Then `lantern serve` also serves the web editor at `http://127.0.0.1:4710/` and opens it in the browser.
+Build the binary with the feature `embed-ui`. Then `loremaster serve` also serves the web editor at `http://127.0.0.1:4710/` and opens it in the browser.
 
 ```sh
 task build:local
-target/release/lantern serve examples/lighthouse
+target/release/loremaster serve examples/lighthouse
 ```
 
 | Option | What it does |
@@ -36,7 +36,7 @@ target/release/lantern serve examples/lighthouse
 | `--no-open` | Do not open the browser. |
 | `--allow-origin URL` | Let a hosted editor use this server, for example `--allow-origin https://sunsided.github.io`. You can give the option more than one time. |
 
-The editor finds the server itself. A page from `localhost` or `127.0.0.1` asks its own address first, then port 4710. A hosted page asks only when you select "Use AI from lantern serve on this computer" in the settings. The browser can ask you for permission first.
+The editor finds the server itself. A page from `localhost` or `127.0.0.1` asks its own address first, then port 4710. A hosted page asks only when you select "Use AI from loremaster serve on this computer" in the settings. The browser can ask you for permission first.
 
 ## Connect Claude Code
 
@@ -44,35 +44,35 @@ The editor finds the server itself. A page from `localhost` or `127.0.0.1` asks 
 2. Add the server. Use absolute paths:
 
    ```sh
-   claude mcp add lantern -- /path/to/lantern/target/release/lantern mcp /path/to/my-story
+   claude mcp add loremaster -- /path/to/loremaster/target/release/loremaster mcp /path/to/my-story
    ```
 
 3. Start Claude Code and ask, for example: "Review the room shore."
 
-If `lantern serve` runs, connect to it instead:
+If `loremaster serve` runs, connect to it instead:
 
 ```sh
-claude mcp add --transport http lantern http://127.0.0.1:4710/mcp
+claude mcp add --transport http loremaster http://127.0.0.1:4710/mcp
 ```
 
-To let Claude Code use only the lantern tools, start it like this:
+To let Claude Code use only the loremaster tools, start it like this:
 
 ```sh
 claude -p "Review the room shore." \
-  --mcp-config lantern-mcp.json --strict-mcp-config \
+  --mcp-config loremaster-mcp.json --strict-mcp-config \
   --tools "ToolSearch,ListMcpResourcesTool,ReadMcpResourceTool" \
-  --allowedTools "mcp__lantern__*,ToolSearch,ListMcpResourcesTool,ReadMcpResourceTool"
+  --allowedTools "mcp__loremaster__*,ToolSearch,ListMcpResourcesTool,ReadMcpResourceTool"
 ```
 
 `--tools` turns off the built-in tools, for example Read, Grep and Bash. The three tools in the list stay on: Claude Code needs them to read the guide resource and to find deferred tools. Do not use `--tools ""`: then Claude Code cannot read the guide.
 
-The file `lantern-mcp.json` contains:
+The file `loremaster-mcp.json` contains:
 
 ```json
 {
   "mcpServers": {
-    "lantern": {
-      "command": "/path/to/lantern/target/release/lantern",
+    "loremaster": {
+      "command": "/path/to/loremaster/target/release/loremaster",
       "args": ["mcp", "/path/to/my-story"]
     }
   }
@@ -88,7 +88,7 @@ The file `lantern-mcp.json` contains:
 | Propose | `propose`, `list_proposals`, `get_proposal`, `withdraw_proposal` |
 | Play | `session_start`, `input`, `act`, `author`, `scene`, `assembly`, `room_parts`, `inspect`, `vars`, `rules`, `verbs`, `map`, `save` |
 
-The server also gives this guide as a resource: `lantern://guide/writing-stories`.
+The server also gives this guide as a resource: `loremaster://guide/writing-stories`.
 
 In `overview`, a message exit (an exit without `to`) has the value `null`. `neighbors` and `map` do not show message exits, because they go to no room.
 
@@ -117,8 +117,8 @@ You can start a story from an idea. The AI writes the first 2 or 3 rooms as one 
 
 | Where | How |
 | --- | --- |
-| Terminal | `lantern new <folder> --title "The Drowned Bell" --idea "A church bell sank in a storm. At low tide it still rings."` The command writes the new story, runs the job and tells you the proposal id. Then start `lantern serve <folder>` and accept the proposal in the editor. |
-| Editor | Start `lantern serve --bootstrap`. In the editor, select "New story…", type the title and the idea, then select "Create and draft with AI". When the proposal comes, open Atlas › AI and select "Accept". The server also writes the files into its folder, and the game starts again from the intro. |
+| Terminal | `loremaster new <folder> --title "The Drowned Bell" --idea "A church bell sank in a storm. At low tide it still rings."` The command writes the new story, runs the job and tells you the proposal id. Then start `loremaster serve <folder>` and accept the proposal in the editor. |
+| Editor | Start `loremaster serve --bootstrap`. In the editor, select "New story…", type the title and the idea, then select "Create and draft with AI". When the proposal comes, open Atlas › AI and select "Accept". The server also writes the files into its folder, and the game starts again from the intro. |
 | MCP client | Call the tool `bootstrap_project` with `idea` (and `title`, `rooms` if you want). It writes the new story, then gives the `seed_story` request. The assistant follows the request. |
 
 Bootstrap works only on a folder that has no story, or that has only a new story without changes. Else it refuses, and no file changes.
@@ -127,17 +127,17 @@ A job takes approximately 1 minute. At the `low` effort level, a test run cost a
 
 ## Jobs
 
-A job is one task prompt that `lantern serve` gives to Claude Code. The editor starts a job with `POST /jobs`. Then it reads the progress with `GET /jobs/<id>`.
+A job is one task prompt that `loremaster serve` gives to Claude Code. The editor starts a job with `POST /jobs`. Then it reads the progress with `GET /jobs/<id>`.
 
-The server starts `claude -p` with the login of the user, for example a Max plan. Claude Code connects to the server at `/mcp` and gets only the lantern tools, the MCP resources and the search for deferred tools. It cannot read files, search files or run commands on the computer. Thus it can only read, play and propose.
+The server starts `claude -p` with the login of the user, for example a Max plan. Claude Code connects to the server at `/mcp` and gets only the loremaster tools, the MCP resources and the search for deferred tools. It cannot read files, search files or run commands on the computer. Thus it can only read, play and propose.
 
 These environment variables change the agent:
 
 | Variable | Contents |
 | --- | --- |
-| `LANTERN_CLAUDE` | The `claude` program. The default is `claude` on the `PATH`. |
-| `LANTERN_CLAUDE_MODEL` | The model. The default is `sonnet`: it is fast for these short tasks and uses less than half the quota of a larger model. Set it to `opus`, for example, for more care. Set it to an empty value to use the default model of Claude Code. |
-| `LANTERN_CLAUDE_EFFORT` | The effort level of Claude Code: `low`, `medium`, `high`, `xhigh` or `max`. The default is `low`, because the agent then writes its proposals sooner. Set it to an empty value to use the default of Claude Code. |
+| `LOREMASTER_CLAUDE` | The `claude` program. The default is `claude` on the `PATH`. |
+| `LOREMASTER_CLAUDE_MODEL` | The model. The default is `sonnet`: it is fast for these short tasks and uses less than half the quota of a larger model. Set it to `opus`, for example, for more care. Set it to an empty value to use the default model of Claude Code. |
+| `LOREMASTER_CLAUDE_EFFORT` | The effort level of Claude Code: `low`, `medium`, `high`, `xhigh` or `max`. The default is `low`, because the agent then writes its proposals sooner. Set it to an empty value to use the default of Claude Code. |
 
 The body of `POST /jobs` has these fields:
 
@@ -146,9 +146,9 @@ The body of `POST /jobs` has these fields:
 | `task` | The name of a task prompt, for example `imagine_exit`. |
 | `args` | The arguments of the prompt, as an object. |
 | `state` | Optional. A state that the editor saved. The server starts a new session `job-<id>` from this state, and the job uses that session. |
-| `model` | Optional. The model for this job, for example `opus`. It replaces `LANTERN_CLAUDE_MODEL`. |
+| `model` | Optional. The model for this job, for example `opus`. It replaces `LOREMASTER_CLAUDE_MODEL`. |
 
-For `imagine_exit` and `seed_story`, if `args` has no `rejected`, the server adds the last 20 rejected proposals from `.lantern/rejected.jsonl`.
+For `imagine_exit` and `seed_story`, if `args` has no `rejected`, the server adds the last 20 rejected proposals from `.loremaster/rejected.jsonl`.
 
 Before the server starts the agent, it gets the context of the task and puts it in the prompt: `story.yaml`, the room file, the neighbours (1 hop) and the scene of the session. For `imagine_exit` it also gives the variables. For `review_room` it also gives the room matrix. The writing guide is in the prompt too. Thus the agent does not use turns to get them. An MCP client that uses `prompts/get` does not get this context. The prompt then tells the assistant to get it with the tools.
 
@@ -158,7 +158,7 @@ The reply is `{ "id": "j1" }` with status 202. A job has these fields:
 | --- | --- |
 | `id`, `task`, `args` | The id, the task prompt and its arguments. |
 | `status` | `running`, `done`, `failed` or `cancelled`. |
-| `events` | The steps of the job: `{ kind, text }`. `kind` is `tool` (the agent used a lantern tool; `text` is the tool name), `text` (the agent wrote text) or `error`. |
+| `events` | The steps of the job: `{ kind, text }`. `kind` is `tool` (the agent used a loremaster tool; `text` is the tool name), `text` (the agent wrote text) or `error`. |
 | `result` | The last reply of the agent, or `null`. |
 | `proposals` | The ids of the proposals that the agent made and did not withdraw. |
 | `agent_session` | The Claude Code session id. |
@@ -232,13 +232,13 @@ A `fragment` change has these fields:
 
 The values are the YAML values as JSON.
 
-The servers keep the proposals in `.lantern/proposals/<id>.json` in the project folder. Thus all servers on one folder see the same proposals. The servers write `.lantern/.gitignore` one time, so that git ignores the proposals. To track the proposals in git, remove the line `proposals/` from that file.
+The servers keep the proposals in `.loremaster/proposals/<id>.json` in the project folder. Thus all servers on one folder see the same proposals. The servers write `.loremaster/.gitignore` one time, so that git ignores the proposals. To track the proposals in git, remove the line `proposals/` from that file.
 
 To play a proposal before you accept it, use `session_start` with `proposal`.
 
 ## HTTP endpoints
 
-`lantern serve` has these endpoints:
+`loremaster serve` has these endpoints:
 
 | Method and path | What it does |
 | --- | --- |
@@ -246,13 +246,13 @@ To play a proposal before you accept it, use `session_start` with `proposal`.
 | `GET /proposals` | Gives the views of all open proposals. |
 | `GET /proposals/<id>` | Gives the view of one proposal. |
 | `POST /proposals/<id>/accept` | Writes the proposal into the project files, then removes the proposal. A proposal with errors is refused (status 409). A stale proposal is refused too, unless the body is `{ "force": true }`. If the editor wrote the change itself, send `{ "applied": true }`: the server then only removes the proposal. |
-| `POST /proposals/<id>/reject` | Removes the proposal. The body `{ "note": "why" }` is optional. The server adds the note to `.lantern/rejected.jsonl`. |
+| `POST /proposals/<id>/reject` | Removes the proposal. The body `{ "note": "why" }` is optional. The server adds the note to `.loremaster/rejected.jsonl`. |
 | `POST /jobs` | Starts a job. See [Jobs](#jobs). The reply has status 202. |
 | `GET /jobs` | Gives all jobs. |
 | `GET /jobs/<id>` | Gives one job, with its status, events, result and proposals. |
 | `POST /jobs/<id>/cancel` | Stops a running job. |
-| `GET /health` | Gives `{ "lantern": "<version>", "ui": true }`. The editor uses it to find the server. |
-| `POST /bootstrap` | Starts a new story from an idea. The body is `{ "title": "...", "idea": "...", "rooms": 3 }`; `title`, `rooms` and `model` are optional. The server writes the new story (the same files as `lantern new`), then starts a `seed_story` job. The reply is `{ "id": "j1" }` with status 202. When the folder has a story, the reply has status 409. |
+| `GET /health` | Gives `{ "loremaster": "<version>", "ui": true }`. The editor uses it to find the server. |
+| `POST /bootstrap` | Starts a new story from an idea. The body is `{ "title": "...", "idea": "...", "rooms": 3 }`; `title`, `rooms` and `model` are optional. The server writes the new story (the same files as `loremaster new`), then starts a `seed_story` job. The reply is `{ "id": "j1" }` with status 202. When the folder has a story, the reply has status 409. |
 
 Each endpoint is also at `/api/...`, for example `GET /api/proposals`. The editor uses these paths.
 

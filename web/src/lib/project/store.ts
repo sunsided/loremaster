@@ -6,14 +6,20 @@
 
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import type { SourceFile } from '#lib/engine/types.ts';
+import { migrateOpfs } from '#lib/migrate.ts';
 
-const ROOT = 'lantern';
+const ROOT = 'loremaster';
+// The copy from the old folder name runs once per page load.
+let migrated: Promise<void> | undefined;
 const isYaml = (name: string) => /\.ya?ml$/.test(name);
 
 async function root(): Promise<FileSystemDirectoryHandle | null> {
 	try {
 		const opfs = await navigator.storage.getDirectory();
-		return await opfs.getDirectoryHandle(ROOT, { create: true });
+		const dir = await opfs.getDirectoryHandle(ROOT, { create: true });
+		migrated ??= migrateOpfs(opfs, dir).catch(() => undefined);
+		await migrated;
+		return dir;
 	} catch {
 		return null;
 	}
@@ -146,7 +152,7 @@ export const canLinkFolder = () => typeof window !== 'undefined' && 'showDirecto
 export async function pickFolder(): Promise<FileSystemDirectoryHandle> {
 	const picker = (window as unknown as { showDirectoryPicker: (o: object) => Promise<FileSystemDirectoryHandle> })
 		.showDirectoryPicker;
-	return picker({ id: 'lantern-story', mode: 'readwrite' });
+	return picker({ id: 'loremaster-story', mode: 'readwrite' });
 }
 
 /** True when the page may write to the folder. Asks when `ask` is true; the browser needs a click for that. */
@@ -160,7 +166,7 @@ export async function folderAccess(dir: FileSystemDirectoryHandle, ask: boolean)
 }
 
 // The linked folder of each story is kept in IndexedDB: a folder handle can not go in local storage.
-const DB = 'lantern';
+const DB = 'loremaster';
 const FOLDERS = 'folders';
 
 function db(): Promise<IDBDatabase> {

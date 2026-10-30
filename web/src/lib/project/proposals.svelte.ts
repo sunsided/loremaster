@@ -1,4 +1,4 @@
-// Proposals from `lantern serve` (docs/ai-tools.md): changes that an AI assistant suggests.
+// Proposals from `loremaster serve` (docs/ai-tools.md): changes that an AI assistant suggests.
 // The editor reads them from the local server, shows them as ghost text, and applies an accepted
 // proposal to its own working copy. Then it tells the server, so the server drops the proposal.
 
@@ -6,16 +6,16 @@ import type { ReviewFinding } from '#lib/design/types.ts';
 import { keepLines } from './yaml-edit.ts';
 import type { Workspace } from './workspace.svelte.ts';
 
-/** Where `lantern serve` listens by default. */
+/** Where `loremaster serve` listens by default. */
 export const SERVE = 'http://127.0.0.1:4710';
 
-/** True when the page comes from this computer: the dev server, or `lantern serve` with the editor in it. */
+/** True when the page comes from this computer: the dev server, or `loremaster serve` with the editor in it. */
 export function localPage(): boolean {
 	return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 }
 
 /**
- * The API address of `lantern serve`, or null when no server answers. A local page asks its own origin
+ * The API address of `loremaster serve`, or null when no server answers. A local page asks its own origin
  * first, then the default address. A hosted page asks only when `linkHosted` is true, because the
  * browser asks the user for permission to connect to the local network.
  */
@@ -25,7 +25,7 @@ export async function findServer(linkHosted: boolean): Promise<string | null> {
 		try {
 			const res = await fetch(`${base}/api/health`);
 			// The dev server answers each path with the app page, so check the body too.
-			if (res.ok && typeof (await res.json()).lantern === 'string') return `${base}/api`;
+			if (res.ok && typeof (await res.json()).loremaster === 'string') return `${base}/api`;
 		} catch {
 			// Try the next address.
 		}
@@ -71,7 +71,7 @@ export interface ProposalView {
 	files: { path: string; base_sha: string | null; before: string | null; after: string | null }[];
 }
 
-/** A job of `lantern serve`: one task that Claude Code does, for example `imagine_exit`. */
+/** A job of `loremaster serve`: one task that Claude Code does, for example `imagine_exit`. */
 export interface JobView {
 	id: string;
 	task: string;
@@ -123,7 +123,7 @@ async function sha256(text: string): Promise<string> {
 	return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** The link to `lantern serve`: the open proposals, read again from time to time. */
+/** The link to `loremaster serve`: the open proposals, read again from time to time. */
 export class AiLink {
 	/** True while the server answers. */
 	reachable = $state(false);
@@ -139,7 +139,7 @@ export class AiLink {
 	#stopped = true;
 	#polling = false;
 
-	/** `linkHosted` tells whether a hosted page may look for `lantern serve` on this computer. */
+	/** `linkHosted` tells whether a hosted page may look for `loremaster serve` on this computer. */
 	constructor(linkHosted: () => boolean = () => false) {
 		this.#linkHosted = linkHosted;
 	}
@@ -194,7 +194,7 @@ export class AiLink {
 
 	/** The address of an endpoint. Throws when no server answered yet, so that no request goes to `null/...`. */
 	#url(path: string): string {
-		if (this.#base === null) throw new Error('lantern serve is not connected.');
+		if (this.#base === null) throw new Error('loremaster serve is not connected.');
 		return `${this.#base}${path}`;
 	}
 
@@ -267,7 +267,7 @@ export class AiLink {
 				body: JSON.stringify({ title, idea })
 			});
 			if (res.status === 409)
-				return 'The AI server has a story already. Start `lantern serve --bootstrap` for a new story, then try again.';
+				return 'The AI server has a story already. Start `loremaster serve --bootstrap` for a new story, then try again.';
 			if (!res.ok) return `${res.status} ${await res.text()}`;
 			const { id } = (await res.json()) as { id: string };
 			this.#started.set(id, Date.now());

@@ -1,6 +1,6 @@
 # Writing stories
 
-This guide tells you how to write a story for lantern. The examples are in `examples/lighthouse` and `examples/cantina`.
+This guide tells you how to write a story for loremaster. The examples are in `examples/lighthouse` and `examples/cantina`.
 
 ## Project folder
 
@@ -16,13 +16,13 @@ A story is a folder of YAML files. Each entity has its own file.
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
-To examine a story for problems, run `task check:story` or `cargo run -p lantern-cli -- check <folder>`.
+To examine a story for problems, run `task check:story` or `cargo run -p loremaster-cli -- check <folder>`.
 
 ## Start a new story
 
 A new story has two files: `story.yaml` and the start room `rooms/start.yaml`. The start room has a placeholder text. Replace it with your text.
 
-- In the terminal: `cargo run -p lantern-cli -- new <folder> --title "The Drowned Bell"`. The folder must not contain a `story.yaml`.
+- In the terminal: `cargo run -p loremaster-cli -- new <folder> --title "The Drowned Bell"`. The folder must not contain a `story.yaml`.
 - In the editor: open the project menu or the command palette (Ctrl+K), then select "New story…". Type the title and push Enter. The browser keeps the story as a working copy. "Open my story …" in the same menu opens it again.
 - With AI: type an idea too. The AI writes the first 2 or 3 rooms as a proposal. Read "Start a new story with AI" in `docs/ai-tools.md`.
 
@@ -200,14 +200,14 @@ The checker tells you about these problems:
 
 A dropped thread gives no warnings. Use it to keep an idea that you removed.
 
-The state explorer (`lantern explore`, or Atlas › Checks in the editor) plays all the ways through the story and follows the beats. For each open or resolved thread with a payoff, it tells you:
+The state explorer (`loremaster explore`, or Atlas › Checks in the editor) plays all the ways through the story and follows the beats. For each open or resolved thread with a payoff, it tells you:
 
 - No explored path shows the payoff. Then the player can never see it.
 - The payoff shows before any setup. The explorer gives the shortest path, and the editor can replay it.
 
 A beat on a fragment shows when that fragment shows. A beat on a room or a thing shows when any of its text shows. A beat on a rule shows when the rule fires. A `mention` is not checked.
 
-To list all open TODOs with their file and line, run `cargo run -p lantern-cli -- check <folder> --todos`.
+To list all open TODOs with their file and line, run `cargo run -p loremaster-cli -- check <folder> --todos`.
 
 In the editor:
 
@@ -220,7 +220,7 @@ In the editor:
 - The fragment panel has "Notes and threads of this fragment": the notes of the fragment, and a form to tie it to a thread as a setup, a mention or a payoff.
 - Atlas › Threads shows each thread with its beats, its status and its warnings. Change the status with its select. "+ Thread" makes a new file in `threads/`. "Explore" runs the state explorer for the payoff checks.
 
-If a note contains a colon, put it in quotes, for example `- "Premise: a lighthouse without a keeper."`. Without quotes, YAML reads the colon as a map. lantern then keeps the text, but other tools can read it differently.
+If a note contains a colon, put it in quotes, for example `- "Premise: a lighthouse without a keeper."`. Without quotes, YAML reads the colon as a map. loremaster then keeps the text, but other tools can read it differently.
 
 ## The Atlas
 
@@ -287,7 +287,7 @@ After a "Whole game" run, each text has a mark: "seen in the whole-game run" or 
 The state explorer plays all ways through the story from the start. It stops at 2000 states or 40 commands.
 
 1. In the web app, open Atlas › Checks (Ctrl+M, then "Checks"), select "Whole game", then select "Explore all states".
-2. Or, run `task explore` or `cargo run -p lantern-cli -- explore <folder>` in a terminal.
+2. Or, run `task explore` or `cargo run -p loremaster-cli -- explore <folder>` in a terminal.
 
 The explorer shows:
 
@@ -352,7 +352,7 @@ The editor makes the ids from the names. For example, "The Beach" becomes `the_b
 
 ### AI proposals
 
-When `lantern serve` runs for the story (read `docs/ai-tools.md`), the editor reads the open proposals of the AI assistant from it:
+When `loremaster serve` runs for the story (read `docs/ai-tools.md`), the editor reads the open proposals of the AI assistant from it:
 
 - The status line shows "✦ N proposals", or "✦ drafting… 12 s" while a job runs. Select it to open the AI tray. The tray shows the jobs, their cost and the warning about the files. "All jobs and proposals ↗" opens Atlas › AI, with the jobs and with each proposal, its changes and its problems.
 - In write mode, a proposal that changes the text of the current room shows as ghost text (italics, a dotted line and ✦) under the fragment that it changes, with its card in the margin.

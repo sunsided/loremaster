@@ -1,8 +1,9 @@
 // Per-viewer display settings, remembered in localStorage when it is available.
 
+import '#lib/migrate.ts';
 import type { EffectsLevel as Effects, MotionPreference as Motion, RevealMode, Theme } from '#lib/design/types.ts';
 
-const KEY = 'lantern.settings';
+const KEY = 'loremaster.settings';
 
 interface Stored {
 	theme: Theme;
@@ -32,7 +33,7 @@ class Settings {
 	tooltips = $state(defaults.tooltips);
 	/** How new game text appears: line by line, or a paragraph at once. */
 	reveal = $state<RevealMode>(defaults.reveal);
-	/** On a hosted page: look for `lantern serve` on this computer. Off by default, because the browser asks for permission. */
+	/** On a hosted page: look for `loremaster serve` on this computer. Off by default, because the browser asks for permission. */
 	serveLink = $state(defaults.serveLink);
 	/** The operating system asks for reduced motion. */
 	systemReduce = $state(false);

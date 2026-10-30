@@ -23,7 +23,7 @@ The motion setting has two choices:
 Reduced motion keeps the textures, because they do not move.
 The app keeps these settings in the browser storage of the user.
 
-On a hosted page (\`hostedOrigin\` is set), the dialog also offers the link to \`lantern serve\` on the computer of the user. It is off by default, because the browser asks for permission to connect to the local network.`
+On a hosted page (\`hostedOrigin\` is set), the dialog also offers the link to \`loremaster serve\` on the computer of the user. It is off by default, because the browser asks for permission to connect to the local network.`
 				},
 				story: { inline: false, iframeHeight: 640 }
 			}
@@ -48,6 +48,6 @@ On a hosted page (\`hostedOrigin\` is set), the dialog also offers the link to \
 
 <Story name="On a hosted page" asChild>
 	<Button aria-haspopup="dialog" aria-expanded={hostedOpen} onclick={() => (hostedOpen = true)}>Look and motion</Button>
-	<p>Link to lantern serve: {serveLink ? 'on' : 'off'}</p>
+	<p>Link to loremaster serve: {serveLink ? 'on' : 'off'}</p>
 	<SettingsDialog bind:open={hostedOpen} hostedOrigin="https://sunsided.github.io" bind:serveLink />
 </Story>

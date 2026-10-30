@@ -1,6 +1,6 @@
 # Contributing
 
-lantern uses GitHub Flow. There is one long-lived branch, `main`. Each change goes to `main` through a pull request from a feature branch.
+loremaster uses GitHub Flow. There is one long-lived branch, `main`. Each change goes to `main` through a pull request from a feature branch.
 
 ## Branches
 
