@@ -281,6 +281,21 @@ fn explore(project: Project) -> ExitCode {
     for r in &result.never_fired {
         println!("Never fired: {r}");
     }
+    for t in &result.threads {
+        if !t.paid_off {
+            println!(
+                "Thread {}: no explored path shows its payoff ({}).",
+                t.thread,
+                t.payoffs.join(", ")
+            );
+        } else if !t.payoff_before_setup.is_empty() {
+            println!(
+                "Thread {}: the payoff shows before any setup after {}.",
+                t.thread,
+                t.payoff_before_setup.join(", ")
+            );
+        }
+    }
     let problems = result.stuck > 0 || result.rooms.iter().any(|r| !r.reached);
     if problems {
         ExitCode::FAILURE

@@ -336,6 +336,19 @@ export interface Exploration {
 	endings: { text: string; path: string[] }[];
 	stuck: number;
 	stuck_path: string[];
+	/** For each open or resolved thread with a payoff: whether a payoff showed, and in which order. */
+	threads: ThreadReach[];
+}
+
+/** What the explorer found for one thread. */
+export interface ThreadReach {
+	thread: string;
+	/** True when an explored path showed a payoff. */
+	paid_off: boolean;
+	/** The shortest explored path on which a payoff shows before any setup; empty when there is none. */
+	payoff_before_setup: string[];
+	/** Where the payoffs are, for example `room:vault#2`. */
+	payoffs: string[];
 }
 
 /** The check of text that the author types. Offsets are UTF-16. */

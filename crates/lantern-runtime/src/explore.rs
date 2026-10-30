@@ -71,6 +71,9 @@ pub struct Exploration {
     pub stuck: usize,
     /// The shortest path into a stuck state, if there is one.
     pub stuck_path: Vec<String>,
+    /// For each open or resolved thread with a payoff: whether a payoff showed, and in which order.
+    #[serde(default)]
+    pub threads: Vec<crate::ThreadReach>,
 }
 
 /// A state as the explorer compares it: the parts that change what can happen.
@@ -235,6 +238,40 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     let mut queue: VecDeque<usize> = VecDeque::new();
     let mut truncated = false;
 
+    // Thread beats: the beats that each state's path showed, to see a payoff before its setup.
+    let (thread_ids, beats) = crate::threads::beats(&start.world().story);
+    let mut histories: Vec<BTreeSet<usize>> = Vec::new();
+    let mut paid_off = vec![false; thread_ids.len()];
+    let mut too_early: Vec<Option<Vec<String>>> = vec![None; thread_ids.len()];
+    let beats_of = |turn: &Turn,
+                    before: &BTreeSet<usize>,
+                    path: &[String],
+                    paid_off: &mut Vec<bool>,
+                    too_early: &mut Vec<Option<Vec<String>>>| {
+        let mut after = before.clone();
+        for (b, beat) in beats.iter().enumerate() {
+            if after.contains(&b) || !beat.hit(turn) {
+                continue;
+            }
+            if beat.payoff {
+                paid_off[beat.thread] = true;
+                let set_up = beats
+                    .iter()
+                    .enumerate()
+                    .any(|(s, x)| x.thread == beat.thread && !x.payoff && after.contains(&s));
+                let has_setups = beats.iter().any(|x| x.thread == beat.thread && !x.payoff);
+                let shorter = too_early[beat.thread]
+                    .as_ref()
+                    .is_none_or(|p| p.len() > path.len());
+                if has_setups && !set_up && shorter {
+                    too_early[beat.thread] = Some(path.to_vec());
+                }
+            }
+            after.insert(b);
+        }
+        after
+    };
+
     sources(&opening, &mut shown);
     let mut record = |game: &Game,
                       path: &[String],
@@ -262,6 +299,13 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
 
     seen.insert(fingerprint(&game, counters), 0);
     record(&game, &[], &mut variants, &mut shown);
+    histories.push(beats_of(
+        &opening,
+        &BTreeSet::new(),
+        &[],
+        &mut paid_off,
+        &mut too_early,
+    ));
     nodes.push((game, Vec::new()));
     edges.push(Vec::new());
     queue.push_back(0);
@@ -279,6 +323,15 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                 fired.insert(entry.text.clone());
             }
             let key = fingerprint(&next, counters);
+            let mut next_path = path.clone();
+            next_path.push(label);
+            let history = beats_of(
+                &turn,
+                &histories[i],
+                &next_path,
+                &mut paid_off,
+                &mut too_early,
+            );
             let j = match seen.get(&key) {
                 Some(&j) => j,
                 None => {
@@ -286,8 +339,6 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                         truncated = true;
                         continue;
                     }
-                    let mut next_path = path.clone();
-                    next_path.push(label);
                     if next.state().ended {
                         let text = turn
                             .blocks
@@ -302,6 +353,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                         });
                     }
                     record(&next, &next_path, &mut variants, &mut shown);
+                    histories.push(history);
                     let j = nodes.len();
                     seen.insert(key, j);
                     nodes.push((next, next_path));
@@ -410,5 +462,16 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         endings: endings.into_values().collect(),
         stuck,
         stuck_path,
+        threads: thread_ids
+            .iter()
+            .enumerate()
+            .filter(|(t, _)| beats.iter().any(|b| b.thread == *t && b.payoff))
+            .map(|(t, id)| crate::ThreadReach {
+                thread: id.clone(),
+                paid_off: paid_off[t],
+                payoff_before_setup: too_early[t].clone().unwrap_or_default(),
+                payoffs: crate::threads::payoff_labels(&beats, t),
+            })
+            .collect(),
     }
 }

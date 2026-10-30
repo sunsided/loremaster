@@ -337,7 +337,11 @@ export const exploration: Exploration = {
 		{ id: 'vault', name: 'The Vault', reached: false, variants: [], seen: [] }
 	],
 	never_shown: ['room:vault#1: Cold stone and the smell of old coins.'],
-	never_fired: ['open_vault']
+	never_fired: ['open_vault'],
+	threads: [
+		{ thread: 'lost_key', paid_off: true, payoff_before_setup: ['go east'], payoffs: ['room:stairwell#2'] },
+		{ thread: 'the_marigold', paid_off: false, payoff_before_setup: [], payoffs: ['rule:marigold_arrives'] }
+	]
 };
 
 // The cantina of the cantina example: the presence text of Blackbeard depends on what the player knows.
