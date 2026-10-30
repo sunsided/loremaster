@@ -99,6 +99,8 @@
 	const BOX_W = 168;
 	const BOX_H = 44;
 	const PAD = 24;
+	/** Room around the map for the marks of message exits, which reach out of the room boxes. */
+	const pad = $derived(map.ends?.length ? PAD + 36 : PAD);
 
 	const bounds = $derived.by(() => {
 		const ps = [...layout.values()];
@@ -113,14 +115,14 @@
 	});
 	// Extra room on the right for exit labels such as "through the mirror".
 	const LABEL_ROOM = 120;
-	const width = $derived((bounds.maxX - bounds.minX) * CELL_X + BOX_W + 2 * PAD + LABEL_ROOM);
-	const height = $derived((bounds.maxY - bounds.minY) * CELL_Y + BOX_H + 2 * PAD);
+	const width = $derived((bounds.maxX - bounds.minX) * CELL_X + BOX_W + 2 * pad + LABEL_ROOM);
+	const height = $derived((bounds.maxY - bounds.minY) * CELL_Y + BOX_H + 2 * pad);
 
 	/** A long name is cut to fit the box. The full name is in the title and in the list for screen readers. */
 	const short = (name: string) => (name.length > 21 ? `${name.slice(0, 20).trimEnd()}…` : name);
 	const at = (r: MapRoom) => layout.get(r.id) ?? { x: r.x, y: r.y };
-	const cx = (r: MapRoom) => (at(r).x - bounds.minX) * CELL_X + PAD + BOX_W / 2;
-	const cy = (r: MapRoom) => (at(r).y - bounds.minY) * CELL_Y + PAD + BOX_H / 2;
+	const cx = (r: MapRoom) => (at(r).x - bounds.minX) * CELL_X + pad + BOX_W / 2;
+	const cy = (r: MapRoom) => (at(r).y - bounds.minY) * CELL_Y + pad + BOX_H / 2;
 	/** In the stacked view, the levels next to the shown one sit a little up and right (above) or down and left (below). */
 	const GHOST = 14;
 	const room = (id: string) => map.rooms.find((r) => r.id === id);
@@ -217,8 +219,8 @@
 			</marker>
 		</defs>
 		{#each ghosts as { r, d } (r.id)}
-			{@const gx = (r.x - bounds.minX) * CELL_X + PAD + d * GHOST}
-			{@const gy = (r.y - bounds.minY) * CELL_Y + PAD - d * GHOST}
+			{@const gx = (r.x - bounds.minX) * CELL_X + pad + d * GHOST}
+			{@const gy = (r.y - bounds.minY) * CELL_Y + pad - d * GHOST}
 			<rect class="ghost" class:above={d > 0} x={gx} y={gy} width={BOX_W} height={BOX_H}><title>{r.name}, level {r.level}</title></rect>
 		{/each}
 		{#each map.links.filter(drawn) as link (link.from + link.to + link.direction)}

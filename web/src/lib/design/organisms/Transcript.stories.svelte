@@ -2,7 +2,7 @@
 	import { defineMeta } from '@storybook/addon-svelte-csf';
 	import type { ComponentProps } from 'svelte';
 	import { fn } from 'storybook/test';
-	import { authorTurn, doorTurn, drawerTurn, endTurn, entries, exits, openingTurn, things } from '../fixtures.ts';
+	import { authorTurn, doorTurn, drawerTurn, endTurn, entries, findings, exits, openingTurn, things } from '../fixtures.ts';
 	import Transcript from './Transcript.svelte';
 	import FragmentWriter from './FragmentWriter.svelte';
 	import { shoreFragment, writerTools } from '../fixtures.ts';
@@ -94,6 +94,28 @@ The transcript scrolls to the newest text. Put it in a container with a fixed he
 		writable: 0,
 		onwrite: fn(),
 		onadd: fn(),
+		margin: {
+			owner: 'room:shore',
+			things: 2,
+			exits: 2,
+			fragments: [
+				{ index: 0, layer: 'base', detail: 'always', shown: true, why: null, text: '' },
+				{ index: 1, layer: 'ambient', detail: 'always · when time.phase == dusk', shown: true, why: null, text: '' },
+				{ index: 2, layer: 'ambient', detail: 'shuffle · when time.phase == night', shown: false, why: 'time.phase == night is false', text: 'Waves hiss on the stones.' }
+			]
+		}
+	}}
+	{template}
+/>
+<Story
+	name="Write mode with review findings"
+	args={{
+		entries: [{ id: 0, turn: openingTurn }],
+		writable: 0,
+		onwrite: fn(),
+		onadd: fn(),
+		findings,
+		ondismiss: fn(),
 		margin: {
 			owner: 'room:shore',
 			things: 2,

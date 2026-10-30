@@ -2,7 +2,7 @@
 // same as the runtime output.
 
 import type { AtlasRoom, Exploration, ExitInfo, RoomMatrix, FragmentView, FrameUse, MapView, RoomParts, RuleView, SourcePiece, ThingInfo, Turn, VerbInfo } from '#lib/engine/types.ts';
-import type { MarkupToken, StoryStep, TranscriptEntry, WriterFragment, WriterTools } from './types.ts';
+import type { MarkupToken, ReviewFinding, StoryStep, TranscriptEntry, WriterFragment, WriterTools } from './types.ts';
 
 const shore = (fragment: number, text: string, condition?: string) => ({
 	text,
@@ -213,6 +213,26 @@ export const map: MapView = {
 		{ from: 'shore', to: 'cottage', direction: 'north', visible: true, one_way: false },
 		{ from: 'shore', to: 'stairwell', direction: 'east', visible: true, one_way: false },
 		{ from: 'stairwell', to: 'lantern_room', direction: 'up', visible: true, one_way: false }
+	]
+};
+
+/** The lighthouse map with an AI proposal: a new room west of the shore, where a message exit was. */
+export const proposalMap: MapView = {
+	rooms: [
+		{ id: 'shore', name: 'The Shore', x: 0, y: 0, level: 0, visited: true, current: true },
+		{ id: 'cottage', name: "Keeper's Cottage", x: 0, y: -1, level: 0, visited: true, current: false },
+		{ id: 'stairwell', name: 'Lighthouse Stairwell', x: 1, y: 0, level: 0, visited: false, current: false },
+		{ id: 'sea_rocks', name: 'The Sea Rocks', x: -1, y: 0, level: 0, visited: false, current: false, proposed: 'p2' }
+	],
+	links: [
+		{ from: 'shore', to: 'cottage', direction: 'north', visible: true, one_way: false },
+		{ from: 'shore', to: 'stairwell', direction: 'east', visible: true, one_way: false },
+		{ from: 'shore', to: 'sea_rocks', direction: 'west', visible: true, one_way: false, proposed: 'p2' }
+	],
+	ends: [
+		{ room: 'shore', direction: 'west', visible: true, removed: 'p2' },
+		{ room: 'sea_rocks', direction: 'south', visible: true, proposed: 'p2' },
+		{ room: 'cottage', direction: 'north', visible: true }
 	]
 };
 
@@ -494,3 +514,17 @@ export const towerRooms: AtlasRoom[] = towerMap.rooms.map((r) => ({
 	exits: towerMap.links.filter((l) => l.from === r.id).map((l) => [l.direction, l.to] as [string, string]),
 	fragments: 1
 }));
+
+/** The findings of an AI review of the shore. */
+export const findings: ReviewFinding[] = [
+	{
+		key: 'j1#0',
+		severity: 'high',
+		owner: 'room:shore',
+		fragment: 0,
+		problem: '"huddles against the wind" and "black against the stars" both lean on wind and dark.',
+		fix: 'Cut "against the wind".'
+	},
+	{ key: 'j1#1', severity: 'medium', owner: 'room:shore', fragment: 2, problem: 'The bell buoy line has no sound word.', fix: 'Add "dull" before "clangs".' },
+	{ key: 'j1#2', severity: 'low', owner: 'room:shore', fragment: null, problem: 'The room has no smell.', fix: 'Add salt and weed.' }
+];

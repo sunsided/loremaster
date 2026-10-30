@@ -46,4 +46,5 @@
 		]
 	}}
 />
+<Story name="With review findings" args={{ findings: 3, onfindings: fn() }} />
 <Story name="Files differ" args={{ jobs: [], differ: ['rooms/shore.yaml'] }} />
