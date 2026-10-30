@@ -4,6 +4,14 @@ lantern is a world editor for text adventures. In lantern, each text in the game
 
 The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge). The editor is a SvelteKit app. The player can play with typed commands or with a SCUMM-style verb bar. Both use the same runtime.
 
+Try it in the browser: [sunsided.github.io/lantern](https://sunsided.github.io/lantern/). The browser version keeps your stories in the browser. For AI help and files on disk, run `lantern serve` (see [docs/ai-tools.md](docs/ai-tools.md)).
+
+![Play mode: the lighthouse example after three commands. The side panel shows the map, the values this room depends on, the rules here and what changed: opening the drawer fired a rule that put the iron key in the room.](docs/images/play.png)
+
+![Write mode: the same room. Each text fragment shows its layer and its condition in the margin, and the room desk shows the file, notes and rules.](docs/images/write.png)
+
+![The Atlas map of Zork I, imported from its ZIL source: 110 rooms on six floors, with the rooms of the current floor and the details of the selected room.](docs/images/atlas.png)
+
 ## Layout
 
 | Path | Contents |
