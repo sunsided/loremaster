@@ -25,6 +25,7 @@ pub fn notes(project: &Project) -> Vec<NoteRef> {
     let mut c = Collector {
         project,
         out: Vec::new(),
+        seen: Default::default(),
     };
     let story = &project.story;
     c.list("story", "notes", None, &story.notes);
@@ -109,9 +110,42 @@ pub fn threads(project: &Project) -> Vec<ThreadView> {
         .collect()
 }
 
+/// The 1-based lines where `needle` is the text of a note: inside a list under a `notes:` key.
+fn note_lines(text: &str, needle: &str) -> Vec<u32> {
+    let lines: Vec<&str> = text.lines().collect();
+    let indent = |l: &str| l.len() - l.trim_start_matches([' ', '-']).len();
+    let under_notes = |i: usize| {
+        let mut level = indent(lines[i]);
+        for l in lines[..i].iter().rev() {
+            if l.trim().is_empty() || l.trim_start().starts_with('#') {
+                continue;
+            }
+            let own = indent(l);
+            if own < level {
+                if l.trim_start_matches([' ', '-']).starts_with("notes:") {
+                    return true;
+                }
+                level = own;
+                if level == 0 {
+                    break;
+                }
+            }
+        }
+        false
+    };
+    lines
+        .iter()
+        .enumerate()
+        .filter(|(i, l)| l.contains(needle) && under_notes(*i))
+        .map(|(i, _)| i as u32 + 1)
+        .collect()
+}
+
 struct Collector<'a> {
     project: &'a Project,
     out: Vec<NoteRef>,
+    /// How many notes with the same text each file had so far, to find the next one.
+    seen: std::collections::HashMap<(String, String), usize>,
 }
 
 impl Collector<'_> {
@@ -127,10 +161,14 @@ impl Collector<'_> {
         let file = self.file_of(entity);
         let text = self.project.file(&file).map(|f| f.text.as_str());
         for (i, note) in notes.iter().enumerate() {
-            let line = text.and_then(|t| {
-                t.find(note.text.as_str())
-                    .map(|pos| t[..pos].matches('\n').count() as u32 + 1)
-            });
+            // The same text can be in the story text or in another note: count only the
+            // places under a `notes:` key, and take the next one of this file.
+            let nth = self
+                .seen
+                .entry((file.clone(), note.text.clone()))
+                .or_default();
+            let line = text.and_then(|t| note_lines(t, &note.text).get(*nth).copied());
+            *nth += 1;
             self.out.push(NoteRef {
                 entity: entity.to_string(),
                 file: file.clone(),
