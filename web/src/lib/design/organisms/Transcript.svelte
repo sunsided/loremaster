@@ -73,6 +73,12 @@
 		return out;
 	}
 
+	/** The last block of room text, or the room title when the room has no text yet. */
+	function lastRoomText(blocks: Block[]): number {
+		const prose = blocks.findLastIndex((b) => b.kind === 'prose');
+		return prose >= 0 ? prose : blocks.findIndex((b) => b.kind === 'title');
+	}
+
 	/** The block after which the writer shows: the block with the fragment, else the last block of room text. */
 	function writerAfter(blocks: Block[]): number {
 		if (writing && writing.fragment === -2) return -1;
@@ -191,6 +197,7 @@
 			{@const fresh = entry.id === latest}
 			{@const writeHere = entry.id === writable}
 			{@const writerAt = writeHere && writing ? writerAfter(entry.turn.blocks) : -1}
+			{@const addAt = writeHere && !writing && onadd ? lastRoomText(entry.turn.blocks) : -1}
 			<div class="turn" class:fx-glitch={entry.id === glitchId && fresh} class:write={writeHere}>
 				{#each entry.turn.blocks as block, bi (bi)}
 					{@const inPlace = !!editor && writeHere && editable(block.kind) && block.runs.some((r) => same(r.source, writing))}
@@ -218,10 +225,11 @@
 						<div class="block prose editing">{@render editor()}</div>
 					{/if}
 					{#if bi === writerAt}{@render writer?.()}{/if}
+					{#if bi === addAt}
+						<!-- New room text goes after the room text, so the button is there too, above the things and exits. -->
+						<p class="add"><button type="button" class="add-button" onclick={onadd}>+ Add room text</button></p>
+					{/if}
 				{/each}
-				{#if writeHere && !writing && onadd}
-					<p class="add"><button type="button" class="add-button" onclick={onadd}>+ Add room text</button></p>
-				{/if}
 				{#if entry.rewritten}<p class="rewritten">Written again after an edit of the story.</p>{/if}
 				{#if respond && onrespond && !writing && entry.id === latest}
 					<p class="add">
