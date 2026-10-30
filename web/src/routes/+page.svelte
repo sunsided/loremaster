@@ -19,6 +19,7 @@
 	import { examples } from '#lib/engine/example.ts';
 	import { newStory, notesOf, threadsOf, type NoteRef, type ThreadView } from '#lib/engine/index.ts';
 	import ThreadsView from '#lib/design/organisms/ThreadsView.svelte';
+	import ThreadTag from '#lib/design/molecules/ThreadTag.svelte';
 	import NotesList from '#lib/design/organisms/NotesList.svelte';
 	import RadioGroup from '#lib/design/molecules/RadioGroup.svelte';
 	import type { NoteItem, ThreadItem } from '#lib/design/types.ts';
@@ -297,6 +298,14 @@
 		const id = slug(name, new Set(allThreads.map((t) => t.id)));
 		const problems = await ws.change(`threads/${id}.yaml`, `name: ${JSON.stringify(name)}\nstatus: open\n`);
 		if (problems?.length) failure = problems.map((p) => p.message).join(' ');
+	}
+
+	/** The file of a fragment and the YAML path of its notes, for the notes in the fragment panel. */
+	function fragmentNotePlace(at: WritingAt): { file: string; notes: (string | number)[]; prefix: string } | null {
+		const where = workspace?.project.listOf(at.owner);
+		if (!where || at.fragment < 0) return null;
+		const list = where.list.join('.');
+		return { file: where.file, notes: [...where.list, at.fragment, 'notes'], prefix: `${list}[${at.fragment}].notes[` };
 	}
 
 	/** Go to the room of a TODO. */
@@ -1088,7 +1097,24 @@
 				oncreate={createNamed}
 				onthing={makeThing}
 				prose
-			/>
+			>
+				{#snippet notes()}
+					{@const place = fragmentNotePlace(at)}
+					{#if place}
+						<NotesList
+							notes={allNotes.filter((n) => n.file === place.file && n.at.startsWith(place.prefix)).map((n) => noteItem(n, true))}
+							empty="No notes on this fragment."
+							onadd={(note) => editNote(place.file, (t) => addNote(t, place.notes, note))}
+							ontoggle={toggleNote}
+							onremove={deleteNote}
+						/>
+						<ThreadTag
+							threads={allThreads.map((t) => ({ id: t.id, name: t.name }))}
+							ontag={(beat) => editNote(place.file, (t) => addNote(t, place.notes, { ...beat, todo: false }))}
+						/>
+					{/if}
+				{/snippet}
+			</FragmentWriter>
 		{/key}
 	{/if}
 {/snippet}
