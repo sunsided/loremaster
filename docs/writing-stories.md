@@ -200,6 +200,13 @@ The checker tells you about these problems:
 
 A dropped thread gives no warnings. Use it to keep an idea that you removed.
 
+The state explorer (`lantern explore`, or Atlas › Checks in the editor) plays all the ways through the story and follows the beats. For each open or resolved thread with a payoff, it tells you:
+
+- No explored path shows the payoff. Then the player can never see it.
+- The payoff shows before any setup. The explorer gives the shortest path, and the editor can replay it.
+
+A beat on a fragment shows when that fragment shows. A beat on a room or a thing shows when any of its text shows. A beat on a rule shows when the rule fires. A `mention` is not checked.
+
 To list all open TODOs with their file and line, run `cargo run -p lantern-cli -- check <folder> --todos`.
 
 In the editor:
@@ -209,6 +216,8 @@ In the editor:
 - In Atlas › TODOs, "Show" selects the open TODOs, the done TODOs or all. A done TODO stays in its file, struck through; clear its checkbox to open it again. "×" removes a TODO from the file. Then it is gone.
 - A TODO that you add in Atlas › TODOs goes into `story.yaml`, for the whole story.
 - In write mode, the margin note of a fragment shows its notes ("✎ 1 note") and its threads, for example "setup of lost_key".
+- The fragment panel has "Notes and threads of this fragment": the notes of the fragment, and a form to tie it to a thread as a setup, a mention or a payoff.
+- Atlas › Threads shows each thread with its beats, its status and its warnings. Change the status with its select. "+ Thread" makes a new file in `threads/`. "Explore" runs the state explorer for the payoff checks.
 
 If a note contains a colon, put it in quotes, for example `- "Premise: a lighthouse without a keeper."`. Without quotes, YAML reads the colon as a map. lantern then keeps the text, but other tools can read it differently.
 

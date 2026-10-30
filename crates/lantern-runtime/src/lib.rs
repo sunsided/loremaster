@@ -20,6 +20,7 @@ mod parser;
 mod rng;
 mod state;
 mod text;
+mod threads;
 mod world;
 
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
@@ -33,4 +34,5 @@ pub use output::{Block, BlockKind, Link, LinkKind, LogEntry, Run, Source, Turn};
 pub use parser::{Command, Preview};
 pub use state::{FragmentProgress, State};
 pub use text::{SourcePiece, SourceRole};
+pub use threads::ThreadReach;
 pub use world::{CompileError, World};

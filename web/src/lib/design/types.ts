@@ -211,3 +211,16 @@ export interface NoteItem {
 	thread?: string | null;
 	role?: 'setup' | 'payoff' | 'mention' | null;
 }
+
+/** A long-range thread in the threads view, with its beats and its warnings. */
+export interface ThreadItem {
+	id: string;
+	name: string;
+	status: 'open' | 'resolved' | 'dropped';
+	summary: string | null;
+	setups: number;
+	payoffs: number;
+	/** Problems from the checker and the state explorer, in words. */
+	warnings: string[];
+	beats: NoteItem[];
+}

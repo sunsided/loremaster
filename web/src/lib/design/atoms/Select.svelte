@@ -6,15 +6,17 @@
 		options: { value: T; label: string }[];
 		/** Hide the label visually. Screen readers still read it. */
 		hideLabel?: boolean;
+		/** Called when the user picks an option. */
+		onchange?: (event: Event) => void;
 	}
 
-	let { label, value = $bindable(), options, hideLabel = false }: Props = $props();
+	let { label, value = $bindable(), options, hideLabel = false, onchange }: Props = $props();
 </script>
 
 <!-- A native select with a label. The browser gives it keyboard and screen-reader support. -->
 <label class="select">
 	<span class="label" class:visually-hidden={hideLabel}>{label}</span>
-	<select bind:value>
+	<select bind:value {onchange}>
 		{#each options as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
 	</select>
 </label>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { untrack } from 'svelte';
 	import Button from '../atoms/Button.svelte';
 	import Checkbox from '../atoms/Checkbox.svelte';
@@ -41,6 +42,8 @@
 		 * slim fragment panel: properties, and how the text reads in other states. The markup is one key away.
 		 */
 		prose?: boolean;
+		/** The author notes of this fragment, for example a NotesList and the form that ties it to a thread. */
+		notes?: Snippet;
 	}
 
 	let {
@@ -56,7 +59,8 @@
 		oncreate,
 		draft: given,
 		onthing,
-		prose = false
+		prose = false,
+		notes
 	}: Props = $props();
 
 
@@ -340,9 +344,27 @@
 		{#if onremove && !fresh}<Button size="compact" variant="quiet" onclick={onremove}>Remove this fragment</Button>{/if}
 		<span class="keys" aria-hidden="true">Enter saves · Shift+Enter new line · Esc cancels</span>
 	</div>
+	{#if notes && !fresh}
+		<details class="notes">
+			<summary>Notes and threads of this fragment</summary>
+			{@render notes()}
+		</details>
+	{/if}
 </section>
 
 <style>
+	.notes {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+	}
+	.notes summary {
+		min-height: var(--size-target-compact);
+		color: var(--color-text-muted);
+		cursor: pointer;
+	}
 	.writer {
 		display: flex;
 		flex-direction: column;

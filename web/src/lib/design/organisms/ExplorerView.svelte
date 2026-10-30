@@ -148,6 +148,26 @@
 			<SectionRule title="never fired" />
 			{#each result.never_fired as r (r)}<p class="warning-text"><code>{r}</code></p>{:else}<p class="muted">Every rule fired.</p>{/each}
 		</section>
+		{#if result.threads?.length}
+			<section class="group">
+				<SectionRule title="threads" />
+				{#each result.threads as t (t.thread)}
+					<div class="item">
+						{#if !t.paid_off}
+							<p class="warning-text">
+								<code>{t.thread}</code>: no explored path shows its payoff ({t.payoffs.join(', ')}).
+							</p>
+						{:else if t.payoff_before_setup.length}
+							<p class="warning-text"><code>{t.thread}</code>: the payoff shows before any setup on this path:</p>
+							{@render path(t.payoff_before_setup)}
+							<Button size="compact" variant="quiet" onclick={() => onreplay(t.payoff_before_setup)}>Replay this path</Button>
+						{:else}
+							<p class="muted"><code>{t.thread}</code>: the payoff shows, after a setup.</p>
+						{/if}
+					</div>
+				{/each}
+			</section>
+		{/if}
 	{/if}
 </section>
 

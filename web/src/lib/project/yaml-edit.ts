@@ -230,6 +230,9 @@ function setScalar(node: Scalar, value: string) {
 export interface NoteData {
 	text: string;
 	todo: boolean;
+	/** The thread that the note is a beat of, with its role. */
+	thread?: string;
+	role?: 'setup' | 'payoff' | 'mention';
 }
 
 /**
@@ -290,8 +293,21 @@ export function removeNote(text: string, note: YamlPath): string {
 }
 
 function noteNode(note: NoteData) {
-	if (!note.todo) return quoted(note.text);
+	if (!note.todo && !note.thread) return quoted(note.text);
 	const map = new YAMLMap();
-	map.set('todo', quoted(note.text));
+	map.set(note.todo ? 'todo' : 'text', quoted(note.text));
+	if (note.thread) map.set('thread', note.thread);
+	if (note.thread && note.role) map.set('role', note.role);
+	// A beat is one short line: `- { text: "…", thread: x, role: setup }`.
+	if (note.thread) map.flow = true;
 	return map;
+}
+
+/** Set a top-level scalar, for example the `status` of a thread. The key is added when it is missing. */
+export function setField(text: string, key: string, value: string): string {
+	const doc = parse(text);
+	const node = doc.get(key, true);
+	if (isScalar(node)) setScalar(node, value);
+	else doc.set(key, value);
+	return serialize(doc);
 }

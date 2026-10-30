@@ -17,11 +17,13 @@
 	import type { Source } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
-	import { newStory, notesOf, type NoteRef } from '#lib/engine/index.ts';
+	import { newStory, notesOf, threadsOf, type NoteRef, type ThreadView } from '#lib/engine/index.ts';
+	import ThreadsView from '#lib/design/organisms/ThreadsView.svelte';
+	import ThreadTag from '#lib/design/molecules/ThreadTag.svelte';
 	import NotesList from '#lib/design/organisms/NotesList.svelte';
 	import RadioGroup from '#lib/design/molecules/RadioGroup.svelte';
-	import type { NoteItem } from '#lib/design/types.ts';
-	import { addNote, pathOf, removeNote, setNoteDone } from '#lib/project/yaml-edit.ts';
+	import type { NoteItem, ThreadItem } from '#lib/design/types.ts';
+	import { addNote, pathOf, removeNote, setField, setNoteDone } from '#lib/project/yaml-edit.ts';
 	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
 	import NewStoryDialog from '#lib/design/organisms/NewStoryDialog.svelte';
 	import { settings } from '#lib/settings.svelte.ts';
@@ -173,12 +175,16 @@
 
 	// Author notes and TODOs, read from the files after each change.
 	let allNotes = $state<NoteRef[]>([]);
+	let allThreads = $state<ThreadView[]>([]);
 	$effect(() => {
 		const files = workspace?.project.files;
 		if (!files) return;
 		let current = true;
 		notesOf(files).then((n) => {
 			if (current) allNotes = n;
+		});
+		threadsOf(files).then((t) => {
+			if (current) allThreads = t;
 		});
 		return () => {
 			current = false;
@@ -260,6 +266,48 @@
 		const n = allNotes.find((x) => noteKey(x) === key);
 		if (n) editNote(n.file, (t) => removeNote(t, pathOf(n.at)));
 	}
+	/** The threads for the threads view, with the warnings of the checker and of the last exploration. */
+	const threadItems = $derived(
+		allThreads.map((t): ThreadItem => {
+			const warnings: string[] = [];
+			if (t.status === 'open' && t.setups > 0 && t.payoffs === 0) warnings.push(`Open, with ${t.setups} setup(s) and no payoff.`);
+			if (t.status !== 'dropped' && t.payoffs > 0 && t.setups === 0) warnings.push('A payoff and no setup.');
+			if (t.status === 'resolved' && t.open_todos > 0) warnings.push(`Resolved, with ${t.open_todos} open TODO(s).`);
+			const reach = exploration?.threads.find((r) => r.thread === t.id);
+			if (reach && !reach.paid_off) warnings.push(`No explored path shows the payoff${exploration?.truncated ? ' (the walk stopped early)' : ''}.`);
+			if (reach?.payoff_before_setup.length) warnings.push(`The payoff shows before any setup after: ${reach.payoff_before_setup.join(', ')}.`);
+			return {
+				id: t.id,
+				name: t.name,
+				status: t.status,
+				summary: t.summary,
+				setups: t.setups,
+				payoffs: t.payoffs,
+				warnings,
+				beats: t.beats.map((b) => noteItem(b, false))
+			};
+		})
+	);
+	function setThreadStatus(id: string, status: string) {
+		const t = allThreads.find((x) => x.id === id);
+		if (t) editNote(t.file, (text) => setField(text, 'status', status));
+	}
+	async function createThread(name: string) {
+		const ws = workspace;
+		if (!ws) return;
+		const id = slug(name, new Set(allThreads.map((t) => t.id)));
+		const problems = await ws.change(`threads/${id}.yaml`, `name: ${JSON.stringify(name)}\nstatus: open\n`);
+		if (problems?.length) failure = problems.map((p) => p.message).join(' ');
+	}
+
+	/** The file of a fragment and the YAML path of its notes, for the notes in the fragment panel. */
+	function fragmentNotePlace(at: WritingAt): { file: string; notes: (string | number)[]; prefix: string } | null {
+		const where = workspace?.project.listOf(at.owner);
+		if (!where || at.fragment < 0) return null;
+		const list = where.list.join('.');
+		return { file: where.file, notes: [...where.list, at.fragment, 'notes'], prefix: `${list}[${at.fragment}].notes[` };
+	}
+
 	/** Go to the room of a TODO. */
 	function goToNote(key: string) {
 		const n = allNotes.find((x) => noteKey(x) === key);
@@ -275,7 +323,7 @@
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'proposals'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'proposals'>('map');
 	let atlasRoom = $state<string | null>(null);
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
@@ -284,6 +332,7 @@
 		{ id: 'story', label: 'Story' },
 		{ id: 'checks', label: 'Checks' },
 		{ id: 'todos', label: `TODOs ${openTodos.length}` },
+		{ id: 'threads', label: `Threads ${allThreads.length}` },
 		...(ai.reachable ? [{ id: 'proposals', label: `Proposals ${ai.proposals.length}` }] : [])
 	]);
 	// The Proposals tab goes away when the server stops; show the map in its place.
@@ -1048,7 +1097,24 @@
 				oncreate={createNamed}
 				onthing={makeThing}
 				prose
-			/>
+			>
+				{#snippet notes()}
+					{@const place = fragmentNotePlace(at)}
+					{#if place}
+						<NotesList
+							notes={allNotes.filter((n) => n.file === place.file && n.at.startsWith(place.prefix)).map((n) => noteItem(n, true))}
+							empty="No notes on this fragment."
+							onadd={(note) => editNote(place.file, (t) => addNote(t, place.notes, note))}
+							ontoggle={toggleNote}
+							onremove={deleteNote}
+						/>
+						<ThreadTag
+							threads={allThreads.map((t) => ({ id: t.id, name: t.name }))}
+							ontag={(beat) => editNote(place.file, (t) => addNote(t, place.notes, { ...beat, todo: false }))}
+						/>
+					{/if}
+				{/snippet}
+			</FragmentWriter>
 		{/key}
 	{/if}
 {/snippet}
@@ -1121,6 +1187,17 @@
 							A TODO added here goes into story.yaml. Add a TODO for a room in the Notes section of the Here panel. A done TODO stays,
 							struck through, until you remove it with ×. A removed TODO is gone from the file.
 						</p>
+					</section>
+				{:else if atlasTab === 'threads'}
+					<section class="todos-view">
+						<ThreadsView
+							threads={threadItems}
+							explored={exploration !== null}
+							onstatus={setThreadStatus}
+							oncreate={createThread}
+							onbeat={goToNote}
+							onexplore={runExplorer}
+						/>
 					</section>
 				{:else if atlasTab === 'proposals'}
 					<section class="proposals-view" aria-label="Proposals">
