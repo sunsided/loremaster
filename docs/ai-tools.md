@@ -119,7 +119,7 @@ These environment variables change the agent:
 | Variable | Contents |
 | --- | --- |
 | `LANTERN_CLAUDE` | The `claude` program. The default is `claude` on the `PATH`. |
-| `LANTERN_CLAUDE_MODEL` | The model, for example `sonnet`. If you do not set it, Claude Code uses its default model. |
+| `LANTERN_CLAUDE_MODEL` | The model. The default is `sonnet`: it is fast for these short tasks and uses less than half the quota of a larger model. Set it to `opus`, for example, for more care. Set it to an empty value to use the default model of Claude Code. |
 | `LANTERN_CLAUDE_EFFORT` | The effort level of Claude Code: `low`, `medium`, `high`, `xhigh` or `max`. The default is `low`, because the agent then writes its proposals sooner. Set it to an empty value to use the default of Claude Code. |
 
 The body of `POST /jobs` has these fields:
@@ -129,7 +129,7 @@ The body of `POST /jobs` has these fields:
 | `task` | The name of a task prompt, for example `imagine_exit`. |
 | `args` | The arguments of the prompt, as an object. |
 | `state` | Optional. A state that the editor saved. The server starts a new session `job-<id>` from this state, and the job uses that session. |
-| `model` | Optional. The model for this job, for example `sonnet`. It replaces `LANTERN_CLAUDE_MODEL`. |
+| `model` | Optional. The model for this job, for example `opus`. It replaces `LANTERN_CLAUDE_MODEL`. |
 
 For `imagine_exit` and `seed_story`, if `args` has no `rejected`, the server adds the last 20 rejected proposals from `.lantern/rejected.jsonl`.
 
