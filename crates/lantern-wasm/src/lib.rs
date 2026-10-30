@@ -51,6 +51,32 @@ pub fn check_project(files: JsValue) -> Result<JsValue, JsValue> {
     to_js(&diags)
 }
 
+/// The files of a new story with this title (`[{ path, text }]`).
+#[wasm_bindgen(js_name = newStory)]
+pub fn new_story(title: &str) -> Result<JsValue, JsValue> {
+    to_js(&lantern_project::scaffold(title))
+}
+
+/// All author notes of the project files, with their place. Empty when the files do not load.
+#[wasm_bindgen(js_name = projectNotes)]
+pub fn project_notes(files: JsValue) -> Result<JsValue, JsValue> {
+    let files: Vec<SourceFile> = from_js(files)?;
+    match load(files) {
+        Ok(project) => to_js(&lantern_project::notes(&project)),
+        Err(_) => to_js(&Vec::<lantern_project::NoteRef>::new()),
+    }
+}
+
+/// All threads of the project files, with their beats. Empty when the files do not load.
+#[wasm_bindgen(js_name = projectThreads)]
+pub fn project_threads(files: JsValue) -> Result<JsValue, JsValue> {
+    let files: Vec<SourceFile> = from_js(files)?;
+    match load(files) {
+        Ok(project) => to_js(&lantern_project::threads(&project)),
+        Err(_) => to_js(&Vec::<lantern_project::ThreadView>::new()),
+    }
+}
+
 /// A running game.
 #[wasm_bindgen]
 pub struct Engine {

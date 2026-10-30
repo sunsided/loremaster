@@ -19,11 +19,13 @@ mod check;
 mod diagnostic;
 mod load;
 mod notes;
+mod scaffold;
 
 pub use check::check;
 pub use diagnostic::{Diagnostic, Severity};
 pub use load::{Project, SourceFile, load};
 pub use notes::{NoteRef, ThreadView, notes, open_todos, threads};
+pub use scaffold::{START_TEXT, scaffold};
 
 #[cfg(not(target_family = "wasm"))]
 pub use load::read_dir;

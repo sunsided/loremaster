@@ -1,4 +1,5 @@
-//! `lantern play <dir>`, `lantern check <dir> [--todos]`, `lantern explore <dir>` and
+//! `lantern new <dir> [--title T]`, `lantern play <dir>`, `lantern check <dir> [--todos]`,
+//! `lantern explore <dir>` and
 //! `lantern mcp <dir>` and `lantern serve <dir> [--port N]`.
 
 use lantern_project::{Project, Severity, check, load, open_todos, read_dir};
@@ -8,7 +9,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern check <project-folder> --todos\n       lantern serve <project-folder> [--port N]";
+const USAGE: &str = "usage: lantern <play|check|explore|mcp> <project-folder>\n       lantern new <project-folder> [--title \"The Title\"]\n       lantern check <project-folder> --todos\n       lantern serve <project-folder> [--port N]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -16,6 +17,17 @@ fn main() -> ExitCode {
         eprintln!("{USAGE}");
         return ExitCode::from(2);
     };
+    if cmd == "new" {
+        let title = match args.get(2).map(String::as_str) {
+            None => "Untitled",
+            Some("--title") if args.len() == 4 => args[3].as_str(),
+            Some(_) => {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            }
+        };
+        return new_story(Path::new(dir), title);
+    }
     // The MCP server owns stdout and also serves a project with errors, so it skips `open`.
     if cmd == "mcp" {
         return match lantern_mcp::serve_stdio(Path::new(dir)) {
@@ -79,6 +91,31 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+/// Write the files of a new story into a folder. The folder must not hold a story yet.
+fn new_story(dir: &Path, title: &str) -> ExitCode {
+    if dir.join("story.yaml").exists() {
+        eprintln!("error: {} has a story.yaml already", dir.display());
+        return ExitCode::FAILURE;
+    }
+    for file in lantern_project::scaffold(title) {
+        let path = dir.join(&file.path);
+        let written = path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| std::fs::write(&path, &file.text));
+        if let Err(e) = written {
+            eprintln!("error: cannot write {}: {e}", path.display());
+            return ExitCode::FAILURE;
+        }
+    }
+    println!(
+        "New story in {}. Play it with `lantern play {}`.",
+        dir.display(),
+        dir.display()
+    );
+    ExitCode::SUCCESS
 }
 
 /// Load and check a project, printing every problem.

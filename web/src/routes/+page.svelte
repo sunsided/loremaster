@@ -17,6 +17,9 @@
 	import type { Source } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
+	import { newStory } from '#lib/engine/index.ts';
+	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
+	import NewStoryDialog from '#lib/design/organisms/NewStoryDialog.svelte';
 	import { settings } from '#lib/settings.svelte.ts';
 	import Button from '#lib/design/atoms/Button.svelte';
 	import CommandPrompt from '#lib/design/molecules/CommandPrompt.svelte';
@@ -45,18 +48,35 @@
 	let workspace: Workspace | undefined = $state();
 	const session = $derived(workspace?.session ?? undefined);
 	const STORY_KEY = 'lantern.story';
+	let mine = $state<StoryEntry[]>(myStories());
 	let storyName = $state(readStory());
+	let showNewStory = $state(false);
+	/** True for a story that the author made, false for a bundled example. */
+	const isMine = $derived(!(storyName in examples));
 
 	function readStory(): string {
 		try {
 			const name = localStorage.getItem(STORY_KEY);
-			return name && name in examples ? name : 'lighthouse';
+			return name && (name in examples || mine.some((s) => s.name === name)) ? name : 'lighthouse';
 		} catch {
 			return 'lighthouse';
 		}
 	}
 
-	/** Load an example story and start a new session with it. */
+	/** The bundled files of a story: the example, or the new-story files of the author's story. */
+	async function bundledFiles(name: string) {
+		if (name in examples) return examples[name];
+		return newStory(mine.find((s) => s.name === name)?.title ?? name);
+	}
+
+	/** Make a new story from the dialog and open it. */
+	function createStory({ title }: { title: string; idea: string }) {
+		const entry = addStory(title, Object.keys(examples));
+		mine = myStories();
+		openStory(entry.name);
+	}
+
+	/** Load a story and start a new session with it. */
 	function openStory(name: string) {
 		storyName = name;
 		try {
@@ -67,7 +87,8 @@
 		failure = '';
 		exploration = null;
 		workspace = undefined;
-		Workspace.open(name, examples[name])
+		bundledFiles(name)
+			.then((files) => Workspace.open(name, files))
 			.then((ws) => (workspace = ws))
 			.catch((e) => (failure = String(e)));
 	}
@@ -106,9 +127,9 @@
 			case 'folder-locked':
 				return 'folder needs access';
 			case 'browser':
-				return p.edited ? 'edited, saved in browser' : 'bundled example';
+				return p.edited ? 'edited, saved in browser' : isMine ? 'new story' : 'bundled example';
 			default:
-				return p.edited ? 'edited, not saved' : 'bundled example';
+				return p.edited ? 'edited, not saved' : isMine ? 'new story' : 'bundled example';
 		}
 	});
 	let showSettings = $state(false);
@@ -282,7 +303,15 @@
 		items.push({ id: 'files-export', group: 'Files', label: 'Export the story as a zip file', run: () => exportZip(ws) });
 		items.push({ id: 'files-import', group: 'Files', label: 'Import a story from a zip file', run: () => zipInput?.click() });
 		if (p.edited || p.storage === 'folder')
-			items.push({ id: 'files-reset', group: 'Files', label: `Go back to the bundled example “${p.name}”`, run: () => fileAction(() => ws.reset()) });
+			items.push({
+				id: 'files-reset',
+				group: 'Files',
+				label: isMine ? 'Start this story again from one empty room' : `Go back to the bundled example “${p.name}”`,
+				run: () => fileAction(() => ws.reset())
+			});
+		items.push({ id: 'story-new', group: 'Stories', label: 'New story…', run: () => (showNewStory = true) });
+		for (const s of mine.filter((s) => s.name !== storyName))
+			items.push({ id: `story-${s.name}`, group: 'Stories', label: `Open my story “${s.title}”`, run: () => openStory(s.name) });
 		for (const name of Object.keys(examples).filter((n) => n !== storyName))
 			items.push({ id: `story-${name}`, group: 'Examples', label: `Open the example “${name}”`, run: () => openStory(name) });
 		return items;
@@ -1201,6 +1230,7 @@
 			if (file && workspace) fileAction(() => workspace!.importZip(file));
 		}}
 	/>
+	<NewStoryDialog bind:open={showNewStory} aiUnavailable="The AI draft comes in a later step." oncreate={createStory} />
 	<SettingsDialog
 		bind:open={showSettings}
 		bind:theme={settings.theme}
@@ -1223,7 +1253,9 @@
 				<p>The changed files do not build.</p>
 				<div class="actions">
 					<Button onclick={() => exportZip(ws)}>Export the changed files as a zip</Button>
-					<Button variant="primary" onclick={() => fileAction(() => ws.reset())}>Go back to the bundled example</Button>
+					<Button variant="primary" onclick={() => fileAction(() => ws.reset())}
+						>{isMine ? 'Start this story again from one empty room' : 'Go back to the bundled example'}</Button
+					>
 				</div>
 			{/if}
 		{:else if failure}

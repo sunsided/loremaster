@@ -18,6 +18,13 @@ The id of an entity is its file name. You can set `id:` to use a different id.
 
 To examine a story for problems, run `task check:story` or `cargo run -p lantern-cli -- check <folder>`.
 
+## Start a new story
+
+A new story has two files: `story.yaml` and the start room `rooms/start.yaml`. The start room has a placeholder text. Replace it with your text.
+
+- In the terminal: `cargo run -p lantern-cli -- new <folder> --title "The Drowned Bell"`. The folder must not contain a `story.yaml`.
+- In the editor: open the project menu or the command palette (Ctrl+K), then select "New story…". Type the title and push Enter. The browser keeps the story as a working copy. "Open my story …" in the same menu opens it again.
+
 ## Fragments
 
 A text is a list of fragments. A fragment is a plain string, or a map with these fields:
