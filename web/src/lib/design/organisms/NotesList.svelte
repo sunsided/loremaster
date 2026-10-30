@@ -10,6 +10,10 @@
 		empty?: string;
 		/** Add a note or a TODO. Leave it out for a list without the add form. */
 		onadd?: (note: { text: string; todo: boolean }) => void;
+		/** The add form makes TODOs only, for example in a list of TODOs. */
+		todoOnly?: boolean;
+		/** The placeholder of the add form. */
+		placeholder?: string;
 		/** Mark a TODO as done, or as open again. */
 		ontoggle: (key: string, done: boolean) => void;
 		onremove?: (key: string) => void;
@@ -17,7 +21,16 @@
 		onselect?: (key: string) => void;
 	}
 
-	let { notes, empty = 'No notes here.', onadd, ontoggle, onremove, onselect }: Props = $props();
+	let {
+		notes,
+		empty = 'No notes here.',
+		onadd,
+		todoOnly = false,
+		placeholder = 'A note for the authors',
+		ontoggle,
+		onremove,
+		onselect
+	}: Props = $props();
 	const uid = $props.id();
 	let draft = $state('');
 
@@ -68,14 +81,18 @@
 			class="add"
 			onsubmit={(e) => {
 				e.preventDefault();
-				add(false);
+				add(todoOnly);
 			}}
 		>
-			<VisuallyHidden><label for="{uid}-draft">A new note or TODO</label></VisuallyHidden>
-			<input id="{uid}-draft" bind:value={draft} placeholder="A note for the authors" autocomplete="off" />
+			<VisuallyHidden><label for="{uid}-draft">{todoOnly ? 'A new TODO' : 'A new note or TODO'}</label></VisuallyHidden>
+			<input id="{uid}-draft" bind:value={draft} {placeholder} autocomplete="off" />
 			<div class="buttons">
-				<Button size="compact" type="submit" disabled={!draft.trim()}>+ Note</Button>
-				<Button size="compact" type="button" disabled={!draft.trim()} onclick={() => add(true)}>+ TODO</Button>
+				{#if todoOnly}
+					<Button size="compact" type="submit" disabled={!draft.trim()}>+ TODO</Button>
+				{:else}
+					<Button size="compact" type="submit" disabled={!draft.trim()}>+ Note</Button>
+					<Button size="compact" type="button" disabled={!draft.trim()} onclick={() => add(true)}>+ TODO</Button>
+				{/if}
 			</div>
 		</form>
 	{/if}

@@ -203,7 +203,9 @@ To list all open TODOs with their file and line, run `cargo run -p lantern-cli -
 In the editor:
 
 - The Here panel has a "Notes" section. It shows the notes and TODOs of the room and of the things in it. Type a text, then select "+ Note" or "+ TODO". Select the checkbox of a TODO when it is done. "×" removes a note.
-- The status line shows the number of open TODOs. Select it to open Atlas › TODOs, with all open TODOs of the story. Select the place of a TODO to go to its room.
+- The status line shows the number of open TODOs. Select it to open Atlas › TODOs, with all open TODOs of the story. Select the place of a TODO to go to its room. Ctrl+K, "Add a TODO, or find the done ones", opens the same tab.
+- In Atlas › TODOs, "Show" selects the open TODOs, the done TODOs or all. A done TODO stays in its file, struck through; clear its checkbox to open it again. "×" removes a TODO from the file. Then it is gone.
+- A TODO that you add in Atlas › TODOs goes into `story.yaml`, for the whole story.
 - In write mode, the margin note of a fragment shows its notes ("✎ 1 note") and its threads, for example "setup of lost_key".
 
 If a note contains a colon, put it in quotes, for example `- "Premise: a lighthouse without a keeper."`. Without quotes, YAML reads the colon as a map. lantern then keeps the text, but other tools can read it differently.

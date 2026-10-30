@@ -19,6 +19,7 @@
 	import { examples } from '#lib/engine/example.ts';
 	import { newStory, notesOf, type NoteRef } from '#lib/engine/index.ts';
 	import NotesList from '#lib/design/organisms/NotesList.svelte';
+	import RadioGroup from '#lib/design/molecules/RadioGroup.svelte';
 	import type { NoteItem } from '#lib/design/types.ts';
 	import { addNote, pathOf, removeNote, setNoteDone } from '#lib/project/yaml-edit.ts';
 	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
@@ -175,7 +176,10 @@
 			current = false;
 		};
 	});
-	const openTodos = $derived(allNotes.filter((n) => n.note.todo && !n.note.done));
+	const allTodos = $derived(allNotes.filter((n) => n.note.todo));
+	const openTodos = $derived(allTodos.filter((n) => !n.note.done));
+	const doneTodos = $derived(allTodos.filter((n) => n.note.done));
+	let todoFilter = $state<'open' | 'done' | 'all'>('open');
 	const noteKey = (n: NoteRef) => `${n.file}#${n.at}`;
 
 	/** Where a note is, in words: the room or thing name, or the fragment. */
@@ -235,6 +239,10 @@
 		const s = session;
 		const file = s && workspace?.project.origins[`room:${s.scene.room}`];
 		if (file) editNote(file, (t) => addNote(t, ['notes'], note));
+	}
+	/** A note for the whole story, in story.yaml. */
+	function addStoryNote(note: { text: string; todo: boolean }) {
+		editNote(workspace?.project.origins['story'] ?? 'story.yaml', (t) => addNote(t, ['notes'], note));
 	}
 	function toggleNote(key: string, done: boolean) {
 		const n = allNotes.find((x) => noteKey(x) === key);
@@ -449,6 +457,7 @@
 		const s = session;
 		if (!s) return [];
 		const items: PaletteItem[] = [];
+		items.push({ id: 'todo-add', group: 'Notes', label: 'Add a TODO, or find the done ones', keywords: 'note todo task struck', run: () => openAtlas('todos') });
 		items.push({ id: 'atlas', group: 'Atlas', label: atlasOpen ? 'Close the Atlas' : 'Open the Atlas', keywords: 'world map ctrl m', run: () => (atlasOpen ? closeAtlas() : openAtlas()) });
 		for (const tab of atlasTabs) {
 			items.push({ id: `atlas-${tab.id}`, group: 'Atlas', label: `Show ${tab.label} in the Atlas`, keywords: tab.id === 'checks' ? 'explore' : '', run: () => openAtlas(tab.id as typeof atlasTab) });
@@ -1077,12 +1086,33 @@
 					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
 				{:else if atlasTab === 'todos'}
 					<section class="todos-view" aria-label="TODOs">
+						<RadioGroup
+							legend="Show"
+							name="todo-filter"
+							look="pills"
+							options={[
+								{ value: 'open', label: `Open ${openTodos.length}` },
+								{ value: 'done', label: `Done ${doneTodos.length}` },
+								{ value: 'all', label: 'All' }
+							]}
+							bind:value={todoFilter}
+						/>
 						<NotesList
-							notes={openTodos.map((n) => noteItem(n, false))}
-							empty="No open TODOs. Add one in the Notes section of the Here panel, or with todo: in a notes list."
+							notes={(todoFilter === 'open' ? openTodos : todoFilter === 'done' ? doneTodos : allTodos).map((n) => noteItem(n, false))}
+							empty={todoFilter === 'done'
+								? 'No done TODOs. A done TODO stays in its file, struck through, until you remove it with ×.'
+								: 'No open TODOs.'}
+							todoOnly
+							placeholder="A TODO for the whole story"
+							onadd={addStoryNote}
 							ontoggle={toggleNote}
+							onremove={deleteNote}
 							onselect={goToNote}
 						/>
+						<p class="muted-line">
+							A TODO added here goes into story.yaml. Add a TODO for a room in the Notes section of the Here panel. A done TODO stays,
+							struck through, until you remove it with ×. A removed TODO is gone from the file.
+						</p>
 					</section>
 				{:else if atlasTab === 'proposals'}
 					<section class="proposals-view" aria-label="Proposals">
@@ -1465,6 +1495,9 @@
 		outline-offset: 2px;
 	}
 	.todos-view {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-5);
 		max-width: 48rem;
 		padding: var(--space-5) var(--space-6);
 	}
