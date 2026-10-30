@@ -46,11 +46,26 @@
 			for (const r of map.rooms) if (!multi || r.level === shown) pos.set(r.id, { x: r.x, y: r.y });
 			return pos;
 		}
-		// One row for each level, the highest at the top. Each row starts one column further right,
-		// so a spiral reads as a staircase.
+		// One row for each level, the highest at the top, the rooms in ring order. Each row is shifted so that
+		// the room at the top of a stair is right above the room at its foot: a spiral reads as a staircase,
+		// and a stair is a straight line up.
 		const top = levels.at(-1) ?? 0;
+		let shift = 0;
 		levels.forEach((l, li) => {
-			ringOrder(l).forEach((r, i) => pos.set(r.id, { x: li + i, y: top - l }));
+			const ring = ringOrder(l);
+			if (li > 0) {
+				const stair = map.links.find((k) => {
+					const a = map.rooms.find((r) => r.id === k.from);
+					const b = map.rooms.find((r) => r.id === k.to);
+					return a && b && ((a.level === l - 1 && b.level === l) || (b.level === l - 1 && a.level === l)) && (pos.has(a.id) || pos.has(b.id));
+				});
+				if (stair) {
+					const lower = pos.get(stair.from) ?? pos.get(stair.to)!;
+					const upper = ring.findIndex((r) => r.id === stair.from || r.id === stair.to);
+					shift = lower.x - upper;
+				}
+			}
+			ring.forEach((r, i) => pos.set(r.id, { x: shift + i, y: top - l }));
 		});
 		return pos;
 	});
@@ -58,6 +73,16 @@
 	const ghosts = $derived(
 		multi && view === 'stacked' ? map.rooms.filter((r) => Math.abs(r.level - shown) === 1).map((r) => ({ r, d: r.level - shown })) : []
 	);
+	const unfolded = $derived(multi && view === 'unfolded');
+	let drawing: HTMLDivElement | undefined = $state();
+	// In the unfolded view, scroll so that the current room is in the middle.
+	$effect(() => {
+		const el = drawing;
+		const me = here;
+		if (!el || !unfolded || !me || !layout.has(me.id)) return;
+		const scale = el.scrollWidth / width;
+		el.scrollLeft = Math.max(0, cx(me) * scale - el.clientWidth / 2);
+	});
 	const placed = $derived(map.rooms.filter((r) => layout.has(r.id)));
 	const stairs = (r: MapRoom) => ({
 		up: map.links.some((l) => (l.from === r.id && l.direction === 'up') || (l.to === r.id && l.direction === 'down' && !l.one_way)),
@@ -127,7 +152,8 @@
 		const pb = at(b);
 		if (multi && view === 'unfolded') {
 			if (pa.y !== pb.y) {
-				// A stair: up or down from the side of the room, then across to the other room.
+				// A stair: straight up or down when the rooms are above each other, else up and then across.
+				if (pa.x === pb.x) return `M${cx(a)} ${cy(a)}L${end.x} ${end.y}`;
 				const side = cx(a) + (cx(b) >= cx(a) ? BOX_W / 2 : -BOX_W / 2) * 0.6;
 				return `M${side} ${cy(a)}V${end.y}H${end.x}`;
 			}
@@ -174,7 +200,10 @@
 		</div>
 	{/if}
 
-	<svg viewBox="0 0 {width} {height}" class="map" aria-hidden="true">
+	<!-- The unfolded view can be wider than the panel: it scrolls sideways, so the names stay readable. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div class="drawing" class:wide={unfolded} bind:this={drawing} tabindex={unfolded ? 0 : undefined} role={unfolded ? 'group' : undefined} aria-label={unfolded ? 'Unfolded map, scrolls sideways' : undefined}>
+	<svg viewBox="0 0 {width} {height}" class="map" aria-hidden="true" style:min-width={unfolded ? `${Math.round(width * 0.7)}px` : undefined}>
 		<defs>
 			<marker id="{uid}-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 				<path d="M0 0L10 5L0 10z" class="arrow" />
@@ -219,6 +248,7 @@
 			</g>
 		{/each}
 	</svg>
+	</div>
 
 	<div class="legend" aria-hidden="true">
 		<span><i class="swatch current-swatch"></i>you are here</span>
@@ -265,7 +295,16 @@
 		margin: 0;
 		color: var(--color-text-muted);
 	}
+	.drawing.wide {
+		position: relative;
+		overflow-x: auto;
+	}
+	.drawing.wide:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
+	}
 	.map {
+		display: block;
 		width: 100%;
 		height: auto;
 		font-family: var(--font-ui);
