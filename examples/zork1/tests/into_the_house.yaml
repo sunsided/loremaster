@@ -5,8 +5,8 @@ steps:
   - take leaflet
   - "n"
   - "e"
-  - open window
-  - { do: "w", see: Kitchen }
+  - { do: go to window, see: "(first opening the kitchen window)" }
+  - { do: look, see: Kitchen }
   - { do: "w", see: Living Room }
   - { do: take lamp, see: Taken. }
   - open case

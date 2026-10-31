@@ -1176,6 +1176,14 @@ impl Game {
                     (e.direction.name().to_string(), name)
                 })
                 .collect(),
+            doors: self
+                .visible_exits()
+                .iter()
+                .filter_map(|(_, e)| {
+                    let door = self.world.story.thing(e.door.as_ref()?.as_str())?;
+                    Some((e.direction.name().to_string(), self.nouns_of(door)))
+                })
+                .collect(),
             back: self.state.previous.as_ref().and_then(|prev| {
                 self.visible_exits()
                     .iter()

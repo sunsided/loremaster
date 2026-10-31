@@ -27,6 +27,8 @@ pub(crate) struct ParseScope {
     pub things: Vec<(Id, Vec<String>)>,
     /// Exit direction name and the name of the room it leads to.
     pub exits: Vec<(String, String)>,
+    /// Exit direction name and the nouns of its door, for "go through the window".
+    pub doors: Vec<(String, Vec<String>)>,
     /// The direction of a visible exit to the room the player came from, for `back`.
     pub back: Option<String>,
 }
@@ -75,6 +77,7 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
                 .ok_or_else(|| NO_WAY_BACK.to_string());
         }
         return direction(scope, &target)
+            .or_else(|| through_door(scope, &target))
             .map(|direction| Command::Go { direction })
             .ok_or_else(|| "You can't go that way.".to_string());
     }
@@ -130,6 +133,30 @@ fn direction(scope: &ParseScope, phrase: &str) -> Option<String> {
         .or_else(|| scope.exits.iter().find(|(_, room)| by_room(room)))
         .map(|(dir, _)| dir.clone())
         .or(canonical)
+}
+
+/// The exit whose door the phrase names: "window", "through the window", "to the window".
+fn through_door(scope: &ParseScope, phrase: &str) -> Option<String> {
+    let mut words: Vec<&str> = phrase.split_whitespace().collect();
+    while words
+        .first()
+        .is_some_and(|w| ["through", "to", "into", "in", "the", "a", "an"].contains(w))
+    {
+        words.remove(0);
+    }
+    let noun = words.join(" ");
+    if noun.is_empty() {
+        return None;
+    }
+    scope
+        .doors
+        .iter()
+        .find(|(_, nouns)| {
+            nouns
+                .iter()
+                .any(|n| *n == noun || n.ends_with(&format!(" {noun}")))
+        })
+        .map(|(dir, _)| dir.clone())
 }
 
 /// Longest verb phrase at the start of the input. When two verbs share the
@@ -303,7 +330,7 @@ pub(crate) fn preview(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Pre
 
     if verb.id.as_str() == "go" {
         let target = strip_articles(&rest).join(" ");
-        out.direction = direction(scope, &target);
+        out.direction = direction(scope, &target).or_else(|| through_door(scope, &target));
         out.complete = out.direction.is_some();
         return out;
     }
@@ -365,6 +392,7 @@ mod tests {
                 ("door".into(), vec!["oak door".into(), "door".into()]),
             ],
             exits: vec![("north".into(), "Keeper's Cottage".into())],
+            doors: vec![("north".into(), vec!["oak door".into(), "door".into()])],
             back: None,
         }
     }
@@ -398,6 +426,20 @@ mod tests {
                 })
         );
         check!(parse(&v, &s, "i") == Ok(verb("inventory", &[])));
+        for cmd in [
+            "go to the door",
+            "walk door",
+            "enter oak door",
+            "climb through the door",
+        ] {
+            check!(
+                parse(&v, &s, cmd)
+                    == Ok(Command::Go {
+                        direction: "north".into()
+                    }),
+                "{cmd}"
+            );
+        }
     }
 
     #[test]
