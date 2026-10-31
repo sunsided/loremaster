@@ -24,6 +24,13 @@ tasks:
     cmds:
       - "{{.CARGO}} clippy --workspace --all-targets --no-default-features -- -D warnings"
 
+  lint:workflows:
+    desc: Check the GitHub workflows with actionlint and zizmor (needs docker and uv)
+    cmds:
+      # Use the same versions as the job `workflows` in .github/workflows/ci.yml.
+      - docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+      - uvx zizmor@1.31.1 .github
+
   test:
     desc: Run all Rust tests (without the embedded web editor)
     cmds:

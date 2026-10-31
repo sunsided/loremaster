@@ -39,6 +39,7 @@ Run these commands before you open a pull request:
 | `task verify` | Examines the format, runs clippy and runs the Rust tests. |
 | `task web:check` | Type-checks the Svelte code and the stories. Run it when you change `web/`. |
 | `task package` | Builds the web editor and packages the crates for crates.io. Run it when you change a `Cargo.toml`. |
+| `task lint:workflows` | Examines the GitHub workflows with actionlint and zizmor. Run it when you change `.github/`. It needs Docker and uv. |
 
 The crate `loremaster` embeds the web editor by default (the feature `embed-ui`). The editor comes from `crates/loremaster-mcp/ui/`, and git ignores this folder. If the folder is missing, the build stops with an error. Thus the Rust tasks and the Rust CI job use `--no-default-features`. To build with the editor, run `task release:ui` first. The CI web job builds the web app, copies it into the crate and runs `cargo package`.
 
