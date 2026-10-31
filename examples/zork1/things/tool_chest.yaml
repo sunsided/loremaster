@@ -2,4 +2,5 @@
 name: "group of tool chests"
 aliases: ["chest", "chests", "group", "toolchests"]
 location: { room: maintenance_room }
+container: true
 props: { open: true }

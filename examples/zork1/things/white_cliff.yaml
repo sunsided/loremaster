@@ -2,4 +2,5 @@
 name: "white cliffs"
 aliases: ["cliff", "cliffs"]
 location: { room: white_cliffs_north }
+also_in: ["white_cliffs_south"]
 listed: false

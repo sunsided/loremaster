@@ -1,7 +1,7 @@
 # Imported from ZIL: LUNCH (1dungeon.zil)
 name: "lunch"
 aliases: ["food", "sandwich", "dinner"]
-location: { room: kitchen }
+location: { in: sandwich_bag }
 portable: true
 presence:
   - "A hot pepper sandwich is here."

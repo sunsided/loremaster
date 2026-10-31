@@ -1,0 +1,47 @@
+# Hand-ported from BELL-F, CANDLES-FCN, BLACK-BOOK and LLD-ROOM (1actions.zil):
+# at the entrance to Hades, ring the bell, light the candles and read the book,
+# one quickly after the other. Then the spirits flee and the gate opens.
+start: idle
+states:
+  - name: idle
+    description: The spirits block the gate and jeer at the player.
+  - name: rung
+    description: The bell is red hot and the spirits are stunned. The timer exorcism_window runs.
+  - name: lit
+    description: The candles burn and the spirits cower. Only the prayer in the black book is missing.
+  - name: done
+    description: The spirits fled through the walls. The gate to the Land of the Living Dead is open (lld_flag).
+steps:
+  - from: idle
+    on: { verb: [ring, bell] }
+    when: here == entrance_to_hades
+    to: rung
+    instead: true
+    say: "The bell suddenly becomes red hot and falls to the ground. The wraiths, as if paralyzed, stop their jeering and slowly turn to face you. On their ashen faces, the expression of a long-forgotten terror takes shape."
+    then:
+      - move: { bell: nowhere, hot_bell: entrance_to_hades }
+      - say: "{candles.carried ? In your confusion, the candles drop to the ground (and they are out). | }"
+      - set: { candles.lit: false }
+      - move: { candles: entrance_to_hades }
+      - start: exorcism_window
+  - from: rung
+    on: { verb: [turn_on, candles] }
+    when: here == entrance_to_hades and candles.carried
+    to: lit
+    say: "The flames flicker wildly and appear to dance. The earth beneath your feet trembles, and your legs nearly buckle beneath you. The spirits cower at your unearthly power."
+  - from: lit
+    on: { verb: [examine, book] }
+    when: here == entrance_to_hades and book.carried
+    to: done
+    instead: true
+    say: "Each word of the prayer reverberates through the hall in a deafening confusion. As the last word fades, a voice, loud and commanding, speaks: \"Begone, fiends!\" A heart-stopping scream fills the cavern, and the spirits, sensing a greater power, flee through the walls."
+    then:
+      - move: { ghosts: nowhere }
+      - set: { lld_flag: true }
+      - cancel: exorcism_window
+  - from: [rung, lit]
+    on: { timer: exorcism_window }
+    to: idle
+    say: "{here == entrance_to_hades ? The tension of this ceremony is broken, and the wraiths, amused but shaken at your clumsy attempt, resume their hideous jeering. | }"
+    then:
+      - move: { hot_bell: nowhere, bell: entrance_to_hades }

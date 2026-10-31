@@ -1,0 +1,11 @@
+# Blackbeard tells about the Marigold only when he trusts the player.
+name: Learn where the Marigold went
+steps:
+  - in
+  - talk to shadow
+  - { do: "1", see: "They call me Blackbeard" }
+  - { do: "1", see: "South, past the breakwater" }
+  - { do: "1", see: "Harbour Street" }
+expect:
+  facts: { knows_blackbeard_name: true }
+  room: street

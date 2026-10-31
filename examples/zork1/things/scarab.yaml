@@ -3,3 +3,4 @@ name: "beautiful jeweled scarab"
 aliases: ["scarab", "bug", "beetle", "treasure"]
 location: nowhere
 portable: true
+props: { value: 5, tvalue: 5 }

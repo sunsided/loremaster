@@ -3,5 +3,6 @@ name: "platinum bar"
 aliases: ["bar", "platinum", "treasure"]
 location: { room: loud_room }
 portable: true
+props: { value: 10, tvalue: 5 }
 presence:
   - "On the ground is a large platinum bar."

@@ -1,5 +1,6 @@
 use crate::{
-    ClockConfig, Dialogue, Fragment, Frames, Id, Note, Room, Rule, Thing, Thread, Value, VerbDef,
+    ClockConfig, Dialogue, Fragment, Frames, Id, Machine, Note, Room, Rule, Thing, Thread, Timer,
+    Value, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +20,41 @@ pub struct VarDef {
     #[serde(rename = "type")]
     pub ty: VarType,
     pub initial: Value,
+}
+
+/// The score of the story: a number variable, its maximum and the ranks.
+/// With a score, the `score` command shows it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Score {
+    /// The number variable that holds the score. The loader declares it when
+    /// story.yaml does not.
+    #[serde(default = "score_var")]
+    pub var: Id,
+    pub max: i64,
+    /// Rank names, each from a score up, for example `{ from: 26, name: Amateur Adventurer }`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ranks: Vec<Rank>,
+}
+
+fn score_var() -> Id {
+    Id::new("score")
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Rank {
+    pub from: i64,
+    pub name: String,
+}
+
+impl Score {
+    /// The name of the rank for a score: the rank with the highest `from` that the score reaches.
+    pub fn rank(&self, score: i64) -> Option<&str> {
+        self.ranks
+            .iter()
+            .filter(|r| r.from <= score)
+            .max_by_key(|r| r.from)
+            .map(|r| r.name.as_str())
+    }
 }
 
 /// A whole story: everything a project folder holds, and what the bundle carries.
@@ -44,6 +80,18 @@ pub struct Story {
     pub things: Vec<Thing>,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<Score>,
+    /// Puzzles with named states. The loader also makes their variables and rules.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub machines: Vec<Machine>,
+    /// Behaviors in Rust that the game registers, by id. A build without one
+    /// of them plays the story without its logic.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub behaviors: Vec<Id>,
+    /// Counters that go down each turn.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub timers: Vec<Timer>,
     /// Relation axes between the player and the characters, such as `trust`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub relations: Vec<Id>,
@@ -80,6 +128,10 @@ impl Story {
     /// The dialogue of a thing, if it has one.
     pub fn dialogue_with(&self, thing: &str) -> Option<&Dialogue> {
         self.dialogues.iter().find(|d| d.with.as_str() == thing)
+    }
+
+    pub fn timer(&self, id: &str) -> Option<&Timer> {
+        self.timers.iter().find(|t| t.id.as_str() == id)
     }
 
     pub fn var(&self, id: &str) -> Option<&VarDef> {

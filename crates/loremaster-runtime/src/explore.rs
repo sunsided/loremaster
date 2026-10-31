@@ -195,10 +195,13 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         }
     }
     // Waiting, when the story reacts to time.
-    if story
-        .rules
-        .iter()
-        .any(|r| matches!(r.on, EventPattern::Time(_) | EventPattern::Turn))
+    // Waiting matters when the story reacts to time: rules on time and turns, and timers.
+    if !story.timers.is_empty()
+        || !story.behaviors.is_empty()
+        || story
+            .rules
+            .iter()
+            .any(|r| matches!(r.on, EventPattern::Time(_) | EventPattern::Turn))
     {
         out.push(("wait".into(), verb("wait", Vec::new())));
     }

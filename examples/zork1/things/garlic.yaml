@@ -1,5 +1,5 @@
 # Imported from ZIL: GARLIC (1dungeon.zil)
 name: "clove of garlic"
 aliases: ["garlic", "clove"]
-location: { room: kitchen }
+location: { in: sandwich_bag }
 portable: true

@@ -237,6 +237,12 @@ impl Game {
         }
         if outcomes {
             self.apply_outcomes(turn, d, &node.outcomes_on_enter);
+            // World rules hear about the node, after its outcomes.
+            let event = crate::Event::Talk {
+                dialogue: d.id.clone(),
+                node: key.clone(),
+            };
+            self.fire(turn, &event, 1);
         }
         if self.state.talk.is_some() && self.available().is_empty() {
             self.end_talk();
@@ -366,10 +372,7 @@ impl Game {
         self.mirror(turn, &option.outcomes);
         // A world effect can end the story or take the player away.
         let with = d.with.clone();
-        let here = self
-            .state
-            .is_in_room(with.as_str(), self.state.room.as_str())
-            || self.state.is_carried(with.as_str());
+        let here = self.eval().present(with.as_str());
         if self.state.ended || !here {
             self.end_talk();
         } else {

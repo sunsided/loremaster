@@ -2,6 +2,7 @@
 name: "red buoy"
 aliases: ["buoy"]
 location: { room: river_4 }
+container: true
 portable: true
 props: { open: false }
 presence:

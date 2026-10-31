@@ -3,5 +3,6 @@ name: "jade figurine"
 aliases: ["figurine", "treasure"]
 location: { room: bat_room }
 portable: true
+props: { value: 5, tvalue: 5 }
 presence:
   - "There is an exquisite jade figurine here."

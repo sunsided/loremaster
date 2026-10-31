@@ -58,6 +58,9 @@ pub struct State {
     /// The memories that things keep, from dialogues. dramaturge holds them too.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub memories: BTreeMap<Id, BTreeSet<String>>,
+    /// Running timers and the turns they have left.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub timers: BTreeMap<Id, u32>,
 }
 
 /// Where a conversation is: the dialogue and its current node, by key, so
@@ -76,12 +79,65 @@ impl State {
         self.locations.get(thing)
     }
 
+    /// Where the thing is at the end of its containers and supporters: a room,
+    /// carried or nowhere.
+    pub fn outer_location(&self, thing: &str) -> Option<&Location> {
+        let mut at = self.locations.get(thing)?;
+        // A loop of containers is an authoring error; give up after a few steps.
+        for _ in 0..16 {
+            match at.holder() {
+                Some(holder) => at = self.locations.get(holder.as_str())?,
+                None => return Some(at),
+            }
+        }
+        None
+    }
+
+    /// The player has the thing, in the hands or in something carried.
     pub fn is_carried(&self, thing: &str) -> bool {
+        matches!(self.outer_location(thing), Some(Location::Carried))
+    }
+
+    /// The player holds the thing itself, not in a container.
+    pub fn is_held(&self, thing: &str) -> bool {
         matches!(self.locations.get(thing), Some(Location::Carried))
     }
 
+    /// The thing is in the room, also inside containers and on supporters there.
     pub fn is_in_room(&self, thing: &str, room: &str) -> bool {
-        matches!(self.locations.get(thing), Some(Location::Room(r)) if r.as_str() == room)
+        matches!(self.outer_location(thing), Some(Location::Room(r)) if r.as_str() == room)
+    }
+
+    /// The first closed container around the thing, if one hides it. A
+    /// container is closed when its `open` property is false; `transparent`
+    /// lets the player see in, but not reach in.
+    pub fn closed_around(&self, thing: &str, seeing: bool) -> Option<&Id> {
+        let mut at = self.locations.get(thing)?;
+        for _ in 0..16 {
+            let Location::In(holder) = at else {
+                at = self.locations.get(at.holder()?.as_str())?;
+                continue;
+            };
+            let closed = matches!(
+                self.facts.get(&format!("{holder}.open")),
+                Some(Value::Bool(false))
+            );
+            let see_through = self.flag(&format!("{holder}.transparent"));
+            if closed && !(seeing && see_through) {
+                return Some(holder);
+            }
+            at = self.locations.get(holder.as_str())?;
+        }
+        None
+    }
+
+    /// The things directly in or on a holder, in id order.
+    pub fn contents(&self, holder: &str) -> Vec<&Id> {
+        self.locations
+            .iter()
+            .filter(|(_, at)| at.holder().is_some_and(|h| h.as_str() == holder))
+            .map(|(id, _)| id)
+            .collect()
     }
 
     pub fn visits_to(&self, room: &str) -> u32 {

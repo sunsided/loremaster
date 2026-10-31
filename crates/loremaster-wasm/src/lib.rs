@@ -262,6 +262,11 @@ impl Engine {
         to_js(&self.game.rules())
     }
 
+    /// The puzzle machines with their states and steps, for the Atlas.
+    pub fn machines(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.game.machines())
+    }
+
     /// All rooms and exits, for the map panel.
     pub fn map(&self) -> Result<JsValue, JsValue> {
         to_js(&self.game.map())

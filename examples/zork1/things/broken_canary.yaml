@@ -1,8 +1,9 @@
 # Imported from ZIL: BROKEN-CANARY (1dungeon.zil)
 name: "broken clockwork canary"
 aliases: ["canary", "treasure"]
-location: nowhere
+location: { in: broken_egg }
 portable: true
+props: { tvalue: 1 }
 presence:
   - when: "broken_canary.interactions == 0"
     text: "There is a golden clockwork canary nestled in the egg. It seems to have recently had a bad experience. The mountings for its jewel-like eyes are empty, and its silver beak is crumpled. Through a cracked crystal window below its left wing you can see the remains of intricate machinery. It is not clear what result winding it would have, as the mainspring seems sprung."

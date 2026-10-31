@@ -1,4 +1,5 @@
 # Imported from ZIL: RIVER (1dungeon.zil)
 name: "river"
 location: { room: dam_base }
+also_in: ["river_1", "river_2", "river_3", "white_cliffs_north", "white_cliffs_south", "river_4", "river_5", "shore", "sandy_beach", "aragain_falls", "end_of_rainbow", "canyon_bottom", "cliff_middle", "canyon_view"]
 listed: false

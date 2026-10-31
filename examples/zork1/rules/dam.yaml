@@ -1,0 +1,25 @@
+# Hand-ported from BUTTON-F and BOLT-F (1actions.zil).
+- id: yellow_button
+  on: { verb: [push, yellow_button] }
+  instead: true
+  then:
+    - set: { gate_flag: true }
+    - say: "Click."
+- id: brown_button
+  on: { verb: [push, brown_button] }
+  instead: true
+  then:
+    - set: { gate_flag: false }
+    - say: "Click."
+- id: bolt_stuck
+  on: { check: [turn, bolt] }
+  when: not gate_flag
+  then:
+    - say: "The bolt won't turn with your best effort."
+    - stop
+- id: bolt_needs_wrench
+  on: { check: [turn, bolt] }
+  when: not wrench.carried
+  then:
+    - say: "Your bare hands don't appear to be enough."
+    - stop

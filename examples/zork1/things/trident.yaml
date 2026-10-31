@@ -3,6 +3,7 @@ name: "crystal trident"
 aliases: ["trident", "fork", "treasure"]
 location: { room: atlantis_room }
 portable: true
+props: { value: 4, tvalue: 11 }
 presence:
   - when: "trident.interactions == 0"
     text: "On the shore lies Poseidon's own crystal trident."

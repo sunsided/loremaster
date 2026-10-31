@@ -2,7 +2,8 @@
 name: "chalice"
 aliases: ["cup", "silver", "treasure"]
 location: { room: treasure_room }
+container: true
 portable: true
-props: { open: false }
+props: { open: false, value: 10, tvalue: 5 }
 presence:
   - "There is a silver chalice, intricately engraved, here."

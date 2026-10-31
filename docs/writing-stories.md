@@ -8,10 +8,15 @@ A story is a folder of YAML files. Each entity has its own file.
 
 | Path | Contents |
 | --- | --- |
-| `story.yaml` | Title, start room, intro, clock, variables, custom verbs and story frames. |
-| `rooms/*.yaml` | One room in each file. |
-| `things/*.yaml` | One thing or character in each file. |
-| `rules/*.yaml` | One rule, or a list of rules, in each file. |
+| `story.yaml` | Title, start room, intro, clock, variables, custom verbs, the score and story frames. |
+| `rooms/*.yaml` | One room in each file. A room file can also have rules. |
+| `things/*.yaml` | One thing or character in each file. A thing file can also have rules. |
+| `rules/*.yaml` | One rule, or a list of rules, in each file. Read [Rules](#rules). |
+| `timers/*.yaml` | One timer in each file. Read [Timers](#timers). |
+| `machines/*.yaml` | One puzzle machine in each file. Read [Puzzle machines](#puzzle-machines). |
+| `verbs/*.yaml` | One custom verb in each file, as an item of `verbs:` in story.yaml. |
+| `behaviors/*.yaml` | One file for each behavior in Rust, with notes about it. Read [Behaviors in Rust](#behaviors-in-rust). |
+| `tests/*.yaml` | One walkthrough test in each file. Read [Walkthrough tests](#walkthrough-tests). |
 | `threads/*.yaml` | One long-range thread in each file. Read [Author notes and threads](#author-notes-and-threads). |
 | `dialogues/*.yaml` | One talk with a thing in each file. Read [Dialogues](#dialogues). |
 
@@ -58,6 +63,10 @@ Conditions use variables, thing properties and values that the runtime calculate
 - Time: `night`, `time.phase == dusk`, `time.hour`, `time.day`, `turns`.
 - Place: `here == cellar`, `in(cellar)`, `cellar.visits`, `visited(cellar)`, `first_visit`, `level`.
 - Things: `carried(lamp)`, `present(lamp)`, `lamp.location`, `lamp.interactions`, `lamp.talked`.
+- Containers: `in(coin, trophy_case)` is true when the coin is in or on the trophy case, also deeper inside.
+- Timers: `timer.fuse` is the number of turns left, 0 when the timer does not run. `timer.fuse.running` is true while it runs.
+- Machines: `exorcism == lit`. The id of a machine is a variable with its state.
+- Chance: `chance(30)` is true in about 30 of 100 turns. In one state, the result is always the same, so a game replays.
 - The current action: `action.repeat`, `action.count`, `action.total`, `action.verb`.
 
 Use `and`, `or`, `not` and parentheses to join conditions.
@@ -216,6 +225,199 @@ An exit without `to` is a message exit. It goes to no room. When the player goes
 - The scene, the verb bar and the room brief do not show message exits, because they go to no room. The map shows a message exit as a short line out of the room that ends in a bar.
 - In write mode, a new exit in the direction of a message exit replaces the message exit.
 
+## Rules
+
+A rule fires on an event. If its condition `when` is true, its effects `then` run.
+
+```yaml
+# rules/drawer.yaml
+- id: find_iron_key
+  on: { verb: [open, drawer] }
+  when: not drawer_searched
+  then:
+    - set: { drawer_searched: true }
+    - move: { iron_key: cottage }
+    - say: "Under a fold of oilcloth lies an iron key."
+```
+
+The events:
+
+| Event | When it fires |
+| --- | --- |
+| `start` | The game starts. |
+| `turn` | Each turn, after the command. |
+| `{ enter: room }`, `{ leave: room }` | The player enters or leaves the room. |
+| `{ time: "21:00" }` | The clock reaches the time. |
+| `{ check: [verb, thing] }` | Before the verb. Read [Action phases](#action-phases). `{ check: [go, north] }` checks a move. |
+| `{ verb: [verb, thing, other] }` | After the default response of the verb, or instead of it with `instead: true`. Fewer parts match more commands. |
+| `{ timer: fuse }` | The timer runs out. |
+| `{ event: blast }` | An `emit: blast` effect sends the event. |
+| `{ talk: [dialogue, node] }` | A dialogue reaches the node. `[dialogue]` matches all nodes. |
+
+The effects:
+
+| Effect | What it does |
+| --- | --- |
+| `set: { name: value }` | Sets variables and properties. |
+| `add: { name: 1 }` | Adds to number variables. |
+| `say: "text"` | Shows the text. Inline markup is permitted. |
+| `move: { thing: place }` | Moves things. The place is a room, `carried`, `nowhere`, `in:box` or `on:table`. |
+| `goto: room` | Moves the player. Leave and enter rules fire. |
+| `end: "text"` | Ends the game with the text. |
+| `stop` | Stops the action. Read [Action phases](#action-phases). |
+| `emit: name` | Sends a custom event. Rules `on: { event: name }` fire immediately. |
+| `start: fuse` or `start: { fuse: 6 }` | Starts a timer, with its own turns or with a number of turns. |
+| `cancel: fuse` | Stops a timer. Its rules do not fire. |
+
+More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response.
+
+### Action phases
+
+A verb goes through these phases:
+
+1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes.
+2. `instead` rules (verb rules with `instead: true`). If one fires, it replaces the default response.
+3. The default response of the verb, or an `instead` frame.
+4. The other verb rules. They can read the result of the default response, for example `lamp.lit`.
+5. The `after` frame, then turn rules, timers and time rules.
+
+```yaml
+- id: dead_lamp
+  on: { check: [turn_on, lamp] }
+  when: not timer.lamp_battery.running
+  then:
+    - say: "A burned-out lamp won't light."
+    - stop
+```
+
+`stop` in an `instead` or a verb rule stops the rules after it in that phase, and the later phases.
+
+### Scope and priority
+
+Put a rule in a thing file or a room file, under `rules:`. Or give a rule `within: <thing, room or region>`.
+
+- A thing rule fires for verbs on that thing. For other events, it fires while the thing is present.
+- A room or region rule fires while the player is in the room or region.
+
+In one phase, thing rules run first, then room rules, then region rules, then story rules. In one scope, a higher `priority` runs first. Rules with the same priority run in file order.
+
+```yaml
+# things/rug.yaml
+rules:
+  - id: rug_too_heavy
+    on: { verb: [take] }
+    instead: true
+    then:
+      - say: "The rug is extremely heavy and cannot be carried."
+```
+
+## Timers
+
+A timer counts down by one each turn. Put it in `timers/*.yaml`, or in a `timers:` list in story.yaml.
+
+```yaml
+# timers/lamp_battery.yaml
+turns: 385
+running: true
+runs_while: lamp.lit
+at:
+  15: [{ say: "The lamp is nearly out." }]
+  0: [{ set: { lamp.lit: false } }]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `turns` | The turns from the start value to zero. |
+| `running` | `true`: the timer runs from the start of the game. Else, a `start` effect starts it. |
+| `runs_while` | The timer counts down only while this condition is true. |
+| `at` | Effects at a number of turns left. At 0 the timer runs out. Then rules `on: { timer: id }` fire. |
+| `repeat` | `true`: the timer starts again when it runs out. |
+
+The turns left are part of the save game. In the Atlas, "State" shows them as `timer.<id>`, and you can set them.
+
+## Containers and scenery
+
+A thing with `container: true` can hold things. A thing with `supporter: true` can have things on it. Put a thing in or on another one with `location: { in: box }` or `location: { on: table }`.
+
+```yaml
+# things/trophy_case.yaml
+name: trophy case
+location: { room: living_room }
+container: true
+capacity: 20
+listed: false
+props: { open: false, transparent: true }
+```
+
+- The player uses `put coin in case` or `put coin on table`.
+- A container with an `open` property holds its contents only while it is open. While it is closed, the player can not see or take them. With `transparent: true`, the player can see them, but not take them.
+- `capacity` is the number of things that fit. Without it, any number fits.
+- The room text, `examine`, `open` and the inventory tell the contents.
+- The contents move with their container. A carried bag carries what is in it.
+
+Scenery can be in more than one room. `also_in: [forest_1, forest_2]` or `also_in: [forest]` (a region) puts the thing in these rooms too, while its location is not `nowhere`.
+
+## Score
+
+```yaml
+# story.yaml
+score:
+  max: 350
+  ranks:
+    - { from: 0, name: Beginner }
+    - { from: 26, name: Amateur Adventurer }
+```
+
+With a score, the command `score` shows the score, the moves and the rank. The score is the number variable `score`. Set `var:` for a different variable. If story.yaml does not declare the variable, the loader declares it. Rules change the score with `add: { score: 10 }`.
+
+## Puzzle machines
+
+A machine is a puzzle with named states and steps between them. Use a machine for a puzzle with an order, such as a ritual or a dam.
+
+```yaml
+# machines/exorcism.yaml
+start: idle
+states: [idle, rung, lit, done]
+steps:
+  - from: idle
+    on: { verb: [ring, bell] }
+    to: rung
+    instead: true
+    say: "The bell suddenly becomes red hot."
+    then: [{ start: exorcism_window }]
+  - from: rung
+    on: { verb: [turn_on, candles] }
+    when: candles.carried
+    to: lit
+  - from: [rung, lit]
+    on: { timer: exorcism_window }
+    to: idle
+```
+
+- A step fires on its event when the machine is in one of its `from` states and `when` is true. Then the machine goes to `to`, shows `say` and runs `then`.
+- A machine takes one step for one event only.
+- The id of the machine is a variable with its state. Conditions read it: `exorcism == lit`.
+- Each step is a rule with the id `<machine>#<number>`. The rules view, the checks and the explorer show them.
+- Without `states`, the states are the start state and all states that the steps name.
+- A state in the list can be a map with a description for the authors: `{ name: rung, description: The spirits are stunned. }`. The player does not see it.
+
+In the editor, Atlas › Machines shows each machine: the states in a row, and the steps as numbered arrows. Forward steps are above, steps back are below. The current state is filled. A step that the next event can take is marked. Point at a state or a step to light its connections. Select a state to see its description and its steps in and out on the right.
+
+The checker finds unknown states and states that no step goes to.
+
+## Behaviors in Rust
+
+Some logic is too large for rules, for example a character that walks the map and steals. A game that uses loremaster as a library can write this logic in Rust as a behavior.
+
+1. Write a type that implements `loremaster_runtime::Behavior`. Its `handle` method gets each event, after the rules of the event.
+2. Change the world only through `Cx`: facts, things, the player, text, events and `roll`. Then the save game, the walkthroughs and the explorer see all changes. Do not keep state in fields of the type.
+3. Register the behavior: `world.register(Thief::zork())`.
+4. Name the behavior in the story: `behaviors: [thief]` in story.yaml, or a file `behaviors/thief.yaml` with notes.
+
+A build without the code, such as the editor or `loremaster play`, plays the story without the behavior. The rules view shows the behavior as code, and the terminal commands show a note.
+
+`Flow::Stop` from `handle` works as the `stop` effect. The example is the thief of Zork I: `examples/zork1/thief.rs`. Run `cargo run -p loremaster-runtime --example zork` to play Zork I with it.
+
 ## Author notes and threads
 
 Notes are text for the authors. The player does not see them. Put the notes in the file of the entity that they are about, in a `notes:` list. You can add notes to `story.yaml`, to rooms, things and rules, and to a fragment in its map form.
@@ -299,6 +501,7 @@ The Atlas shows the whole world at full width. Push Ctrl+M, or select the room n
 | --- | --- |
 | Map | The floors on the left. The map of a floor in the middle: drag or use the arrow keys to move, the wheel or + and − to zoom, F to see the whole floor. "/" finds a room or a thing. "List view" shows the rooms as a table. The room card on the right has "Go there", "Write here" and "Explore". |
 | Rules | All rules, with "Here and now", "Fired" and "All". |
+| Machines | The puzzle machines, with their states and steps. The tab shows only when the story has machines. |
 | State | All variables and properties, with their values now. A switch sets a value in the game. |
 | Story | The turns so far. |
 | Checks | The texts of the current room in all states, and the whole-game explorer. |
@@ -368,6 +571,28 @@ The explorer shows:
 The explorer tries the actions that move the story forward: exits, verbs that rules listen to, take, open, turn on, unlock with a key in reach, and wait when the story reacts to time. It does not try drop, close, turn off or lock.
 
 In the web app, "Replay this path" starts the game again and plays the command list. You can then continue from that state.
+
+## Walkthrough tests
+
+A walkthrough is a test that plays the story. Put it in `tests/*.yaml`.
+
+```yaml
+# tests/win.yaml
+name: Light the beacon
+steps:
+  - n
+  - { do: open drawer, see: "Under a fold of oilcloth lies an iron key." }
+  - take key
+expect:
+  facts: { beacon_lit: true }
+  room: lantern_room
+  ended: true
+```
+
+- A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room` and `ended`.
+- `expect` says what must be true after the last step. `see` there looks at the whole transcript.
+
+Run `cargo run -p loremaster --no-default-features -- test <folder>`, or `task walkthroughs` for all examples. The command names each step that failed. The Rust tests run the walkthroughs of all examples, so CI runs them too.
 
 ## Write in the game
 

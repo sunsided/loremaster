@@ -1,4 +1,5 @@
 # Imported from ZIL: CHIMNEY (1dungeon.zil)
 name: "chimney"
 location: { room: kitchen }
+also_in: ["studio"]
 listed: false

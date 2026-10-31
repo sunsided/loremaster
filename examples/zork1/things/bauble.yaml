@@ -3,3 +3,4 @@ name: "beautiful brass bauble"
 aliases: ["bauble", "treasure"]
 location: nowhere
 portable: true
+props: { value: 1, tvalue: 1 }

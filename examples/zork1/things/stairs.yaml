@@ -2,4 +2,5 @@
 name: "stairs"
 aliases: ["steps", "staircase", "stairway"]
 location: { room: kitchen }
+also_in: ["attic", "living_room", "cellar", "cyclops_room", "treasure_room", "reservoir_north", "small_cave", "tiny_cave", "atlantis_room", "ew_passage", "deep_canyon", "loud_room", "chasm_room", "egypt_room", "torch_room", "north_temple", "smelly_room", "gas_room", "ladder_top"]
 listed: false

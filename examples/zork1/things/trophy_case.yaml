@@ -2,5 +2,6 @@
 name: "trophy case"
 aliases: ["case"]
 location: { room: living_room }
+container: true
 listed: false
-props: { open: false }
+props: { open: false, transparent: true }

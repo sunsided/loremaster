@@ -2,4 +2,5 @@
 name: "board"
 aliases: ["boards"]
 location: { room: west_of_house }
+also_in: ["north_of_house", "south_of_house"]
 listed: false

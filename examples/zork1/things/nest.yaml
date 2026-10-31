@@ -2,6 +2,7 @@
 name: "bird's nest"
 aliases: ["nest"]
 location: { room: up_a_tree }
+container: true
 portable: true
 props: { open: true }
 presence:

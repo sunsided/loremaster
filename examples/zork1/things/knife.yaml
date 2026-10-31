@@ -1,7 +1,7 @@
 # Imported from ZIL: KNIFE (1dungeon.zil)
 name: "nasty knife"
 aliases: ["knives", "knife", "blade"]
-location: { room: attic }
+location: { on: attic_table }
 portable: true
 presence:
   - when: "knife.interactions == 0"

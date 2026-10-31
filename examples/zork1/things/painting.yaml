@@ -3,6 +3,7 @@ name: "painting"
 aliases: ["art", "canvas", "treasure"]
 location: { room: gallery }
 portable: true
+props: { value: 4, tvalue: 6 }
 presence:
   - when: "painting.interactions == 0"
     text: "Fortunately, there is still one chance for you to be a vandal, for on the far wall is a painting of unparalleled beauty."

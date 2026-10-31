@@ -2,5 +2,6 @@
 name: "kitchen window"
 aliases: ["window"]
 location: { room: east_of_house }
+also_in: ["kitchen"]
 listed: false
 props: { open: false }

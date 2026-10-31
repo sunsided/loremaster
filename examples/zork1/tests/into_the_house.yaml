@@ -1,0 +1,17 @@
+# From the start into the house, and the lamp and the trophy case there.
+name: Into the house
+steps:
+  - { do: open mailbox, see: "a leaflet" }
+  - take leaflet
+  - "n"
+  - "e"
+  - { do: go to window, see: "(first opening the kitchen window)" }
+  - { do: look, see: Kitchen }
+  - { do: "w", see: Living Room }
+  - { do: take lamp, see: Taken. }
+  - open case
+  - { do: put leaflet in case, see: Done. }
+  - { do: look, see: "The trophy case contains a leaflet." }
+  - { do: score, see: "Your score is" }
+expect:
+  room: living_room

@@ -13,7 +13,7 @@ loremaster-zil makes this file. Do not edit it. Run the importer again to make i
 | Message exits (only show a message) | 37 |
 | Other exits that are not imported | 0 |
 | Things | 131 |
-| Things in a different place | 54 |
+| Things in a different place | 18 |
 | Room and object routines (not ported) | 130 |
 | Interrupt routines (not ported) | 16 |
 
@@ -228,57 +228,21 @@ A routine decides these exits in the original. The importer uses hints from `hin
 
 ## Things in a different place
 
-A loremaster thing is in one room, or nowhere. These things are in a container, in more than one room, or not visible in the original.
+These things are inside an object that is not a container or a surface, are global objects, or are not visible in the original.
 
 | Thing | Note |
 | --- | --- |
-| `board` | scenery of 3 rooms; placed in west_of_house only (also in north_of_house, south_of_house) |
 | `teeth` | global object in every room; placed nowhere |
 | `wall` | global object in every room; placed nowhere |
 | `granite_wall` | global object in every room; placed nowhere |
-| `songbird` | scenery of 6 rooms; placed in forest_1 only (also in forest_2, forest_3, path, up_a_tree, clearing) |
-| `white_house` | scenery of 12 rooms; placed in west_of_house only (also in north_of_house, south_of_house, east_of_house, forest_1, forest_2, mountains, forest_3, path, up_a_tree, grating_clearing, clearing) |
-| `forest` | scenery of 10 rooms; placed in west_of_house only (also in north_of_house, south_of_house, east_of_house, forest_1, forest_2, forest_3, path, up_a_tree, clearing) |
-| `tree` | scenery of 7 rooms; placed in forest_1 only (also in forest_2, mountains, forest_3, path, up_a_tree, clearing) |
-| `global_water` | scenery of 19 rooms; placed in reservoir_south only (also in reservoir, reservoir_north, stream_view, in_stream, dam_room, dam_base, river_1, river_2, river_3, white_cliffs_north, white_cliffs_south, river_4, river_5, shore, sandy_beach, aragain_falls, end_of_rainbow, canyon_bottom) |
-| `water` | inside bottle in kitchen_table; placed in the room kitchen |
-| `kitchen_window` | scenery of 2 rooms; placed in east_of_house only (also in kitchen) |
-| `chimney` | scenery of 2 rooms; placed in kitchen only (also in studio) |
-| `lunch` | inside sandwich_bag in kitchen_table; placed in the room kitchen |
-| `axe` | inside troll; placed in the room troll_room |
-| `book` | inside altar; placed in the room south_temple |
-| `sceptre` | inside coffin; placed in the room egypt_room |
-| `slide` | scenery of 2 rooms; placed in cellar only (also in slide_room) |
-| `sandwich_bag` | inside kitchen_table; placed in the room kitchen |
-| `garlic` | inside sandwich_bag in kitchen_table; placed in the room kitchen |
-| `boarded_window` | scenery of 2 rooms; placed in north_of_house only (also in south_of_house) |
-| `bottle` | inside kitchen_table; placed in the room kitchen |
-| `crack` | scenery of 2 rooms; placed in damp_cave only (also in chasm_room) |
-| `grate` | scenery of 2 rooms; placed in grating_clearing only (also in grating_room) |
-| `knife` | inside attic_table; placed in the room attic |
-| `emerald` | inside buoy; placed in the room river_4 |
-| `advertisement` | inside mailbox; placed in the room west_of_house |
+| `axe` | inside troll, which is not a container; placed in the room troll_room |
 | `leak` | invisible at the start; placed nowhere until a rule moves it |
-| `bodies` | scenery of 2 rooms; placed in entrance_to_hades only (also in land_of_living_dead) |
 | `pot_of_gold` | invisible at the start; placed nowhere until a rule moves it |
-| `rainbow` | scenery of 4 rooms; placed in aragain_falls only (also in on_rainbow, end_of_rainbow, canyon_view) |
-| `river` | scenery of 15 rooms; placed in dam_base only (also in river_1, river_2, river_3, white_cliffs_north, white_cliffs_south, river_4, river_5, shore, sandy_beach, aragain_falls, end_of_rainbow, canyon_bottom, cliff_middle, canyon_view) |
-| `ladder` | scenery of 2 rooms; placed in ladder_top only (also in ladder_bottom) |
 | `scarab` | invisible at the start; placed nowhere until a rule moves it |
-| `large_bag` | inside thief; placed in the room round_room |
-| `stiletto` | inside thief; placed in the room round_room |
-| `map` | inside trophy_case; placed in the room living_room |
 | `map` | invisible at the start; placed nowhere until a rule moves it |
 | `thief` | invisible at the start; placed nowhere until a rule moves it |
-| `torch` | inside pedestal; placed in the room torch_room |
 | `trunk` | invisible at the start; placed nowhere until a rule moves it |
-| `putty` | inside tube; placed in the room maintenance_room |
-| `climbable_cliff` | scenery of 3 rooms; placed in canyon_bottom only (also in cliff_middle, canyon_view) |
-| `white_cliff` | scenery of 2 rooms; placed in white_cliffs_north only (also in white_cliffs_south) |
-| `egg` | inside nest; placed in the room up_a_tree |
-| `canary` | inside egg in nest; placed in the room up_a_tree |
 | `blessings` | global object in every room; placed nowhere |
-| `stairs` | scenery of 20 rooms; placed in kitchen only (also in attic, living_room, cellar, cyclops_room, treasure_room, reservoir_north, small_cave, tiny_cave, atlantis_room, ew_passage, deep_canyon, loud_room, chasm_room, egypt_room, torch_room, north_temple, smelly_room, gas_room, ladder_top) |
 | `sailor` | global object in every room; placed nowhere |
 | `ground` | global object in every room; placed nowhere |
 | `grue` | global object in every room; placed nowhere |

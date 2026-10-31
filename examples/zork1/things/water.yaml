@@ -1,5 +1,5 @@
 # Imported from ZIL: WATER (1dungeon.zil)
 name: "quantity of water"
 aliases: ["water", "quantity", "liquid", "h2o"]
-location: { room: kitchen }
+location: { in: bottle }
 portable: true

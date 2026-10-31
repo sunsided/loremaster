@@ -1,0 +1,18 @@
+# The shortest way to light the beacon. `loremaster test examples/lighthouse` runs it.
+name: Light the beacon
+steps:
+  - n
+  - { do: open drawer, see: "Under a fold of oilcloth lies an iron key." }
+  - take key
+  - take lamp
+  - take matches
+  - light lamp
+  - s
+  - unlock iron door with key
+  - e
+  - up
+  - light beacon
+expect:
+  facts: { beacon_lit: true }
+  room: lantern_room
+  ended: true

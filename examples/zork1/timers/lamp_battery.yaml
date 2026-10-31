@@ -1,0 +1,13 @@
+# Hand-ported from I-LANTERN and LAMP-TABLE (1actions.zil). The battery runs
+# down while the lamp is lit: after 200 turns the first warning, after 100,
+# 70 and 15 more turns the next ones, and then the lamp is dead.
+turns: 385
+running: true
+runs_while: lamp.lit
+at:
+  185: [{ say: "{lamp.present ? The lamp appears a bit dimmer. | }" }]
+  85: [{ say: "{lamp.present ? The lamp is definitely dimmer now. | }" }]
+  15: [{ say: "{lamp.present ? The lamp is nearly out. | }" }]
+  0:
+    - say: "{lamp.present ? You'd better have more light than from the brass lantern. | }"
+    - set: { lamp.lit: false }

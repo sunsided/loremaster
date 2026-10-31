@@ -3,5 +3,6 @@ name: "huge diamond"
 aliases: ["diamond", "treasure"]
 location: nowhere
 portable: true
+props: { value: 10, tvalue: 10 }
 presence:
   - "There is an enormous diamond (perfectly cut) here."

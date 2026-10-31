@@ -2,6 +2,7 @@
 name: "basket"
 aliases: ["cage", "dumbwaiter"]
 location: { room: shaft_room }
-props: { open: true }
+container: true
+props: { open: true, transparent: true }
 presence:
   - "At the end of the chain is a basket."

@@ -1,9 +1,9 @@
 # Imported from ZIL: TORCH (1dungeon.zil)
 name: "torch"
 aliases: ["ivory", "treasure"]
-location: { room: torch_room }
+location: { on: pedestal }
 portable: true
-props: { lit: true }
+props: { lit: true, value: 14, tvalue: 6 }
 presence:
   - when: "torch.interactions == 0"
     text: "Sitting on the pedestal is a flaming torch, made of ivory."
