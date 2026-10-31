@@ -1469,28 +1469,36 @@
 				{#if atlasTab === 'map'}
 					<AtlasMap map={shownMap} rooms={atlasRooms} bind:selected={atlasRoom} onselect={(id) => (atlasRoom = id)} />
 				{:else if atlasTab === 'story'}
-					<StoryTimeline steps={s.history} />
+					<div class="atlas-pane">
+						<StoryTimeline steps={s.history} />
+					</div>
 				{:else if atlasTab === 'checks'}
-					<ExplorerView
-						bind:mode={exploreMode}
-						{matrix}
-						roomName={s.scene.room_name}
-						ontry={(values) => {
-							s.author({ type: 'situation', room: s.scene.room, values });
-							prompt?.focus();
-						}}
-						result={exploration}
-						running={exploring}
-						onrun={runExplorer}
-						onreplay={(path) => {
-							s.replay(path);
-							prompt?.focus();
-						}}
-					/>
+					<div class="atlas-pane">
+						<ExplorerView
+							bind:mode={exploreMode}
+							{matrix}
+							roomName={s.scene.room_name}
+							ontry={(values) => {
+								s.author({ type: 'situation', room: s.scene.room, values });
+								prompt?.focus();
+							}}
+							result={exploration}
+							running={exploring}
+							onrun={runExplorer}
+							onreplay={(path) => {
+								s.replay(path);
+								prompt?.focus();
+							}}
+						/>
+					</div>
 				{:else if atlasTab === 'rules'}
-					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+					<div class="atlas-pane">
+						<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+					</div>
 				{:else if atlasTab === 'machines'}
-					<MachinesView machines={s.machines} onrule={showRule} />
+					<div class="atlas-pane">
+						<MachinesView machines={s.machines} onrule={showRule} />
+					</div>
 				{:else if atlasTab === 'todos'}
 					<section class="todos-view" aria-label="TODOs">
 						<RadioGroup
@@ -1897,6 +1905,10 @@
 	.job-chip:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-status-text);
 		outline-offset: 2px;
+	}
+	/* Atlas views other than the map keep the same distance from the edges. */
+	.atlas-pane {
+		padding: var(--space-5) var(--space-6);
 	}
 	.todos-view {
 		display: flex;
