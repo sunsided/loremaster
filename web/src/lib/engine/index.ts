@@ -21,6 +21,7 @@ import type {
 	Preview,
 	RoomParts,
 	RuleView,
+	MachineView,
 	Scene,
 	SourceFile,
 	Turn,
@@ -174,6 +175,10 @@ export class Game {
 
 	rules(): RuleView[] {
 		return this.#engine.rules();
+	}
+
+	machines(): MachineView[] {
+		return this.#engine.machines();
 	}
 
 	map(): MapView {

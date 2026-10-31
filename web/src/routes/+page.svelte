@@ -52,6 +52,7 @@
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
+	import MachinesView from '#lib/design/organisms/MachinesView.svelte';
 	import ExplorerView from '#lib/design/organisms/ExplorerView.svelte';
 	import AtlasMap from '#lib/design/organisms/AtlasMap.svelte';
 	import RoomCard from '#lib/design/molecules/RoomCard.svelte';
@@ -368,11 +369,12 @@
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'machines' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
 	let atlasRoom = $state<string | null>(null);
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
 		{ id: 'rules', label: 'Rules' },
+		...(session?.machines.length ? [{ id: 'machines', label: `Machines ${session.machines.length}` }] : []),
 		{ id: 'state', label: 'State' },
 		{ id: 'story', label: 'Story' },
 		{ id: 'checks', label: 'Checks' },
@@ -383,6 +385,7 @@
 	// The AI tab goes away when the server stops; show the map in its place.
 	$effect(() => {
 		if (atlasTab === 'ai' && !ai.reachable) atlasTab = 'map';
+		if (atlasTab === 'machines' && !session?.machines.length) atlasTab = 'map';
 	});
 
 	let proposalProblems = $state<Record<string, string>>({});
@@ -1486,6 +1489,8 @@
 					/>
 				{:else if atlasTab === 'rules'}
 					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+				{:else if atlasTab === 'machines'}
+					<MachinesView machines={s.machines} onrule={showRule} />
 				{:else if atlasTab === 'todos'}
 					<section class="todos-view" aria-label="TODOs">
 						<RadioGroup

@@ -56,7 +56,7 @@ pub fn tools() -> Vec<ToolDef> {
         ),
         def(
             "list_files",
-            "The paths of all project files. Rooms are in rooms/, things in things/, rules in rules/, long-range threads in threads/, and story.yaml holds the rest.",
+            "The paths of all project files. Rooms are in rooms/, things in things/, rules in rules/, puzzle machines in machines/, long-range threads in threads/, and story.yaml holds the rest (also timers).",
             schema(json!({}), &[]),
             true,
         ),

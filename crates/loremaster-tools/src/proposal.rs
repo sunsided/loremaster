@@ -163,7 +163,7 @@ pub(crate) fn check_paths(p: &Proposal) -> Result<(), ToolError> {
         ));
     }
     for path in p.files.iter().map(|f| &f.path).chain(&p.delete) {
-        let in_folder = ["rooms/", "things/", "rules/", "threads/"]
+        let in_folder = ["rooms/", "things/", "rules/", "threads/", "machines/"]
             .iter()
             .any(|d| path.strip_prefix(d).is_some_and(|rest| !rest.contains('/')));
         let ok = (path == "story.yaml" || in_folder)
@@ -173,7 +173,7 @@ pub(crate) fn check_paths(p: &Proposal) -> Result<(), ToolError> {
                 .any(|c| c.is_empty() || c == "." || c == "..");
         if !ok {
             return Err(err(format!(
-                "`{path}` is not a project file. Use story.yaml, or rooms/, things/, rules/ or threads/ with one `.yaml` file name."
+                "`{path}` is not a project file. Use story.yaml, or rooms/, things/, rules/, threads/ or machines/ with one `.yaml` file name."
             )));
         }
     }

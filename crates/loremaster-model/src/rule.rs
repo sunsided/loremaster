@@ -25,6 +25,10 @@ pub struct Rule {
     /// Order in one scope: a higher priority runs first. Equal rules run in file order.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub priority: i32,
+    /// The machine that this rule is a step of. The loader sets it. A machine
+    /// takes at most one step for one event.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine: Option<Id>,
     /// Author notes. The player never sees them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<Note>,

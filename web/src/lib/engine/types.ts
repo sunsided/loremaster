@@ -310,6 +310,29 @@ export interface RoomParts {
 	exits: PartView[];
 }
 
+/** A puzzle machine: its states, where it is now and its steps. */
+export interface MachineView {
+	id: string;
+	state: string;
+	states: string[];
+	steps: MachineStepView[];
+}
+
+/** One step of a puzzle machine. */
+export interface MachineStepView {
+	/** The id of the rule that the step became. */
+	rule: string;
+	from: string[];
+	to: string;
+	/** The event, in words. */
+	when: string;
+	condition: string | null;
+	/** The step ran at least once in this game. */
+	fired: boolean;
+	/** The machine is in a `from` state and the condition holds. */
+	ready: boolean;
+}
+
 export interface RuleView {
 	id: string;
 	/** The event, in words. */

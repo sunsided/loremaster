@@ -1,6 +1,6 @@
 use crate::{
-    ClockConfig, Dialogue, Fragment, Frames, Id, Note, Room, Rule, Thing, Thread, Timer, Value,
-    VerbDef,
+    ClockConfig, Dialogue, Fragment, Frames, Id, Machine, Note, Room, Rule, Thing, Thread, Timer,
+    Value, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +45,9 @@ pub struct Story {
     pub things: Vec<Thing>,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    /// Puzzles with named states. The loader also makes their variables and rules.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub machines: Vec<Machine>,
     /// Counters that go down each turn.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,

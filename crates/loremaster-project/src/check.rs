@@ -248,6 +248,7 @@ impl Checker<'_> {
         self.threads();
         self.dialogues();
         self.timers();
+        self.machines();
 
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
@@ -527,6 +528,53 @@ impl Checker<'_> {
     fn timer_ref(&mut self, file: &str, at: &str, id: &str) {
         if self.story().timer(id).is_none() {
             self.error(file, at, format!("unknown timer `{id}`"));
+        }
+    }
+
+    /// Machines: known states, and states that some step reaches.
+    fn machines(&mut self) {
+        let machines = self.story().machines.clone();
+        let mut seen = BTreeSet::new();
+        for m in &machines {
+            let file = self.file_of(&format!("machine:{}", m.id));
+            let at = format!("machines.{}", m.id);
+            if !seen.insert(m.id.clone()) {
+                self.error(&file, &at, format!("machine `{}` is defined twice", m.id));
+            }
+            let clash = self.story().vars.iter().filter(|v| v.id == m.id).count() > 1
+                || self.story().thing(m.id.as_str()).is_some();
+            if clash {
+                self.error(
+                    &file,
+                    &at,
+                    format!("`{}` is a machine and also a variable or thing", m.id),
+                );
+            }
+            let states = m.all_states();
+            let known = |s: &str| states.iter().any(|x| x == s);
+            if !known(&m.start) {
+                self.error(
+                    &file,
+                    &format!("{at}.start"),
+                    format!("unknown state `{}`", m.start),
+                );
+            }
+            for (i, step) in m.steps.iter().enumerate() {
+                for s in step.from.list().into_iter().chain([step.to.as_str()]) {
+                    if !known(s) {
+                        self.error(
+                            &file,
+                            &format!("{at}.steps[{i}]"),
+                            format!("unknown state `{s}`"),
+                        );
+                    }
+                }
+            }
+            for s in &states {
+                if *s != m.start && !m.steps.iter().any(|step| step.to == *s) {
+                    self.warning(&file, &at, format!("no step goes to the state `{s}`"));
+                }
+            }
         }
     }
 

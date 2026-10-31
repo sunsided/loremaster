@@ -381,3 +381,88 @@ fn scenery_is_in_every_room_of_its_region() {
     let text = say(&mut g, "examine ceiling");
     assert!(text.contains("Plaster."), "{text}");
 }
+
+fn chapel() -> Game {
+    world_of(&[
+        (
+            "story.yaml",
+            r#"title: Chapel
+start: hall
+verbs:
+  - { id: ring, label: Ring, words: [ring], default: "Nothing rings." }
+timers:
+  - { id: window, turns: 6 }
+"#,
+        ),
+        (
+            "rooms/hall.yaml",
+            "name: Hall\ndescription: [\"A chapel.\"]\n",
+        ),
+        (
+            "things/bell.yaml",
+            "name: bell\nlocation: { room: hall }\nportable: true\n",
+        ),
+        (
+            "things/candles.yaml",
+            "name: candles\nlocation: { room: hall }\nportable: true\nprops: { lit: false }\n",
+        ),
+        (
+            "things/book.yaml",
+            "name: book\nlocation: { room: hall }\nportable: true\n",
+        ),
+        (
+            "machines/exorcism.yaml",
+            r#"start: idle
+steps:
+  - from: idle
+    on: { verb: [ring, bell] }
+    to: rung
+    instead: true
+    say: "The bell rings red hot."
+    then: [{ start: window }]
+  - from: rung
+    on: { verb: [turn_on, candles] }
+    when: carried(candles)
+    to: lit
+  - from: lit
+    on: { verb: [examine, book] }
+    to: done
+    say: "The spirits flee."
+  - from: [rung, lit]
+    on: { timer: window }
+    to: idle
+    say: "The spirits jeer."
+"#,
+        ),
+    ])
+}
+
+#[test]
+fn a_machine_takes_its_steps_in_order() {
+    let mut g = chapel();
+    assert_eq!(g.machines()[0].state, "idle");
+    let text = say(&mut g, "ring bell");
+    assert!(text.contains("The bell rings red hot."), "{text}");
+    assert!(!text.contains("Nothing rings."), "{text}");
+    say(&mut g, "take candles");
+    say(&mut g, "light candles");
+    assert_eq!(g.machines()[0].state, "lit");
+    let text = say(&mut g, "read book");
+    assert!(text.contains("The spirits flee."), "{text}");
+    assert_eq!(g.state().facts["exorcism"].as_text(), Some("done"));
+}
+
+#[test]
+fn a_machine_takes_one_step_for_one_event_and_a_timer_resets_it() {
+    let mut g = chapel();
+    say(&mut g, "ring bell");
+    let mut log = String::new();
+    for _ in 0..6 {
+        log.push_str(&say(&mut g, "wait"));
+    }
+    assert!(log.contains("The spirits jeer."), "{log}");
+    assert_eq!(g.machines()[0].state, "idle");
+    let view = &g.machines()[0];
+    assert_eq!(view.states, ["idle", "rung", "lit", "done"]);
+    assert!(view.steps[0].ready);
+}

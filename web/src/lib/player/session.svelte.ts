@@ -14,6 +14,7 @@ import {
 	type Preview,
 	type RoomParts,
 	type RuleView,
+	type MachineView,
 	type Scene,
 	type Turn,
 	type VerbInfo
@@ -36,6 +37,7 @@ export class Session {
 	map = $state<MapView>({ rooms: [], links: [] });
 	parts = $state<RoomParts>({ objects: [], exits: [] });
 	rules = $state<RuleView[]>([]);
+	machines = $state<MachineView[]>([]);
 	vars = $state<VarView[]>([]);
 	/** The action frame used for the last action, or null. */
 	frame = $state<FrameUse | null>(null);
@@ -140,6 +142,7 @@ export class Session {
 		this.map = this.game.map();
 		this.parts = this.game.roomParts();
 		this.rules = this.game.rules();
+		this.machines = this.game.machines();
 		this.vars = this.game.vars();
 		this.frame = this.game.lastFrame();
 		this.choices = this.game.choices();

@@ -1,7 +1,7 @@
 use crate::{Diagnostic, Severity};
 use loremaster_model::{
-    ClockConfig, Dialogue, Fragment, Id, Note, Room, Rule, Story, Thing, Thread, Timer, VarDef,
-    VerbDef,
+    ClockConfig, Dialogue, Effect, Fragment, Id, Machine, Note, Room, Rule, Story, Thing, Thread,
+    Timer, VarDef, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -54,6 +54,8 @@ struct StoryFile {
     notes: Vec<Note>,
     #[serde(default)]
     timers: Vec<Timer>,
+    #[serde(default)]
+    machines: Vec<Machine>,
 }
 
 /// Load a project from its files. Paths use `/` and are relative to the
@@ -67,6 +69,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut rules = Vec::new();
     let mut threads = Vec::new();
     let mut dialogues = Vec::new();
+    let mut machines = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -123,6 +126,15 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                     Err(e) => errors.push(parse_err(e)),
                 }
             }
+            "machines" => {
+                match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
+                    Ok(m) => {
+                        origins.insert(format!("machine:{}", m.id), path.to_string());
+                        machines.push(m);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                }
+            }
             "rules" => {
                 let parsed = if file.text.trim_start().starts_with('-') {
                     serde_saphyr::from_str::<Vec<Rule>>(&file.text)
@@ -158,13 +170,34 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     if !errors.is_empty() {
         return Err(errors);
     }
+    for m in &header.machines {
+        origins.insert(format!("machine:{}", m.id), "story.yaml".to_string());
+    }
+    machines.splice(0..0, header.machines);
+    let mut vars = header.vars;
+    for m in &machines {
+        vars.push(VarDef {
+            id: m.id.clone(),
+            ty: loremaster_model::VarType::Enum(m.all_states()),
+            initial: loremaster_model::Value::Text(m.start.clone()),
+        });
+        let file = origins
+            .get(&format!("machine:{}", m.id))
+            .cloned()
+            .unwrap_or_default();
+        for rule in machine_rules(m) {
+            origins.insert(format!("rule:{}", rule.id), file.clone());
+            rules.push(rule);
+        }
+    }
     let story = Story {
         title: header.title,
         author: header.author,
         start: header.start,
         intro: header.intro,
         clock: header.clock,
-        vars: header.vars,
+        vars,
+        machines,
         verbs: header.verbs,
         rooms,
         things,
@@ -182,6 +215,48 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         files,
         origins,
     })
+}
+
+/// The rules of a machine: one for each step. A step holds in one of its
+/// `from` states and when its own `when` holds; it sets the new state first.
+fn machine_rules(m: &Machine) -> Vec<Rule> {
+    m.steps
+        .iter()
+        .enumerate()
+        .map(|(i, step)| {
+            let from: Vec<String> = step
+                .from
+                .list()
+                .iter()
+                .map(|s| format!("{} == {s}", m.id))
+                .collect();
+            let mut when = format!("({})", from.join(" or "));
+            if let Some(extra) = &step.when {
+                when = format!("{when} and ({extra})");
+            }
+            let mut then = vec![Effect::Set(
+                [(
+                    m.id.to_string(),
+                    loremaster_model::Value::Text(step.to.clone()),
+                )]
+                .into(),
+            )];
+            then.extend(step.say.iter().map(|s| Effect::Say(s.clone())));
+            then.extend(step.then.iter().cloned());
+            Rule {
+                id: m.step_rule(i),
+                on: step.on.clone(),
+                when: Some(when),
+                then,
+                once: false,
+                instead: step.instead,
+                within: None,
+                priority: 0,
+                machine: Some(m.id.clone()),
+                notes: Vec::new(),
+            }
+        })
+        .collect()
 }
 
 /// Take the rules out of a room or thing file. They belong to it.

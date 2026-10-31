@@ -209,6 +209,32 @@ pub enum AuthorCommand {
     },
 }
 
+/// A puzzle machine for the Atlas: its states, where it is now and its steps.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MachineView {
+    pub id: String,
+    pub state: String,
+    pub states: Vec<String>,
+    pub steps: Vec<MachineStepView>,
+}
+
+/// One step of a machine.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MachineStepView {
+    /// The id of the rule that the step became.
+    pub rule: String,
+    pub from: Vec<String>,
+    pub to: String,
+    /// The event, in words.
+    pub when: String,
+    /// The step's own condition, as written.
+    pub condition: Option<String>,
+    /// The step ran at least once in this game.
+    pub fired: bool,
+    /// The machine is in a `from` state and the condition holds: the event takes the step now.
+    pub ready: bool,
+}
+
 /// One room for the Atlas: where it is, what is in it now, and its exits.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AtlasRoom {
@@ -1879,6 +1905,44 @@ impl Game {
             .collect()
     }
 
+    /// The puzzle machines with their states and steps.
+    pub fn machines(&self) -> Vec<MachineView> {
+        let rules = self.rules();
+        self.world
+            .story
+            .machines
+            .iter()
+            .map(|m| MachineView {
+                id: m.id.to_string(),
+                state: self
+                    .state
+                    .facts
+                    .get(m.id.as_str())
+                    .map(Value::to_string)
+                    .unwrap_or_else(|| m.start.clone()),
+                states: m.all_states(),
+                steps: m
+                    .steps
+                    .iter()
+                    .enumerate()
+                    .map(|(i, step)| {
+                        let id = m.step_rule(i);
+                        let view = rules.iter().find(|r| r.id == id.as_str());
+                        MachineStepView {
+                            rule: id.to_string(),
+                            from: step.from.list().iter().map(|s| s.to_string()).collect(),
+                            to: step.to.clone(),
+                            when: view.map(|r| r.when.clone()).unwrap_or_default(),
+                            condition: step.when.clone(),
+                            fired: view.is_some_and(|r| r.fired),
+                            ready: view.is_some_and(|r| r.condition_holds),
+                        }
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+
     /// Why a rule matters at the player's position and time now, if it does.
     fn relevance(&self, rule: &loremaster_model::Rule) -> Option<String> {
         if self.last_fired.contains(&rule.id) {
@@ -2099,12 +2163,18 @@ impl Game {
         let world = self.world.clone();
         // A `stop` ends this run of rules only: keep the flag of the run around it.
         let outer = std::mem::replace(&mut self.stopped, false);
+        // A machine takes one step for one event, even when its new state
+        // matches another step.
+        let mut stepped: Vec<&Id> = Vec::new();
         for &i in &world.rule_order {
             if self.stopped || self.state.ended {
                 break;
             }
             let rule = &world.story.rules[i];
             if !event.matches(rule) || (rule.once && self.state.fired.contains(&rule.id)) {
+                continue;
+            }
+            if rule.machine.as_ref().is_some_and(|m| stepped.contains(&m)) {
                 continue;
             }
             if !self.within_holds(&world.rules[i].within, event)
@@ -2118,6 +2188,7 @@ impl Game {
             });
             self.state.fired.insert(rule.id.clone());
             out.instead |= rule.instead;
+            stepped.extend(rule.machine.as_ref());
             for effect in &world.rules[i].then {
                 self.apply(turn, &rule.id, effect, depth + 1);
                 if self.stopped || self.state.ended {
