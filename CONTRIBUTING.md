@@ -4,7 +4,7 @@ loremaster uses GitHub Flow. There is one long-lived branch, `main`. Each change
 
 ## Branches
 
-- `main` must always build and pass all checks. Do not push to `main` directly.
+- `main` must always build and pass all checks. Do not push to `main` directly. The only exception is the release commit (see "Releases").
 - Make one branch for each change. Start the branch from the newest `main`.
 - Name the branch `feature/<short-name>`. Use lowercase words and hyphens, for example `feature/room-matrix-export`.
 - Keep a branch short-lived. Merge it soon, then delete it.
@@ -51,6 +51,7 @@ loremaster uses [cargo-release](https://github.com/crate-ci/cargo-release). The 
 - `loremaster-wasm` and `loremaster-zil` have `publish = false` and `release = false`. Their version changes together with the other crates.
 - All crates have one version. A release makes one commit "Release <version>" and one tag `v<version>`. Git signs the commit and the tag.
 - Releases come only from `main`.
+- cargo-release pushes the release commit and the tag directly to `main`, without a pull request. If you add a branch protection rule to `main`, let the release push through it. If the push fails, the crates are already on crates.io, and you cannot remove them from crates.io.
 
 ### Why there are two commands
 
@@ -99,6 +100,21 @@ Thus a release has two commands:
    ```
 
    For a dry run, use `task release:publish -- --dry-run`. Before the first upload of the other crates, this dry run stops with "no matching package named `loremaster-project` found". This is correct. `task package` does the full check without crates.io.
+
+   `task release:publish` stops if HEAD has no tag `v<version>`. Thus it uploads only from the release commit.
+
+### If a step fails
+
+A release is not one operation. Step 4 uploads 5 crates and pushes the tag before step 5 starts. crates.io does not let you remove or replace an uploaded version.
+
+- If step 4 stops before the upload, nothing is on crates.io. Look at `git log -1`. If the last commit is "Release <version>", remove it with `git reset --hard HEAD~1`. If not, remove the changed files with `git checkout -- .`. Then correct the problem and start again.
+- If step 4 stops after some uploads, do not change the version. Correct the problem, then run `cargo release publish --execute` and `cargo release tag --execute` and `cargo release push --execute`. cargo-release does not upload a version that is already on crates.io.
+- If step 5 fails, do these steps:
+
+  1. Check out the tag: `git checkout v<version>`.
+  2. Build the web editor again: `task release:ui`.
+  3. Run `task release:publish` again.
+  4. Go back to `main`: `git switch main`.
 
 ### The first release
 

@@ -178,6 +178,8 @@ tasks:
         msg: "There is no web editor in crates/loremaster-mcp/ui. Run `task release:ui` first."
       - sh: test -z "$(git status --porcelain)"
         msg: "The working tree has changes. Commit them or remove them first."
+      - sh: git describe --exact-match --tags --match 'v*' HEAD
+        msg: "HEAD has no release tag v<version>. Check out the release commit (the tag) first."
     cmds:
       # The ui/ files are the only "dirty" files: git ignores them.
       - "{{.CARGO}} publish -p loremaster-mcp -p loremaster --allow-dirty {{.CLI_ARGS}}"
