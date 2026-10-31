@@ -2,6 +2,7 @@
 name: "tube"
 aliases: ["tooth", "paste"]
 location: { room: maintenance_room }
+container: true
 portable: true
 props: { open: false }
 description:

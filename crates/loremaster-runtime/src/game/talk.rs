@@ -372,10 +372,7 @@ impl Game {
         self.mirror(turn, &option.outcomes);
         // A world effect can end the story or take the player away.
         let with = d.with.clone();
-        let here = self
-            .state
-            .is_in_room(with.as_str(), self.state.room.as_str())
-            || self.state.is_carried(with.as_str());
+        let here = self.eval().present(with.as_str());
         if self.state.ended || !here {
             self.end_talk();
         } else {

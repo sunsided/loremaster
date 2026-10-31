@@ -1,7 +1,8 @@
 # Imported from ZIL: SANDWICH-BAG (1dungeon.zil)
 name: "brown sack"
 aliases: ["bag", "sack"]
-location: { room: kitchen }
+location: { on: kitchen_table }
+container: true
 portable: true
 props: { open: false }
 presence:

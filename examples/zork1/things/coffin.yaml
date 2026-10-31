@@ -2,6 +2,7 @@
 name: "gold coffin"
 aliases: ["coffin", "casket", "treasure"]
 location: { room: egypt_room }
+container: true
 portable: true
 props: { open: false }
 presence:

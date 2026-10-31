@@ -66,6 +66,11 @@ pub(crate) fn lower_bool(expr: &Expr, scope: &Scope) -> Result<Condition, LangEr
                     .to_condition(CmpOp::Eq, FactValue::Bool(true)),
             )
         }
+        Expr::Call(name, args, span) if name == "in" && args.len() == 2 => {
+            let thing = thing_arg(&args[..1], span, scope)?;
+            let holder = thing_arg(&args[1..], span, scope)?;
+            Ok(Derived::Inside(thing, holder).to_condition(CmpOp::Eq, FactValue::Bool(true)))
+        }
         Expr::Call(name, args, span) if name == "in" => {
             let room = room_arg(args, span, scope)?;
             Ok(Derived::Here.to_condition(CmpOp::Eq, FactValue::Text(room.to_string())))

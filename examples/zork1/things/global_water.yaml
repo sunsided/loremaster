@@ -2,3 +2,4 @@
 name: "water"
 aliases: ["quantity"]
 location: { room: reservoir_south }
+also_in: ["reservoir", "reservoir_north", "stream_view", "in_stream", "dam_room", "dam_base", "river_1", "river_2", "river_3", "white_cliffs_north", "white_cliffs_south", "river_4", "river_5", "shore", "sandy_beach", "aragain_falls", "end_of_rainbow", "canyon_bottom"]

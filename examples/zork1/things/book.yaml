@@ -1,7 +1,8 @@
 # Imported from ZIL: BOOK (1dungeon.zil)
 name: "black book"
 aliases: ["book", "prayer", "page", "books"]
-location: { room: south_temple }
+location: { on: altar }
+container: true
 portable: true
 props: { open: false }
 description:

@@ -1,7 +1,7 @@
 # Imported from ZIL: CANARY (1dungeon.zil)
 name: "golden clockwork canary"
 aliases: ["canary", "treasure"]
-location: { room: up_a_tree }
+location: { in: egg }
 portable: true
 presence:
   - when: "canary.interactions == 0"

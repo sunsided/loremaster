@@ -2,6 +2,7 @@
 name: "grating"
 aliases: ["grate"]
 location: { room: grating_clearing }
+also_in: ["grating_room"]
 key: keys
 listed: false
 props: { open: false, locked: true }

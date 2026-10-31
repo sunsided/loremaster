@@ -1,7 +1,7 @@
 # Imported from ZIL: TORCH (1dungeon.zil)
 name: "torch"
 aliases: ["ivory", "treasure"]
-location: { room: torch_room }
+location: { on: pedestal }
 portable: true
 props: { lit: true }
 presence:

@@ -55,8 +55,11 @@ pub struct ThingOut {
     pub origin: String,
     pub name: String,
     pub aliases: Vec<String>,
-    /// A room id, or `None` for nowhere.
-    pub room: Option<String>,
+    pub location: crate::convert::Place,
+    /// More rooms for local-global scenery.
+    pub also_in: Vec<String>,
+    pub container: bool,
+    pub supporter: bool,
     pub portable: bool,
     pub key: Option<String>,
     pub listed: bool,
@@ -205,13 +208,21 @@ impl ThingOut {
         if !self.aliases.is_empty() {
             let _ = writeln!(out, "aliases: {}", list(&self.aliases));
         }
-        match &self.room {
-            Some(room) => {
-                let _ = writeln!(out, "location: {{ room: {room} }}");
-            }
-            None => {
-                let _ = writeln!(out, "location: nowhere");
-            }
+        use crate::convert::Place;
+        let _ = match &self.location {
+            Place::Room(room) => writeln!(out, "location: {{ room: {room} }}"),
+            Place::In(holder) => writeln!(out, "location: {{ in: {holder} }}"),
+            Place::On(holder) => writeln!(out, "location: {{ on: {holder} }}"),
+            Place::Nowhere => writeln!(out, "location: nowhere"),
+        };
+        if !self.also_in.is_empty() {
+            let _ = writeln!(out, "also_in: {}", list(&self.also_in));
+        }
+        if self.container {
+            let _ = writeln!(out, "container: true");
+        }
+        if self.supporter {
+            let _ = writeln!(out, "supporter: true");
         }
         if self.portable {
             let _ = writeln!(out, "portable: true");

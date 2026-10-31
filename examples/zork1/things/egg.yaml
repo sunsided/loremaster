@@ -1,7 +1,8 @@
 # Imported from ZIL: EGG (1dungeon.zil)
 name: "jewel-encrusted egg"
 aliases: ["egg", "treasure"]
-location: { room: up_a_tree }
+location: { in: nest }
+container: true
 portable: true
 props: { open: false }
 presence:

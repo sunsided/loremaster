@@ -527,11 +527,7 @@ fn overview(ws: &Workspace) -> ToolResult {
 }
 
 fn location(loc: &Location) -> String {
-    match loc {
-        Location::Room(id) => id.to_string(),
-        Location::Carried => "carried".into(),
-        Location::Nowhere => "nowhere".into(),
-    }
+    loc.to_word()
 }
 
 fn get_entity(ws: &Workspace, kind: &str, id: &str) -> ToolResult {

@@ -1,7 +1,7 @@
 # Imported from ZIL: BROKEN-CANARY (1dungeon.zil)
 name: "broken clockwork canary"
 aliases: ["canary", "treasure"]
-location: nowhere
+location: { in: broken_egg }
 portable: true
 presence:
   - when: "broken_canary.interactions == 0"

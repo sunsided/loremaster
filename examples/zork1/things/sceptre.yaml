@@ -1,7 +1,7 @@
 # Imported from ZIL: SCEPTRE (1dungeon.zil)
 name: "sceptre"
 aliases: ["scepter", "treasure"]
-location: { room: egypt_room }
+location: { in: coffin }
 portable: true
 presence:
   - when: "sceptre.interactions == 0"

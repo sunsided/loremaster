@@ -270,3 +270,114 @@ fn world_rules_hear_when_a_dialogue_reaches_a_node() {
     assert!(text.contains("They call me Blackbeard"), "{text}");
     assert!(text.contains("The barkeep looks up at the name."), "{text}");
 }
+
+fn world_of(files: &[(&str, &str)]) -> Game {
+    let files = files
+        .iter()
+        .map(|(path, text)| SourceFile {
+            path: path.to_string(),
+            text: text.to_string(),
+        })
+        .collect();
+    let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
+    let problems = check(&project);
+    assert!(problems.is_empty(), "{problems:#?}");
+    let mut game = Game::new(Arc::new(World::compile(project.story).unwrap()));
+    game.start();
+    game
+}
+
+fn museum() -> Game {
+    world_of(&[
+        (
+            "story.yaml",
+            "title: Museum\nstart: hall\nvars:\n  - { id: score, type: int, initial: 0 }\n",
+        ),
+        (
+            "rooms/hall.yaml",
+            "name: Hall\nregion: inside\ndescription: [\"A hall.\"]\nexits:\n  - { direction: east, to: annex }\n",
+        ),
+        (
+            "rooms/annex.yaml",
+            "name: Annex\nregion: inside\ndescription: [\"An annex.\"]\nexits:\n  - { direction: west, to: hall }\n",
+        ),
+        (
+            "things/case.yaml",
+            "name: trophy case\naliases: [case]\nlocation: { room: hall }\ncontainer: true\ncapacity: 2\nlisted: false\nprops: { open: false, transparent: true }\n",
+        ),
+        (
+            "things/table.yaml",
+            "name: table\nlocation: { room: hall }\nsupporter: true\n",
+        ),
+        (
+            "things/coin.yaml",
+            "name: coin\nlocation: { on: table }\nportable: true\n",
+        ),
+        (
+            "things/box.yaml",
+            "name: box\nlocation: { room: hall }\nportable: true\ncontainer: true\nprops: { open: false }\n",
+        ),
+        (
+            "things/pearl.yaml",
+            "name: pearl\nlocation: { in: box }\nportable: true\n",
+        ),
+        (
+            "things/ceiling.yaml",
+            "name: ceiling\nlocation: { room: hall }\nalso_in: [inside]\nlisted: false\ndescription: [\"Plaster.\"]\n",
+        ),
+        (
+            "rules/score.yaml",
+            "- id: coin_scores\n  on: { verb: [put, coin, case] }\n  when: in(coin, case)\n  once: true\n  then:\n    - add: { score: 10 }\n",
+        ),
+    ])
+}
+
+#[test]
+fn things_go_in_containers_and_on_supporters() {
+    let mut g = museum();
+    let look = say(&mut g, "look");
+    assert!(look.contains("On the table is a coin."), "{look}");
+    assert!(
+        !look.contains("pearl"),
+        "a closed box hides the pearl: {look}"
+    );
+    let text = say(&mut g, "take pearl");
+    assert!(text.contains("You see no pearl here."), "{text}");
+    let text = say(&mut g, "open box");
+    assert!(text.contains("The box contains a pearl."), "{text}");
+    say(&mut g, "take coin");
+    let text = say(&mut g, "put coin in case");
+    assert!(text.contains("The trophy case is closed."), "{text}");
+    say(&mut g, "open case");
+    say(&mut g, "put coin in case");
+    assert_eq!(g.state().facts["score"].as_int(), Some(10));
+    say(&mut g, "close case");
+    let look = say(&mut g, "look");
+    assert!(
+        look.contains("The trophy case contains a coin."),
+        "transparent: {look}"
+    );
+    let text = say(&mut g, "take coin");
+    assert!(text.contains("The trophy case is closed."), "{text}");
+}
+
+#[test]
+fn a_carried_container_carries_its_contents() {
+    let mut g = museum();
+    say(&mut g, "take box");
+    say(&mut g, "e");
+    say(&mut g, "open box");
+    let inv = say(&mut g, "inventory");
+    assert!(inv.contains("a box (with a pearl in it)"), "{inv}");
+    say(&mut g, "take pearl");
+    let text = say(&mut g, "put box in box");
+    assert!(text.contains("inside itself"), "{text}");
+}
+
+#[test]
+fn scenery_is_in_every_room_of_its_region() {
+    let mut g = museum();
+    say(&mut g, "e");
+    let text = say(&mut g, "examine ceiling");
+    assert!(text.contains("Plaster."), "{text}");
+}

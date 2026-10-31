@@ -1,9 +1,10 @@
 # Imported from ZIL: BOTTLE (1dungeon.zil)
 name: "glass bottle"
 aliases: ["bottle", "container"]
-location: { room: kitchen }
+location: { on: kitchen_table }
+container: true
 portable: true
-props: { open: false }
+props: { open: false, transparent: true }
 presence:
   - when: "bottle.interactions == 0"
     text: "A bottle is sitting on the table."

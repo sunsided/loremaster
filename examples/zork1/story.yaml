@@ -1,5 +1,5 @@
 title: "Zork I: The Great Underground Empire"
-author: "Tim Anderson, Marc Blank, Bruce Daniels and Dave Lebling (Infocom). Imported from ZIL with lantern-zil."
+author: "Tim Anderson, Marc Blank, Bruce Daniels and Dave Lebling (Infocom). Imported from ZIL with loremaster-zil."
 start: west_of_house
 
 vars:

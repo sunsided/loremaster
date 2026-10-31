@@ -2,6 +2,7 @@
 name: "chalice"
 aliases: ["cup", "silver", "treasure"]
 location: { room: treasure_room }
+container: true
 portable: true
 props: { open: false }
 presence:

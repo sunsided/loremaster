@@ -1,4 +1,5 @@
 # Imported from ZIL: RAINBOW (1dungeon.zil)
 name: "rainbow"
 location: { room: aragain_falls }
+also_in: ["on_rainbow", "end_of_rainbow", "canyon_view"]
 listed: false

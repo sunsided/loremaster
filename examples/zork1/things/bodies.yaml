@@ -2,4 +2,5 @@
 name: "pile of bodies"
 aliases: ["bodies", "body", "remains", "pile"]
 location: { room: entrance_to_hades }
+also_in: ["land_of_living_dead"]
 listed: false

@@ -1,5 +1,5 @@
 # Imported from ZIL: PEDESTAL (1dungeon.zil)
 name: "pedestal"
 location: { room: torch_room }
+supporter: true
 listed: false
-props: { open: true }

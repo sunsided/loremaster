@@ -91,6 +91,8 @@ pub enum Derived {
     Timer(Id),
     /// `timer.id.running`: the timer runs.
     TimerRunning(Id),
+    /// `in(thing, holder)`: the thing is in or on the holder, also deeper inside.
+    Inside(Id, Id),
     /// `chance(n)`: true in about n of 100 turns. The salt keeps two chances
     /// apart; the result is fixed for one state, so play replays.
     Chance(u8, u64),
@@ -123,6 +125,7 @@ impl Derived {
             Derived::Timer(id) => ("timer", Some(id)),
             Derived::TimerRunning(id) => ("timer_running", Some(id)),
             Derived::Chance(..) => ("chance", None),
+            Derived::Inside(..) => ("inside", None),
         }
     }
 
@@ -130,6 +133,7 @@ impl Derived {
     fn arg(&self) -> String {
         match self {
             Derived::Chance(n, salt) => format!("{n}:{salt}"),
+            Derived::Inside(thing, holder) => format!("{thing}:{holder}"),
             other => other.name().1.map(|a| a.to_string()).unwrap_or_default(),
         }
     }
@@ -157,6 +161,10 @@ impl Derived {
             "talked" => Derived::Talked(id()),
             "timer" => Derived::Timer(id()),
             "timer_running" => Derived::TimerRunning(id()),
+            "inside" => {
+                let (thing, holder) = arg.split_once(':')?;
+                Derived::Inside(Id::new(thing), Id::new(holder))
+            }
             "chance" => {
                 let (n, salt) = arg.split_once(':')?;
                 Derived::Chance(n.parse().ok()?, salt.parse().ok()?)

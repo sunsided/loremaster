@@ -2,6 +2,7 @@
 name: "broken jewel-encrusted egg"
 aliases: ["egg", "treasure"]
 location: nowhere
+container: true
 portable: true
 props: { open: true }
 presence:

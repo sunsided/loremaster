@@ -215,8 +215,22 @@ impl Checker<'_> {
                     format!("thing `{}` is defined twice", thing.id),
                 );
             }
-            if let Location::Room(r) = &thing.location {
-                self.room_ref(&file, "location", r.as_str());
+            match &thing.location {
+                Location::Room(r) => self.room_ref(&file, "location", r.as_str()),
+                Location::In(h) | Location::On(h) => {
+                    self.holder_ref(&file, "location", &thing.location, h.as_str())
+                }
+                Location::Carried | Location::Nowhere => {}
+            }
+            for (i, w) in thing.also_in.iter().enumerate() {
+                let region = story.rooms.iter().any(|r| r.region.as_ref() == Some(w));
+                if story.room(w.as_str()).is_none() && !region {
+                    self.error(
+                        &file,
+                        &format!("also_in[{i}]"),
+                        format!("`{w}` is not a room or a region"),
+                    );
+                }
             }
             if let Some(key) = &thing.key {
                 self.thing_ref(&file, "key", key.as_str());
@@ -401,8 +415,13 @@ impl Checker<'_> {
                 Effect::Move(moves) => {
                     for (thing, to) in moves {
                         self.thing_ref(file, &at, thing.as_str());
-                        if to.as_str() != "carried" && to.as_str() != "nowhere" {
-                            self.room_ref(file, &at, to.as_str());
+                        match Location::from_word(to.as_str()) {
+                            Location::Room(r) => self.room_ref(file, &at, r.as_str()),
+                            loc @ (Location::In(_) | Location::On(_)) => {
+                                let h = loc.holder().cloned().unwrap_or_else(|| to.clone());
+                                self.holder_ref(file, &at, &loc, h.as_str())
+                            }
+                            Location::Carried | Location::Nowhere => {}
                         }
                     }
                 }
@@ -485,6 +504,23 @@ impl Checker<'_> {
                 ),
                 _ => {}
             }
+        }
+    }
+
+    /// `in: x` needs a container `x`, `on: x` a supporter.
+    fn holder_ref(&mut self, file: &str, at: &str, loc: &Location, id: &str) {
+        let Some(holder) = self.story().thing(id) else {
+            self.error(file, at, format!("unknown thing `{id}`"));
+            return;
+        };
+        match loc {
+            Location::In(_) if !holder.container => {
+                self.error(file, at, format!("`{id}` is not a container"))
+            }
+            Location::On(_) if !holder.supporter => {
+                self.error(file, at, format!("`{id}` is not a supporter"))
+            }
+            _ => {}
         }
     }
 

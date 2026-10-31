@@ -2,4 +2,5 @@
 name: "cliff"
 aliases: ["wall", "walls", "ledge"]
 location: { room: canyon_bottom }
+also_in: ["cliff_middle", "canyon_view"]
 listed: false
