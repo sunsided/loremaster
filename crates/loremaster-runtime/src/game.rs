@@ -1,8 +1,9 @@
 use crate::eval::{Eval, to_fact_value};
 use crate::parser::{ParseScope, parse};
 use crate::text::{self, SourcePiece, article};
-use crate::world::{CEffect, CFragment};
+use crate::world::{CEffect, CFragment, Within};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
+use crate::{Event, Phase};
 use dramaturge_model::{Fact, FactId, FactScope};
 use dramaturge_runtime::DialogWorldState;
 use loremaster_model::{EventPattern, Id, Location, TimeOfDay, Value, VerbSlots};
@@ -25,6 +26,17 @@ pub struct Game {
     last_fired: Vec<Id>,
     /// The frame used for the last action, for the assembly panel.
     last_frame: Option<FrameUse>,
+    /// A `stop` effect ran in the rules that fire now.
+    stopped: bool,
+}
+
+/// What a run of rules did.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct Fired {
+    /// An `instead` rule fired.
+    pub instead: bool,
+    /// A rule ran `stop`.
+    pub stopped: bool,
 }
 
 /// A verb for the verb bar.
@@ -354,6 +366,12 @@ impl Game {
             talk: None,
             relations: Default::default(),
             memories: Default::default(),
+            timers: story
+                .timers
+                .iter()
+                .filter(|t| t.running)
+                .map(|t| (t.id.clone(), t.turns))
+                .collect(),
         };
         for v in &story.vars {
             state.facts.insert(v.id.to_string(), v.initial.clone());
@@ -407,6 +425,14 @@ impl Game {
         if !has_room(&state.room) {
             state.room = world.story.start.clone();
         }
+        state
+            .timers
+            .retain(|id, _| world.story.timer(id.as_str()).is_some());
+        for (id, turns) in &new_start.timers {
+            if !old_start.timers.contains_key(id) {
+                state.timers.entry(id.clone()).or_insert(*turns);
+            }
+        }
         state.visits.retain(|r, _| has_room(r));
         let talk_ok = state.talk.as_ref().is_some_and(|t| {
             world
@@ -440,6 +466,7 @@ impl Game {
             last_shown: None,
             last_fired: Vec::new(),
             last_frame: None,
+            stopped: false,
         };
         game.restore_dialog_state();
         game
@@ -468,7 +495,7 @@ impl Game {
         let runs = self.assemble(&intro, true);
         turn.push(BlockKind::Narration, runs);
         self.enter_room(&mut turn, 0);
-        self.fire(&mut turn, |r| matches!(r.on, EventPattern::Start), 0);
+        self.fire(&mut turn, &Event::Start, 0);
         self.finish(turn)
     }
 
@@ -856,8 +883,15 @@ impl Game {
                 self.begin_action(&verb, &[], &format!("go {direction}"));
                 let frame = self.frame_for(&verb, None);
                 self.frame_text(turn, frame.as_ref().map(|f| &f.before));
-                self.go(turn, &direction);
-                self.frame_text(turn, frame.as_ref().map(|f| &f.after));
+                let check = Event::Verb {
+                    phase: Phase::Check,
+                    verb: verb.clone(),
+                    objects: vec![Id::new(direction.as_str())],
+                };
+                if !self.fire(turn, &check, 0).stopped {
+                    self.go(turn, &direction);
+                    self.frame_text(turn, frame.as_ref().map(|f| &f.after));
+                }
             }
             Command::Verb { verb, objects } => {
                 if let Some(missing) = objects.iter().find(|o| !self.reachable(o.as_str())) {
@@ -873,27 +907,30 @@ impl Game {
                     .join(" ");
                 self.begin_action(&verb, &objects, &key);
                 let frame = self.frame_for(&verb, objects.first());
-                let on_verb = |rule: &loremaster_model::Rule| match &rule.on {
-                    EventPattern::Verb(parts) => {
-                        parts.first() == Some(&verb)
-                            && parts.len() - 1 <= objects.len()
-                            && parts[1..].iter().zip(objects.iter()).all(|(a, b)| a == b)
-                    }
-                    _ => false,
+                let event = |phase| Event::Verb {
+                    phase,
+                    verb: verb.clone(),
+                    objects: objects.clone(),
                 };
                 self.frame_text(turn, frame.as_ref().map(|f| &f.before));
-                // `instead` rules run before the default and replace it;
-                // other rules run after it, so their text follows the response.
-                let instead = self.fire(turn, |r| r.instead && on_verb(r), 0);
-                if !instead {
-                    // An `instead` frame replaces the default response, but not the rules.
-                    let replaced = self.frame_text(turn, frame.as_ref().map(|f| &f.instead));
-                    if !replaced {
-                        self.default_action(turn, verb.as_str(), &objects);
+                // `check` rules can refuse the action with `stop`.
+                if !self.fire(turn, &event(Phase::Check), 0).stopped {
+                    // `instead` rules run before the default and replace it;
+                    // other rules run after it, so their text follows the response.
+                    let instead = self.fire(turn, &event(Phase::Instead), 0);
+                    let mut stopped = instead.stopped;
+                    if !instead.instead && !stopped {
+                        // An `instead` frame replaces the default response, but not the rules.
+                        let replaced = self.frame_text(turn, frame.as_ref().map(|f| &f.instead));
+                        if !replaced {
+                            self.default_action(turn, verb.as_str(), &objects);
+                        }
+                        stopped = self.fire(turn, &event(Phase::After), 0).stopped;
                     }
-                    self.fire(turn, |r| !r.instead && on_verb(r), 0);
+                    if !stopped {
+                        self.frame_text(turn, frame.as_ref().map(|f| &f.after));
+                    }
                 }
-                self.frame_text(turn, frame.as_ref().map(|f| &f.after));
             }
         }
         self.state.action = None;
@@ -1448,6 +1485,18 @@ impl Game {
                 self.describe_room(&mut turn);
             }
             AuthorCommand::Set { name, value } => {
+                if let Some(id) = name.strip_prefix("timer.")
+                    && self.world.story.timer(id).is_some()
+                {
+                    let left = value.as_int().unwrap_or(0).clamp(0, i64::from(u32::MAX)) as u32;
+                    note(&mut turn, format!("set {name} = {left}"));
+                    if left == 0 {
+                        self.state.timers.remove(id);
+                    } else {
+                        self.state.timers.insert(Id::new(id), left);
+                    }
+                    return self.finish(turn);
+                }
                 if !self.state.facts.contains_key(&name) {
                     turn.say(
                         BlockKind::Response,
@@ -1666,6 +1715,13 @@ impl Game {
                     _ => Vec::new(),
                 },
             })
+            .chain(self.world.story.timers.iter().map(|t| VarView {
+                name: format!("timer.{}", t.id),
+                value: Value::Int(i64::from(
+                    self.state.timers.get(&t.id).copied().unwrap_or(0),
+                )),
+                options: Vec::new(),
+            }))
             .collect()
     }
 
@@ -1694,6 +1750,21 @@ impl Game {
                 .or_else(|| story.room(id.as_str()).map(|r| r.name.clone()))
                 .unwrap_or_else(|| id.to_string())
         };
+        let verb_text = |parts: &[Id]| {
+            let verb = parts
+                .first()
+                .and_then(|v| self.world.verb(v.as_str()))
+                .map_or_else(
+                    || parts.first().map(Id::to_string).unwrap_or_default(),
+                    |v| v.label.to_lowercase(),
+                );
+            let objects: Vec<String> = parts.iter().skip(1).map(thing_or_room).collect();
+            if objects.is_empty() {
+                verb
+            } else {
+                format!("{verb} {}", objects.join(" with "))
+            }
+        };
         story
             .rules
             .iter()
@@ -1710,21 +1781,18 @@ impl Game {
                     }
                     EventPattern::Time(t) => format!("the clock reaches {t}"),
                     EventPattern::Verb(parts) => {
-                        let verb = parts
-                            .first()
-                            .and_then(|v| self.world.verb(v.as_str()))
-                            .map_or_else(
-                                || parts.first().map(Id::to_string).unwrap_or_default(),
-                                |v| v.label.to_lowercase(),
-                            );
-                        let objects: Vec<String> =
-                            parts.iter().skip(1).map(thing_or_room).collect();
-                        if objects.is_empty() {
-                            format!("the player uses \"{verb}\"")
-                        } else {
-                            format!("the player uses \"{verb} {}\"", objects.join(" with "))
-                        }
+                        format!("the player uses \"{}\"", verb_text(parts))
                     }
+                    EventPattern::Check(parts) => {
+                        format!("the player tries \"{}\"", verb_text(parts))
+                    }
+                    EventPattern::Timer(t) => format!("the timer {t} runs out"),
+                    EventPattern::Event(e) => format!("the event {e} happens"),
+                    EventPattern::Talk(parts) => match parts.as_slice() {
+                        [d, node, ..] => format!("the dialogue {d} reaches {node}"),
+                        [d] => format!("the dialogue {d} goes on"),
+                        [] => "a dialogue goes on".to_string(),
+                    },
                 };
                 let then = r
                     .then
@@ -1756,6 +1824,20 @@ impl Game {
                             format!("move the player to {}", thing_or_room(room))
                         }
                         loremaster_model::Effect::End(t) => format!("end the game: \"{t}\""),
+                        loremaster_model::Effect::Stop => "stop the action".to_string(),
+                        loremaster_model::Effect::Emit(e) => format!("send the event {e}"),
+                        loremaster_model::Effect::Start(t) => format!(
+                            "start {}",
+                            t.entries()
+                                .iter()
+                                .map(|(id, n)| match n {
+                                    Some(n) => format!("{id} at {n}"),
+                                    None => id.to_string(),
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                        loremaster_model::Effect::Cancel(t) => format!("cancel {t}"),
                     })
                     .collect();
                 let trigger = match &r.on {
@@ -1765,8 +1847,16 @@ impl Game {
                     EventPattern::Leave(_) => "leave",
                     EventPattern::Time(_) => "time",
                     EventPattern::Verb(_) => "verb",
+                    EventPattern::Check(_) => "check",
+                    EventPattern::Timer(_) => "timer",
+                    EventPattern::Event(_) => "event",
+                    EventPattern::Talk(_) => "talk",
                 };
                 let relevant = self.relevance(r);
+                let when = match &r.within {
+                    Some(w) => format!("{when}, in {}", thing_or_room(w)),
+                    None => when,
+                };
                 RuleView {
                     id: r.id.to_string(),
                     trigger: trigger.to_string(),
@@ -1802,7 +1892,7 @@ impl Game {
                     .is_some_and(|room| room.exits.iter().any(|e| e.to.as_ref() == Some(r)));
                 next_door.then(|| "fires in a room next to this one".into())
             }
-            EventPattern::Verb(parts) => {
+            EventPattern::Verb(parts) | EventPattern::Check(parts) => {
                 let scope = self.in_scope();
                 let things = &parts[1..];
                 if things.is_empty() {
@@ -1820,7 +1910,19 @@ impl Game {
                 (ahead <= 60).then(|| format!("fires in {ahead} minutes"))
             }
             EventPattern::Turn => Some("checks every turn".into()),
-            EventPattern::Leave(_) | EventPattern::Start => None,
+            EventPattern::Timer(t) => self
+                .state
+                .timers
+                .get(t)
+                .filter(|left| **left <= 5)
+                .map(|left| format!("the timer runs out in {left} turns")),
+            EventPattern::Talk(parts) => self
+                .state
+                .talk
+                .as_ref()
+                .filter(|t| parts.first() == Some(&t.dialogue))
+                .map(|_| "about the talk now".into()),
+            EventPattern::Leave(_) | EventPattern::Start | EventPattern::Event(_) => None,
         }
     }
 
@@ -1952,42 +2054,37 @@ impl Game {
             .or_default() += 1;
         self.describe_room(turn);
         let room = self.state.room.clone();
-        self.fire(
-            turn,
-            |r| matches!(&r.on, EventPattern::Enter(id) if *id == room),
-            depth,
-        );
+        self.fire(turn, &Event::Enter(room), depth);
     }
 
     fn move_player(&mut self, turn: &mut Turn, to: Id, depth: u8) {
         let from = self.state.room.clone();
         self.state.previous = Some(from.clone());
-        self.fire(
-            turn,
-            |r| matches!(&r.on, EventPattern::Leave(id) if *id == from),
-            depth,
-        );
+        self.fire(turn, &Event::Leave(from), depth);
         self.state.room = to;
         self.enter_room(turn, depth);
     }
 
-    /// Run every matching rule. Returns true if one of them was `instead`.
-    fn fire(
-        &mut self,
-        turn: &mut Turn,
-        matches: impl Fn(&loremaster_model::Rule) -> bool,
-        depth: u8,
-    ) -> bool {
+    /// Run every rule that listens for the event, in rule order.
+    pub(crate) fn fire(&mut self, turn: &mut Turn, event: &Event, depth: u8) -> Fired {
+        let mut out = Fired::default();
         if depth > MAX_RULE_DEPTH || self.state.ended {
-            return false;
+            return out;
         }
         let world = self.world.clone();
-        let mut instead = false;
-        for (i, rule) in world.story.rules.iter().enumerate() {
-            if !matches(rule) || (rule.once && self.state.fired.contains(&rule.id)) {
+        // A `stop` ends this run of rules only: keep the flag of the run around it.
+        let outer = std::mem::replace(&mut self.stopped, false);
+        for &i in &world.rule_order {
+            if self.stopped || self.state.ended {
+                break;
+            }
+            let rule = &world.story.rules[i];
+            if !event.matches(rule) || (rule.once && self.state.fired.contains(&rule.id)) {
                 continue;
             }
-            if !self.eval().holds_opt(&world.rules[i].when) {
+            if !self.within_holds(&world.rules[i].within, event)
+                || !self.eval().holds_opt(&world.rules[i].when)
+            {
                 continue;
             }
             turn.log.push(LogEntry {
@@ -1995,12 +2092,37 @@ impl Game {
                 text: rule.id.to_string(),
             });
             self.state.fired.insert(rule.id.clone());
-            instead |= rule.instead;
+            out.instead |= rule.instead;
             for effect in &world.rules[i].then {
                 self.apply(turn, &rule.id, effect, depth + 1);
+                if self.stopped || self.state.ended {
+                    break;
+                }
             }
         }
-        instead
+        out.stopped = self.stopped;
+        self.stopped = outer;
+        out
+    }
+
+    /// Does the scope of a rule hold for the event? A thing rule needs the
+    /// thing as an object of the verb, or present for other events. A room or
+    /// region rule needs the player there.
+    fn within_holds(&self, within: &Option<Within>, event: &Event) -> bool {
+        match within {
+            None => true,
+            Some(Within::Thing(t)) => match event.objects() {
+                Some(objects) => objects.contains(t),
+                None => self.present(t.as_str()),
+            },
+            Some(Within::Room(r)) => self.state.room == *r,
+            Some(Within::Region(g)) => self.room_def().and_then(|r| r.region.as_ref()) == Some(g),
+        }
+    }
+
+    /// The thing is carried or in the current room.
+    fn present(&self, thing: &str) -> bool {
+        self.state.is_carried(thing) || self.state.is_in_room(thing, self.state.room.as_str())
     }
 
     fn apply(&mut self, turn: &mut Turn, rule: &Id, effect: &CEffect, depth: u8) {
@@ -2040,6 +2162,35 @@ impl Game {
                 turn.push(BlockKind::End, vec![rule_run(text, rule)]);
                 self.state.ended = true;
             }
+            CEffect::Stop => self.stopped = true,
+            CEffect::Emit(name) => {
+                turn.log.push(LogEntry {
+                    kind: "event".into(),
+                    text: name.to_string(),
+                });
+                self.fire(turn, &Event::Custom(name.clone()), depth);
+            }
+            CEffect::Start(timers) => {
+                for (id, turns) in timers {
+                    let Some(t) = self.world.story.timer(id.as_str()) else {
+                        continue;
+                    };
+                    let turns = turns.unwrap_or(t.turns);
+                    turn.log.push(LogEntry {
+                        kind: "timer".into(),
+                        text: format!("{id} starts at {turns}"),
+                    });
+                    self.state.timers.insert(id.clone(), turns);
+                }
+            }
+            CEffect::Cancel(id) => {
+                if self.state.timers.remove(id).is_some() {
+                    turn.log.push(LogEntry {
+                        kind: "timer".into(),
+                        text: format!("{id} is cancelled"),
+                    });
+                }
+            }
         }
     }
 
@@ -2052,15 +2203,43 @@ impl Game {
         self.state.minutes += u32::from(self.world.story.clock.minutes_per_turn);
         self.state.turns += 1;
         let after = self.state.minutes;
-        self.fire(turn, |r| matches!(r.on, EventPattern::Turn), 0);
-        self.fire(
-            turn,
-            |r| match r.on {
-                EventPattern::Time(t) => crossed(before, after, t),
-                _ => false,
-            },
-            0,
-        );
+        self.fire(turn, &Event::Turn, 0);
+        self.tick_timers(turn);
+        self.fire(turn, &Event::Time { before, after }, 0);
+    }
+
+    /// Each running timer whose `runs_while` holds goes down by one. A timer at
+    /// zero runs out: its effects at 0 run, then its rules fire.
+    fn tick_timers(&mut self, turn: &mut Turn) {
+        let world = self.world.clone();
+        for (ti, t) in world.story.timers.iter().enumerate() {
+            if self.state.ended {
+                return;
+            }
+            let Some(&left) = self.state.timers.get(&t.id) else {
+                continue;
+            };
+            if !self.eval().holds_opt(&world.timers[ti].runs_while) {
+                continue;
+            }
+            let left = left.saturating_sub(1);
+            match (left, t.repeat) {
+                (0, true) => self.state.timers.insert(t.id.clone(), t.turns),
+                (0, false) => self.state.timers.remove(&t.id),
+                _ => self.state.timers.insert(t.id.clone(), left),
+            };
+            let owner = Id::new(format!("timer:{}", t.id));
+            for effect in world.timers[ti].at.get(&left).into_iter().flatten() {
+                self.apply(turn, &owner, effect, 1);
+            }
+            if left == 0 {
+                turn.log.push(LogEntry {
+                    kind: "timer".into(),
+                    text: format!("{} runs out", t.id),
+                });
+                self.fire(turn, &Event::Timer(t.id.clone()), 0);
+            }
+        }
     }
 
     fn finish(&mut self, mut turn: Turn) -> Turn {
@@ -2378,7 +2557,7 @@ fn mentions(text: &str, noun: &str) -> bool {
 }
 
 /// Did the clock pass time of day `t` in `(before, after]`?
-fn crossed(before: u32, after: u32, t: TimeOfDay) -> bool {
+pub(crate) fn crossed(before: u32, after: u32, t: TimeOfDay) -> bool {
     let day = TimeOfDay::MINUTES_PER_DAY;
     let t = u32::from(t.0);
     let mut start = before - before % day;

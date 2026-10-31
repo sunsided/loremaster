@@ -12,6 +12,7 @@
 //! through dramaturge's `Custom` condition.
 
 mod eval;
+mod events;
 mod explore;
 mod game;
 mod matrix;
@@ -24,6 +25,7 @@ mod text;
 mod threads;
 mod world;
 
+pub use events::{Event, Phase};
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
 pub use game::{
     AtlasRoom, AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game,

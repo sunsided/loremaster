@@ -1,6 +1,7 @@
 use crate::{Diagnostic, Severity};
 use loremaster_model::{
-    ClockConfig, Dialogue, Fragment, Id, Note, Room, Rule, Story, Thing, Thread, VarDef, VerbDef,
+    ClockConfig, Dialogue, Fragment, Id, Note, Room, Rule, Story, Thing, Thread, Timer, VarDef,
+    VerbDef,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -51,6 +52,8 @@ struct StoryFile {
     seed: u64,
     #[serde(default)]
     notes: Vec<Note>,
+    #[serde(default)]
+    timers: Vec<Timer>,
 }
 
 /// Load a project from its files. Paths use `/` and are relative to the
@@ -81,15 +84,23 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                 Err(e) => errors.push(parse_err(e)),
             },
             "rooms" => match serde_saphyr::from_str::<Room>(&with_default_id(&file.text, stem)) {
-                Ok(r) => {
+                Ok(mut r) => {
                     origins.insert(format!("room:{}", r.id), path.to_string());
+                    for rule in nested_rules(&mut r.rules, &r.id) {
+                        origins.insert(format!("rule:{}", rule.id), path.to_string());
+                        rules.push(rule);
+                    }
                     rooms.push(r);
                 }
                 Err(e) => errors.push(parse_err(e)),
             },
             "things" => match serde_saphyr::from_str::<Thing>(&with_default_id(&file.text, stem)) {
-                Ok(t) => {
+                Ok(mut t) => {
                     origins.insert(format!("thing:{}", t.id), path.to_string());
+                    for rule in nested_rules(&mut t.rules, &t.id) {
+                        origins.insert(format!("rule:{}", rule.id), path.to_string());
+                        rules.push(rule);
+                    }
                     things.push(t);
                 }
                 Err(e) => errors.push(parse_err(e)),
@@ -158,6 +169,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         rooms,
         things,
         rules,
+        timers: header.timers,
         relations: header.relations,
         dialogues,
         frames: header.frames,
@@ -170,6 +182,17 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         files,
         origins,
     })
+}
+
+/// Take the rules out of a room or thing file. They belong to it.
+fn nested_rules(rules: &mut Vec<Rule>, owner: &Id) -> Vec<Rule> {
+    std::mem::take(rules)
+        .into_iter()
+        .map(|mut r| {
+            r.within.get_or_insert_with(|| owner.clone());
+            r
+        })
+        .collect()
 }
 
 fn yaml_stem(path: &str) -> Option<&str> {

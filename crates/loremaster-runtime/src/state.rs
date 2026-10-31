@@ -58,6 +58,9 @@ pub struct State {
     /// The memories that things keep, from dialogues. dramaturge holds them too.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub memories: BTreeMap<Id, BTreeSet<String>>,
+    /// Running timers and the turns they have left.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub timers: BTreeMap<Id, u32>,
 }
 
 /// Where a conversation is: the dialogue and its current node, by key, so

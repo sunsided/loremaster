@@ -1,4 +1,4 @@
-use crate::{Fragment, Frames, Id, Note, Value};
+use crate::{Fragment, Frames, Id, Note, Rule, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -50,6 +50,10 @@ pub struct Thing {
     /// Author text around the responses to verbs used on this thing.
     #[serde(default, skip_serializing_if = "Frames::is_empty")]
     pub frames: Frames,
+    /// Rules that belong to this thing. The loader moves them to the story's
+    /// rules and sets their `within`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rules: Vec<Rule>,
     /// Author notes. The player never sees them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<Note>,

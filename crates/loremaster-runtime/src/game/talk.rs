@@ -237,6 +237,12 @@ impl Game {
         }
         if outcomes {
             self.apply_outcomes(turn, d, &node.outcomes_on_enter);
+            // World rules hear about the node, after its outcomes.
+            let event = crate::Event::Talk {
+                dialogue: d.id.clone(),
+                node: key.clone(),
+            };
+            self.fire(turn, &event, 1);
         }
         if self.state.talk.is_some() && self.available().is_empty() {
             self.end_talk();

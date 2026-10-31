@@ -16,6 +16,7 @@ mod room;
 mod rule;
 mod story;
 mod thing;
+mod timer;
 mod value;
 mod verb;
 
@@ -29,5 +30,6 @@ pub use room::{Direction, Exit, Room};
 pub use rule::{Effect, EventPattern, Rule};
 pub use story::{Story, VarDef, VarType};
 pub use thing::{Location, NameStage, Thing};
+pub use timer::{StartTimers, Timer};
 pub use value::Value;
 pub use verb::{VerbDef, VerbSlots, standard_verbs};

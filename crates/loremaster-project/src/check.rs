@@ -233,34 +233,87 @@ impl Checker<'_> {
 
         self.threads();
         self.dialogues();
+        self.timers();
 
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
             .chain(story.verbs.iter())
             .map(|v| v.id.to_string())
             .collect();
+        let emitted = emitted_events(&story);
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
             match &rule.on {
                 EventPattern::Enter(r) | EventPattern::Leave(r) => {
                     self.room_ref(&file, "on", r.as_str())
                 }
-                EventPattern::Verb(parts) => match parts.split_first() {
-                    Some((verb, objects)) => {
-                        if !verbs.contains(verb.as_str()) {
-                            self.error(&file, "on.verb", format!("unknown verb `{verb}`"));
-                        }
-                        for o in objects {
-                            if self.story().thing(o.as_str()).is_none()
-                                && self.story().room(o.as_str()).is_none()
-                            {
-                                self.error(&file, "on.verb", format!("unknown thing `{o}`"));
+                EventPattern::Verb(parts) | EventPattern::Check(parts) => {
+                    let at = if matches!(rule.on, EventPattern::Check(_)) {
+                        "on.check"
+                    } else {
+                        "on.verb"
+                    };
+                    match parts.split_first() {
+                        Some((verb, objects)) => {
+                            if !verbs.contains(verb.as_str()) {
+                                self.error(&file, at, format!("unknown verb `{verb}`"));
+                            }
+                            for o in objects {
+                                let direction = verb.as_str() == "go";
+                                if !direction
+                                    && self.story().thing(o.as_str()).is_none()
+                                    && self.story().room(o.as_str()).is_none()
+                                {
+                                    self.error(&file, at, format!("unknown thing `{o}`"));
+                                }
                             }
                         }
+                        None => self.error(&file, at, "name the verb"),
                     }
-                    None => self.error(&file, "on.verb", "name the verb"),
+                }
+                EventPattern::Timer(t) => self.timer_ref(&file, "on.timer", t.as_str()),
+                EventPattern::Talk(parts) => match parts.split_first() {
+                    Some((d, node)) => match self.story().dialogues.iter().find(|x| x.id == *d) {
+                        None => self.error(&file, "on.talk", format!("unknown dialogue `{d}`")),
+                        Some(dialogue) => {
+                            if let Some(n) = node.first()
+                                && dialogue.node(n.as_str()).is_none()
+                            {
+                                self.error(
+                                    &file,
+                                    "on.talk",
+                                    format!("dialogue `{d}` has no node `{n}`"),
+                                );
+                            }
+                        }
+                    },
+                    None => self.error(&file, "on.talk", "name the dialogue"),
                 },
+                EventPattern::Event(name) => {
+                    if !emitted.contains(name.as_str()) {
+                        self.warning(
+                            &file,
+                            "on.event",
+                            format!("no `emit` sends the event `{name}`"),
+                        );
+                    }
+                }
                 EventPattern::Start | EventPattern::Turn | EventPattern::Time(_) => {}
+            }
+            if let Some(w) = &rule.within
+                && self.story().thing(w.as_str()).is_none()
+                && self.story().room(w.as_str()).is_none()
+                && !self
+                    .story()
+                    .rooms
+                    .iter()
+                    .any(|r| r.region.as_ref() == Some(w))
+            {
+                self.error(
+                    &file,
+                    "within",
+                    format!("`{w}` is not a thing, a room or a region"),
+                );
             }
             if let Some(when) = &rule.when {
                 self.condition(&file, "when", when);
@@ -367,6 +420,13 @@ impl Checker<'_> {
                         }
                     }
                 }
+                Effect::Start(timers) => {
+                    for (t, _) in timers.entries() {
+                        self.timer_ref(file, &at, t.as_str());
+                    }
+                }
+                Effect::Cancel(t) => self.timer_ref(file, &at, t.as_str()),
+                Effect::Stop | Effect::Emit(_) => {}
             }
         }
     }
@@ -428,6 +488,41 @@ impl Checker<'_> {
         }
     }
 
+    fn timer_ref(&mut self, file: &str, at: &str, id: &str) {
+        if self.story().timer(id).is_none() {
+            self.error(file, at, format!("unknown timer `{id}`"));
+        }
+    }
+
+    /// Timers: their conditions and effects.
+    fn timers(&mut self) {
+        let timers = self.story().timers.clone();
+        let mut seen = BTreeSet::new();
+        for t in &timers {
+            let file = self.file_of(&format!("timer:{}", t.id));
+            let at = format!("timers.{}", t.id);
+            if !seen.insert(t.id.clone()) {
+                self.error(&file, &at, format!("timer `{}` is defined twice", t.id));
+            }
+            if t.turns == 0 {
+                self.error(&file, &at, "a timer needs at least one turn");
+            }
+            if let Some(cond) = &t.runs_while {
+                self.condition(&file, &format!("{at}.runs_while"), cond);
+            }
+            for (n, effects) in &t.at {
+                if *n > t.turns {
+                    self.warning(
+                        &file,
+                        &format!("{at}.at.{n}"),
+                        format!("the timer starts at {}, so it never reaches {n}", t.turns),
+                    );
+                }
+                self.effects(&file, &format!("{at}.at.{n}"), effects);
+            }
+        }
+    }
+
     fn ty_of(&self, name: &str) -> Option<loremaster_lang::Ty> {
         if let Some(ty) = self.scope.vars.get(name) {
             return Some(ty.clone());
@@ -447,6 +542,28 @@ impl Checker<'_> {
             _ => false,
         }
     }
+}
+
+/// The names of the custom events that some `emit` sends.
+fn emitted_events(story: &Story) -> BTreeSet<String> {
+    let rule_effects = story.rules.iter().flat_map(|r| r.then.iter());
+    let timer_effects = story.timers.iter().flat_map(|t| t.at.values().flatten());
+    let dialogue_effects = story.dialogues.iter().flat_map(|d| {
+        d.nodes.iter().flat_map(|n| {
+            n.outcomes
+                .then
+                .iter()
+                .chain(n.options.iter().flat_map(|o| o.outcomes.then.iter()))
+        })
+    });
+    rule_effects
+        .chain(timer_effects)
+        .chain(dialogue_effects)
+        .filter_map(|e| match e {
+            Effect::Emit(name) => Some(name.to_string()),
+            _ => None,
+        })
+        .collect()
 }
 
 fn line_col(text: &str, pos: usize) -> (u32, u32) {

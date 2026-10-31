@@ -321,8 +321,18 @@ export interface RuleView {
 	once: boolean;
 	instead: boolean;
 	fired: boolean;
-	/** The kind of event: start, turn, enter, leave, time or verb. */
-	trigger: 'start' | 'turn' | 'enter' | 'leave' | 'time' | 'verb';
+	/** The kind of event. `check` runs before a verb, `verb` instead of or after it. */
+	trigger:
+		| 'start'
+		| 'turn'
+		| 'enter'
+		| 'leave'
+		| 'time'
+		| 'verb'
+		| 'check'
+		| 'timer'
+		| 'event'
+		| 'talk';
 	/** Why the rule matters here and now, or null. */
 	relevant: string | null;
 }

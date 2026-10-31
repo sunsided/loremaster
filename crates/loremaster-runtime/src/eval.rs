@@ -92,6 +92,13 @@ impl Eval<'_> {
             Derived::Interactions(t) => {
                 FactValue::Int(i64::from(s.interactions.get(t).copied().unwrap_or(0)))
             }
+            Derived::Timer(t) => FactValue::Int(i64::from(s.timers.get(t).copied().unwrap_or(0))),
+            Derived::TimerRunning(t) => FactValue::Bool(s.timers.contains_key(t)),
+            Derived::Chance(n, salt) => {
+                let mut seed =
+                    s.rng ^ salt ^ u64::from(s.turns).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                FactValue::Bool(crate::rng::next(&mut seed) % 100 < u64::from(*n))
+            }
             Derived::Talked(t) => FactValue::Int(i64::from(s.talked.get(t).copied().unwrap_or(0))),
             Derived::Location(t) => FactValue::Text(match s.location_of(t.as_str()) {
                 Some(Location::Room(r)) => r.to_string(),

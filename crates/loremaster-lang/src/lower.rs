@@ -7,7 +7,30 @@ use loremaster_model::Id;
 /// Parse, type-check and lower a condition to a dramaturge condition tree.
 pub fn compile_condition(src: &str, scope: &Scope) -> Result<Condition, LangError> {
     let expr = parse_expr(src)?;
-    lower_bool(&expr, scope)
+    let mut cond = lower_bool(&expr, scope)?;
+    salt_chances(&mut cond, src);
+    Ok(cond)
+}
+
+/// Give each `chance(n)` a salt from its source text and place, so two
+/// chances in different rules roll apart.
+fn salt_chances(cond: &mut Condition, src: &str) {
+    match cond {
+        Condition::All(items) | Condition::Any(items) => {
+            items.iter_mut().for_each(|c| salt_chances(c, src))
+        }
+        Condition::Not(inner) => salt_chances(inner, src),
+        Condition::Custom { key, args } => {
+            if let Some((Derived::Chance(n, at), op, value)) = Derived::from_condition(key, args) {
+                let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+                for b in src.bytes().chain(at.to_le_bytes()) {
+                    h = (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3);
+                }
+                *cond = Derived::Chance(n, h).to_condition(op, value);
+            }
+        }
+        _ => {}
+    }
 }
 
 pub(crate) fn lower_bool(expr: &Expr, scope: &Scope) -> Result<Condition, LangError> {
@@ -28,6 +51,21 @@ pub(crate) fn lower_bool(expr: &Expr, scope: &Scope) -> Result<Condition, LangEr
                 .collect::<Result<_, _>>()?,
         )),
         Expr::Call(name, args, span) if name == "remembers" => remembers(args, span, scope),
+        Expr::Call(name, args, span) if name == "chance" => {
+            let n = match args.as_slice() {
+                [Expr::Int(n, _)] if (0..=100).contains(n) => *n as u8,
+                _ => {
+                    return Err(LangError::new(
+                        "`chance` takes a number from 0 to 100",
+                        span.clone(),
+                    ));
+                }
+            };
+            Ok(
+                Derived::Chance(n, span.start as u64)
+                    .to_condition(CmpOp::Eq, FactValue::Bool(true)),
+            )
+        }
         Expr::Call(name, args, span) if name == "in" => {
             let room = room_arg(args, span, scope)?;
             Ok(Derived::Here.to_condition(CmpOp::Eq, FactValue::Text(room.to_string())))
@@ -159,7 +197,7 @@ pub(crate) fn resolve(expr: &Expr, scope: &Scope) -> Result<(Operand, Ty), LangE
                 other => {
                     return Err(LangError::new(
                         format!(
-                            "unknown function `{other}`; try visited, visits, carried, present, in or remembers"
+                            "unknown function `{other}`; try visited, visits, carried, present, in, remembers or chance"
                         ),
                         span.clone(),
                     ));
@@ -191,6 +229,16 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
         ["action", "count"] => derived(Derived::ActionCount, Ty::Int),
         ["action", "total"] => derived(Derived::ActionTotal, Ty::Int),
         ["action", "verb"] => derived(Derived::ActionVerb, Ty::Text),
+        ["timer", id] if scope.timers.contains(*id) => {
+            derived(Derived::Timer(Id::new(*id)), Ty::Int)
+        }
+        ["timer", id, "running"] if scope.timers.contains(*id) => {
+            derived(Derived::TimerRunning(Id::new(*id)), Ty::Bool)
+        }
+        ["timer", id, ..] if !scope.things.contains_key("timer") => Err(LangError::new(
+            format!("unknown timer `{id}`"),
+            span.clone(),
+        )),
         [var] if scope.vars.contains_key(*var) => {
             Ok((Operand::Fact(var.to_string()), scope.vars[*var].clone()))
         }

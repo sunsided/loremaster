@@ -19,6 +19,10 @@ pub struct World {
     pub(crate) rooms: Vec<CRoom>,
     pub(crate) things: Vec<CThing>,
     pub(crate) rules: Vec<CRule>,
+    /// Rule indexes in the order they run: more specific scope first, then
+    /// higher priority, then file order.
+    pub(crate) rule_order: Vec<usize>,
+    pub(crate) timers: Vec<CTimer>,
     pub(crate) frames: BTreeMap<Id, CFrame>,
     pub(crate) dialogues: Vec<std::sync::Arc<CDialogue>>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
@@ -82,6 +86,33 @@ pub(crate) struct CFrame {
 pub(crate) struct CRule {
     pub when: Option<Condition>,
     pub then: Vec<CEffect>,
+    pub within: Option<Within>,
+}
+
+/// What a rule belongs to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Within {
+    Thing(Id),
+    Room(Id),
+    Region(Id),
+}
+
+impl Within {
+    /// Higher is more specific.
+    fn rank(within: &Option<Within>) -> u8 {
+        match within {
+            Some(Within::Thing(_)) => 3,
+            Some(Within::Room(_)) => 2,
+            Some(Within::Region(_)) => 1,
+            None => 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CTimer {
+    pub runs_while: Option<Condition>,
+    pub at: BTreeMap<u32, Vec<CEffect>>,
 }
 
 /// A dialogue lowered to a dramaturge graph, with its world effects compiled.
@@ -120,6 +151,10 @@ pub(crate) enum CEffect {
     Move(BTreeMap<Id, Id>),
     Goto(Id),
     End(Vec<Segment>),
+    Stop,
+    Emit(Id),
+    Start(Vec<(Id, Option<u32>)>),
+    Cancel(Id),
 }
 
 /// The first problem found while compiling a story.
@@ -194,6 +229,10 @@ impl Compiler {
             Effect::Move(m) => CEffect::Move(m.clone()),
             Effect::Goto(r) => CEffect::Goto(r.clone()),
             Effect::End(s) => CEffect::End(self.markup(at, s)?),
+            Effect::Stop => CEffect::Stop,
+            Effect::Emit(e) => CEffect::Emit(e.clone()),
+            Effect::Start(t) => CEffect::Start(t.entries()),
+            Effect::Cancel(t) => CEffect::Cancel(t.clone()),
         })
     }
 
@@ -276,12 +315,22 @@ impl World {
                 })
             })
             .collect::<Result<_, CompileError>>()?;
-        let rules = story
+        let rules: Vec<CRule> = story
             .rules
             .iter()
             .map(|r| {
                 let at = format!("rule:{}", r.id);
+                let within = r.within.as_ref().map(|w| {
+                    if story.thing(w.as_str()).is_some() {
+                        Within::Thing(w.clone())
+                    } else if story.room(w.as_str()).is_some() {
+                        Within::Room(w.clone())
+                    } else {
+                        Within::Region(w.clone())
+                    }
+                });
                 Ok(CRule {
+                    within,
                     when: c.cond(&at, &r.when)?,
                     then: r
                         .then
@@ -291,6 +340,37 @@ impl World {
                 })
             })
             .collect::<Result<_, CompileError>>()?;
+        let mut rule_order: Vec<usize> = (0..story.rules.len()).collect();
+        rule_order.sort_by_key(|&i| {
+            let rank: &Option<Within> = &rules[i].within;
+            (
+                std::cmp::Reverse(Within::rank(rank)),
+                std::cmp::Reverse(story.rules[i].priority),
+                i,
+            )
+        });
+        let timers = story
+            .timers
+            .iter()
+            .map(|t| {
+                let at = format!("timer:{}", t.id);
+                Ok(CTimer {
+                    runs_while: c.cond(&at, &t.runs_while)?,
+                    at: t
+                        .at
+                        .iter()
+                        .map(|(n, effects)| {
+                            let list = effects.iter().map(|e| c.effect(&at, e)).collect::<Result<
+                                Vec<_>,
+                                CompileError,
+                            >>(
+                            )?;
+                            Ok((*n, list))
+                        })
+                        .collect::<Result<_, CompileError>>()?,
+                })
+            })
+            .collect::<Result<Vec<_>, CompileError>>()?;
         let frames = c.frames("story", &story.frames)?;
         let mut symbols = c.scope.symbols.clone();
         let dialogues = story
@@ -342,6 +422,8 @@ impl World {
             rooms,
             things,
             rules,
+            rule_order,
+            timers,
             frames,
             dialogues,
             symbols,
