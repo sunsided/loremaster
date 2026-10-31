@@ -67,7 +67,7 @@ To make a release:
    cargo release <level>
    ```
 
-   `<level>` is `patch`, `minor`, `major` or a version, for example `0.2.0`. For the first release, use `0.1.0`.
+   `<level>` is `patch`, `minor`, `major` or a version, for example `0.2.0`. For the first release, read "The first release" below.
 4. Read the output. If it is correct, do the release:
 
    ```sh
@@ -81,6 +81,49 @@ cargo-release then does these steps:
 3. It makes the release commit.
 4. It uploads the crates to crates.io in the order of their dependencies.
 5. It makes the tag and pushes the commit and the tag.
+
+### The first release
+
+crates.io lets you make only 5 new crates at one time. After that, it lets you make 1 new crate each 10 minutes. The first release has 7 new crates. Thus `cargo release 0.1.0` stops with the error "attempting to publish 7 new crates which is above the rate limit: 5".
+
+Thus do the first release in steps. The version is 0.1.0 already, so no step changes the version. On `main`, with a clean working tree:
+
+1. Build the web editor into the crate:
+
+   ```sh
+   task release:ui
+   ```
+
+2. Move "Unreleased" in `CHANGELOG.md` to 0.1.0, and make the release commit:
+
+   ```sh
+   cargo release replace --execute
+   cargo release commit --execute
+   ```
+
+3. Upload the first 5 crates:
+
+   ```sh
+   cargo release publish --execute --workspace --exclude loremaster-mcp --exclude loremaster
+   ```
+
+4. Wait 20 minutes.
+5. Upload the other 2 crates. cargo-release skips the crates that are on crates.io already:
+
+   ```sh
+   cargo release publish --execute
+   ```
+
+6. Make the tag `v0.1.0` and push the commit and the tag:
+
+   ```sh
+   cargo release tag --execute
+   cargo release push --execute
+   ```
+
+Do a dry run of each step first: remove `--execute`. From the second release on, `cargo release <level> --execute` does all steps, because no crate is new.
+
+### Size of the package
 
 The crate `loremaster-mcp` contains the built web editor. The `.crate` file is approximately 3 MB. The limit of crates.io is 10 MB. Do not use the GitHub Pages build (`task build:static`) for the crate. It is below `/loremaster`, and the embedded editor must be below `/`.
 
