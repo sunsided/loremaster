@@ -1,20 +1,38 @@
 <script lang="ts">
 	import type { MachineView } from '#lib/engine/types.ts';
+	import type { StateEdit } from '#lib/project/yaml-edit.ts';
+	import Button from '../atoms/Button.svelte';
+	import TextInput from '../atoms/TextInput.svelte';
 
 	interface Props {
 		machine: MachineView;
-		state: string;
+		/** The state to show. */
+		stateName: string;
 		/** Show the rule of a step in the rules view. */
 		onrule?: (id: string) => void;
+		/** Change the state in the story files. Resolves to a problem in words, or null. Without it, the card only shows. */
+		onedit?: (edit: StateEdit) => Promise<string | null>;
 	}
 
-	let { machine, state, onrule }: Props = $props();
+	let { machine, stateName, onrule, onedit }: Props = $props();
 	const id = $props.id();
 
-	const description = $derived(machine.descriptions[state] ?? null);
+	// The fields follow the shown state; typing overrides them until the state changes.
+	let draft = $derived(machine.descriptions[stateName] ?? '');
+	let newName = $derived(stateName);
+	/** The problem of the last change, for the state it was about. */
+	let problem = $state<{ of: string; text: string } | null>(null);
+	const inUse = $derived(machine.start === stateName || machine.steps.some((s) => s.from.includes(stateName) || s.to === stateName));
+
+	async function run(edit: StateEdit) {
+		const text = (await onedit?.(edit)) ?? null;
+		problem = text ? { of: edit.name, text } : null;
+	}
+
+	const description = $derived(machine.descriptions[stateName] ?? null);
 	const steps = $derived(machine.steps.map((step, i) => ({ ...step, n: i + 1 })));
-	const into = $derived(steps.filter((s) => s.to === state));
-	const out = $derived(steps.filter((s) => s.from.includes(state)));
+	const into = $derived(steps.filter((s) => s.to === stateName));
+	const out = $derived(steps.filter((s) => s.from.includes(stateName)));
 </script>
 
 {#snippet stepList(label: string, list: typeof steps, word: string, other: (s: (typeof steps)[number]) => string)}
@@ -38,12 +56,48 @@
 
 <!-- One state of a puzzle machine in the Atlas: its description, and the steps into it and out of it. -->
 <section class="state-card" aria-labelledby="{id}-title">
-	<h2 id="{id}-title">{state}</h2>
-	<p class="where">{machine.id}{state === machine.state ? ' · now' : ''}</p>
-	{#if description}
+	<h2 id="{id}-title">{stateName}</h2>
+	<p class="where">{machine.id}{stateName === machine.state ? ' · now' : ''}</p>
+	{#if onedit}
+		<form
+			class="edit"
+			onsubmit={(e) => {
+				e.preventDefault();
+				run({ kind: 'describe', name: stateName, description: draft });
+			}}
+		>
+			<label for="{id}-description">Description</label>
+			<textarea id="{id}-description" rows="4" bind:value={draft} placeholder="What is true in this state, for the authors"></textarea>
+			<div class="actions">
+				<Button size="compact" type="submit" disabled={draft.trim() === (description ?? '')}>Save description</Button>
+			</div>
+		</form>
+		<form
+			class="edit"
+			onsubmit={(e) => {
+				e.preventDefault();
+				run({ kind: 'rename', name: stateName, to: newName.trim() });
+			}}
+		>
+			<TextInput id="{id}-name" label="Name" bind:value={newName} autocomplete="off" spellcheck="false" />
+			<div class="actions">
+				<Button size="compact" type="submit" disabled={!newName.trim() || newName.trim() === stateName}>Rename</Button>
+				<Button
+					size="compact"
+					variant="quiet"
+					disabled={inUse}
+					title={inUse ? 'The start or a step uses this state' : undefined}
+					onclick={() => run({ kind: 'delete', name: stateName })}>Delete state</Button
+				>
+			</div>
+			{#if inUse}<p class="muted">The start or a step uses this state, so it can not go.</p>{/if}
+		</form>
+		<p class="muted">A rename changes the start and the steps of the machine. Conditions elsewhere, such as <code>{machine.id} == {stateName}</code>, keep the old name; the checks show them.</p>
+		{#if problem?.of === stateName}<p class="problem" role="alert">{problem.text}</p>{/if}
+	{:else if description}
 		<p class="description">{description}</p>
 	{:else}
-		<p class="muted">No description. Write one in the list of states: <code>{'{ name: ' + state + ', description: … }'}</code>.</p>
+		<p class="muted">No description. Write one in the list of states: <code>{'{ name: ' + stateName + ', description: … }'}</code>.</p>
 	{/if}
 	{@render stepList('steps in', into, 'from', (s) => s.from.join(' or '))}
 	{@render stepList('steps out', out, 'to', (s) => s.to)}
@@ -81,6 +135,37 @@
 	}
 	.description {
 		color: var(--color-text-strong);
+	}
+	.edit {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+	label {
+		color: var(--color-text-muted);
+	}
+	textarea {
+		box-sizing: border-box;
+		width: 100%;
+		padding: var(--space-3);
+		border: var(--size-border) solid var(--color-border-control);
+		background: var(--color-surface-control);
+		color: var(--color-text);
+		font: inherit;
+		line-height: var(--line-height-body);
+		resize: vertical;
+	}
+	textarea:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-3);
+	}
+	.problem {
+		color: var(--color-text-warning);
 	}
 	ul {
 		display: flex;

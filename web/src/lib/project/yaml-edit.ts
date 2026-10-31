@@ -326,3 +326,127 @@ export function writeScalar(text: string, path: YamlPath, value: string): string
 	else doc.setIn(path, quoted(value));
 	return serialize(doc);
 }
+
+// ---- puzzle machines --------------------------------------------------------
+
+/** A change to the states of a machine. */
+export type StateEdit =
+	| { kind: 'add'; name: string }
+	| { kind: 'rename'; name: string; to: string }
+	| { kind: 'describe'; name: string; description: string }
+	| { kind: 'delete'; name: string };
+
+/** A state name is one word, so conditions can name it: `exorcism == lit`. */
+export const STATE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** The name of a state entry: `idle` or `{ name: idle, description: … }`. */
+function stateName(node: unknown): string | null {
+	if (isScalar(node)) return String(node.value);
+	if (isMap(node)) {
+		const n = node.get('name');
+		return n === undefined ? null : String(n);
+	}
+	return null;
+}
+
+/** The names in a `from` value: one state, or a list. */
+function fromNames(node: unknown): string[] {
+	if (isScalar(node)) return [String(node.value)];
+	if (isSeq(node)) return node.items.map((i) => (isScalar(i) ? String(i.value) : '')).filter(Boolean);
+	return [];
+}
+
+/**
+ * Change the states of the machine at `at` in a YAML file: the whole document for `machines/<id>.yaml`,
+ * or `['machines', i]` in story.yaml. `all` is the list of states as the runtime sees it; a machine
+ * without a `states` list gets one first, so a new state or a description has a place.
+ */
+export function editStates(text: string, at: YamlPath, all: string[], edit: StateEdit): string {
+	const doc = parse(text);
+	const machine = at.length ? doc.getIn(at, true) : doc.contents;
+	if (!isMap(machine)) throw new EditError('This is not a machine.');
+	const found: unknown = machine.get('states', true);
+	let list: YAMLSeq;
+	if (isSeq(found)) {
+		list = found;
+	} else {
+		list = new YAMLSeq();
+		for (const s of all) list.items.push(new Scalar(s));
+		list.flow = true;
+		machine.set('states', list);
+	}
+	const index = list.items.findIndex((i) => stateName(i) === edit.name);
+	const steps = machine.get('steps', true);
+	const stepMaps = isSeq(steps) ? steps.items.filter(isMap) : [];
+	const used = (name: string) =>
+		String(machine.get('start')) === name ||
+		stepMaps.some((s) => fromNames(s.get('from', true)).includes(name) || String(s.get('to')) === name);
+
+	switch (edit.kind) {
+		case 'add': {
+			if (!STATE_NAME.test(edit.name)) throw new EditError('A state name is one word: letters, digits and _.');
+			if (index >= 0) throw new EditError(`The state ${edit.name} is already there.`);
+			list.items.push(new Scalar(edit.name));
+			break;
+		}
+		case 'rename': {
+			if (index < 0) throw new EditError(`There is no state ${edit.name}.`);
+			if (!STATE_NAME.test(edit.to)) throw new EditError('A state name is one word: letters, digits and _.');
+			if (edit.to !== edit.name && list.items.some((i) => stateName(i) === edit.to))
+				throw new EditError(`The state ${edit.to} is already there.`);
+			const item = list.items[index];
+			if (isMap(item)) item.set('name', edit.to);
+			else list.items[index] = new Scalar(edit.to);
+			if (String(machine.get('start')) === edit.name) machine.set('start', edit.to);
+			for (const s of stepMaps) {
+				const from = s.get('from', true);
+				if (isScalar(from) && String(from.value) === edit.name) from.value = edit.to;
+				if (isSeq(from))
+					for (const f of from.items) if (isScalar(f) && String(f.value) === edit.name) f.value = edit.to;
+				const to = s.get('to', true);
+				if (isScalar(to) && String(to.value) === edit.name) to.value = edit.to;
+			}
+			break;
+		}
+		case 'describe': {
+			if (index < 0) throw new EditError(`There is no state ${edit.name}.`);
+			const description = edit.description.trim();
+			const item = list.items[index];
+			if (!description) {
+				list.items[index] = new Scalar(edit.name);
+			} else if (isMap(item)) {
+				item.set('description', quoted(description));
+			} else {
+				const map = new YAMLMap();
+				map.set('name', edit.name);
+				map.set('description', quoted(description));
+				list.items[index] = map;
+			}
+			// A list with descriptions reads better one state per line.
+			list.flow = list.items.every((i) => isScalar(i));
+			break;
+		}
+		case 'delete': {
+			if (index < 0) throw new EditError(`There is no state ${edit.name}.`);
+			if (used(edit.name)) throw new EditError(`The start or a step uses the state ${edit.name}. Change them first.`);
+			list.items.splice(index, 1);
+			break;
+		}
+	}
+	return serialize(doc);
+}
+
+/** Can the state go? Not while the start or a step uses it. */
+export function stateInUse(machine: { start?: string; steps: { from: string[]; to: string }[] }, name: string): boolean {
+	return machine.start === name || machine.steps.some((s) => s.from.includes(name) || s.to === name);
+}
+
+/** Where machine `id` is in its file: the whole document of `machines/<id>.yaml`, or its item in `machines:`. */
+export function machinePath(text: string, file: string, id: string): YamlPath {
+	if (file.startsWith('machines/')) return [];
+	const doc = parse(text);
+	const list = doc.get('machines', true);
+	const i = isSeq(list) ? list.items.findIndex((m) => isMap(m) && String(m.get('id')) === id) : -1;
+	if (i < 0) throw new EditError(`There is no machine ${id} in ${file}.`);
+	return ['machines', i];
+}
