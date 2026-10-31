@@ -8,6 +8,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+## [0.1.0] - 2026-10-31
+
 ### Added
 
 - The first release on crates.io: `loremaster` (the command), `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-tools` and `loremaster-mcp`.
@@ -18,4 +20,5 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - The public API of `loremaster-lang` and `loremaster-runtime` uses types from dramaturge 0.2. A new major version of dramaturge thus can also be a breaking change of loremaster.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/sunsided/loremaster/commits/main
+[Unreleased]: https://github.com/sunsided/loremaster/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sunsided/loremaster/releases/tag/v0.1.0
