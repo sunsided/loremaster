@@ -51,81 +51,61 @@ loremaster uses [cargo-release](https://github.com/crate-ci/cargo-release). The 
 - All crates have one version. A release makes one commit "Release <version>" and one tag `v<version>`. Git signs the commit and the tag.
 - Releases come only from `main`.
 
-Before the first release:
+### Why there are two commands
+
+The crate `loremaster-mcp` contains the built web editor in `crates/loremaster-mcp/ui/`. git ignores this folder. Thus `cargo publish` sees its files as not committed, and stops. Only `--allow-dirty` prevents this, but cargo-release does not give this option to `cargo publish`.
+
+Thus a release has two commands:
+
+1. `cargo release` changes the version and `CHANGELOG.md`, builds the web editor, makes the commit, uploads the 5 crates without the editor, makes the tag and pushes.
+2. `task release:publish` uploads `loremaster-mcp` and `loremaster` with `--allow-dirty`. It stops if the working tree has other changes, or if `ui/` is missing.
+
+### Before the first release
 
 1. Install cargo-release: `cargo install cargo-release`.
-2. Get an API token from crates.io. Give it the scope `publish-new` and `publish-update`.
+2. Get an API token from crates.io. Give it the scopes `publish-new` and `publish-update`.
 3. Log in: `cargo login`. Then type the token.
 
-To make a release:
+### Make a release
 
 1. Switch to `main` and pull. Make sure that the working tree is clean.
 2. Add the changes to the section "Unreleased" in `CHANGELOG.md`. Commit them.
-3. Do a dry run. The dry run does not change files, does not upload and does not push:
+3. Do a dry run. The dry run does not upload, does not commit and does not push. It runs the hook, thus it builds the web editor:
 
    ```sh
    cargo release <level>
    ```
 
-   `<level>` is `patch`, `minor`, `major` or a version, for example `0.2.0`. For the first release, read "The first release" below.
+   `<level>` is `patch`, `minor`, `major` or a version, for example `0.2.0`. For the first release, use `0.1.0`: this is the version now.
 4. Read the output. If it is correct, do the release:
 
    ```sh
    cargo release <level> --execute
    ```
 
-cargo-release then does these steps:
+   cargo-release does these steps:
 
-1. It runs `task release:ui` (the hook of `loremaster-mcp`). This builds the web app below `/` and copies it into `crates/loremaster-mcp/ui/`.
-2. It sets the new version in all crates and moves "Unreleased" in `CHANGELOG.md` to the new version.
-3. It makes the release commit.
-4. It uploads the crates to crates.io in the order of their dependencies.
-5. It makes the tag and pushes the commit and the tag.
+   1. It runs `task release:ui` (the hook of `loremaster-mcp`). This builds the web app below `/` and copies it into `crates/loremaster-mcp/ui/`.
+   2. It sets the new version in all crates and moves "Unreleased" in `CHANGELOG.md` to the new version.
+   3. It makes the release commit.
+   4. It uploads `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime` and `loremaster-tools` in the order of their dependencies.
+   5. It makes the tag and pushes the commit and the tag.
+
+5. Upload the two crates with the editor. Do this on the release commit, and do not change files before:
+
+   ```sh
+   task release:publish
+   ```
+
+   For a dry run, use `task release:publish -- --dry-run`. Before the first upload of the other crates, this dry run stops with "no matching package named `loremaster-project` found". This is correct. `task package` does the full check without crates.io.
 
 ### The first release
 
-crates.io lets you make only 5 new crates at one time. After that, it lets you make 1 new crate each 10 minutes. The first release has 7 new crates. Thus `cargo release 0.1.0` stops with the error "attempting to publish 7 new crates which is above the rate limit: 5".
-
-Thus do the first release in steps. The version is 0.1.0 already, so no step changes the version. On `main`, with a clean working tree:
-
-1. Build the web editor into the crate:
-
-   ```sh
-   task release:ui
-   ```
-
-2. Move "Unreleased" in `CHANGELOG.md` to 0.1.0, and make the release commit:
-
-   ```sh
-   cargo release replace --execute
-   cargo release commit --execute
-   ```
-
-3. Upload the first 5 crates:
-
-   ```sh
-   cargo release publish --execute --workspace --exclude loremaster-mcp --exclude loremaster
-   ```
-
-4. Wait 20 minutes.
-5. Upload the other 2 crates. cargo-release skips the crates that are on crates.io already:
-
-   ```sh
-   cargo release publish --execute
-   ```
-
-6. Make the tag `v0.1.0` and push the commit and the tag:
-
-   ```sh
-   cargo release tag --execute
-   cargo release push --execute
-   ```
-
-Do a dry run of each step first: remove `--execute`. From the second release on, `cargo release <level> --execute` does all steps, because no crate is new.
+crates.io lets you make only 5 new crates at one time. After that, it lets you make 1 new crate each 10 minutes. Step 4 uploads 5 new crates. Thus, for the first release, wait 20 minutes between step 4 and step 5. From the second release on, no crate is new, and you do not have to wait.
 
 ### Size of the package
 
-The crate `loremaster-mcp` contains the built web editor. The `.crate` file is approximately 3 MB. The limit of crates.io is 10 MB. Do not use the GitHub Pages build (`task build:static`) for the crate. It is below `/loremaster`, and the embedded editor must be below `/`.
+The `.crate` file of `loremaster-mcp` is approximately 3 MB. The limit of crates.io is 10 MB. Do not use the GitHub Pages build (`task build:static`) for the crate. It is below `/loremaster`, and the embedded editor must be below `/`.
 
 Binaries on GitHub Releases are not available yet. They can come later.
 
