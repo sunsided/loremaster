@@ -217,7 +217,7 @@ fn open(dir: &Path) -> Option<Project> {
 
 fn play(project: Project) -> ExitCode {
     let world = match World::compile(project.story) {
-        Ok(w) => Arc::new(w),
+        Ok(w) => Arc::new(note_behaviors(w)),
         Err(e) => {
             eprintln!("error: {e}");
             return ExitCode::FAILURE;
@@ -256,11 +256,22 @@ fn play(project: Project) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// The story names behaviors in Rust that this program does not have. Say so once.
+fn note_behaviors(world: World) -> World {
+    for id in world.missing_behaviors() {
+        eprintln!(
+            "note: the story names the behavior `{id}`, which is code in its own game; \
+             here it does not run"
+        );
+    }
+    world
+}
+
 /// Run the walkthroughs in `tests/` and print what failed.
 fn walkthroughs(project: Project) -> ExitCode {
     let walks = project.walkthroughs.clone();
     let world = match World::compile(project.story) {
-        Ok(w) => Arc::new(w),
+        Ok(w) => Arc::new(note_behaviors(w)),
         Err(e) => {
             eprintln!("error: {e}");
             return ExitCode::FAILURE;
@@ -303,7 +314,7 @@ fn walkthroughs(project: Project) -> ExitCode {
 /// Walk all reachable states and print what the walk found.
 fn explore(project: Project) -> ExitCode {
     let world = match World::compile(project.story) {
-        Ok(w) => Arc::new(w),
+        Ok(w) => Arc::new(note_behaviors(w)),
         Err(e) => {
             eprintln!("error: {e}");
             return ExitCode::FAILURE;

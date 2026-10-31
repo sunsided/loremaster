@@ -58,6 +58,8 @@ struct StoryFile {
     timers: Vec<Timer>,
     #[serde(default)]
     machines: Vec<Machine>,
+    #[serde(default)]
+    behaviors: Vec<Id>,
 }
 
 /// Load a project from its files. Paths use `/` and are relative to the
@@ -73,6 +75,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut dialogues = Vec::new();
     let mut machines = Vec::new();
     let mut walkthroughs = Vec::new();
+    let mut behaviors: Vec<Id> = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -137,6 +140,11 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                 Ok(w) => walkthroughs.push((path.to_string(), w)),
                 Err(e) => errors.push(parse_err(e)),
             },
+            // A file that names a behavior in Rust; the text holds author notes about it.
+            "behaviors" => {
+                origins.insert(format!("behavior:{stem}"), path.to_string());
+                behaviors.push(Id::new(stem));
+            }
             "machines" => {
                 match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
                     Ok(m) => {
@@ -214,6 +222,16 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         things,
         rules,
         timers: header.timers,
+        behaviors: header
+            .behaviors
+            .into_iter()
+            .chain(behaviors)
+            .fold(Vec::new(), |mut all, b| {
+                if !all.contains(&b) {
+                    all.push(b);
+                }
+                all
+            }),
         relations: header.relations,
         dialogues,
         frames: header.frames,

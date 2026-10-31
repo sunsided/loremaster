@@ -23,6 +23,10 @@ pub struct World {
     /// higher priority, then file order.
     pub(crate) rule_order: Vec<usize>,
     pub(crate) timers: Vec<CTimer>,
+    /// Registered behaviors that the story names, in story order.
+    pub(crate) behaviors: Vec<std::sync::Arc<dyn crate::Behavior>>,
+    /// Every registered behavior, also the ones that the story does not name.
+    registered: Vec<std::sync::Arc<dyn crate::Behavior>>,
     pub(crate) frames: BTreeMap<Id, CFrame>,
     pub(crate) dialogues: Vec<std::sync::Arc<CDialogue>>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
@@ -424,12 +428,46 @@ impl World {
             rules,
             rule_order,
             timers,
+            behaviors: Vec::new(),
+            registered: Vec::new(),
             frames,
             dialogues,
             symbols,
             room_index,
             thing_index,
         })
+    }
+
+    /// Add a behavior. It runs only if story.yaml names its id under `behaviors:`.
+    pub fn register(&mut self, behavior: impl crate::Behavior + 'static) -> &mut Self {
+        self.registered.push(std::sync::Arc::new(behavior));
+        self.behaviors = self
+            .story
+            .behaviors
+            .iter()
+            .filter_map(|id| {
+                self.registered
+                    .iter()
+                    .find(|b| b.id() == id.as_str())
+                    .cloned()
+            })
+            .collect();
+        self
+    }
+
+    /// The behaviors that the story names and that this build does not have.
+    /// Their logic does not run.
+    pub fn missing_behaviors(&self) -> Vec<&Id> {
+        self.story
+            .behaviors
+            .iter()
+            .filter(|id| !self.behaviors.iter().any(|b| b.id() == id.as_str()))
+            .collect()
+    }
+
+    /// The behavior with this id, if the story names it and this build has it.
+    pub fn behavior(&self, id: &str) -> Option<&dyn crate::Behavior> {
+        self.behaviors.iter().find(|b| b.id() == id).map(|b| &**b)
     }
 
     pub(crate) fn room_idx(&self, id: &str) -> Option<usize> {

@@ -1902,6 +1902,26 @@ impl Game {
                     fired: self.state.fired.contains(&r.id),
                 }
             })
+            .chain(self.world.story.behaviors.iter().map(|id| {
+                let found = self.world.behavior(id.as_str());
+                let when = match found.map(|b| b.description()) {
+                    Some("") | None if found.is_some() => "code in this game".to_string(),
+                    Some(d) => format!("code in this game: {d}"),
+                    None => "code in the game, which this build does not have".to_string(),
+                };
+                RuleView {
+                    id: format!("behavior:{id}"),
+                    trigger: "event".into(),
+                    relevant: None,
+                    when,
+                    condition: None,
+                    condition_holds: found.is_some(),
+                    then: Vec::new(),
+                    once: false,
+                    instead: false,
+                    fired: false,
+                }
+            }))
             .collect()
     }
 
@@ -2116,7 +2136,7 @@ impl Game {
 
     // ---- state changes --------------------------------------------------
 
-    fn set_fact(&mut self, turn: &mut Turn, name: &str, value: Value) {
+    pub(crate) fn set_fact(&mut self, turn: &mut Turn, name: &str, value: Value) {
         turn.log.push(LogEntry {
             kind: "set".into(),
             text: format!("{name} = {value}"),
@@ -2131,7 +2151,7 @@ impl Game {
         self.state.facts.insert(name.to_string(), value);
     }
 
-    fn move_thing(&mut self, id: &Id, to: Location) {
+    pub(crate) fn move_thing(&mut self, id: &Id, to: Location) {
         self.state.locations.insert(id.clone(), to);
     }
 
@@ -2146,7 +2166,7 @@ impl Game {
         self.fire(turn, &Event::Enter(room), depth);
     }
 
-    fn move_player(&mut self, turn: &mut Turn, to: Id, depth: u8) {
+    pub(crate) fn move_player(&mut self, turn: &mut Turn, to: Id, depth: u8) {
         let from = self.state.room.clone();
         self.state.previous = Some(from.clone());
         self.fire(turn, &Event::Leave(from), depth);
@@ -2194,6 +2214,21 @@ impl Game {
                 if self.stopped || self.state.ended {
                     break;
                 }
+            }
+        }
+        // Behaviors run after the rules of the event.
+        for b in &world.behaviors {
+            if self.stopped || self.state.ended {
+                break;
+            }
+            let mut cx = crate::Cx {
+                owner: Id::new(format!("behavior:{}", b.id())),
+                game: self,
+                turn,
+                depth,
+            };
+            if b.handle(event, &mut cx) == crate::Flow::Stop {
+                self.stopped = true;
             }
         }
         out.stopped = self.stopped;
@@ -2760,7 +2795,7 @@ impl Game {
     }
 }
 
-fn rule_run(text: String, rule: &Id) -> Run {
+pub(crate) fn rule_run(text: String, rule: &Id) -> Run {
     Run {
         text,
         source: Some(crate::Source {

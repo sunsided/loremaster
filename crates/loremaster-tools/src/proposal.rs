@@ -180,7 +180,7 @@ pub(crate) fn check_paths(p: &Proposal) -> Result<(), ToolError> {
                 .any(|c| c.is_empty() || c == "." || c == "..");
         if !ok {
             return Err(err(format!(
-                "`{path}` is not a project file. Use story.yaml, or rooms/, things/, rules/, threads/, machines/ or tests/ with one `.yaml` file name."
+                "`{path}` is not a project file. Use story.yaml, or rooms/, things/, rules/, threads/, machines/, tests/ or behaviors/ with one `.yaml` file name."
             )));
         }
     }

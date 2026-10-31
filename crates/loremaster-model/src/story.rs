@@ -48,6 +48,10 @@ pub struct Story {
     /// Puzzles with named states. The loader also makes their variables and rules.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub machines: Vec<Machine>,
+    /// Behaviors in Rust that the game registers, by id. A build without one
+    /// of them plays the story without its logic.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub behaviors: Vec<Id>,
     /// Counters that go down each turn.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,
