@@ -50,7 +50,8 @@ pub enum StateDef {
     Described {
         name: String,
         /// Author text about the state, for the Atlas. The player never sees it.
-        description: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
     },
 }
 
@@ -64,7 +65,7 @@ impl StateDef {
     pub fn description(&self) -> Option<&str> {
         match self {
             StateDef::Name(_) => None,
-            StateDef::Described { description, .. } => Some(description),
+            StateDef::Described { description, .. } => description.as_deref(),
         }
     }
 }

@@ -249,6 +249,7 @@ impl Checker<'_> {
         self.dialogues();
         self.timers();
         self.machines();
+        self.score();
 
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
@@ -531,6 +532,44 @@ impl Checker<'_> {
         }
     }
 
+    /// The score: a number variable, a positive maximum, and ranks in reach.
+    fn score(&mut self) {
+        let Some(score) = self.story().score.clone() else {
+            return;
+        };
+        let file = "story.yaml";
+        if score.max <= 0 {
+            self.error(file, "score.max", "the highest score must be more than 0");
+        }
+        if !matches!(
+            self.ty_of(score.var.as_str()),
+            Some(loremaster_lang::Ty::Int)
+        ) {
+            self.error(
+                file,
+                "score.var",
+                format!("`{}` is not a number variable", score.var),
+            );
+        }
+        let mut seen = BTreeSet::new();
+        for (i, rank) in score.ranks.iter().enumerate() {
+            let at = format!("score.ranks[{i}]");
+            if !seen.insert(rank.from) {
+                self.error(file, &at, format!("two ranks start at {}", rank.from));
+            }
+            if rank.from > score.max {
+                self.warning(
+                    file,
+                    &at,
+                    format!(
+                        "the rank {} starts above the highest score {}",
+                        rank.name, score.max
+                    ),
+                );
+            }
+        }
+    }
+
     /// Machines: known states, and states that some step reaches.
     fn machines(&mut self) {
         let machines = self.story().machines.clone();
@@ -551,6 +590,23 @@ impl Checker<'_> {
                 );
             }
             let states = m.all_states();
+            let mut names = BTreeSet::new();
+            for s in &states {
+                if !names.insert(s.as_str()) {
+                    self.error(
+                        &file,
+                        &format!("{at}.states"),
+                        format!("the state `{s}` is there twice"),
+                    );
+                }
+                if !is_state_name(s) {
+                    self.error(
+                        &file,
+                        &format!("{at}.states"),
+                        format!("`{s}` is not a state name: use one word of letters, digits and _, not a keyword"),
+                    );
+                }
+            }
             let known = |s: &str| states.iter().any(|x| x == s);
             if !known(&m.start) {
                 self.error(
@@ -560,6 +616,13 @@ impl Checker<'_> {
                 );
             }
             for (i, step) in m.steps.iter().enumerate() {
+                if step.from.list().is_empty() {
+                    self.error(
+                        &file,
+                        &format!("{at}.steps[{i}].from"),
+                        "the step has no `from` state, so it never fires",
+                    );
+                }
                 for s in step.from.list().into_iter().chain([step.to.as_str()]) {
                     if !known(s) {
                         self.error(
@@ -595,11 +658,15 @@ impl Checker<'_> {
                 self.condition(&file, &format!("{at}.runs_while"), cond);
             }
             for (n, effects) in &t.at {
-                if *n > t.turns {
+                // The timer counts down before it looks at `at`, so it never shows its start value.
+                if *n >= t.turns {
                     self.warning(
                         &file,
                         &format!("{at}.at.{n}"),
-                        format!("the timer starts at {}, so it never reaches {n}", t.turns),
+                        format!(
+                            "the timer starts at {} and counts down first, so it never reaches {n}",
+                            t.turns
+                        ),
                     );
                 }
                 self.effects(&file, &format!("{at}.at.{n}"), effects);
@@ -626,6 +693,16 @@ impl Checker<'_> {
             _ => false,
         }
     }
+}
+
+/// A state name is one word that conditions can name: `exorcism == lit`.
+fn is_state_name(s: &str) -> bool {
+    let mut chars = s.chars();
+    chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && !matches!(s, "and" | "or" | "not" | "true" | "false")
 }
 
 /// The names of the custom events that some `emit` sends.

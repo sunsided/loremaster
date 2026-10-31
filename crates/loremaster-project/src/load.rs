@@ -296,7 +296,13 @@ fn machine_rules(m: &Machine) -> Vec<Rule> {
                 .iter()
                 .map(|s| format!("{} == {s}", m.id))
                 .collect();
-            let mut when = format!("({})", from.join(" or "));
+            // A step without `from` never fires; the checker reports it.
+            let from = if from.is_empty() {
+                "false".to_string()
+            } else {
+                from.join(" or ")
+            };
+            let mut when = format!("({from})");
             if let Some(extra) = &step.when {
                 when = format!("{when} and ({extra})");
             }

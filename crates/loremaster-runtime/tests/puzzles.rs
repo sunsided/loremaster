@@ -466,3 +466,56 @@ fn a_machine_takes_one_step_for_one_event_and_a_timer_resets_it() {
     assert_eq!(view.states, ["idle", "rung", "lit", "done"]);
     assert!(view.steps[0].ready);
 }
+
+#[test]
+fn the_checker_finds_bad_machines_timers_and_scores() {
+    let files = [
+        (
+            "story.yaml",
+            "title: Bad\nstart: hall\nscore: { max: 0, ranks: [{ from: 0, name: A }, { from: 0, name: B }] }\ntimers:\n  - { id: fuse, turns: 3, at: { 3: [{ say: never }] } }\n",
+        ),
+        ("rooms/hall.yaml", "name: Hall\ndescription: [\"A hall.\"]\n"),
+        (
+            "machines/m.yaml",
+            "start: a\nstates: [a, a, { name: b }, \"not ok\"]\nsteps:\n  - { from: [], on: turn, to: b }\n",
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    });
+    let project = load(files.into()).unwrap_or_else(|e| panic!("{e:#?}"));
+    let found: Vec<String> = check(&project).into_iter().map(|d| d.message).collect();
+    for want in [
+        "the state `a` is there twice",
+        "`not ok` is not a state name",
+        "the step has no `from` state",
+        "never reaches 3",
+        "the highest score must be more than 0",
+        "two ranks start at 0",
+    ] {
+        assert!(found.iter().any(|f| f.contains(want)), "{want}: {found:#?}");
+    }
+}
+
+#[test]
+fn a_timer_that_ends_the_game_stops_there() {
+    let mut g = world_of(&[
+        (
+            "story.yaml",
+            "title: End\nstart: hall\ntimers:\n  - id: doom\n    turns: 1\n    running: true\n    at:\n      0: [{ end: \"The roof falls in.\" }, { say: \"After the end.\" }]\n",
+        ),
+        (
+            "rooms/hall.yaml",
+            "name: Hall\ndescription: [\"A hall.\"]\n",
+        ),
+        (
+            "rules/doom.yaml",
+            "- id: too_late\n  on: { timer: doom }\n  then:\n    - say: \"Too late.\"\n",
+        ),
+    ]);
+    let text = say(&mut g, "wait");
+    assert!(text.contains("The roof falls in."), "{text}");
+    assert!(!text.contains("After the end."), "{text}");
+    assert!(!text.contains("Too late."), "{text}");
+}
