@@ -15,6 +15,8 @@
 	const BOX_W = 116;
 	const BOX_H = 34;
 	const PAD = 24;
+	/** Two badges closer than this move apart. */
+	const BADGE_GAP = 24;
 
 	interface Edge {
 		/** The number of the step, from 1. */
@@ -25,32 +27,45 @@
 		fired: boolean;
 	}
 
-	/** States in a row; a step to a later state arcs above, a step back arcs below. */
+	/**
+	 * States in a row; a step to a later state arcs above, a step back arcs below. An arc whose badge
+	 * would sit on another badge goes higher (or lower), so every number stays readable.
+	 */
 	function layout(m: MachineView) {
 		const index = new Map(m.states.map((s, i) => [s, i]));
-		let above = 0;
-		let below = 0;
-		const raw = m.steps.flatMap((step, i) =>
-			step.from.map((from) => {
-				const a = index.get(from) ?? 0;
-				const b = index.get(step.to) ?? 0;
-				const lift = 22 + 16 * Math.abs(b - a);
-				if (b > a) above = Math.max(above, lift);
-				else if (b < a) below = Math.max(below, lift);
-				else above = Math.max(above, 40);
-				return { n: i + 1, a, b, lift, ready: step.ready && from === m.state, fired: step.fired };
-			})
-		);
-		const top = PAD + above;
 		const cx = (i: number) => PAD + BOX_W / 2 + i * COL;
-		const edges: Edge[] = raw.map(({ n, a, b, lift, ready, fired }) => {
+		const raw = m.steps.flatMap((step, i) =>
+			step.from.map((from) => ({
+				n: i + 1,
+				a: index.get(from) ?? 0,
+				b: index.get(step.to) ?? 0,
+				ready: step.ready && from === m.state,
+				fired: step.fired
+			}))
+		);
+		// The same step from several states to one state shares one badge per arc; first place the arcs.
+		const placed: { x: number; side: number; lift: number }[] = [];
+		const lifts = raw.map(({ a, b }) => {
+			const side = b > a ? -1 : b < a ? 1 : -1;
+			const x = a === b ? cx(a) : (cx(a) + cx(b)) / 2;
+			let lift = a === b ? 40 : 22 + 16 * Math.abs(b - a);
+			while (placed.some((p) => p.side === side && Math.abs(p.x - x) < BADGE_GAP && Math.abs(p.lift - lift) < BADGE_GAP)) {
+				lift += BADGE_GAP;
+			}
+			placed.push({ x, side, lift });
+			return lift;
+		});
+		const above = Math.max(0, ...raw.map((r, i) => (r.b >= r.a ? lifts[i] : 0)));
+		const below = Math.max(0, ...raw.map((r, i) => (r.b < r.a ? lifts[i] : 0)));
+		const top = PAD + above;
+		const edges: Edge[] = raw.map(({ n, a, b, ready, fired }, i) => {
+			const lift = lifts[i];
 			if (a === b) {
 				const x = cx(a);
-				const y = top;
 				return {
 					n,
-					path: `M ${x - 14} ${y} C ${x - 30} ${y - 46}, ${x + 30} ${y - 46}, ${x + 14} ${y}`,
-					label: { x, y: y - 40 },
+					path: `M ${x - 14} ${top} C ${x - 30} ${top - lift * 1.15}, ${x + 30} ${top - lift * 1.15}, ${x + 14} ${top}`,
+					label: { x, y: top - lift },
 					ready,
 					fired
 				};
@@ -60,11 +75,12 @@
 			const x1 = cx(a) + (forward ? 12 : -12);
 			const x2 = cx(b) + (forward ? -12 : 12);
 			const peak = forward ? y - lift : y + lift;
-			const mid = (x1 + x2) / 2;
+			// A quadratic curve reaches half way to its control point; aim twice as far.
+			const control = forward ? y - 2 * lift : y + 2 * lift;
 			return {
 				n,
-				path: `M ${x1} ${y} Q ${mid} ${peak + (forward ? -lift / 3 : lift / 3)}, ${x2} ${y}`,
-				label: { x: mid, y: peak },
+				path: `M ${x1} ${y} Q ${(x1 + x2) / 2} ${control}, ${x2} ${y}`,
+				label: { x: (x1 + x2) / 2, y: peak },
 				ready,
 				fired
 			};
@@ -80,16 +96,22 @@
 </script>
 
 <!--
-	The puzzle machines of the story, for the Atlas. Each machine shows its states in a row and its steps as
-	numbered arrows: forward steps above, steps back below. The current state is filled; a step that the next
-	matching event takes now is marked. The list under the drawing says the same in words.
+	The puzzle machines of the story, for the Atlas, in the layout of the rules view: one group for each
+	machine. The drawing shows the states in a row and the steps as numbered arrows: forward steps above,
+	steps back below. The current state is marked; a step that the next matching event takes now is marked
+	too. The list under the drawing says the same in words; a row opens the rule of the step.
 -->
-<section class="machines-view" aria-label="Puzzle machines">
+<section class="machines-view" aria-labelledby="machines-title">
+	<Heading level={2} id="machines-title">Machines</Heading>
+
 	{#each machines as m (m.id)}
 		{@const g = layout(m)}
-		<article class="machine">
-			<Heading level={3}>{m.id}</Heading>
-			<p class="now">Now: <strong>{m.state}</strong></p>
+		<details class="group" open>
+			<summary>
+				<span class="group-name">{m.id}</span>
+				<span class="count">{m.steps.length} steps</span>
+				<span class="now">now <strong>{m.state}</strong></span>
+			</summary>
 			<div class="graph">
 				<svg
 					viewBox="0 0 {g.width} {g.height}"
@@ -105,14 +127,16 @@
 					</defs>
 					{#each g.edges as e, i (i)}
 						<path class="edge" class:ready={e.ready} class:fired={e.fired} d={e.path} marker-end="url(#arrow-{m.id})" />
+					{/each}
+					{#each g.edges as e, i (i)}
 						<g class="badge" class:ready={e.ready}>
-							<circle cx={e.label.x} cy={e.label.y} r="10" />
+							<rect x={e.label.x - 9} y={e.label.y - 9} width="18" height="18" />
 							<text x={e.label.x} y={e.label.y}>{e.n}</text>
 						</g>
 					{/each}
 					{#each m.states as s, i (s)}
 						<g class="state" class:current={s === m.state}>
-							<rect x={g.cx(i) - BOX_W / 2} y={g.top} width={BOX_W} height={BOX_H} rx="6" />
+							<rect x={g.cx(i) - BOX_W / 2} y={g.top} width={BOX_W} height={BOX_H} />
 							<text x={g.cx(i)} y={g.top + BOX_H / 2}>{s}</text>
 						</g>
 					{/each}
@@ -120,21 +144,34 @@
 			</div>
 			<ol class="steps">
 				{#each m.steps as step, i (step.rule)}
-					<li class:ready={step.ready}>
-						<span class="n">{i + 1}</span>
-						<span class="move">{step.from.join(' or ')} → {step.to}</span>
-						<span class="when">when {step.when}{#if step.condition}, if <code>{step.condition}</code>{/if}</span>
-						{#if step.ready}<span class="mark">ready</span>{/if}
-						{#if step.fired}<span class="mark muted">ran</span>{/if}
-						{#if onrule}<button type="button" class="link" onclick={() => onrule(step.rule)}>rule</button>{/if}
+					<li>
+						<button
+							type="button"
+							class="step"
+							class:ready={step.ready}
+							disabled={!onrule}
+							onclick={() => onrule?.(step.rule)}
+							aria-label="Step {i + 1}: {step.from.join(' or ')} to {step.to}. Show rule {step.rule}"
+						>
+							<span class="n">{i + 1}</span>
+							<span class="text">
+								<span class="move">{step.from.join(' or ')} → {step.to}</span>
+								<span class="when">
+									when {step.when}{#if step.condition}, if <code>{step.condition}</code>{/if}
+								</span>
+							</span>
+							<span class="status" class:on={step.ready || step.fired}>
+								{step.ready ? 'ready now' : step.fired ? 'ran' : 'not run yet'}
+							</span>
+						</button>
 					</li>
 				{/each}
 			</ol>
-		</article>
+		</details>
 	{:else}
-		<p class="muted">
-			No puzzle machines. A machine is a puzzle with named states and steps between them, in <code>machines/</code> or under
-			<code>machines:</code> in story.yaml.
+		<p class="empty">
+			This story has no puzzle machines. A machine is a puzzle with named states and steps between them, in
+			<code>machines/</code> or under <code>machines:</code> in story.yaml.
 		</p>
 	{/each}
 </section>
@@ -144,29 +181,55 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-6);
-		font-family: var(--font-ui);
-		font-size: var(--font-size-sm);
 	}
-	.machine {
+	/* Groups as in the rules view. */
+	summary {
+		list-style: none;
+	}
+	summary::-webkit-details-marker {
+		display: none;
+	}
+	.group > summary {
 		display: flex;
-		flex-direction: column;
-		gap: var(--space-3);
-		padding-bottom: var(--space-5);
-		border-bottom: var(--size-border) solid var(--color-border-subtle);
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-4);
+		min-height: var(--size-target-compact);
+		cursor: pointer;
 	}
-	p {
-		margin: 0;
-	}
-	.now,
-	.muted {
+	.group > summary::before {
+		content: '▸';
 		color: var(--color-text-muted);
+		transition: transform var(--duration-fast);
+	}
+	.group[open] > summary::before {
+		transform: rotate(90deg);
+	}
+	.group-name {
+		font-weight: var(--font-weight-strong);
+		letter-spacing: var(--letter-spacing-caps);
+		text-transform: uppercase;
+	}
+	.count,
+	.now {
+		padding: 0 var(--space-3);
+		border: var(--size-border) solid var(--color-border-subtle);
+		font-size: var(--font-size-xs);
+		color: var(--color-text-muted);
+	}
+	.now {
+		border-color: var(--color-accent);
 	}
 	.now strong {
 		color: var(--color-text-accent);
+		font-weight: var(--font-weight-strong);
 	}
 	.graph {
 		max-width: 100%;
+		margin-top: var(--space-3);
+		padding: var(--space-4);
 		overflow-x: auto;
+		border: var(--size-border) solid var(--color-border-subtle);
 	}
 	svg {
 		display: block;
@@ -182,77 +245,100 @@
 	}
 	.edge.ready {
 		stroke: var(--color-accent);
-		stroke-width: 2.5;
+		stroke-width: 2;
 	}
-	.badge circle {
-		fill: var(--color-surface-raised);
-		stroke: var(--color-border-control);
+	.badge rect {
+		fill: var(--color-surface);
+		stroke: var(--color-border-subtle);
 	}
-	.badge.ready circle {
+	.badge text {
+		fill: var(--color-text-muted);
+	}
+	.badge.ready rect {
 		stroke: var(--color-accent);
+	}
+	.badge.ready text {
+		fill: var(--color-text-accent);
 	}
 	text {
 		fill: var(--color-text);
-		font-family: var(--font-ui);
-		font-size: 12px;
+		font-family: inherit;
+		font-size: var(--font-size-sm);
 		text-anchor: middle;
 		dominant-baseline: central;
 	}
 	.state rect {
-		fill: var(--color-surface-control);
+		fill: var(--color-surface);
 		stroke: var(--color-border-control);
 	}
 	.state.current rect {
-		fill: var(--color-accent);
+		fill: var(--color-accent-tint);
 		stroke: var(--color-accent);
 	}
 	.state.current text {
-		fill: var(--color-text-on-accent);
-		font-weight: 600;
+		fill: var(--color-text-accent);
+		font-weight: var(--font-weight-strong);
 	}
+	/* Step rows as the rule rows of the rules view. */
 	.steps {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		margin: 0;
+		margin: var(--space-3) 0 0;
 		padding: 0;
 		list-style: none;
 	}
-	.steps li {
-		display: flex;
-		flex-wrap: wrap;
+	.step {
+		display: grid;
+		grid-template-columns: 1.5em minmax(0, 1fr);
+		gap: var(--space-1) var(--space-4);
 		align-items: baseline;
-		gap: var(--space-1) var(--space-3);
-		line-height: var(--line-height-body);
+		width: 100%;
+		padding: var(--space-3) var(--space-4);
+		border: var(--size-border) solid var(--color-border-subtle);
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.step:disabled {
+		cursor: default;
+	}
+	.step:not(:disabled):hover {
+		border-color: var(--color-accent);
+	}
+	.step:focus-visible {
+		outline: var(--size-focus-ring) solid var(--color-focus);
+		outline-offset: 2px;
+	}
+	.step.ready {
+		border-left: var(--size-border-strong) solid var(--color-accent);
 	}
 	.n {
-		min-width: 1.5em;
 		color: var(--color-text-muted);
 		font-variant-numeric: tabular-nums;
 	}
 	.move {
-		color: var(--color-text-strong);
+		color: var(--color-text-accent);
+	}
+	.move {
+		margin-right: var(--space-3);
 	}
 	.when {
 		color: var(--color-text);
+		overflow-wrap: anywhere;
 	}
-	.mark {
-		color: var(--color-text-accent);
-	}
-	.mark.muted {
+	.status {
+		grid-column: 2;
+		font-size: var(--font-size-sm);
 		color: var(--color-text-muted);
 	}
-	.link {
-		padding: 0;
-		border: 0;
-		background: none;
+	.status.on {
 		color: var(--color-text-accent);
-		font: inherit;
-		text-decoration: underline;
-		cursor: pointer;
 	}
-	.link:focus-visible {
-		outline: var(--size-focus, 2px) solid var(--color-focus);
-		outline-offset: 2px;
+	.empty {
+		margin: 0;
+		color: var(--color-text-muted);
 	}
 </style>
