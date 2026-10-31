@@ -2312,6 +2312,7 @@ impl Game {
             return;
         };
         let Some(holder) = self.world.story.thing(into.as_str()).cloned() else {
+            say(turn, "You can't see anything like that here.".into());
             return;
         };
         let (the_what, the_into) = (self.the(what, false), self.the(into, false));
@@ -2324,8 +2325,10 @@ impl Game {
             return;
         }
         // The holder must not be the thing, or inside it.
+        // A loop of holders is an authoring error; stop after as many steps as `State::outer_location`.
         let mut at = Some(into.clone());
-        while let Some(h) = at {
+        for _ in 0..16 {
+            let Some(h) = at else { break };
             if h == *what {
                 say(turn, format!("You can't put {the_what} inside itself."));
                 return;
@@ -2469,6 +2472,9 @@ impl Game {
             let owner = Id::new(format!("timer:{}", t.id));
             for effect in world.timers[ti].at.get(&left).into_iter().flatten() {
                 self.apply(turn, &owner, effect, 1);
+                if self.state.ended {
+                    return;
+                }
             }
             if left == 0 {
                 turn.log.push(LogEntry {
@@ -2633,6 +2639,7 @@ impl Game {
             "wait" => say(turn, "Time passes.".into()),
             "score" => {
                 let Some(score) = &self.world.story.score else {
+                    say(turn, "This story has no score.".into());
                     return;
                 };
                 let now = self

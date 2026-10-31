@@ -91,6 +91,10 @@ impl Behavior for Thief {
                 };
                 let here = cx.here().clone();
                 if at == here {
+                    // The thief steals only when he can get away; a room without a dark exit keeps him.
+                    let Some(to) = self.next_room(cx, at.as_str()) else {
+                        return Flow::Continue;
+                    };
                     let loot: Vec<Id> = cx
                         .carried()
                         .into_iter()
@@ -108,9 +112,7 @@ impl Behavior for Thief {
                     } else {
                         return Flow::Continue;
                     }
-                    if let Some(to) = self.next_room(cx, at.as_str()) {
-                        cx.move_thing(&self.thief, Location::Room(to));
-                    }
+                    cx.move_thing(&self.thief, Location::Room(to));
                 } else if cx.roll(100) < 50
                     && let Some(to) = self.next_room(cx, at.as_str())
                 {
