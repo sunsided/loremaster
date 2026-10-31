@@ -31,8 +31,10 @@ embed-ui = ["loremaster-mcp/embed-ui"]
 workspace = true
 
 # cargo-release: this crate makes the one tag `v<version>` and updates CHANGELOG.md.
+# `task release:publish` uploads it (it needs loremaster-mcp, which contains `ui/`).
 [package.metadata.release]
 tag = true
+publish = false
 pre-release-replacements = [
     { file = "../../CHANGELOG.md", search = "## \\[Unreleased\\] - ReleaseDate", replace = "## [{{version}}] - {{date}}", exactly = 1 },
     { file = "../../CHANGELOG.md", search = "<!-- next-header -->", replace = "<!-- next-header -->\n\n## [Unreleased] - ReleaseDate", exactly = 1 },

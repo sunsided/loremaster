@@ -26,9 +26,12 @@ include_dir = { workspace = true, optional = true }
 # Embed the built web app (`ui/`, a copy of web/build) and serve it at `/`. Run `task release:ui` first.
 embed-ui = ["dep:include_dir"]
 
-# cargo-release: build the web editor into `ui/` before the crate is packaged.
+# cargo-release: build the web editor into `ui/` before the release commit.
+# cargo publish sees the files in `ui/` as not committed, and cargo-release cannot give
+# `--allow-dirty`. Thus `task release:publish` uploads this crate and `loremaster`.
 [package.metadata.release]
 pre-release-hook = ["task", "--dir", "../..", "release:ui"]
+publish = false
 
 [lints]
 workspace = true

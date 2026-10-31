@@ -161,7 +161,19 @@ tasks:
     deps:
       - release:ui
     cmds:
-      - "{{.CARGO}} package --workspace --exclude loremaster-wasm --exclude loremaster-zil"
+      # git ignores crates/loremaster-mcp/ui, so cargo sees its files as not committed.
+      - "{{.CARGO}} package --workspace --exclude loremaster-wasm --exclude loremaster-zil --allow-dirty"
+
+  release:publish:
+    desc: After `cargo release --execute`, upload loremaster-mcp and loremaster (with the web editor) to crates.io
+    preconditions:
+      - sh: test -f crates/loremaster-mcp/ui/index.html
+        msg: "There is no web editor in crates/loremaster-mcp/ui. Run `task release:ui` first."
+      - sh: test -z "$(git status --porcelain)"
+        msg: "The working tree has changes. Commit them or remove them first."
+    cmds:
+      # The ui/ files are the only "dirty" files: git ignores them.
+      - "{{.CARGO}} publish -p loremaster-mcp -p loremaster --allow-dirty {{.CLI_ARGS}}"
 
   serve:local:
     desc: Build the local binary, then serve the lighthouse example with the editor

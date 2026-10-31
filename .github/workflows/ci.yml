@@ -90,7 +90,8 @@ jobs:
       # The same as `task release:ui`: the build is below `/` (no BASE_PATH).
       - name: Copy the web editor into loremaster-mcp
         run: cp -r web/build crates/loremaster-mcp/ui
+      # git ignores ui/, so cargo sees its files as not committed.
       - name: Package the crates for crates.io
-        run: cargo package --workspace --exclude loremaster-wasm --exclude loremaster-zil
+        run: cargo package --workspace --exclude loremaster-wasm --exclude loremaster-zil --allow-dirty
       - working-directory: web
         run: pnpm build-storybook
