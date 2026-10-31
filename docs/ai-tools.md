@@ -17,18 +17,22 @@ There are two servers. Both serve the same tools.
 If the folder does not exist, `loremaster serve` makes it.
 
 ```sh
-cargo build --release -p loremaster-cli
-target/release/loremaster serve examples/lighthouse
+cargo install loremaster
+loremaster serve examples/lighthouse
 ```
 
 ### The editor in the binary
 
-Build the binary with the feature `embed-ui`. Then `loremaster serve` also serves the web editor at `http://127.0.0.1:4710/` and opens it in the browser.
+The binary from crates.io contains the web editor (the feature `embed-ui`). `loremaster serve` serves it at `http://127.0.0.1:4710/` and opens it in the browser.
+
+In a git checkout, build the editor into the binary with `task build:local`:
 
 ```sh
 task build:local
 target/release/loremaster serve examples/lighthouse
 ```
+
+A binary without the editor (`cargo build -p loremaster --no-default-features`) tells you to use the hosted editor at <https://sunsided.github.io/loremaster/> with `--allow-origin https://sunsided.github.io`.
 
 | Option | What it does |
 | --- | --- |

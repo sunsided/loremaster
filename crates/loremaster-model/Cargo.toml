@@ -5,7 +5,12 @@ edition.workspace = true
 version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["text-adventure", "interactive-fiction", "world-model", "game"]
+categories = ["game-development", "data-structures"]
 
 [dependencies]
 serde.workspace = true

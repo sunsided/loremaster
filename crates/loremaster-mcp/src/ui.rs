@@ -1,11 +1,11 @@
 //! The web editor, embedded in the binary with the feature `embed-ui`.
 //!
-//! `web/build` must exist when the crate is built: run `task build:local`.
+//! `ui/` (a copy of `web/build`) must exist when the crate is built: run `task release:ui`.
 //! A path without a file gets `200.html`, the fallback page of the single-page app.
 
 use include_dir::{Dir, include_dir};
 
-static UI: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../web/build");
+static UI: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/ui");
 
 /// The file for a request path, with its content type. `None` when the build has no fallback page.
 pub fn file(path: &str) -> Option<(&'static [u8], &'static str)> {

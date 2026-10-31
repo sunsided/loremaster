@@ -4,7 +4,7 @@ loremaster is a world editor for text adventures. In loremaster, each text in th
 
 The core is in Rust. It uses [dramaturge](https://github.com/sunsided/dramaturge). The editor is a SvelteKit app. The player can play with typed commands or with a SCUMM-style verb bar. Both use the same runtime.
 
-Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.io/loremaster/). The browser version keeps your stories in the browser. For AI help and files on disk, run `loremaster serve` (see [docs/ai-tools.md](docs/ai-tools.md)).
+Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.io/loremaster/). The browser version keeps your stories in the browser. For AI help and files on disk, install the command with `cargo install loremaster` and run `loremaster serve` (see [docs/ai-tools.md](docs/ai-tools.md)). The command contains the web editor.
 
 ![Play mode: the lighthouse example after three commands. The side panel shows the map, the values this room depends on, the rules here and what changed: opening the drawer fired a rule that put the iron key in the room.](docs/images/play.png)
 
@@ -23,9 +23,9 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 | `crates/loremaster-project` | The project folder format (one YAML file for each entity) and the checker. |
 | `crates/loremaster-runtime` | The runtime: state, text assembly, rules and parser. It has no input or output of its own. |
 | `crates/loremaster-wasm` | The WebAssembly bindings for the web app. Trunk builds them. |
-| `crates/loremaster-cli` | The terminal player: `loremaster play` and `loremaster check`. Also `loremaster new`, `loremaster mcp` and `loremaster serve`. |
+| `crates/loremaster-cli` | The crate `loremaster`, with the terminal player: `loremaster play` and `loremaster check`. Also `loremaster new`, `loremaster mcp` and `loremaster serve`. |
 | `crates/loremaster-tools` | The operations that an AI assistant can do on a project: read, play and verify. It has no input or output of its own. |
-| `crates/loremaster-mcp` | The MCP server for one project: `loremaster mcp <project-folder>` on stdin and stdout, and `loremaster serve <project-folder>` on local HTTP with the proposal and job endpoints for the editor. A job gives a task prompt (`imagine_exit`, `review_room`) to Claude Code. |
+| `crates/loremaster-mcp` | The MCP server and the embedded web editor (`ui/`, made by `task release:ui`) for one project: `loremaster mcp <project-folder>` on stdin and stdout, and `loremaster serve <project-folder>` on local HTTP with the proposal and job endpoints for the editor. A job gives a task prompt (`imagine_exit`, `review_room`) to Claude Code. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
 | `examples/cantina` | A small story with a character whose name changes, and a dialogue with him. |
 | `examples/zork1` | Zork I, imported from its ZIL source. A large map for tests. Read `examples/zork1/README.md`. |
@@ -60,7 +60,9 @@ Install [go-task](https://taskfile.dev), Trunk, Node.js and pnpm before you star
 | `task web:install` | Installs the web dependencies. Do this one time. |
 | `task dev` | Builds the WebAssembly package, then runs `trunk watch` and the Vite dev server. |
 | `task build:static` | Builds the browser-only site for GitHub Pages into `web/build`, below `/loremaster`. |
+| `task release:ui` | Builds the web app below `/` and copies it into `crates/loremaster-mcp/ui` for the embedded editor. |
 | `task build:local` | Builds `target/release/loremaster` with the web editor in it. |
+| `task package` | Builds the web editor, then packages the crates for crates.io. It does not upload them. |
 | `task serve:local` | Builds the local binary, then opens the example in the editor. |
 | `task storybook` | Starts Storybook on port 6006. |
 | `task web:check` | Type-checks the Svelte code and the stories. |
@@ -68,7 +70,7 @@ Install [go-task](https://taskfile.dev), Trunk, Node.js and pnpm before you star
 
 If you do not use go-task:
 
-1. Play in the terminal with `cargo run -p loremaster-cli -- play examples/lighthouse`.
+1. Play in the terminal with `cargo run -p loremaster --no-default-features -- play examples/lighthouse`.
 2. For the web app, run `trunk watch` in `crates/loremaster-wasm`.
 3. At the same time, run `pnpm dev` in `web/`.
 
@@ -92,6 +94,12 @@ These rules apply to all web work:
 ## Documentation
 
 Write all documentation in ASD-STE100 Simplified Technical English. The "Foundations/Writing documentation" page in Storybook gives the rules.
+
+## Crates
+
+These crates are on crates.io: `loremaster`, `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-tools` and `loremaster-mcp`. All have the same version. `loremaster-wasm` and `loremaster-zil` are not on crates.io. The changes are in [CHANGELOG.md](CHANGELOG.md).
+
+The crate `loremaster` builds with the web editor by default. In a git checkout, the editor must be in `crates/loremaster-mcp/ui` first: run `task release:ui`. To build without the editor, use `--no-default-features`.
 
 ## Contributing
 

@@ -5,7 +5,14 @@ edition.workspace = true
 version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["text-adventure", "interactive-fiction", "runtime", "parser", "game"]
+categories = ["game-development", "game-engines"]
+# The tests read the stories in ../../examples. They are not in the package.
+exclude = ["tests/"]
 
 [dependencies]
 dramaturge-model.workspace = true

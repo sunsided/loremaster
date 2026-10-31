@@ -47,11 +47,12 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo fmt -- --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      # Without the embedded web editor: this job does not build web/.
+      - run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+      - run: cargo test --workspace --no-default-features
 
   web:
-    name: Web (WASM, check, build, Storybook)
+    name: Web (WASM, check, build, Storybook, crates)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -86,5 +87,11 @@ jobs:
         run: pnpm check
       - working-directory: web
         run: pnpm build
+      # The same as `task release:ui`: the build is below `/` (no BASE_PATH).
+      - name: Copy the web editor into loremaster-mcp
+        run: cp -r web/build crates/loremaster-mcp/ui
+      # git ignores ui/, so cargo sees its files as not committed.
+      - name: Package the crates for crates.io
+        run: cargo package --workspace --exclude loremaster-wasm --exclude loremaster-zil --allow-dirty
       - working-directory: web
         run: pnpm build-storybook
