@@ -1,0 +1,5 @@
+# The thief is code: `thief.rs` in this folder's parent. Run the game with it:
+#   cargo run -p loremaster-runtime --example zork
+# A build without the code (the editor, `loremaster play`) plays Zork I without the thief.
+notes:
+  - "Hand-ported in part from I-THIEF and ROBBER-FUNCTION. Fights and the thief's lair are not ported."

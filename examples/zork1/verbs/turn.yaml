@@ -1,0 +1,7 @@
+# `turn bolt with wrench`, for the dam.
+label: Turn
+words: [turn, rotate, twist]
+slots: two
+preposition: with
+bar: false
+default: "Your bare hands don't appear to be enough."

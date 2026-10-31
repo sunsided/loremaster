@@ -2,4 +2,5 @@
 name: "forest"
 aliases: ["trees", "pines", "hemlocks"]
 location: { room: west_of_house }
+also_in: ["north_of_house", "south_of_house", "east_of_house", "forest_1", "forest_2", "forest_3", "path", "up_a_tree", "clearing"]
 listed: false

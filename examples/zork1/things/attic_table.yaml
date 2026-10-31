@@ -1,5 +1,5 @@
 # Imported from ZIL: ATTIC-TABLE (1dungeon.zil)
 name: "table"
 location: { room: attic }
+supporter: true
 listed: false
-props: { open: true }

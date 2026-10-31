@@ -1,5 +1,5 @@
 # Imported from ZIL: ALTAR (1dungeon.zil)
 name: "altar"
 location: { room: south_temple }
+supporter: true
 listed: false
-props: { open: true }

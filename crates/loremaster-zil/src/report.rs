@@ -101,8 +101,8 @@ pub fn render(world: &World) -> String {
     table(
         &mut out,
         "Things in a different place",
-        "A loremaster thing is in one room, or nowhere. These things are in a container, \
-         in more than one room, or not visible in the original.",
+        "These things are inside an object that is not a container or a surface, are \
+         global objects, or are not visible in the original.",
         ("Thing", "Note"),
         &r.placement,
     );

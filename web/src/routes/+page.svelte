@@ -52,6 +52,8 @@
 	import CommandPalette from '#lib/design/organisms/CommandPalette.svelte';
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
+	import MachinesView from '#lib/design/organisms/MachinesView.svelte';
+	import MachineStateCard from '#lib/design/molecules/MachineStateCard.svelte';
 	import ExplorerView from '#lib/design/organisms/ExplorerView.svelte';
 	import AtlasMap from '#lib/design/organisms/AtlasMap.svelte';
 	import RoomCard from '#lib/design/molecules/RoomCard.svelte';
@@ -368,11 +370,12 @@
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'machines' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
 	let atlasRoom = $state<string | null>(null);
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
 		{ id: 'rules', label: 'Rules' },
+		...(session?.machines.length ? [{ id: 'machines', label: `Machines ${session.machines.length}` }] : []),
 		{ id: 'state', label: 'State' },
 		{ id: 'story', label: 'Story' },
 		{ id: 'checks', label: 'Checks' },
@@ -383,6 +386,7 @@
 	// The AI tab goes away when the server stops; show the map in its place.
 	$effect(() => {
 		if (atlasTab === 'ai' && !ai.reachable) atlasTab = 'map';
+		if (atlasTab === 'machines' && !session?.machines.length) atlasTab = 'map';
 	});
 
 	let proposalProblems = $state<Record<string, string>>({});
@@ -623,6 +627,9 @@
 		atlasOpen = false;
 		queueMicrotask(() => prompt?.focus());
 	}
+
+	/** The machine state that the details panel of Atlas › Machines shows. */
+	let machineState = $state<{ machine: string; state: string } | null>(null);
 
 	/** A rule for the Rules tab to show and focus. */
 	let revealRule = $state<string | null>(null);
@@ -1466,26 +1473,41 @@
 				{#if atlasTab === 'map'}
 					<AtlasMap map={shownMap} rooms={atlasRooms} bind:selected={atlasRoom} onselect={(id) => (atlasRoom = id)} />
 				{:else if atlasTab === 'story'}
-					<StoryTimeline steps={s.history} />
+					<div class="atlas-pane">
+						<StoryTimeline steps={s.history} />
+					</div>
 				{:else if atlasTab === 'checks'}
-					<ExplorerView
-						bind:mode={exploreMode}
-						{matrix}
-						roomName={s.scene.room_name}
-						ontry={(values) => {
-							s.author({ type: 'situation', room: s.scene.room, values });
-							prompt?.focus();
-						}}
-						result={exploration}
-						running={exploring}
-						onrun={runExplorer}
-						onreplay={(path) => {
-							s.replay(path);
-							prompt?.focus();
-						}}
-					/>
+					<div class="atlas-pane">
+						<ExplorerView
+							bind:mode={exploreMode}
+							{matrix}
+							roomName={s.scene.room_name}
+							ontry={(values) => {
+								s.author({ type: 'situation', room: s.scene.room, values });
+								prompt?.focus();
+							}}
+							result={exploration}
+							running={exploring}
+							onrun={runExplorer}
+							onreplay={(path) => {
+								s.replay(path);
+								prompt?.focus();
+							}}
+						/>
+					</div>
 				{:else if atlasTab === 'rules'}
-					<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+					<div class="atlas-pane">
+						<RulesView rules={s.rules} reveal={revealRule} onrevealed={() => (revealRule = null)} />
+					</div>
+				{:else if atlasTab === 'machines'}
+					<div class="atlas-pane">
+						<MachinesView
+							machines={s.machines}
+							onrule={showRule}
+							selected={machineState}
+							onselect={(machine, state) => (machineState = { machine, state })}
+						/>
+					</div>
 				{:else if atlasTab === 'todos'}
 					<section class="todos-view" aria-label="TODOs">
 						<RadioGroup
@@ -1575,6 +1597,14 @@
 				{/if}
 
 		{#snippet aside()}
+			{#if atlasTab === 'machines' && session?.machines.length}
+				{@const m = session.machines.find((x) => x.id === machineState?.machine) ?? session.machines[0]}
+				<MachineStateCard
+					machine={m}
+					state={machineState?.machine === m.id && m.states.includes(machineState.state) ? machineState.state : m.state}
+					onrule={showRule}
+				/>
+			{/if}
 			{#if atlasTab === 'map' && card}
 				<RoomCard
 					room={card}
@@ -1892,6 +1922,10 @@
 	.job-chip:focus-visible {
 		outline: var(--size-focus-ring) solid var(--color-status-text);
 		outline-offset: 2px;
+	}
+	/* Atlas views other than the map keep the same distance from the edges. */
+	.atlas-pane {
+		padding: var(--space-5) var(--space-6);
 	}
 	.todos-view {
 		display: flex;

@@ -2,4 +2,5 @@
 name: "wooden ladder"
 aliases: ["ladder"]
 location: { room: ladder_top }
+also_in: ["ladder_bottom"]
 listed: false

@@ -126,6 +126,14 @@ pub fn convert(src: &Source, rules: &str) -> World {
         start: id(start),
         intro: Vec::new(),
         vars,
+        score: src
+            .globals
+            .get("SCORE-MAX")
+            .and_then(|n| match n {
+                Node::Int(i) => Some(*i),
+                _ => None,
+            })
+            .map(|max| (max, hints::ranks(start).to_vec())),
     };
     World {
         story,
@@ -316,8 +324,32 @@ fn exit(
     }
 }
 
-/// Where a ZIL object is, as a loremaster room, or `None` for nowhere.
-fn place(o: &Entity, src: &Source, report: &mut Report) -> Option<String> {
+/// Where a ZIL object is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Place {
+    Room(String),
+    /// In a container: an object with `CONTBIT`.
+    In(String),
+    /// On a supporter: an object with `SURFACEBIT`.
+    On(String),
+    Nowhere,
+}
+
+/// A holder that loremaster can model: a thing with a container or surface flag.
+fn holder_place(holder: &Entity) -> Option<Place> {
+    holder.text("DESC")?;
+    let hid = id(&holder.name);
+    if holder.has_flag("SURFACEBIT") {
+        Some(Place::On(hid))
+    } else if holder.has_flag("CONTBIT") {
+        Some(Place::In(hid))
+    } else {
+        None
+    }
+}
+
+/// Where a ZIL object is, and the other rooms of local-global scenery.
+fn place(o: &Entity, src: &Source, report: &mut Report) -> (Place, Vec<String>) {
     let oid = id(&o.name);
     let mut note = |detail: String| {
         report.placement.push(Note {
@@ -326,55 +358,59 @@ fn place(o: &Entity, src: &Source, report: &mut Report) -> Option<String> {
         })
     };
     let mut chain: Vec<String> = Vec::new();
-    let mut here = o.atom("IN")?;
+    let Some(mut here) = o.atom("IN") else {
+        return (Place::Nowhere, Vec::new());
+    };
     for _ in 0..8 {
         if let Some(room) = src.room(here) {
             if !chain.is_empty() {
                 note(format!(
-                    "inside {}; placed in the room {}",
+                    "inside {}, which is not a container; placed in the room {}",
                     chain.join(" in "),
                     id(&room.name)
                 ));
             }
-            return Some(id(&room.name));
+            return (Place::Room(id(&room.name)), Vec::new());
         }
         match here {
             "LOCAL-GLOBALS" => {
-                let rooms: Vec<&Entity> = src
+                let rooms: Vec<String> = src
                     .rooms
                     .iter()
                     .filter(|r| r.atoms("GLOBAL").contains(&o.name.as_str()))
+                    .map(|r| id(&r.name))
                     .collect();
-                let first = rooms.first()?;
-                if rooms.len() > 1 {
-                    let others: Vec<String> = rooms[1..].iter().map(|r| id(&r.name)).collect();
-                    note(format!(
-                        "scenery of {} rooms; placed in {} only (also in {})",
-                        rooms.len(),
-                        id(&first.name),
-                        others.join(", ")
-                    ));
-                }
-                return Some(id(&first.name));
+                return match rooms.split_first() {
+                    Some((first, rest)) => (Place::Room(first.clone()), rest.to_vec()),
+                    None => (Place::Nowhere, Vec::new()),
+                };
             }
             "GLOBAL-OBJECTS" => {
                 note("global object in every room; placed nowhere".into());
-                return None;
+                return (Place::Nowhere, Vec::new());
             }
             _ => {}
         }
         let Some(holder) = src.object(here) else {
             note(format!("in {here}, which is not a room or object"));
-            return None;
+            return (Place::Nowhere, Vec::new());
         };
+        if chain.is_empty()
+            && let Some(p) = holder_place(holder)
+        {
+            return (p, Vec::new());
+        }
         chain.push(id(&holder.name));
-        here = holder.atom("IN")?;
+        let Some(up) = holder.atom("IN") else {
+            return (Place::Nowhere, Vec::new());
+        };
+        here = up;
     }
     note(format!(
         "inside {}: too deep, or a loop; placed nowhere",
         chain.join(" in ")
     ));
-    None
+    (Place::Nowhere, Vec::new())
 }
 
 fn thing(
@@ -387,14 +423,16 @@ fn thing(
     let name = o.text("DESC")?.to_string();
     let door = doors.contains(&oid) || o.has_flag("DOORBIT");
 
-    let mut room = place(o, src, report);
+    let (mut location, also_in) = place(o, src, report);
     if o.has_flag("INVISIBLE") && !door {
         report.placement.push(Note {
             owner: oid.clone(),
             detail: "invisible at the start; placed nowhere until a rule moves it".into(),
         });
-        room = None;
+        location = Place::Nowhere;
     }
+    let supporter = o.has_flag("SURFACEBIT");
+    let container = o.has_flag("CONTBIT") && !supporter;
 
     let mut aliases: Vec<String> = Vec::new();
     let lower = name.to_lowercase();
@@ -407,15 +445,24 @@ fn thing(
 
     let mut props = Vec::new();
     let mut key = None;
-    if o.has_flag("CONTBIT") || door {
-        props.push(("open".to_string(), o.has_flag("OPENBIT")));
+    if container || door {
+        props.push(("open".to_string(), o.has_flag("OPENBIT").to_string()));
+    }
+    if container && o.has_flag("TRANSBIT") {
+        props.push(("transparent".to_string(), "true".to_string()));
     }
     if let Some((_, locked, k)) = hints::LOCKS.iter().find(|(d, ..)| *d == o.name) {
-        props.push(("locked".to_string(), *locked));
+        props.push(("locked".to_string(), locked.to_string()));
         key = k.map(id);
     }
     if o.has_flag("LIGHTBIT") {
-        props.push(("lit".to_string(), o.has_flag("ONBIT")));
+        props.push(("lit".to_string(), o.has_flag("ONBIT").to_string()));
+    }
+    // Points for the first time the player takes a treasure, and for a treasure in the trophy case.
+    for (zil, prop) in [("VALUE", "value"), ("TVALUE", "tvalue")] {
+        if let Some(n) = o.int(zil).filter(|n| *n > 0) {
+            props.push((prop.to_string(), n.to_string()));
+        }
     }
 
     let description = o
@@ -450,7 +497,10 @@ fn thing(
         origin: origin(o),
         name,
         aliases,
-        room,
+        location,
+        also_in,
+        container,
+        supporter,
         portable: o.has_flag("TAKEBIT"),
         key,
         listed: !o.has_flag("NDESCBIT") && !door,
@@ -586,16 +636,18 @@ mod tests {
     fn converts_things() {
         let w = world(MAP);
         let house = w.things.iter().find(|t| t.id == "house").unwrap();
-        check!(house.room.as_deref() == Some("field"));
+        check!(house.location == Place::Room("field".into()));
+        check!(house.also_in == vec!["hall".to_string()]);
         check!(house.aliases == vec!["house".to_string(), "home".to_string()]);
         check!(!house.listed);
         let gem = w.things.iter().find(|t| t.id == "gem").unwrap();
-        check!(gem.room.as_deref() == Some("field"));
+        check!(gem.location == Place::In("box".into()));
+        check!(w.things.iter().any(|t| t.id == "box" && t.container));
         check!(gem.presence[0].when.as_deref() == Some("gem.interactions == 0"));
         let door = w.things.iter().find(|t| t.id == "door").unwrap();
-        check!(door.props == vec![("open".to_string(), false)]);
-        check!(w.report.placement.iter().any(|n| n.owner == "gem"));
-        check!(w.report.placement.iter().any(|n| n.owner == "house"));
+        check!(door.props == vec![("open".to_string(), "false".to_string())]);
+        check!(!w.report.placement.iter().any(|n| n.owner == "gem"));
+        check!(!w.report.placement.iter().any(|n| n.owner == "house"));
     }
 
     #[test]

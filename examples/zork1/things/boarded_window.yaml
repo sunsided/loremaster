@@ -2,4 +2,5 @@
 name: "boarded window"
 aliases: ["window"]
 location: { room: north_of_house }
+also_in: ["south_of_house"]
 listed: false

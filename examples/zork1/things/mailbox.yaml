@@ -2,4 +2,5 @@
 name: "small mailbox"
 aliases: ["mailbox", "box"]
 location: { room: west_of_house }
+container: true
 props: { open: false }

@@ -1,0 +1,8 @@
+# Hand-ported from LANTERN (1actions.zil): a dead lamp does not light again.
+# The timer `lamp_battery` stops when it runs out.
+- id: dead_lamp
+  on: { check: [turn_on, lamp] }
+  when: not timer.lamp_battery.running
+  then:
+    - say: "A burned-out lamp won't light."
+    - stop

@@ -2,5 +2,5 @@
 name: "kitchen table"
 aliases: ["table"]
 location: { room: kitchen }
+supporter: true
 listed: false
-props: { open: true }

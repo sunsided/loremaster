@@ -1,7 +1,7 @@
 # Imported from ZIL: ADVERTISEMENT (1dungeon.zil)
 name: "leaflet"
 aliases: ["advertisement", "booklet", "mail"]
-location: { room: west_of_house }
+location: { in: mailbox }
 portable: true
 description:
   - "\"WELCOME TO ZORK! ZORK is a game of adventure, danger, and low cunning. In it you will explore some of the most amazing territory ever seen by mortals. No computer should be without one!\""

@@ -2,4 +2,5 @@
 name: "white house"
 aliases: ["house"]
 location: { room: west_of_house }
+also_in: ["north_of_house", "south_of_house", "east_of_house", "forest_1", "forest_2", "mountains", "forest_3", "path", "up_a_tree", "grating_clearing", "clearing"]
 listed: false

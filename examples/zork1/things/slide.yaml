@@ -2,3 +2,4 @@
 name: "chute"
 aliases: ["ramp", "slide"]
 location: { room: cellar }
+also_in: ["slide_room"]

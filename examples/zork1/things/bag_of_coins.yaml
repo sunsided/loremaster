@@ -3,5 +3,6 @@ name: "leather bag of coins"
 aliases: ["bag", "coins", "treasure"]
 location: { room: maze_5 }
 portable: true
+props: { value: 10, tvalue: 5 }
 presence:
   - "An old leather bag, bulging with coins, is here."

@@ -2,5 +2,6 @@
 name: "machine"
 aliases: ["pdp10", "dryer", "lid"]
 location: { room: machine_room }
+container: true
 listed: false
 props: { open: false }

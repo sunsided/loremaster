@@ -45,6 +45,8 @@ pub struct Scope {
     pub relations: BTreeSet<String>,
     /// Memory keys that some dialogue gives a thing, for `remembers(thing, key)`.
     pub memories: BTreeSet<String>,
+    /// Timer ids, for `timer.id`.
+    pub timers: BTreeSet<String>,
     /// dramaturge ids for the player, the things and the memories. Built in
     /// story order, so the same story always gets the same numbers.
     pub symbols: SymbolTable,
@@ -109,7 +111,9 @@ impl Scope {
         for m in &memories {
             symbols.intern_memory(m);
         }
+        let timers = story.timers.iter().map(|t| t.id.to_string()).collect();
         Self {
+            timers,
             vars,
             rooms,
             things,

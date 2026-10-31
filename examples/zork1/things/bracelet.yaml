@@ -3,3 +3,4 @@ name: "sapphire-encrusted bracelet"
 aliases: ["bracelet", "jewel", "sapphire", "treasure"]
 location: { room: gas_room }
 portable: true
+props: { value: 5, tvalue: 5 }

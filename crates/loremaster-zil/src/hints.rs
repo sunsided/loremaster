@@ -23,6 +23,23 @@ pub fn title(start: &str) -> Option<&'static str> {
     (start == "WEST-OF-HOUSE").then_some("Zork I: The Great Underground Empire")
 }
 
+/// The ranks of the score, from V-SCORE: `(from score, name)`.
+pub fn ranks(start: &str) -> &'static [(i64, &'static str)] {
+    if start != "WEST-OF-HOUSE" {
+        return &[];
+    }
+    &[
+        (0, "Beginner"),
+        (26, "Amateur Adventurer"),
+        (51, "Novice Adventurer"),
+        (101, "Junior Adventurer"),
+        (201, "Adventurer"),
+        (301, "Master"),
+        (331, "Wizard"),
+        (350, "Master Adventurer"),
+    ]
+}
+
 /// Doors with a lock: `(door, locked at the start, key)`. The trap door has no key, but a rule
 /// bars it from above.
 pub const LOCKS: &[(&str, bool, Option<&str>)] =

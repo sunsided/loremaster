@@ -42,6 +42,31 @@ impl Eval<'_> {
         c.as_ref().is_none_or(|c| self.holds(c))
     }
 
+    /// The thing is carried, in the current room, or scenery of the room.
+    pub fn present(&self, thing: &str) -> bool {
+        self.state.is_carried(thing) || self.is_here(thing, self.state.room.as_str())
+    }
+
+    /// The thing is in the room: in it, in or on something there, or scenery of it.
+    pub fn is_here(&self, thing: &str, room: &str) -> bool {
+        self.state.is_in_room(thing, room) || self.is_backdrop_here(thing, room)
+    }
+
+    /// The thing is scenery of the room through `also_in`, by room or region.
+    pub fn is_backdrop_here(&self, thing: &str, room: &str) -> bool {
+        let Some(t) = self.world.story.thing(thing) else {
+            return false;
+        };
+        if t.also_in.is_empty() || matches!(self.state.location_of(thing), Some(Location::Nowhere))
+        {
+            return false;
+        }
+        let region = self.world.story.room(room).and_then(|r| r.region.as_ref());
+        t.also_in
+            .iter()
+            .any(|w| w.as_str() == room || Some(w) == region)
+    }
+
     pub fn time_of_day(&self) -> TimeOfDay {
         TimeOfDay((self.state.minutes % TimeOfDay::MINUTES_PER_DAY) as u16)
     }
@@ -68,9 +93,22 @@ impl Eval<'_> {
             Derived::Visits(r) => FactValue::Int(i64::from(s.visits_to(r.as_str()))),
             Derived::Visited(r) => FactValue::Bool(s.visits_to(r.as_str()) > 0),
             Derived::Carried(t) => FactValue::Bool(s.is_carried(t.as_str())),
-            Derived::Present(t) => FactValue::Bool(
-                s.is_carried(t.as_str()) || s.is_in_room(t.as_str(), s.room.as_str()),
-            ),
+            Derived::Present(t) => FactValue::Bool(self.present(t.as_str())),
+            Derived::Inside(t, holder) => {
+                let mut at = s.location_of(t.as_str()).and_then(Location::holder);
+                let mut found = false;
+                for _ in 0..16 {
+                    match at {
+                        Some(h) if h == holder => {
+                            found = true;
+                            break;
+                        }
+                        Some(h) => at = s.location_of(h.as_str()).and_then(Location::holder),
+                        None => break,
+                    }
+                }
+                FactValue::Bool(found)
+            }
             Derived::ActionRepeat => FactValue::Int(i64::from(s.repeat)),
             Derived::ActionCount => FactValue::Int(i64::from(
                 s.action
@@ -92,12 +130,18 @@ impl Eval<'_> {
             Derived::Interactions(t) => {
                 FactValue::Int(i64::from(s.interactions.get(t).copied().unwrap_or(0)))
             }
+            Derived::Timer(t) => FactValue::Int(i64::from(s.timers.get(t).copied().unwrap_or(0))),
+            Derived::TimerRunning(t) => FactValue::Bool(s.timers.contains_key(t)),
+            Derived::Chance(n, salt) => {
+                let mut seed =
+                    s.rng ^ salt ^ u64::from(s.turns).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                FactValue::Bool(crate::rng::next(&mut seed) % 100 < u64::from(*n))
+            }
             Derived::Talked(t) => FactValue::Int(i64::from(s.talked.get(t).copied().unwrap_or(0))),
-            Derived::Location(t) => FactValue::Text(match s.location_of(t.as_str()) {
-                Some(Location::Room(r)) => r.to_string(),
-                Some(Location::Carried) => "carried".into(),
-                _ => "nowhere".into(),
-            }),
+            Derived::Location(t) => FactValue::Text(
+                s.location_of(t.as_str())
+                    .map_or_else(|| "nowhere".into(), Location::to_word),
+            ),
         }
     }
 

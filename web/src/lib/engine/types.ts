@@ -310,6 +310,31 @@ export interface RoomParts {
 	exits: PartView[];
 }
 
+/** A puzzle machine: its states, where it is now and its steps. */
+export interface MachineView {
+	id: string;
+	state: string;
+	states: string[];
+	/** Author text about states, by state name. */
+	descriptions: Record<string, string>;
+	steps: MachineStepView[];
+}
+
+/** One step of a puzzle machine. */
+export interface MachineStepView {
+	/** The id of the rule that the step became. */
+	rule: string;
+	from: string[];
+	to: string;
+	/** The event, in words. */
+	when: string;
+	condition: string | null;
+	/** The step ran at least once in this game. */
+	fired: boolean;
+	/** The machine is in a `from` state and the condition holds. */
+	ready: boolean;
+}
+
 export interface RuleView {
 	id: string;
 	/** The event, in words. */
@@ -321,8 +346,18 @@ export interface RuleView {
 	once: boolean;
 	instead: boolean;
 	fired: boolean;
-	/** The kind of event: start, turn, enter, leave, time or verb. */
-	trigger: 'start' | 'turn' | 'enter' | 'leave' | 'time' | 'verb';
+	/** The kind of event. `check` runs before a verb, `verb` instead of or after it. */
+	trigger:
+		| 'start'
+		| 'turn'
+		| 'enter'
+		| 'leave'
+		| 'time'
+		| 'verb'
+		| 'check'
+		| 'timer'
+		| 'event'
+		| 'talk';
 	/** Why the rule matters here and now, or null. */
 	relevant: string | null;
 }

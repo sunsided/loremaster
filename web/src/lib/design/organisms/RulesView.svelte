@@ -25,8 +25,9 @@
 
 	const triggers: { id: RuleView['trigger'][]; label: string }[] = [
 		{ id: ['enter', 'leave'], label: 'Rooms' },
-		{ id: ['verb'], label: 'Actions' },
-		{ id: ['time'], label: 'Time' },
+		{ id: ['check', 'verb'], label: 'Actions' },
+		{ id: ['time', 'timer'], label: 'Time and timers' },
+		{ id: ['event', 'talk'], label: 'Events and talks' },
 		{ id: ['turn'], label: 'Every turn' },
 		{ id: ['start'], label: 'Start' }
 	];

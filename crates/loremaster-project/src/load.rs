@@ -1,6 +1,7 @@
 use crate::{Diagnostic, Severity};
 use loremaster_model::{
-    ClockConfig, Dialogue, Fragment, Id, Note, Room, Rule, Story, Thing, Thread, VarDef, VerbDef,
+    ClockConfig, Dialogue, Effect, Fragment, Id, Machine, Note, Room, Rule, Story, Thing, Thread,
+    Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -19,6 +20,8 @@ pub struct Project {
     pub files: Vec<SourceFile>,
     /// Entity key such as `room:cellar` to the file that defines it.
     pub origins: BTreeMap<String, String>,
+    /// Walkthrough tests from `tests/`, with their file paths.
+    pub walkthroughs: Vec<(String, Walkthrough)>,
 }
 
 impl Project {
@@ -51,6 +54,14 @@ struct StoryFile {
     seed: u64,
     #[serde(default)]
     notes: Vec<Note>,
+    #[serde(default)]
+    timers: Vec<Timer>,
+    #[serde(default)]
+    machines: Vec<Machine>,
+    #[serde(default)]
+    behaviors: Vec<Id>,
+    #[serde(default)]
+    score: Option<loremaster_model::Score>,
 }
 
 /// Load a project from its files. Paths use `/` and are relative to the
@@ -64,6 +75,11 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut rules = Vec::new();
     let mut threads = Vec::new();
     let mut dialogues = Vec::new();
+    let mut machines = Vec::new();
+    let mut walkthroughs = Vec::new();
+    let mut behaviors: Vec<Id> = Vec::new();
+    let mut verbs: Vec<VerbDef> = Vec::new();
+    let mut timers: Vec<Timer> = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -81,15 +97,23 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                 Err(e) => errors.push(parse_err(e)),
             },
             "rooms" => match serde_saphyr::from_str::<Room>(&with_default_id(&file.text, stem)) {
-                Ok(r) => {
+                Ok(mut r) => {
                     origins.insert(format!("room:{}", r.id), path.to_string());
+                    for rule in nested_rules(&mut r.rules, &r.id) {
+                        origins.insert(format!("rule:{}", rule.id), path.to_string());
+                        rules.push(rule);
+                    }
                     rooms.push(r);
                 }
                 Err(e) => errors.push(parse_err(e)),
             },
             "things" => match serde_saphyr::from_str::<Thing>(&with_default_id(&file.text, stem)) {
-                Ok(t) => {
+                Ok(mut t) => {
                     origins.insert(format!("thing:{}", t.id), path.to_string());
+                    for rule in nested_rules(&mut t.rules, &t.id) {
+                        origins.insert(format!("rule:{}", rule.id), path.to_string());
+                        rules.push(rule);
+                    }
                     things.push(t);
                 }
                 Err(e) => errors.push(parse_err(e)),
@@ -112,8 +136,52 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                     Err(e) => errors.push(parse_err(e)),
                 }
             }
+            // Commands such as `n` and `y` are words here, not YAML 1.1 booleans.
+            "tests" => match serde_saphyr::from_str_with_options::<Walkthrough>(
+                &file.text,
+                serde_saphyr::options! { strict_booleans: true },
+            ) {
+                Ok(w) => walkthroughs.push((path.to_string(), w)),
+                Err(e) => errors.push(parse_err(e)),
+            },
+            // A file that names a behavior in Rust; the text holds author notes about it.
+            "behaviors" => {
+                origins.insert(format!("behavior:{stem}"), path.to_string());
+                behaviors.push(Id::new(stem));
+            }
+            "timers" => match serde_saphyr::from_str::<Timer>(&with_default_id(&file.text, stem)) {
+                Ok(t) => {
+                    origins.insert(format!("timer:{}", t.id), path.to_string());
+                    timers.push(t);
+                }
+                Err(e) => errors.push(parse_err(e)),
+            },
+            "verbs" => {
+                match serde_saphyr::from_str::<VerbDef>(&with_default_id(&file.text, stem)) {
+                    Ok(v) => {
+                        origins.insert(format!("verb:{}", v.id), path.to_string());
+                        verbs.push(v);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                }
+            }
+            "machines" => {
+                match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
+                    Ok(m) => {
+                        origins.insert(format!("machine:{}", m.id), path.to_string());
+                        machines.push(m);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                }
+            }
             "rules" => {
-                let parsed = if file.text.trim_start().starts_with('-') {
+                let list = file
+                    .text
+                    .lines()
+                    .map(str::trim_start)
+                    .find(|l| !l.is_empty() && !l.starts_with('#'))
+                    .is_some_and(|l| l.starts_with('-'));
+                let parsed = if list {
                     serde_saphyr::from_str::<Vec<Rule>>(&file.text)
                 } else {
                     serde_saphyr::from_str::<Rule>(&with_default_id(&file.text, stem))
@@ -147,17 +215,59 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     if !errors.is_empty() {
         return Err(errors);
     }
+    for m in &header.machines {
+        origins.insert(format!("machine:{}", m.id), "story.yaml".to_string());
+    }
+    machines.splice(0..0, header.machines);
+    let mut vars = header.vars;
+    if let Some(score) = &header.score
+        && !vars.iter().any(|v| v.id == score.var)
+    {
+        vars.push(VarDef {
+            id: score.var.clone(),
+            ty: loremaster_model::VarType::Int,
+            initial: loremaster_model::Value::Int(0),
+        });
+    }
+    for m in &machines {
+        vars.push(VarDef {
+            id: m.id.clone(),
+            ty: loremaster_model::VarType::Enum(m.all_states()),
+            initial: loremaster_model::Value::Text(m.start.clone()),
+        });
+        let file = origins
+            .get(&format!("machine:{}", m.id))
+            .cloned()
+            .unwrap_or_default();
+        for rule in machine_rules(m) {
+            origins.insert(format!("rule:{}", rule.id), file.clone());
+            rules.push(rule);
+        }
+    }
     let story = Story {
         title: header.title,
         author: header.author,
         start: header.start,
         intro: header.intro,
         clock: header.clock,
-        vars: header.vars,
-        verbs: header.verbs,
+        vars,
+        machines,
+        verbs: header.verbs.into_iter().chain(verbs).collect(),
+        score: header.score,
         rooms,
         things,
         rules,
+        timers: header.timers.into_iter().chain(timers).collect(),
+        behaviors: header
+            .behaviors
+            .into_iter()
+            .chain(behaviors)
+            .fold(Vec::new(), |mut all, b| {
+                if !all.contains(&b) {
+                    all.push(b);
+                }
+                all
+            }),
         relations: header.relations,
         dialogues,
         frames: header.frames,
@@ -169,7 +279,67 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         story,
         files,
         origins,
+        walkthroughs,
     })
+}
+
+/// The rules of a machine: one for each step. A step holds in one of its
+/// `from` states and when its own `when` holds; it sets the new state first.
+fn machine_rules(m: &Machine) -> Vec<Rule> {
+    m.steps
+        .iter()
+        .enumerate()
+        .map(|(i, step)| {
+            let from: Vec<String> = step
+                .from
+                .list()
+                .iter()
+                .map(|s| format!("{} == {s}", m.id))
+                .collect();
+            // A step without `from` never fires; the checker reports it.
+            let from = if from.is_empty() {
+                "false".to_string()
+            } else {
+                from.join(" or ")
+            };
+            let mut when = format!("({from})");
+            if let Some(extra) = &step.when {
+                when = format!("{when} and ({extra})");
+            }
+            let mut then = vec![Effect::Set(
+                [(
+                    m.id.to_string(),
+                    loremaster_model::Value::Text(step.to.clone()),
+                )]
+                .into(),
+            )];
+            then.extend(step.say.iter().map(|s| Effect::Say(s.clone())));
+            then.extend(step.then.iter().cloned());
+            Rule {
+                id: m.step_rule(i),
+                on: step.on.clone(),
+                when: Some(when),
+                then,
+                once: false,
+                instead: step.instead,
+                within: None,
+                priority: 0,
+                machine: Some(m.id.clone()),
+                notes: Vec::new(),
+            }
+        })
+        .collect()
+}
+
+/// Take the rules out of a room or thing file. They belong to it.
+fn nested_rules(rules: &mut Vec<Rule>, owner: &Id) -> Vec<Rule> {
+    std::mem::take(rules)
+        .into_iter()
+        .map(|mut r| {
+            r.within.get_or_insert_with(|| owner.clone());
+            r
+        })
+        .collect()
 }
 
 fn yaml_stem(path: &str) -> Option<&str> {

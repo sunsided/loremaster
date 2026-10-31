@@ -2,4 +2,5 @@
 name: "songbird"
 aliases: ["bird"]
 location: { room: forest_1 }
+also_in: ["forest_2", "forest_3", "path", "up_a_tree", "clearing"]
 listed: false

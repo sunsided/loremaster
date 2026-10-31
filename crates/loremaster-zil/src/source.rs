@@ -25,6 +25,14 @@ impl Entity {
     }
 
     /// The first atom argument of a property, such as `IN` or `ACTION`.
+    /// The first number argument of a property, such as `VALUE`.
+    pub fn int(&self, name: &str) -> Option<i64> {
+        match self.prop(name)?.first()? {
+            Node::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+
     pub fn atom(&self, name: &str) -> Option<&str> {
         self.prop(name)?.first()?.atom()
     }
