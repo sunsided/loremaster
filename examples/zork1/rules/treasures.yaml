@@ -1,0 +1,285 @@
+# Hand-ported from SCORE-OBJ and SCORE-UPD (1actions.zil), and the trophy case.
+# The importer writes the points of each treasure as the properties `value`
+# (for the first take) and `tvalue` (for the trophy case). Made with a small
+# script from those properties; the score does not go down when a treasure
+# leaves the case again.
+
+- id: take_bag_of_coins
+  on: { verb: [take, bag_of_coins] }
+  when: bag_of_coins.carried
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: case_bag_of_coins
+  on: { verb: [put, bag_of_coins, trophy_case] }
+  when: in(bag_of_coins, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: take_bar
+  on: { verb: [take, bar] }
+  when: bar.carried
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: case_bar
+  on: { verb: [put, bar, trophy_case] }
+  when: in(bar, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: take_bauble
+  on: { verb: [take, bauble] }
+  when: bauble.carried
+  once: true
+  then:
+    - add: { score: 1 }
+
+- id: case_bauble
+  on: { verb: [put, bauble, trophy_case] }
+  when: in(bauble, trophy_case)
+  once: true
+  then:
+    - add: { score: 1 }
+
+- id: take_bracelet
+  on: { verb: [take, bracelet] }
+  when: bracelet.carried
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: case_bracelet
+  on: { verb: [put, bracelet, trophy_case] }
+  when: in(bracelet, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: case_broken_canary
+  on: { verb: [put, broken_canary, trophy_case] }
+  when: in(broken_canary, trophy_case)
+  once: true
+  then:
+    - add: { score: 1 }
+
+- id: case_broken_egg
+  on: { verb: [put, broken_egg, trophy_case] }
+  when: in(broken_egg, trophy_case)
+  once: true
+  then:
+    - add: { score: 2 }
+
+- id: take_canary
+  on: { verb: [take, canary] }
+  when: canary.carried
+  once: true
+  then:
+    - add: { score: 6 }
+
+- id: case_canary
+  on: { verb: [put, canary, trophy_case] }
+  when: in(canary, trophy_case)
+  once: true
+  then:
+    - add: { score: 4 }
+
+- id: take_chalice
+  on: { verb: [take, chalice] }
+  when: chalice.carried
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: case_chalice
+  on: { verb: [put, chalice, trophy_case] }
+  when: in(chalice, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: take_coffin
+  on: { verb: [take, coffin] }
+  when: coffin.carried
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: case_coffin
+  on: { verb: [put, coffin, trophy_case] }
+  when: in(coffin, trophy_case)
+  once: true
+  then:
+    - add: { score: 15 }
+
+- id: take_diamond
+  on: { verb: [take, diamond] }
+  when: diamond.carried
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: case_diamond
+  on: { verb: [put, diamond, trophy_case] }
+  when: in(diamond, trophy_case)
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: take_egg
+  on: { verb: [take, egg] }
+  when: egg.carried
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: case_egg
+  on: { verb: [put, egg, trophy_case] }
+  when: in(egg, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: take_emerald
+  on: { verb: [take, emerald] }
+  when: emerald.carried
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: case_emerald
+  on: { verb: [put, emerald, trophy_case] }
+  when: in(emerald, trophy_case)
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: take_jade
+  on: { verb: [take, jade] }
+  when: jade.carried
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: case_jade
+  on: { verb: [put, jade, trophy_case] }
+  when: in(jade, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: take_painting
+  on: { verb: [take, painting] }
+  when: painting.carried
+  once: true
+  then:
+    - add: { score: 4 }
+
+- id: case_painting
+  on: { verb: [put, painting, trophy_case] }
+  when: in(painting, trophy_case)
+  once: true
+  then:
+    - add: { score: 6 }
+
+- id: take_pot_of_gold
+  on: { verb: [take, pot_of_gold] }
+  when: pot_of_gold.carried
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: case_pot_of_gold
+  on: { verb: [put, pot_of_gold, trophy_case] }
+  when: in(pot_of_gold, trophy_case)
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: take_scarab
+  on: { verb: [take, scarab] }
+  when: scarab.carried
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: case_scarab
+  on: { verb: [put, scarab, trophy_case] }
+  when: in(scarab, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }
+
+- id: take_sceptre
+  on: { verb: [take, sceptre] }
+  when: sceptre.carried
+  once: true
+  then:
+    - add: { score: 4 }
+
+- id: case_sceptre
+  on: { verb: [put, sceptre, trophy_case] }
+  when: in(sceptre, trophy_case)
+  once: true
+  then:
+    - add: { score: 6 }
+
+- id: take_skull
+  on: { verb: [take, skull] }
+  when: skull.carried
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: case_skull
+  on: { verb: [put, skull, trophy_case] }
+  when: in(skull, trophy_case)
+  once: true
+  then:
+    - add: { score: 10 }
+
+- id: take_torch
+  on: { verb: [take, torch] }
+  when: torch.carried
+  once: true
+  then:
+    - add: { score: 14 }
+
+- id: case_torch
+  on: { verb: [put, torch, trophy_case] }
+  when: in(torch, trophy_case)
+  once: true
+  then:
+    - add: { score: 6 }
+
+- id: take_trident
+  on: { verb: [take, trident] }
+  when: trident.carried
+  once: true
+  then:
+    - add: { score: 4 }
+
+- id: case_trident
+  on: { verb: [put, trident, trophy_case] }
+  when: in(trident, trophy_case)
+  once: true
+  then:
+    - add: { score: 11 }
+
+- id: take_trunk
+  on: { verb: [take, trunk] }
+  when: trunk.carried
+  once: true
+  then:
+    - add: { score: 15 }
+
+- id: case_trunk
+  on: { verb: [put, trunk, trophy_case] }
+  when: in(trunk, trophy_case)
+  once: true
+  then:
+    - add: { score: 5 }

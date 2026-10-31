@@ -31,7 +31,7 @@ pub use machine::{Machine, States, Step};
 pub use note::{Note, NoteRole, Thread, ThreadStatus};
 pub use room::{Direction, Exit, Room};
 pub use rule::{Effect, EventPattern, Rule};
-pub use story::{Story, VarDef, VarType};
+pub use story::{Rank, Score, Story, VarDef, VarType};
 pub use thing::{Location, NameStage, Thing};
 pub use timer::{StartTimers, Timer};
 pub use value::Value;

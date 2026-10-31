@@ -3,6 +3,7 @@ name: "trunk of jewels"
 aliases: ["trunk", "chest", "jewels", "treasure"]
 location: nowhere
 portable: true
+props: { value: 15, tvalue: 5 }
 presence:
   - when: "trunk.interactions == 0"
     text: "Lying half buried in the mud is an old trunk, bulging with jewels."

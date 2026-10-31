@@ -2,6 +2,18 @@ title: "Zork I: The Great Underground Empire"
 author: "Tim Anderson, Marc Blank, Bruce Daniels and Dave Lebling (Infocom). Imported from ZIL with loremaster-zil."
 start: west_of_house
 
+score:
+  max: 350
+  ranks:
+    - { from: 0, name: "Beginner" }
+    - { from: 26, name: "Amateur Adventurer" }
+    - { from: 51, name: "Novice Adventurer" }
+    - { from: 101, name: "Junior Adventurer" }
+    - { from: 201, name: "Adventurer" }
+    - { from: 301, name: "Master" }
+    - { from: 331, name: "Wizard" }
+    - { from: 350, name: "Master Adventurer" }
+
 vars:
   - { id: coffin_cure, type: bool, initial: false }
   - { id: cyclops_flag, type: bool, initial: false }

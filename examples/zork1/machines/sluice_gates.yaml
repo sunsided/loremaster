@@ -1,0 +1,39 @@
+# Hand-ported from DAM-FUNCTION, BOLT-F, BUTTON-F, I-REMPTY and I-RFILL
+# (1actions.zil). The yellow button in the maintenance room makes the bolt
+# work. The bolt opens and closes the sluice gates; the reservoir then
+# empties or fills in 8 turns.
+start: closed
+states: [closed, draining, low, filling]
+steps:
+  - from: [closed, filling]
+    on: { verb: [turn, bolt, wrench] }
+    when: gate_flag
+    to: draining
+    instead: true
+    say: "The sluice gates open and water pours through the dam."
+    then:
+      - set: { gates_open: true }
+      - cancel: reservoir_fills
+      - start: reservoir_empties
+  - from: [draining, low]
+    on: { verb: [turn, bolt, wrench] }
+    when: gate_flag
+    to: filling
+    instead: true
+    say: "The sluice gates close and water starts to collect behind the dam."
+    then:
+      - set: { gates_open: false }
+      - cancel: reservoir_empties
+      - start: reservoir_fills
+  - from: draining
+    on: { timer: reservoir_empties }
+    to: low
+    say: "{here == reservoir or here == reservoir_north or here == reservoir_south ? The water level is now quite low here and you could easily walk across. | }"
+    then:
+      - set: { low_tide: true }
+  - from: filling
+    on: { timer: reservoir_fills }
+    to: closed
+    say: "{here == reservoir ? You notice that the water level has risen to the point that it is impossible to cross. | }"
+    then:
+      - set: { low_tide: false }

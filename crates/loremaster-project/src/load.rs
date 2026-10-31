@@ -60,6 +60,8 @@ struct StoryFile {
     machines: Vec<Machine>,
     #[serde(default)]
     behaviors: Vec<Id>,
+    #[serde(default)]
+    score: Option<loremaster_model::Score>,
 }
 
 /// Load a project from its files. Paths use `/` and are relative to the
@@ -76,6 +78,8 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut machines = Vec::new();
     let mut walkthroughs = Vec::new();
     let mut behaviors: Vec<Id> = Vec::new();
+    let mut verbs: Vec<VerbDef> = Vec::new();
+    let mut timers: Vec<Timer> = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -145,6 +149,22 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                 origins.insert(format!("behavior:{stem}"), path.to_string());
                 behaviors.push(Id::new(stem));
             }
+            "timers" => match serde_saphyr::from_str::<Timer>(&with_default_id(&file.text, stem)) {
+                Ok(t) => {
+                    origins.insert(format!("timer:{}", t.id), path.to_string());
+                    timers.push(t);
+                }
+                Err(e) => errors.push(parse_err(e)),
+            },
+            "verbs" => {
+                match serde_saphyr::from_str::<VerbDef>(&with_default_id(&file.text, stem)) {
+                    Ok(v) => {
+                        origins.insert(format!("verb:{}", v.id), path.to_string());
+                        verbs.push(v);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                }
+            }
             "machines" => {
                 match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
                     Ok(m) => {
@@ -155,7 +175,13 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                 }
             }
             "rules" => {
-                let parsed = if file.text.trim_start().starts_with('-') {
+                let list = file
+                    .text
+                    .lines()
+                    .map(str::trim_start)
+                    .find(|l| !l.is_empty() && !l.starts_with('#'))
+                    .is_some_and(|l| l.starts_with('-'));
+                let parsed = if list {
                     serde_saphyr::from_str::<Vec<Rule>>(&file.text)
                 } else {
                     serde_saphyr::from_str::<Rule>(&with_default_id(&file.text, stem))
@@ -194,6 +220,15 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     }
     machines.splice(0..0, header.machines);
     let mut vars = header.vars;
+    if let Some(score) = &header.score
+        && !vars.iter().any(|v| v.id == score.var)
+    {
+        vars.push(VarDef {
+            id: score.var.clone(),
+            ty: loremaster_model::VarType::Int,
+            initial: loremaster_model::Value::Int(0),
+        });
+    }
     for m in &machines {
         vars.push(VarDef {
             id: m.id.clone(),
@@ -217,11 +252,12 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         clock: header.clock,
         vars,
         machines,
-        verbs: header.verbs,
+        verbs: header.verbs.into_iter().chain(verbs).collect(),
+        score: header.score,
         rooms,
         things,
         rules,
-        timers: header.timers,
+        timers: header.timers.into_iter().chain(timers).collect(),
         behaviors: header
             .behaviors
             .into_iter()

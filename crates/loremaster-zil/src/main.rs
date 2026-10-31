@@ -1,7 +1,8 @@
 //! `loremaster-zil <zil-folder> <project-folder>`: import a ZIL game into a loremaster project folder.
 //!
 //! The importer writes `story.yaml`, `IMPORT.md`, `rooms/` and `things/`. It removes the room and
-//! thing files of an earlier import, but keeps all other files, such as hand-written `rules/`.
+//! thing files of an earlier import, but keeps all other files, such as hand-written `rules/`,
+//! `machines/`, `timers/` and `verbs/`.
 
 use loremaster_zil::{Source, convert, files};
 use std::fs;
@@ -42,8 +43,12 @@ fn run(zil: &Path, project: &Path) -> std::io::Result<()> {
         src.add_file(&name, &text);
     }
 
+    // Hand-written logic: the importer declares the ZIL flags that it uses.
     let mut rules = String::new();
-    if let Ok(entries) = fs::read_dir(project.join("rules")) {
+    for dir in ["rules", "machines", "timers"] {
+        let Ok(entries) = fs::read_dir(project.join(dir)) else {
+            continue;
+        };
         for entry in entries.filter_map(Result::ok) {
             let path = entry.path();
             if path.extension().is_some_and(|x| x == "yaml" || x == "yml") {

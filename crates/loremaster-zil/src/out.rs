@@ -63,7 +63,8 @@ pub struct ThingOut {
     pub portable: bool,
     pub key: Option<String>,
     pub listed: bool,
-    pub props: Vec<(String, bool)>,
+    /// Properties with their start values, already written as YAML scalars.
+    pub props: Vec<(String, String)>,
     pub description: Vec<Frag>,
     pub presence: Vec<Frag>,
 }
@@ -87,6 +88,8 @@ pub struct StoryOut {
     pub start: String,
     pub intro: Vec<Frag>,
     pub vars: Vec<VarOut>,
+    /// The highest score (`SCORE-MAX`) and the ranks, if the game has a score.
+    pub score: Option<(i64, Vec<(i64, &'static str)>)>,
 }
 
 /// A file to write, with its path relative to the project folder.
@@ -145,6 +148,15 @@ impl StoryOut {
         let _ = writeln!(out, "author: {}", quote(&self.author));
         let _ = writeln!(out, "start: {}", self.start);
         fragments(&mut out, "intro", &self.intro);
+        if let Some((max, ranks)) = &self.score {
+            let _ = writeln!(out, "\nscore:\n  max: {max}");
+            if !ranks.is_empty() {
+                let _ = writeln!(out, "  ranks:");
+                for (from, name) in ranks {
+                    let _ = writeln!(out, "    - {{ from: {from}, name: {} }}", quote(name));
+                }
+            }
+        }
         if !self.vars.is_empty() {
             let _ = writeln!(out, "\nvars:");
             for v in &self.vars {

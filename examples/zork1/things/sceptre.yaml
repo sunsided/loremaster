@@ -3,6 +3,7 @@ name: "sceptre"
 aliases: ["scepter", "treasure"]
 location: { in: coffin }
 portable: true
+props: { value: 4, tvalue: 6 }
 presence:
   - when: "sceptre.interactions == 0"
     text: "A sceptre, possibly that of ancient Egypt itself, is in the coffin. The sceptre is ornamented with colored enamel, and tapers to a sharp point."

@@ -4,6 +4,6 @@ aliases: ["egg", "treasure"]
 location: nowhere
 container: true
 portable: true
-props: { open: true }
+props: { open: true, tvalue: 2 }
 presence:
   - "There is a somewhat ruined egg here."

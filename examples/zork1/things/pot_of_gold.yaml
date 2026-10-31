@@ -3,6 +3,7 @@ name: "pot of gold"
 aliases: ["pot", "gold", "treasure"]
 location: nowhere
 portable: true
+props: { value: 10, tvalue: 10 }
 presence:
   - when: "pot_of_gold.interactions == 0"
     text: "At the end of the rainbow is a pot of gold."

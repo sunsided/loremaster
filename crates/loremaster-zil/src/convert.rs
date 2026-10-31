@@ -126,6 +126,14 @@ pub fn convert(src: &Source, rules: &str) -> World {
         start: id(start),
         intro: Vec::new(),
         vars,
+        score: src
+            .globals
+            .get("SCORE-MAX")
+            .and_then(|n| match n {
+                Node::Int(i) => Some(*i),
+                _ => None,
+            })
+            .map(|max| (max, hints::ranks(start).to_vec())),
     };
     World {
         story,
@@ -438,17 +446,23 @@ fn thing(
     let mut props = Vec::new();
     let mut key = None;
     if container || door {
-        props.push(("open".to_string(), o.has_flag("OPENBIT")));
+        props.push(("open".to_string(), o.has_flag("OPENBIT").to_string()));
     }
     if container && o.has_flag("TRANSBIT") {
-        props.push(("transparent".to_string(), true));
+        props.push(("transparent".to_string(), "true".to_string()));
     }
     if let Some((_, locked, k)) = hints::LOCKS.iter().find(|(d, ..)| *d == o.name) {
-        props.push(("locked".to_string(), *locked));
+        props.push(("locked".to_string(), locked.to_string()));
         key = k.map(id);
     }
     if o.has_flag("LIGHTBIT") {
-        props.push(("lit".to_string(), o.has_flag("ONBIT")));
+        props.push(("lit".to_string(), o.has_flag("ONBIT").to_string()));
+    }
+    // Points for the first time the player takes a treasure, and for a treasure in the trophy case.
+    for (zil, prop) in [("VALUE", "value"), ("TVALUE", "tvalue")] {
+        if let Some(n) = o.int(zil).filter(|n| *n > 0) {
+            props.push((prop.to_string(), n.to_string()));
+        }
     }
 
     let description = o
@@ -631,7 +645,7 @@ mod tests {
         check!(w.things.iter().any(|t| t.id == "box" && t.container));
         check!(gem.presence[0].when.as_deref() == Some("gem.interactions == 0"));
         let door = w.things.iter().find(|t| t.id == "door").unwrap();
-        check!(door.props == vec![("open".to_string(), false)]);
+        check!(door.props == vec![("open".to_string(), "false".to_string())]);
         check!(!w.report.placement.iter().any(|n| n.owner == "gem"));
         check!(!w.report.placement.iter().any(|n| n.owner == "house"));
     }

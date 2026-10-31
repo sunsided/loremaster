@@ -403,6 +403,17 @@ impl World {
             .collect::<Result<_, CompileError>>()?;
         let scope = c.scope.clone();
         let mut verbs = standard_verbs();
+        if story.score.is_some() {
+            verbs.push(VerbDef {
+                id: Id::new("score"),
+                label: "Score".into(),
+                words: vec!["score".into()],
+                slots: loremaster_model::VerbSlots::None,
+                preposition: None,
+                bar: false,
+                default: None,
+            });
+        }
         verbs.extend(story.verbs.iter().cloned());
         let room_index = story
             .rooms

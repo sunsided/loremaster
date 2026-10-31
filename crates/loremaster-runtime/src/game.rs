@@ -2616,6 +2616,27 @@ impl Game {
                 }
             }
             "wait" => say(turn, "Time passes.".into()),
+            "score" => {
+                let Some(score) = &self.world.story.score else {
+                    return;
+                };
+                let now = self
+                    .state
+                    .facts
+                    .get(score.var.as_str())
+                    .and_then(Value::as_int)
+                    .unwrap_or(0);
+                let moves = self.state.turns;
+                let unit = if moves == 1 { "move" } else { "moves" };
+                let mut text = format!(
+                    "Your score is {now} (total of {} points), in {moves} {unit}.",
+                    score.max
+                );
+                if let Some(rank) = score.rank(now) {
+                    text.push_str(&format!(" This gives you the rank of {rank}."));
+                }
+                say(turn, text);
+            }
             "examine" => {
                 let Some(o) = first else { return };
                 let Some(ti) = self.world.thing_idx(o.as_str()) else {

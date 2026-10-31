@@ -4,6 +4,6 @@ aliases: ["coffin", "casket", "treasure"]
 location: { room: egypt_room }
 container: true
 portable: true
-props: { open: false }
+props: { open: false, value: 10, tvalue: 15 }
 presence:
   - "The solid-gold coffin used for the burial of Ramses II is here."

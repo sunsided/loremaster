@@ -3,3 +3,4 @@ name: "large emerald"
 aliases: ["emerald", "treasure"]
 location: { in: buoy }
 portable: true
+props: { value: 5, tvalue: 10 }
