@@ -21,11 +21,50 @@
 	interface Edge {
 		/** The number of the step, from 1. */
 		n: number;
+		from: string;
+		to: string;
 		path: string;
 		label: { x: number; y: number };
 		ready: boolean;
 		fired: boolean;
 	}
+
+	/**
+	 * What the pointer (or the focus on a step row) points at: a state lights its steps in and out, and the
+	 * states at their other ends; a step lights its arrows and the states at both ends.
+	 */
+	let lit = $state<{ machine: string; state?: string; step?: number; from?: string } | null>(null);
+
+	function pointState(m: MachineView, state: string) {
+		lit = { machine: m.id, state };
+	}
+
+	/** A step; `from` narrows it to one of its arrows. */
+	function pointStep(m: MachineView, step: number, from?: string) {
+		lit = { machine: m.id, step, from };
+	}
+
+	function clear() {
+		lit = null;
+	}
+
+	/** The arrow from `from` to `to` of step `n` is lit. */
+	function edgeOn(m: MachineView, n: number, from: string, to: string): boolean {
+		if (lit?.machine !== m.id) return false;
+		if (lit.state) return from === lit.state || to === lit.state;
+		return n === lit.step && (!lit.from || from === lit.from);
+	}
+
+	/** The state is lit: the pointed state, or an end of a lit arrow. */
+	function stateOn(m: MachineView, s: string): boolean {
+		if (lit?.machine !== m.id) return false;
+		if (s === lit.state) return true;
+		return m.steps.some((st, i) =>
+			st.from.some((f) => edgeOn(m, i + 1, f, st.to) && (f === s || st.to === s))
+		);
+	}
+
+	const isLit = (m: MachineView) => lit?.machine === m.id;
 
 	/**
 	 * States in a row; a step to a later state arcs above, a step back arcs below. An arc whose badge
@@ -37,6 +76,8 @@
 		const raw = m.steps.flatMap((step, i) =>
 			step.from.map((from) => ({
 				n: i + 1,
+				from,
+				to: step.to,
 				a: index.get(from) ?? 0,
 				b: index.get(step.to) ?? 0,
 				ready: step.ready && from === m.state,
@@ -58,12 +99,14 @@
 		const above = Math.max(0, ...raw.map((r, i) => (r.b >= r.a ? lifts[i] : 0)));
 		const below = Math.max(0, ...raw.map((r, i) => (r.b < r.a ? lifts[i] : 0)));
 		const top = PAD + above;
-		const edges: Edge[] = raw.map(({ n, a, b, ready, fired }, i) => {
+		const edges: Edge[] = raw.map(({ n, from, to, a, b, ready, fired }, i) => {
 			const lift = lifts[i];
 			if (a === b) {
 				const x = cx(a);
 				return {
 					n,
+					from,
+					to,
 					path: `M ${x - 14} ${top} C ${x - 30} ${top - lift * 1.15}, ${x + 30} ${top - lift * 1.15}, ${x + 14} ${top}`,
 					label: { x, y: top - lift },
 					ready,
@@ -79,6 +122,8 @@
 			const control = forward ? y - 2 * lift : y + 2 * lift;
 			return {
 				n,
+				from,
+				to,
 				path: `M ${x1} ${y} Q ${(x1 + x2) / 2} ${control}, ${x2} ${y}`,
 				label: { x: (x1 + x2) / 2, y: peak },
 				ready,
@@ -114,6 +159,7 @@
 			</summary>
 			<div class="graph">
 				<svg
+					class:pointing={isLit(m)}
 					viewBox="0 0 {g.width} {g.height}"
 					width={g.width}
 					height={g.height}
@@ -126,16 +172,38 @@
 						</marker>
 					</defs>
 					{#each g.edges as e, i (i)}
-						<path class="edge" class:ready={e.ready} class:fired={e.fired} d={e.path} marker-end="url(#arrow-{m.id})" />
+						<path class="edge" class:ready={e.ready} class:fired={e.fired} class:lit={edgeOn(m, e.n, e.from, e.to)} d={e.path} marker-end="url(#arrow-{m.id})" />
+						<!-- A wide, invisible copy of the arrow that is easy to point at. -->
+						<path
+							class="hit"
+							role="presentation"
+							d={e.path}
+							onpointerenter={() => pointStep(m, e.n, e.from)}
+							onpointerleave={clear}
+						/>
 					{/each}
 					{#each g.edges as e, i (i)}
-						<g class="badge" class:ready={e.ready}>
+						<g
+							class="badge"
+							class:ready={e.ready}
+							class:lit={edgeOn(m, e.n, e.from, e.to)}
+							role="presentation"
+							onpointerenter={() => pointStep(m, e.n, e.from)}
+							onpointerleave={clear}
+						>
 							<rect x={e.label.x - 9} y={e.label.y - 9} width="18" height="18" />
 							<text x={e.label.x} y={e.label.y}>{e.n}</text>
 						</g>
 					{/each}
 					{#each m.states as s, i (s)}
-						<g class="state" class:current={s === m.state}>
+						<g
+							class="state"
+							class:current={s === m.state}
+							class:lit={stateOn(m, s)}
+							role="presentation"
+							onpointerenter={() => pointState(m, s)}
+							onpointerleave={clear}
+						>
 							<rect x={g.cx(i) - BOX_W / 2} y={g.top} width={BOX_W} height={BOX_H} />
 							<text x={g.cx(i)} y={g.top + BOX_H / 2}>{s}</text>
 						</g>
@@ -149,7 +217,12 @@
 							type="button"
 							class="step"
 							class:ready={step.ready}
+							class:lit={step.from.some((f) => edgeOn(m, i + 1, f, step.to))}
 							disabled={!onrule}
+							onpointerenter={() => pointStep(m, i + 1)}
+							onpointerleave={clear}
+							onfocus={() => pointStep(m, i + 1)}
+							onblur={clear}
 							onclick={() => onrule?.(step.rule)}
 							aria-label="Step {i + 1}: {step.from.join(' or ')} to {step.to}. Show rule {step.rule}"
 						>
@@ -234,6 +307,51 @@
 	svg {
 		display: block;
 		max-width: none;
+	}
+	/* While the pointer is on a state or a step, the rest steps back. */
+	svg.pointing .edge:not(.lit),
+	svg.pointing .badge:not(.lit),
+	svg.pointing .state:not(.lit) {
+		opacity: 0.3;
+	}
+	.edge,
+	.badge,
+	.state {
+		transition: opacity var(--duration-fast);
+	}
+	.hit {
+		fill: none;
+		stroke: transparent;
+		stroke-width: 14;
+		pointer-events: stroke;
+	}
+	.state,
+	.badge {
+		cursor: default;
+	}
+	.edge.lit {
+		stroke: var(--color-accent);
+		stroke-width: 2.5;
+	}
+	.badge.lit rect {
+		stroke: var(--color-accent);
+	}
+	.badge.lit text {
+		fill: var(--color-text-accent);
+	}
+	.state.lit rect {
+		stroke: var(--color-accent);
+		stroke-width: 2;
+	}
+	.step.lit {
+		border-color: var(--color-accent);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.edge,
+		.badge,
+		.state {
+			transition: none;
+		}
 	}
 	.edge {
 		fill: none;
