@@ -26,7 +26,7 @@
 	import NotesList from '#lib/design/organisms/NotesList.svelte';
 	import RadioGroup from '#lib/design/molecules/RadioGroup.svelte';
 	import type { NoteItem, ReviewFinding, ThreadItem } from '#lib/design/types.ts';
-	import { addNote, pathOf, removeNote, setField, setNoteDone } from '#lib/project/yaml-edit.ts';
+	import { addNote, editStates, machinePath, pathOf, removeNote, setField, setNoteDone, type StateEdit } from '#lib/project/yaml-edit.ts';
 	import { addStory, myStories, type StoryEntry } from '#lib/project/stories.ts';
 	import NewStoryDialog from '#lib/design/organisms/NewStoryDialog.svelte';
 	import { settings } from '#lib/settings.svelte.ts';
@@ -630,6 +630,24 @@
 
 	/** The machine state that the details panel of Atlas › Machines shows. */
 	let machineState = $state<{ machine: string; state: string } | null>(null);
+
+	/** Change the states of a machine in its file. Resolves to a problem in words, or null. */
+	async function editMachineState(machine: string, edit: StateEdit): Promise<string | null> {
+		const ws = workspace;
+		const m = session?.machines.find((x) => x.id === machine);
+		const file = ws?.project.origins[`machine:${machine}`];
+		const text = file ? ws?.project.file(file)?.text : undefined;
+		if (!ws || !m || !file || text === undefined) return 'The file of this machine is not found.';
+		try {
+			const problems = await ws.change(file, editStates(text, machinePath(text, file, machine), m.states, edit));
+			if (problems?.length) return problems.map((p) => p.message).join(' ');
+		} catch (e) {
+			return e instanceof Error ? e.message : String(e);
+		}
+		if (edit.kind === 'rename') machineState = { machine, state: edit.to };
+		if (edit.kind === 'delete') machineState = null;
+		return null;
+	}
 
 	/** A rule for the Rules tab to show and focus. */
 	let revealRule = $state<string | null>(null);
@@ -1506,6 +1524,7 @@
 							onrule={showRule}
 							selected={machineState}
 							onselect={(machine, state) => (machineState = { machine, state })}
+							onaddstate={(machine, name) => editMachineState(machine, { kind: 'add', name })}
 						/>
 					</div>
 				{:else if atlasTab === 'todos'}
@@ -1601,8 +1620,9 @@
 				{@const m = session.machines.find((x) => x.id === machineState?.machine) ?? session.machines[0]}
 				<MachineStateCard
 					machine={m}
-					state={machineState?.machine === m.id && m.states.includes(machineState.state) ? machineState.state : m.state}
+					stateName={machineState?.machine === m.id && m.states.includes(machineState.state) ? machineState.state : m.state}
 					onrule={showRule}
+					onedit={(edit) => editMachineState(m.id, edit)}
 				/>
 			{/if}
 			{#if atlasTab === 'map' && card}

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { MachineView } from '#lib/engine/types.ts';
+	import Button from '../atoms/Button.svelte';
 	import Heading from '../atoms/Heading.svelte';
+	import TextInput from '../atoms/TextInput.svelte';
 
 	interface Props {
 		machines: MachineView[];
@@ -10,9 +12,27 @@
 		selected?: { machine: string; state: string } | null;
 		/** Select a state for the details panel. */
 		onselect?: (machine: string, state: string) => void;
+		/** Add a state to a machine in the story files. Resolves to a problem in words, or null. */
+		onaddstate?: (machine: string, name: string) => Promise<string | null>;
 	}
 
-	let { machines, onrule, selected = null, onselect }: Props = $props();
+	let { machines, onrule, selected = null, onselect, onaddstate }: Props = $props();
+	const uid = $props.id();
+
+	/** The name in the "+ State" field of each machine, and the last problem. */
+	let newState = $state<Record<string, string>>({});
+	let addProblem = $state<Record<string, string | null>>({});
+
+	async function addState(machine: string) {
+		const name = (newState[machine] ?? '').trim();
+		if (!name || !onaddstate) return;
+		const problem = await onaddstate(machine, name);
+		addProblem[machine] = problem;
+		if (!problem) {
+			newState[machine] = '';
+			onselect?.(machine, name);
+		}
+	}
 
 	/** Width of one state column and the size of a state box, in SVG units. */
 	const COL = 150;
@@ -227,6 +247,33 @@
 					{/each}
 				</svg>
 			</div>
+			{#if onaddstate}
+				<form
+					class="add"
+					onsubmit={(e) => {
+						e.preventDefault();
+						addState(m.id);
+					}}
+				>
+					<TextInput
+						id="{uid}-{m.id}-new"
+						label="New state of {m.id}"
+						hideLabel
+						placeholder="new_state"
+						autocomplete="off"
+						spellcheck="false"
+						bind:value={
+							() => newState[m.id] ?? '',
+							(v) => {
+								newState[m.id] = v;
+								addProblem[m.id] = null;
+							}
+						}
+					/>
+					<Button size="compact" type="submit" disabled={!(newState[m.id] ?? '').trim()}>+ State</Button>
+					{#if addProblem[m.id]}<p class="problem" role="alert">{addProblem[m.id]}</p>{/if}
+				</form>
+			{/if}
 			<ol class="steps">
 				{#each m.steps as step, i (step.rule)}
 					<li>
@@ -481,5 +528,19 @@
 	.empty {
 		margin: 0;
 		color: var(--color-text-muted);
+	}
+	.add {
+		display: grid;
+		grid-template-columns: minmax(0, 18rem) auto;
+		align-items: center;
+		gap: var(--space-2) var(--space-3);
+		margin-top: var(--space-3);
+	}
+	.add .problem {
+		grid-column: 1 / -1;
+	}
+	.problem {
+		margin: 0;
+		color: var(--color-text-warning);
 	}
 </style>

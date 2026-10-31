@@ -314,6 +314,8 @@ export interface RoomParts {
 export interface MachineView {
 	id: string;
 	state: string;
+	/** The state at the start of the game. */
+	start: string;
 	states: string[];
 	/** Author text about states, by state name. */
 	descriptions: Record<string, string>;

@@ -6,6 +6,7 @@
 	const machine = {
 		id: 'exorcism',
 		state: 'rung',
+		start: 'idle',
 		states: ['idle', 'rung', 'lit', 'done'],
 		descriptions: { rung: 'The bell is red hot and the spirits are stunned. The timer exorcism_window runs.' },
 		steps: [
@@ -19,7 +20,7 @@
 		title: 'Molecules/MachineStateCard',
 		component: MachineStateCard,
 		tags: ['autodocs'],
-		args: { machine, state: 'rung', onrule: fn() },
+		args: { machine, stateName: 'rung', onrule: fn() },
 		parameters: {
 			docs: {
 				description: {
@@ -31,4 +32,5 @@
 </script>
 
 <Story name="With description" />
-<Story name="Without description" args={{ state: 'lit' }} />
+<Story name="Without description" args={{ stateName: 'lit' }} />
+<Story name="Editable" args={{ onedit: fn(async () => null) }} />

@@ -6,6 +6,7 @@
 	const exorcism = {
 		id: 'exorcism',
 		state: 'rung',
+		start: 'idle',
 		states: ['idle', 'rung', 'lit', 'done'],
 		descriptions: { idle: 'The spirits block the gate and jeer.', rung: 'The bell is red hot; the spirits are stunned.' },
 		steps: [
@@ -20,7 +21,7 @@
 		title: 'Organisms/MachinesView',
 		component: MachinesView,
 		tags: ['autodocs'],
-		args: { machines: [exorcism], onrule: fn(), onselect: fn(), selected: { machine: 'exorcism', state: 'rung' } },
+		args: { machines: [exorcism], onrule: fn(), onselect: fn(), selected: { machine: 'exorcism', state: 'rung' }, onaddstate: fn(async () => null) },
 		parameters: {
 			docs: {
 				description: {

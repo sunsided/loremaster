@@ -214,6 +214,8 @@ pub enum AuthorCommand {
 pub struct MachineView {
     pub id: String,
     pub state: String,
+    /// The state at the start of the game.
+    pub start: String,
     pub states: Vec<String>,
     /// Author text about states, by state name. States without a description are not in it.
     pub descriptions: std::collections::BTreeMap<String, String>,
@@ -1950,6 +1952,7 @@ impl Game {
                     .get(m.id.as_str())
                     .map(Value::to_string)
                     .unwrap_or_else(|| m.start.clone()),
+                start: m.start.clone(),
                 states: m.all_states(),
                 descriptions: m
                     .all_states()
