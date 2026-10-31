@@ -399,8 +399,9 @@ steps:
 - The id of the machine is a variable with its state. Conditions read it: `exorcism == lit`.
 - Each step is a rule with the id `<machine>#<number>`. The rules view, the checks and the explorer show them.
 - Without `states`, the states are the start state and all states that the steps name.
+- A state in the list can be a map with a description for the authors: `{ name: rung, description: The spirits are stunned. }`. The player does not see it.
 
-In the editor, Atlas › Machines shows each machine: the states in a row, and the steps as numbered arrows. Forward steps are above, steps back are below. The current state is filled. A step that the next event can take is marked.
+In the editor, Atlas › Machines shows each machine: the states in a row, and the steps as numbered arrows. Forward steps are above, steps back are below. The current state is filled. A step that the next event can take is marked. Point at a state or a step to light its connections. Select a state to see its description and its steps in and out on the right.
 
 The checker finds unknown states and states that no step goes to.
 

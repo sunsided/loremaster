@@ -12,10 +12,10 @@ pub struct Machine {
     pub id: Id,
     /// The state at the start of the game.
     pub start: String,
-    /// All states. Without the list, the states are the start state and every
-    /// state that a step names.
+    /// All states: a name, or `{ name, description }`. Without the list, the
+    /// states are the start state and every state that a step names.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub states: Vec<String>,
+    pub states: Vec<StateDef>,
     #[serde(default)]
     pub steps: Vec<Step>,
     /// Author notes. The player never sees them.
@@ -42,6 +42,33 @@ pub struct Step {
     pub instead: bool,
 }
 
+/// A state of a machine: `idle`, or `{ name: idle, description: "The spirits jeer." }`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum StateDef {
+    Name(String),
+    Described {
+        name: String,
+        /// Author text about the state, for the Atlas. The player never sees it.
+        description: String,
+    },
+}
+
+impl StateDef {
+    pub fn name(&self) -> &str {
+        match self {
+            StateDef::Name(n) | StateDef::Described { name: n, .. } => n,
+        }
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        match self {
+            StateDef::Name(_) => None,
+            StateDef::Described { description, .. } => Some(description),
+        }
+    }
+}
+
 /// One state, or a list: `from: idle` or `from: [rung, lit]`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -63,7 +90,7 @@ impl Machine {
     /// The declared states, or the start state and every state a step names.
     pub fn all_states(&self) -> Vec<String> {
         if !self.states.is_empty() {
-            return self.states.clone();
+            return self.states.iter().map(|s| s.name().to_string()).collect();
         }
         let mut out = vec![self.start.clone()];
         for step in &self.steps {
@@ -74,6 +101,14 @@ impl Machine {
             }
         }
         out
+    }
+
+    /// The description of a state, if the list of states has one.
+    pub fn description(&self, state: &str) -> Option<&str> {
+        self.states
+            .iter()
+            .find(|s| s.name() == state)
+            .and_then(StateDef::description)
     }
 
     /// The id of the rule that the loader makes for step `index`.

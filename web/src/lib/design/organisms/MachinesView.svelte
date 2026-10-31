@@ -6,9 +6,13 @@
 		machines: MachineView[];
 		/** Show the rule of a step in the rules view. */
 		onrule?: (id: string) => void;
+		/** The state that the details panel shows. */
+		selected?: { machine: string; state: string } | null;
+		/** Select a state for the details panel. */
+		onselect?: (machine: string, state: string) => void;
 	}
 
-	let { machines, onrule }: Props = $props();
+	let { machines, onrule, selected = null, onselect }: Props = $props();
 
 	/** Width of one state column and the size of a state box, in SVG units. */
 	const COL = 150;
@@ -200,9 +204,22 @@
 							class="state"
 							class:current={s === m.state}
 							class:lit={stateOn(m, s)}
-							role="presentation"
+							class:selected={selected?.machine === m.id && selected.state === s}
+							role="button"
+							tabindex={onselect ? 0 : -1}
+							aria-label="State {s}{s === m.state ? ', now' : ''}. Show its details"
+							aria-pressed={selected?.machine === m.id && selected.state === s}
 							onpointerenter={() => pointState(m, s)}
 							onpointerleave={clear}
+							onfocus={() => pointState(m, s)}
+							onblur={clear}
+							onclick={() => onselect?.(m.id, s)}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									onselect?.(m.id, s);
+								}
+							}}
 						>
 							<rect x={g.cx(i) - BOX_W / 2} y={g.top} width={BOX_W} height={BOX_H} />
 							<text x={g.cx(i)} y={g.top + BOX_H / 2}>{s}</text>
@@ -325,9 +342,17 @@
 		stroke-width: 14;
 		pointer-events: stroke;
 	}
-	.state,
 	.badge {
 		cursor: default;
+	}
+	.state {
+		cursor: pointer;
+		outline: none;
+	}
+	.state.selected rect,
+	.state:focus-visible rect {
+		stroke: var(--color-accent);
+		stroke-width: 3;
 	}
 	.edge.lit {
 		stroke: var(--color-accent);

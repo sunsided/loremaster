@@ -7,6 +7,7 @@
 		id: 'exorcism',
 		state: 'rung',
 		states: ['idle', 'rung', 'lit', 'done'],
+		descriptions: { idle: 'The spirits block the gate and jeer.', rung: 'The bell is red hot; the spirits are stunned.' },
 		steps: [
 			{ rule: 'exorcism#1', from: ['idle'], to: 'rung', when: 'the player uses "ring bell"', condition: null, fired: true, ready: false },
 			{ rule: 'exorcism#2', from: ['rung'], to: 'lit', when: 'the player uses "turn on candles"', condition: 'carried(candles)', fired: false, ready: true },
@@ -19,7 +20,7 @@
 		title: 'Organisms/MachinesView',
 		component: MachinesView,
 		tags: ['autodocs'],
-		args: { machines: [exorcism], onrule: fn() },
+		args: { machines: [exorcism], onrule: fn(), onselect: fn(), selected: { machine: 'exorcism', state: 'rung' } },
 		parameters: {
 			docs: {
 				description: {

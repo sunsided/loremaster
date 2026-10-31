@@ -215,6 +215,8 @@ pub struct MachineView {
     pub id: String,
     pub state: String,
     pub states: Vec<String>,
+    /// Author text about states, by state name. States without a description are not in it.
+    pub descriptions: std::collections::BTreeMap<String, String>,
     pub steps: Vec<MachineStepView>,
 }
 
@@ -1949,6 +1951,11 @@ impl Game {
                     .map(Value::to_string)
                     .unwrap_or_else(|| m.start.clone()),
                 states: m.all_states(),
+                descriptions: m
+                    .all_states()
+                    .iter()
+                    .filter_map(|s| Some((s.clone(), m.description(s)?.to_string())))
+                    .collect(),
                 steps: m
                     .steps
                     .iter()

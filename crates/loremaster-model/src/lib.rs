@@ -27,7 +27,7 @@ pub use dialogue::{Dialogue, DialogueNode, DialogueOption, Outcomes};
 pub use fragment::{Fragment, FragmentMode, Layer};
 pub use frame::{Frame, Frames};
 pub use id::Id;
-pub use machine::{Machine, States, Step};
+pub use machine::{Machine, StateDef, States, Step};
 pub use note::{Note, NoteRole, Thread, ThreadStatus};
 pub use room::{Direction, Exit, Room};
 pub use rule::{Effect, EventPattern, Rule};

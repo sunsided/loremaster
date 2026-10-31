@@ -53,6 +53,7 @@
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
 	import MachinesView from '#lib/design/organisms/MachinesView.svelte';
+	import MachineStateCard from '#lib/design/molecules/MachineStateCard.svelte';
 	import ExplorerView from '#lib/design/organisms/ExplorerView.svelte';
 	import AtlasMap from '#lib/design/organisms/AtlasMap.svelte';
 	import RoomCard from '#lib/design/molecules/RoomCard.svelte';
@@ -626,6 +627,9 @@
 		atlasOpen = false;
 		queueMicrotask(() => prompt?.focus());
 	}
+
+	/** The machine state that the details panel of Atlas › Machines shows. */
+	let machineState = $state<{ machine: string; state: string } | null>(null);
 
 	/** A rule for the Rules tab to show and focus. */
 	let revealRule = $state<string | null>(null);
@@ -1497,7 +1501,12 @@
 					</div>
 				{:else if atlasTab === 'machines'}
 					<div class="atlas-pane">
-						<MachinesView machines={s.machines} onrule={showRule} />
+						<MachinesView
+							machines={s.machines}
+							onrule={showRule}
+							selected={machineState}
+							onselect={(machine, state) => (machineState = { machine, state })}
+						/>
 					</div>
 				{:else if atlasTab === 'todos'}
 					<section class="todos-view" aria-label="TODOs">
@@ -1588,6 +1597,14 @@
 				{/if}
 
 		{#snippet aside()}
+			{#if atlasTab === 'machines' && session?.machines.length}
+				{@const m = session.machines.find((x) => x.id === machineState?.machine) ?? session.machines[0]}
+				<MachineStateCard
+					machine={m}
+					state={machineState?.machine === m.id && m.states.includes(machineState.state) ? machineState.state : m.state}
+					onrule={showRule}
+				/>
+			{/if}
 			{#if atlasTab === 'map' && card}
 				<RoomCard
 					room={card}

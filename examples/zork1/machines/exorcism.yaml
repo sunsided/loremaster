@@ -2,7 +2,15 @@
 # at the entrance to Hades, ring the bell, light the candles and read the book,
 # one quickly after the other. Then the spirits flee and the gate opens.
 start: idle
-states: [idle, rung, lit, done]
+states:
+  - name: idle
+    description: The spirits block the gate and jeer at the player.
+  - name: rung
+    description: The bell is red hot and the spirits are stunned. The timer exorcism_window runs.
+  - name: lit
+    description: The candles burn and the spirits cower. Only the prayer in the black book is missing.
+  - name: done
+    description: The spirits fled through the walls. The gate to the Land of the Living Dead is open (lld_flag).
 steps:
   - from: idle
     on: { verb: [ring, bell] }

@@ -315,6 +315,8 @@ export interface MachineView {
 	id: string;
 	state: string;
 	states: string[];
+	/** Author text about states, by state name. */
+	descriptions: Record<string, string>;
 	steps: MachineStepView[];
 }
 

@@ -3,7 +3,15 @@
 # work. The bolt opens and closes the sluice gates; the reservoir then
 # empties or fills in 8 turns.
 start: closed
-states: [closed, draining, low, filling]
+states:
+  - name: closed
+    description: The gates are closed and the reservoir is full.
+  - name: draining
+    description: The gates are open. The reservoir runs dry in 8 turns (timer reservoir_empties).
+  - name: low
+    description: The gates are open and the reservoir is empty (low_tide). The player can walk across.
+  - name: filling
+    description: The gates are closed again. The reservoir fills in 8 turns (timer reservoir_fills).
 steps:
   - from: [closed, filling]
     on: { verb: [turn, bolt, wrench] }
