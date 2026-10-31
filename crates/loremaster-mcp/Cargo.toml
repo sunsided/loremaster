@@ -5,7 +5,14 @@ edition.workspace = true
 version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["text-adventure", "interactive-fiction", "mcp", "llm", "server"]
+categories = ["game-development", "development-tools", "web-programming::http-server"]
+# `ui/` is in .gitignore. `include` puts it in the package all the same.
+include = ["/src/", "/build.rs", "/ui/", "/writing-stories.md", "/README.md", "/LICENSE"]
 
 [dependencies]
 loremaster-project.workspace = true
@@ -16,8 +23,12 @@ tiny_http.workspace = true
 include_dir = { workspace = true, optional = true }
 
 [features]
-# Embed the built web app (web/build) and serve it at `/`. Run `task web:build` first.
+# Embed the built web app (`ui/`, a copy of web/build) and serve it at `/`. Run `task release:ui` first.
 embed-ui = ["dep:include_dir"]
+
+# cargo-release: build the web editor into `ui/` before the crate is packaged.
+[package.metadata.release]
+pre-release-hook = ["task", "--dir", "../..", "release:ui"]
 
 [lints]
 workspace = true

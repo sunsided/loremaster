@@ -1,11 +1,16 @@
 [package]
-name = "loremaster-cli"
+name = "loremaster"
 description = "Terminal player and checker for loremaster stories."
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 authors.workspace = true
-publish.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["text-adventure", "interactive-fiction", "game", "cli", "mcp"]
+categories = ["games", "command-line-utilities", "game-development"]
 
 [[bin]]
 name = "loremaster"
@@ -17,8 +22,19 @@ loremaster-project.workspace = true
 loremaster-runtime.workspace = true
 
 [features]
-# The `loremaster` binary serves the web editor. Build the web app first: `task build:local`.
+# `loremaster serve` serves the web editor. The crates.io package contains the editor.
+# In a git checkout, run `task release:ui` first, or build with `--no-default-features`.
+default = ["embed-ui"]
 embed-ui = ["loremaster-mcp/embed-ui"]
 
 [lints]
 workspace = true
+
+# cargo-release: this crate makes the one tag `v<version>` and updates CHANGELOG.md.
+[package.metadata.release]
+tag = true
+pre-release-replacements = [
+    { file = "../../CHANGELOG.md", search = "## \\[Unreleased\\] - ReleaseDate", replace = "## [{{version}}] - {{date}}", exactly = 1 },
+    { file = "../../CHANGELOG.md", search = "<!-- next-header -->", replace = "<!-- next-header -->\n\n## [Unreleased] - ReleaseDate", exactly = 1 },
+    { file = "../../CHANGELOG.md", search = "\\[Unreleased\\]: .*", replace = "[Unreleased]: https://github.com/sunsided/loremaster/compare/{{tag_name}}...HEAD\n[{{version}}]: https://github.com/sunsided/loremaster/releases/tag/{{tag_name}}", exactly = 1 },
+]

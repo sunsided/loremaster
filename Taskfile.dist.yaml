@@ -22,19 +22,19 @@ tasks:
   lint:
     desc: Check clippy lints for all targets
     cmds:
-      - "{{.CARGO}} clippy --all-targets -- -D warnings"
+      - "{{.CARGO}} clippy --workspace --all-targets --no-default-features -- -D warnings"
 
   test:
-    desc: Run all Rust tests
+    desc: Run all Rust tests (without the embedded web editor)
     cmds:
-      - "{{.CARGO}} test"
+      - "{{.CARGO}} test --workspace --no-default-features"
 
   play:
     desc: Play the lighthouse example in the terminal
     aliases:
       - example
     cmds:
-      - "{{.CARGO}} run -q -p loremaster-cli -- play examples/lighthouse"
+      - "{{.CARGO}} run -q -p loremaster --no-default-features -- play examples/lighthouse"
 
   import:zork:
     desc: Import Zork I from its MIT-licensed ZIL source into examples/zork1
@@ -43,17 +43,17 @@ tasks:
       # The commit that examples/zork1/README.md names.
       - git -C target/zil/zork1 checkout -q 97b7b3d68c075dd9af7da499c3e9690ada3471fd
       - "{{.CARGO}} run -q -p loremaster-zil -- target/zil/zork1 examples/zork1"
-      - "{{.CARGO}} run -q -p loremaster-cli -- check examples/zork1"
+      - "{{.CARGO}} run -q -p loremaster --no-default-features -- check examples/zork1"
 
   check:story:
     desc: Check the lighthouse example for problems
     cmds:
-      - "{{.CARGO}} run -q -p loremaster-cli -- check examples/lighthouse"
+      - "{{.CARGO}} run -q -p loremaster --no-default-features -- check examples/lighthouse"
 
   explore:
     desc: Walk all reachable states of the lighthouse example and report coverage
     cmds:
-      - "{{.CARGO}} run -q -p loremaster-cli -- explore examples/lighthouse"
+      - "{{.CARGO}} run -q -p loremaster --no-default-features -- explore examples/lighthouse"
 
   wasm:
     desc: Build the WASM package into the web app with Trunk (release)
@@ -137,12 +137,31 @@ tasks:
     cmds:
       - pnpm build
 
+  release:ui:
+    desc: Build the web app below / and copy it into crates/loremaster-mcp/ui for the embedded editor
+    deps:
+      - wasm
+    env:
+      BASE_PATH: ""
+      FALLBACK: 200.html
+    cmds:
+      - pnpm --dir web build
+      - rm -rf crates/loremaster-mcp/ui
+      - cp -r web/build crates/loremaster-mcp/ui
+
   build:local:
     desc: Build the loremaster binary with the web editor in it (target/release/loremaster)
     deps:
-      - web:build
+      - release:ui
     cmds:
-      - "{{.CARGO}} build --release -p loremaster-cli --features embed-ui"
+      - "{{.CARGO}} build --release -p loremaster"
+
+  package:
+    desc: Build the web editor, then package all crates for crates.io (no upload)
+    deps:
+      - release:ui
+    cmds:
+      - "{{.CARGO}} package --workspace --exclude loremaster-wasm --exclude loremaster-zil"
 
   serve:local:
     desc: Build the local binary, then serve the lighthouse example with the editor

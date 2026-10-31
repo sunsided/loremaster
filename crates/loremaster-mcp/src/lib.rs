@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 const GUIDE_URI: &str = "loremaster://guide/writing-stories";
-const GUIDE: &str = include_str!("../../../docs/writing-stories.md");
+const GUIDE: &str = include_str!("../writing-stories.md");
 
 const INSTRUCTIONS: &str = "\
 loremaster is a world editor for text adventures. Every text in the game comes from the world state: \

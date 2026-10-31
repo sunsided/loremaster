@@ -17,15 +17,17 @@ edition = "2024"
 version = "0.1.0"
 license = "EUPL-1.2"
 authors = ["Markus Mayer"]
-publish = false
+repository = "https://github.com/sunsided/loremaster"
+homepage = "https://sunsided.github.io/loremaster/"
+rust-version = "1.89"
 
 [workspace.dependencies]
-loremaster-lang = { path = "crates/loremaster-lang" }
-loremaster-model = { path = "crates/loremaster-model" }
-loremaster-project = { path = "crates/loremaster-project" }
-loremaster-runtime = { path = "crates/loremaster-runtime" }
-loremaster-tools = { path = "crates/loremaster-tools" }
-loremaster-mcp = { path = "crates/loremaster-mcp" }
+loremaster-lang = { version = "0.1.0", path = "crates/loremaster-lang" }
+loremaster-model = { version = "0.1.0", path = "crates/loremaster-model" }
+loremaster-project = { version = "0.1.0", path = "crates/loremaster-project" }
+loremaster-runtime = { version = "0.1.0", path = "crates/loremaster-runtime" }
+loremaster-tools = { version = "0.1.0", path = "crates/loremaster-tools" }
+loremaster-mcp = { version = "0.1.0", path = "crates/loremaster-mcp" }
 dramaturge-model = "0.2.0"
 dramaturge-runtime = "0.2.0"
 dramaturge-authoring = "0.2.0"

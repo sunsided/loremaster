@@ -57,6 +57,9 @@ impl Default for Options {
 /// True when the binary has the web editor in it (the feature `embed-ui`).
 pub const HAS_UI: bool = cfg!(feature = "embed-ui");
 
+/// The web editor on GitHub Pages, for a binary without the feature `embed-ui`.
+pub const HOSTED_EDITOR: &str = "https://sunsided.github.io/loremaster/";
+
 /// Serve the project in `root` on `127.0.0.1:<port>` until the process stops.
 pub fn serve_http(root: &Path, options: &Options) -> io::Result<()> {
     let port = options.port;
@@ -73,6 +76,12 @@ pub fn serve_http(root: &Path, options: &Options) -> io::Result<()> {
         if options.open {
             open_browser(&url);
         }
+    } else {
+        eprintln!(
+            "loremaster: this binary has no editor. Use the hosted editor at {HOSTED_EDITOR} \
+             and start the server with `--allow-origin {}`.",
+            origin_of(HOSTED_EDITOR).unwrap_or_default()
+        );
     }
     for request in http.incoming_requests() {
         handle(&mut server, &mut jobs, &options.allow_origins, request);

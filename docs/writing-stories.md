@@ -17,13 +17,13 @@ A story is a folder of YAML files. Each entity has its own file.
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
-To examine a story for problems, run `task check:story` or `cargo run -p loremaster-cli -- check <folder>`.
+To examine a story for problems, run `task check:story` or `cargo run -p loremaster --no-default-features -- check <folder>`.
 
 ## Start a new story
 
 A new story has two files: `story.yaml` and the start room `rooms/start.yaml`. The start room has a placeholder text. Replace it with your text.
 
-- In the terminal: `cargo run -p loremaster-cli -- new <folder> --title "The Drowned Bell"`. The folder must not contain a `story.yaml`.
+- In the terminal: `cargo run -p loremaster --no-default-features -- new <folder> --title "The Drowned Bell"`. The folder must not contain a `story.yaml`.
 - In the editor: open the project menu or the command palette (Ctrl+K), then select "New story…". Type the title and push Enter. The browser keeps the story as a working copy. "Open my story …" in the same menu opens it again.
 - With AI: type an idea too. The AI writes the first 2 or 3 rooms as a proposal. Read "Start a new story with AI" in `docs/ai-tools.md`.
 
@@ -276,7 +276,7 @@ The state explorer (`loremaster explore`, or Atlas › Checks in the editor) pla
 
 A beat on a fragment shows when that fragment shows. A beat on a room or a thing shows when any of its text shows. A beat on a rule shows when the rule fires. A `mention` is not checked.
 
-To list all open TODOs with their file and line, run `cargo run -p loremaster-cli -- check <folder> --todos`.
+To list all open TODOs with their file and line, run `cargo run -p loremaster --no-default-features -- check <folder> --todos`.
 
 In the editor:
 
@@ -356,7 +356,7 @@ After a "Whole game" run, each text has a mark: "seen in the whole-game run" or 
 The state explorer plays all ways through the story from the start. It stops at 2000 states or 40 commands.
 
 1. In the web app, open Atlas › Checks (Ctrl+M, then "Checks"), select "Whole game", then select "Explore all states".
-2. Or, run `task explore` or `cargo run -p loremaster-cli -- explore <folder>` in a terminal.
+2. Or, run `task explore` or `cargo run -p loremaster --no-default-features -- explore <folder>` in a terminal.
 
 The explorer shows:
 

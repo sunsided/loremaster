@@ -28,3 +28,6 @@ Thumbs.db
 
 # go-task state
 .task/
+
+# The web editor that loremaster-mcp embeds (task release:ui)
+/crates/loremaster-mcp/ui/
