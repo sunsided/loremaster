@@ -57,6 +57,12 @@ tasks:
     cmds:
       - "{{.CARGO}} run -q -p loremaster --no-default-features -- check examples/lighthouse"
 
+  walkthroughs:
+    desc: Run the walkthrough tests (tests/*.yaml) of every example
+    cmds:
+      - for: [cantina, lighthouse, tower, zork1]
+        cmd: "{{.CARGO}} run -q -p loremaster --no-default-features -- test examples/{{.ITEM}}"
+
   explore:
     desc: Walk all reachable states of the lighthouse example and report coverage
     cmds:

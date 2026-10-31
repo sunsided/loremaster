@@ -1,7 +1,7 @@
 use crate::{Diagnostic, Severity};
 use loremaster_model::{
     ClockConfig, Dialogue, Effect, Fragment, Id, Machine, Note, Room, Rule, Story, Thing, Thread,
-    Timer, VarDef, VerbDef,
+    Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -20,6 +20,8 @@ pub struct Project {
     pub files: Vec<SourceFile>,
     /// Entity key such as `room:cellar` to the file that defines it.
     pub origins: BTreeMap<String, String>,
+    /// Walkthrough tests from `tests/`, with their file paths.
+    pub walkthroughs: Vec<(String, Walkthrough)>,
 }
 
 impl Project {
@@ -70,6 +72,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut threads = Vec::new();
     let mut dialogues = Vec::new();
     let mut machines = Vec::new();
+    let mut walkthroughs = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -126,6 +129,14 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
                     Err(e) => errors.push(parse_err(e)),
                 }
             }
+            // Commands such as `n` and `y` are words here, not YAML 1.1 booleans.
+            "tests" => match serde_saphyr::from_str_with_options::<Walkthrough>(
+                &file.text,
+                serde_saphyr::options! { strict_booleans: true },
+            ) {
+                Ok(w) => walkthroughs.push((path.to_string(), w)),
+                Err(e) => errors.push(parse_err(e)),
+            },
             "machines" => {
                 match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
                     Ok(m) => {
@@ -214,6 +225,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         story,
         files,
         origins,
+        walkthroughs,
     })
 }
 

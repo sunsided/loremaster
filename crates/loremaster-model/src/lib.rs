@@ -20,6 +20,7 @@ mod thing;
 mod timer;
 mod value;
 mod verb;
+mod walkthrough;
 
 pub use clock::{ClockConfig, Phase, TimeOfDay};
 pub use dialogue::{Dialogue, DialogueNode, DialogueOption, Outcomes};
@@ -35,3 +36,4 @@ pub use thing::{Location, NameStage, Thing};
 pub use timer::{StartTimers, Timer};
 pub use value::Value;
 pub use verb::{VerbDef, VerbSlots, standard_verbs};
+pub use walkthrough::{Expect, WalkStep, Walkthrough};

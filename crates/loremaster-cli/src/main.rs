@@ -1,5 +1,5 @@
 //! `loremaster new <dir> [--title T] [--idea I]`, `loremaster play <dir>`, `loremaster check <dir> [--todos]`,
-//! `loremaster explore <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
+//! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
 use loremaster_project::{Project, Severity, check, load, open_todos, read_dir};
 use loremaster_runtime::{BlockKind, Budget, Game, Turn, World};
@@ -8,7 +8,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: loremaster <play|check|explore|mcp> <project-folder>\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
+const USAGE: &str = "usage: loremaster <play|check|explore|test|mcp> <project-folder>\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -121,6 +121,7 @@ fn main() -> ExitCode {
         }
         "play" => play(project),
         "explore" => explore(project),
+        "test" => walkthroughs(project),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
@@ -253,6 +254,50 @@ fn play(project: Project) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+/// Run the walkthroughs in `tests/` and print what failed.
+fn walkthroughs(project: Project) -> ExitCode {
+    let walks = project.walkthroughs.clone();
+    let world = match World::compile(project.story) {
+        Ok(w) => Arc::new(w),
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if walks.is_empty() {
+        println!("No walkthroughs. Add them as tests/*.yaml.");
+        return ExitCode::SUCCESS;
+    }
+    let mut failed = 0;
+    for (path, walk) in &walks {
+        let stem = path
+            .rsplit('/')
+            .next()
+            .unwrap_or(path)
+            .trim_end_matches(".yaml");
+        let result = loremaster_runtime::run_walkthrough(world.clone(), walk, stem);
+        if result.passed() {
+            println!("ok    {} ({path})", result.name);
+        } else {
+            failed += 1;
+            println!("FAIL  {} ({path})", result.name);
+            for f in &result.failures {
+                println!("      {f}");
+            }
+        }
+    }
+    println!(
+        "{} of {} walkthroughs passed.",
+        walks.len() - failed,
+        walks.len()
+    );
+    if failed > 0 {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 /// Walk all reachable states and print what the walk found.
