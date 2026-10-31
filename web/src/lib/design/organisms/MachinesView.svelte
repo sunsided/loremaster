@@ -262,7 +262,13 @@
 						placeholder="new_state"
 						autocomplete="off"
 						spellcheck="false"
-						bind:value={() => newState[m.id] ?? '', (v) => (newState[m.id] = v)}
+						bind:value={
+							() => newState[m.id] ?? '',
+							(v) => {
+								newState[m.id] = v;
+								addProblem[m.id] = null;
+							}
+						}
 					/>
 					<Button size="compact" type="submit" disabled={!(newState[m.id] ?? '').trim()}>+ State</Button>
 					{#if addProblem[m.id]}<p class="problem" role="alert">{addProblem[m.id]}</p>{/if}

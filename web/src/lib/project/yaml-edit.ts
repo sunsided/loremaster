@@ -339,6 +339,16 @@ export type StateEdit =
 /** A state name is one word, so conditions can name it: `exorcism == lit`. */
 export const STATE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/** Words of the condition language; the checker refuses them as state names too. */
+const KEYWORDS = ['and', 'or', 'not', 'true', 'false'];
+
+/** The same test as `is_state_name` in the checker. */
+export function isStateName(name: string): boolean {
+	return STATE_NAME.test(name) && !KEYWORDS.includes(name);
+}
+
+const NAME_RULE = 'A state name is one word of letters, digits and _. The words and, or, not, true and false are not permitted.';
+
 /** The name of a state entry: `idle` or `{ name: idle, description: … }`. */
 function stateName(node: unknown): string | null {
 	if (isScalar(node)) return String(node.value);
@@ -384,14 +394,14 @@ export function editStates(text: string, at: YamlPath, all: string[], edit: Stat
 
 	switch (edit.kind) {
 		case 'add': {
-			if (!STATE_NAME.test(edit.name)) throw new EditError('A state name is one word: letters, digits and _.');
+			if (!isStateName(edit.name)) throw new EditError(NAME_RULE);
 			if (index >= 0) throw new EditError(`The state ${edit.name} is already there.`);
 			list.items.push(new Scalar(edit.name));
 			break;
 		}
 		case 'rename': {
 			if (index < 0) throw new EditError(`There is no state ${edit.name}.`);
-			if (!STATE_NAME.test(edit.to)) throw new EditError('A state name is one word: letters, digits and _.');
+			if (!isStateName(edit.to)) throw new EditError(NAME_RULE);
 			if (edit.to !== edit.name && list.items.some((i) => stateName(i) === edit.to))
 				throw new EditError(`The state ${edit.to} is already there.`);
 			const item = list.items[index];

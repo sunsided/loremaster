@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { MachineView } from '#lib/engine/types.ts';
-	import type { StateEdit } from '#lib/project/yaml-edit.ts';
+	import { stateInUse, type StateEdit } from '#lib/project/yaml-edit.ts';
 	import Button from '../atoms/Button.svelte';
 	import TextInput from '../atoms/TextInput.svelte';
 
@@ -22,7 +22,7 @@
 	let newName = $derived(stateName);
 	/** The problem of the last change, for the state it was about. */
 	let problem = $state<{ of: string; text: string } | null>(null);
-	const inUse = $derived(machine.start === stateName || machine.steps.some((s) => s.from.includes(stateName) || s.to === stateName));
+	const inUse = $derived(stateInUse(machine, stateName));
 
 	async function run(edit: StateEdit) {
 		const text = (await onedit?.(edit)) ?? null;
