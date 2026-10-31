@@ -1,0 +1,16 @@
+# cargo-release: https://github.com/crate-ci/cargo-release
+# Read CONTRIBUTING.md, "Releases".
+
+# All crates have one version. One commit and one tag release them all.
+shared-version = true
+consolidate-commits = true
+allow-branch = ["main"]
+pre-release-commit-message = "Release {{version}}"
+tag-message = "Release {{version}}"
+tag-name = "v{{version}}"
+# Only the `loremaster` crate makes the tag (crates/loremaster-cli/Cargo.toml).
+tag = false
+sign-commit = true
+sign-tag = true
+push = true
+publish = true
