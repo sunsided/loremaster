@@ -463,10 +463,8 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.move {
-		color: var(--color-text-accent);
-	}
-	.move {
 		margin-right: var(--space-3);
+		color: var(--color-text-accent);
 	}
 	.when {
 		color: var(--color-text);
