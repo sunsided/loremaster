@@ -24,6 +24,7 @@ serde_json.workspace = true
 
 [dev-dependencies]
 assert2.workspace = true
+proptest.workspace = true
 loremaster-project.workspace = true
 
 [lints]
