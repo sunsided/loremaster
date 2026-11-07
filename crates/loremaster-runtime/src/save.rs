@@ -44,7 +44,10 @@ pub struct StoryStamp {
 
 impl StoryStamp {
     pub fn of(world: &World) -> Self {
-        let content = serde_json::to_vec(&world.story).unwrap_or_default();
+        // A story is plain data with string keys (or integer keys, which JSON
+        // writes as strings), so it always serializes. A fallback hash would let
+        // a changed story pass as unchanged.
+        let content = serde_json::to_vec(&world.story).expect("a story always serializes to JSON");
         let digest = Sha256::digest(&content);
         let hash = digest[..8].iter().map(|b| format!("{b:02x}")).collect();
         Self {
@@ -227,11 +230,12 @@ fn reconcile(
             dropped.push(format!("thing:{thing}"));
             continue;
         };
+        // `in` needs a container and `on` a supporter, as in the loader.
         let valid = match &location {
             Location::Room(r) => has_room(r),
-            other => other
-                .holder()
-                .is_none_or(|h| story.thing(h.as_str()).is_some()),
+            Location::In(h) => story.thing(h.as_str()).is_some_and(|t| t.container),
+            Location::On(h) => story.thing(h.as_str()).is_some_and(|t| t.supporter),
+            Location::Carried | Location::Nowhere => true,
         };
         state
             .locations
@@ -295,6 +299,20 @@ fn reconcile(
     });
     if !talk_ok && let Some(t) = state.talk.take() {
         dropped.push(format!("dialogue:{}", t.dialogue));
+    }
+    // The nodes before the current one, for `go: back`: keep only the nodes
+    // that the dialogue still has.
+    if let Some(t) = &mut state.talk
+        && let Some(d) = story.dialogues.iter().find(|d| d.id == t.dialogue)
+    {
+        let dialogue = t.dialogue.clone();
+        t.back.retain(|node| {
+            let keep = d.node(node).is_some();
+            if !keep {
+                dropped.push(format!("dialogue:{dialogue}#{node}"));
+            }
+            keep
+        });
     }
     if let Some(e) = &state.ending
         && story.ending(e.as_str()).is_none()

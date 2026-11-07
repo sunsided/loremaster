@@ -196,3 +196,89 @@ fn a_timer_that_ran_out_does_not_start_again() {
     assert!(restored.story_changed);
     assert!(restored.game.state().timers.is_empty());
 }
+
+fn files_of(dir: &str) -> Vec<SourceFile> {
+    read_dir(
+        &Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../examples")
+            .join(dir),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_thing_in_a_holder_that_is_no_container_any_more_goes_back_to_its_start() {
+    let files = |container: bool| {
+        vec![
+            SourceFile {
+                path: "story.yaml".into(),
+                text: "title: Box\nstart: hall\n".into(),
+            },
+            SourceFile {
+                path: "rooms/hall.yaml".into(),
+                text: "name: Hall\ndescription: [\"A hall.\"]\n".into(),
+            },
+            SourceFile {
+                path: "things/box.yaml".into(),
+                text: format!(
+                    "name: box\nlocation: {{ room: hall }}\ncontainer: {container}\nprops: {{ open: true }}\n"
+                ),
+            },
+            SourceFile {
+                path: "things/coin.yaml".into(),
+                text: "name: coin\nlocation: { room: hall }\nportable: true\n".into(),
+            },
+        ]
+    };
+    let mut game = Game::new(world(files(true)));
+    game.start();
+    game.input("take coin");
+    game.input("put coin in box");
+    assert_eq!(
+        serde_json::to_value(game.state().locations.get("coin")).unwrap(),
+        json!({ "in": "box" })
+    );
+    let save = serde_json::to_value(game.save()).unwrap();
+    let restored = Game::load_save(world(files(false)), save).unwrap();
+    assert_eq!(
+        serde_json::to_value(restored.game.state().locations.get("coin")).unwrap(),
+        json!({ "room": "hall" })
+    );
+}
+
+#[test]
+fn the_back_stack_of_a_talk_keeps_only_nodes_that_still_exist() {
+    let world_of = |files: Vec<SourceFile>| world(files);
+    let mut game = Game::new(world_of(files_of("cantina")));
+    game.start();
+    game.input("in");
+    game.input("talk to figure");
+    game.input("1");
+    let talk = game.state().talk.clone().expect("in a talk");
+    assert_eq!(
+        (talk.node.as_str(), talk.back.clone()),
+        ("names", vec!["meet".to_string()])
+    );
+    let save = serde_json::to_value(game.save()).unwrap();
+
+    // The new version of the dialogue calls its first node `greet`.
+    let mut files = files_of("cantina");
+    for f in &mut files {
+        if f.path == "dialogues/blackbeard.yaml" {
+            f.text = f
+                .text
+                .replace("start: [again, meet]", "start: [again, greet]")
+                .replace("\n  meet:\n", "\n  greet:\n");
+        }
+    }
+    let restored = Game::load_save(world_of(files), save).unwrap();
+    let talk = restored
+        .game
+        .state()
+        .talk
+        .clone()
+        .expect("still in the talk");
+    assert_eq!(talk.node, "names");
+    assert!(talk.back.is_empty(), "{:?}", talk.back);
+    assert_eq!(restored.dropped, ["dialogue:blackbeard#meet"]);
+}
