@@ -8,14 +8,14 @@ The golden slice of the roadmap (phase 0). It is a small part of the demo "The L
 | --- | --- | --- |
 | `yaml/` | The whole slice in YAML | This folder |
 | `dsl/` | The same slice in `world!`, one pack per part, behind the cargo feature `dsl` of the crate `loremaster` | Today, the endings and the tests compile since DSL step L3 (P3-03 #66); the other parts wait for their syntax |
-| `mixed/` | The YAML folder, with the lock machine and the agenda in `world!` instead | The lock machine compiles since L3; the agenda waits for D6 |
+| `mixed/` | The YAML folder, with the lock machine and the agenda in `world!` instead | The lock machine compiles since L3; the agenda waits for agendas in `world!` (the YAML agenda loads since D6, P4-02 #79) |
 | `expected/` | `model.hash`: the canonical model hash of the YAML form in today's syntax (P1-06). `slice_best.transcript` follows with P4-07 | `model.hash` now |
 
 The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine with its timer, the stove with the text of the D2 side note, the keeper with one dialogue and one agenda step (he burns the pages at midnight), and three endings: a win, a loss, and a death. The roadmap names two endings; the death ending is for `slice_undo_after_death`.
 
 ## Which file needs which phase
 
-Files in today's syntax load now. The other files use syntax that the model does not know yet. Today's loader rejects them (`things/stove.yaml`, `rules/keeper.yaml`, `dialogues/`) or skips their folder with a warning (`texts/`, `agendas/`; any other unknown folder is an error since P2-14). `endings/` loads since P1-03.
+Files in today's syntax load now. The other files use syntax that the model does not know yet. Today's loader rejects them (`things/stove.yaml`, `rules/keeper.yaml`, `dialogues/`) or skips their folder with a warning (`texts/`; any other unknown folder is an error since P2-14). `endings/` loads since P1-03, `agendas/` since P4-02 (#79).
 
 | Part | Files | New syntax | Phase |
 | --- | --- | --- | --- |
@@ -24,8 +24,8 @@ Files in today's syntax load now. The other files use syntax that the model does
 | Dialogue | `dialogues/keeper.yaml` | A node says a text pool: `say: { text: keeper_remark }`. The speech segments (`{ says: … }`) load since P3-15 (#111) | 4 (R9) |
 | Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky`. The speech segments with a speaker (`{ says: …, by: keeper }`) are lines as in P3-15 (#111) | 4 (R9) |
 | Stove | `things/stove.yaml` | `one_of`, `pick: best`, `seen_by(player)`, `learn` | 4 (R9) |
-| Keeper rule | `rules/keeper.yaml` | `on: { verb: examine, direct: stove }` (Command record), `say: { text: … }` | 4 (D6, R9) |
-| Agenda | `agendas/keeper.yaml` | `actor`, `steps` with `at`, `place`, `when`, `then`, `closes`, `reason` | 4 (D6, CK) |
+| Keeper rule | `rules/keeper.yaml` | `on: { verb: examine, direct: stove }` (Command record, loads since P4-02 #79), `say: { text: … }` | 4 (R9) |
+| Agenda | `agendas/keeper.yaml` | `actor`, `steps` with `at`, `place`, `when`, `then`, `closes`, `reason` | Loads since P4-02 (#79, D6). It stays a part: the model hash and `slice_equivalence` compare today's syntax, and `world!` has no agendas yet. P4-04 (CK) reads `closes` |
 
 ## Pending tests
 
@@ -42,8 +42,8 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`, and the ones o
 | `slice_undo_after_death` | The death prompt, and undo after it | Today | Passes (P2-03) | #54 |
 | `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Phase 4 (R9, the text pool); the speech segments work since P3-15 | P4-01 #78 |
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
-| `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Phase 4 | P4-02 #79 |
-| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 2 (talk as an await), then phase 4 (and R9 for the text pool) | P4-02 #79, P4-01 #78 |
+| `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Passes (P4-02). `slice_baseline` and `slice_dsl_walkthroughs` leave it out: it needs the agenda part | P4-02 #79 |
+| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 4, R9 for the text pool. The pause works since P4-02: `slice_talk_pauses_agenda_without_the_text_pool` passes with the line of the pool in place of the pool | P4-01 #78 |
 | `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Phase 4 | P4-04 #81 |
 | `slice_best`, `slice_ashes` | The two full walkthroughs | All | Phase 4 | P4-07 #84 |
 
@@ -61,10 +61,10 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | YAML | Walkthroughs to midnight need 17 lines of `wait`. | A step form `{ wait: 17 }` or `{ until: "00:00" }`. |
 | 2026-11-07 | YAML | `end: committed` reuses the field that takes a text today. | Done in P1-03 (#44): `end:` takes an ending id; an unknown id is an error, an ending that no `end` names is a warning. |
 | 2026-11-07 | YAML | `expect:` ignores unknown keys, so `expect: { ending: … }` would pass silently. The walkthroughs use `facts: { ending: …, ending.kind: …, ending.rank: … }` instead. | P1-03 (#44) added `expect: { ending: <id> }`; the kind and rank come from the ending file. P2-14 (#130) rejects unknown keys in `expect:` and in the steps, with the nearest known key. |
-| 2026-11-07 | YAML | `seen_by(inspector)` in D2 needs a name for the player. The slice uses `seen_by(player)`. | Decide the perceiver id with D6. |
+| 2026-11-07 | YAML | `seen_by(inspector)` in D2 needs a name for the player. The slice uses `seen_by(player)`. | Decide the perceiver id with D6. P4-02 (#79): the player's actor id is `player`, as in speech (`by: player`) and in event patterns (`actor: player`). |
 | 2026-11-07 | YAML | `slice_keeper_dialogue` is phase 3 in the spec, but its dialogue says a text pool, which is R9 (phase 4). | The test moves to phase 4 (P3-15, #111): the speech segments load now, and with an inline line in place of the pool the walkthrough passes. Only the text pool (R9) is missing. |
 | 2026-11-07 | YAML | Two candidates of the D2 sketch can never show to the player: "too hot to touch" (when the player examines, `seen_by(player)` is true, so the fresh-ash text scores higher) and "Mind your step." (the keeper never leaves the kitchen). | Keep them as D2 wrote them. `seen_by` matters only with several perceivers (D6); the winnable and quality checks of phase 4 should report a candidate that no state can show. |
-| 2026-11-07 | YAML | The agenda step "comes in from the lock" in one turn, but `place:` names only where it ends. | D6: a step with a route, or a step that takes several turns. |
+| 2026-11-07 | YAML | The agenda step "comes in from the lock" in one turn, but `place:` names only where it ends. | D6: a step with a route, or a step that takes several turns. P4-02 (#79): `place` is where the step happens, and the actor walks there along the exits, one room per turn, before the step runs. A route through other rooms is still open. |
 | 2026-11-07 | DSL | Almost every keeper line needs `\"` escapes. That is hard to read and hard to compare with the YAML. | Done in the slice (Markus, 2026-11-07; #111): raw strings `r#"…"#` for rendered text in tests, and `says "…"` speech segments in lines. A screenplay form is an extension (#112). Done for YAML in P3-15 (#111): `say: [{ says: "Who fed it?" }]`, and the renderer adds the quotes. |
 | 2026-11-07 | DSL | 6 of the 8 part files start with an `extern` list. Conditions and markup (`not pages.carried`, `{lock == empty ? …}`) cannot use Rust paths, so path ids do not help. | A `uses today;` line that brings the ids of a pack into scope for conditions and markup. |
 | 2026-11-07 | DSL | `today.rs` cannot pass the check alone: `end committed` names an ending of another pack. | Move the accuse and jump rules into the endings part, or keep `end "<text>"` until P1-03 and switch both forms in one PR. L3 (P3-03 #66): the macro checks a block with stubs for its `extern` ids, so `today.rs` passes the check at compile time; the joined packs check the ids at load time. |
@@ -72,7 +72,7 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | DSL | Aliases and verb words with a space need strings in a list of idents: `["iron stove", grate, ash]`. | One form in L3, for example strings only. L3 (P3-03 #66) takes both in one list: a word, or a string for words with a space. |
 | 2026-11-07 | DSL | The DSL doc makes each test block a `#[test]` over all packs. That does not fit tests that load only some parts. `wait * 17` keeps the walkthroughs readable. | Test blocks as data that the slice tests run with the parts they choose. A matching `{ wait: 17 }` step in YAML. Done in L3 (P3-03 #66): a test block is a walkthrough of the pack, with its id as key, and `wait * 17` expands to 17 steps. |
 | 2026-11-07 | Mixed | A third to half of each Rust file is `extern` lines for YAML ids, and the macro checks nothing across the seam until load time. | Sealed mode `world!(yaml = "..")` for mixed forms, or accept that mixed pays off only for large Rust parts. |
-| 2026-11-07 | Mixed | The agenda id comes from the file name in YAML, but from `agenda for keeper` in Rust. Parallel file names needed `#[path]` in `mixed.rs`. | An explicit id in both forms: `agenda keeper for keeper`, or `id:` in YAML. |
+| 2026-11-07 | Mixed | The agenda id comes from the file name in YAML, but from `agenda for keeper` in Rust. Parallel file names needed `#[path]` in `mixed.rs`. | An explicit id in both forms: `agenda keeper for keeper`, or `id:` in YAML. P4-02 (#79): YAML takes `id:` (else the file name); an actor has one agenda, and the save keeps its progress by actor id. |
 | 2026-11-07 | DSL | The draft uses `loremaster::prelude::*`, but the crate `loremaster` has no library target yet. | L1 decides which crate exports `world!` and `Pack`. Done (D7, L3): `loremaster::prelude` with the feature `dsl` gives both; `world!` comes from `loremaster-macros`. |
 | 2026-11-07 | All | `allow_unwinnable` called the agenda step "unwinnable", but the game can still end (ashes). A dead end (no ending reachable, as in early King's Quest) and a point of no return (a better ending drops out) are different. | Two checks: a dead end is an error; a rank drop is a warning, which `closes: [<endings>]` with a `reason` accepts. Done in the slice. |
 | 2026-11-07 | YAML | A speech segment with a named speaker needs a key with a space: `{ keeper says: "…" }`. | Done in P3-15 (#111): `{ says: "…", by: keeper }`; `by` is a thing id or `player`. |
@@ -88,3 +88,5 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | DSL | L3: `slice_drowning` in `dsl/tests.rs` had drifted from the YAML walkthrough (no `"Drowned"`, no `ending drowned`). | Fixed; `the_dsl_tests_equal_the_yaml_tests` compares the test blocks with `yaml/tests/` step by step. |
 | 2026-11-07 | DSL | L3: in a machine step, YAML has `say:` and `then:`; the draft writes `line` and then the effects. | The first `line` of a step is its `say`; the next ones are effects. Both forms give the same model. |
 | 2026-11-07 | DSL | L3: an `extern` thing has no properties, and an `extern` machine no states, so a condition such as `stove.hot` or `lock == empty` on them does not check at compile time. | `extern { machine lock [full, emptying, empty]; var n: int; }` exists in L3. Properties of extern things are an open item for L4. |
+| 2026-11-08 | YAML | P4-02: `slice_keeper_agenda` sets `stove.hot`, but the stove is a part with R9 syntax that the test does not load. The game sets the fact anyway; `loremaster check` on today's files plus the agenda reports it. | None: the stove loads with R9 (P4-01 #78). |
+| 2026-11-08 | All | P4-02: a rule without `actor` matches only the player's commands, so `on: { verb: examine, direct: stove }` does not fire when the keeper examines the stove. | Keep (ADR 0004): stories have many rules for the player. A rule for any actor would need a word such as `actor: any`. |

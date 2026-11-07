@@ -50,3 +50,12 @@ from the version before. A step may give up; then the restore refuses the save.
   envelopes. `session_start` and the web player still accept a bare 0.1 state.
 - After 1.0, this decision gets a successor with a real promise, for example
   "every save of the same major version loads".
+
+## Versions
+
+- 0: the bare `State` of loremaster 0.1.
+- 1: the envelope (P1-04, #45).
+- 2: `state.actors`, the progress of each actor's agenda (P4-02, #79, ADR
+  0004). The step from 1 to 2 adds an empty `actors` map: no actor of an old
+  save has done anything, so each agenda starts at its first step, and a step
+  whose time has passed runs in the next turn.
