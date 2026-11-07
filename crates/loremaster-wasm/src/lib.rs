@@ -264,6 +264,11 @@ impl JsSession {
         to_js(&self.session.scene())
     }
 
+    /// The quest journal: open quests first, then finished ones.
+    pub fn journal(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.session.journal())
+    }
+
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.verbs())
     }
@@ -375,6 +380,11 @@ impl JsWorkbench {
 
     pub fn scene(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().scene())
+    }
+
+    /// The quest journal of the session.
+    pub fn journal(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.session().journal())
     }
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {

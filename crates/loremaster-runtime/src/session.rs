@@ -24,6 +24,8 @@ pub const DEFAULT_UNDO_DEPTH: usize = 20;
 pub const UNDO: &str = "undo";
 pub const RESTART: &str = "restart";
 pub const RESTORE: &str = "restore";
+/// The text command that shows the quest journal.
+pub const JOURNAL: &str = "journal";
 
 /// Input from the host (SE-2).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -228,11 +230,11 @@ impl Session {
         if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
             return Some(self.death_turn(&word).unwrap_or_else(Self::note_turn));
         }
-        (word == UNDO
-            && self.game.awaiting().is_none()
-            && self.game.talk().is_none()
-            && !self.parser_knows(UNDO))
-        .then(|| self.undo_turn())
+        let free = self.game.awaiting().is_none() && self.game.talk().is_none();
+        if word == JOURNAL && free && !self.parser_knows(JOURNAL) {
+            return Some(Self::note_turn(self.journal_text()));
+        }
+        (word == UNDO && free && !self.parser_knows(UNDO)).then(|| self.undo_turn())
     }
 
     /// Answer the request of a rule that waits, and run the rest of the rule
@@ -426,6 +428,21 @@ impl Session {
     }
 
     /// A note for the player, without a change.
+    /// The journal as text, for the `journal` command.
+    fn journal_text(&self) -> String {
+        let entries = self.game.journal();
+        if entries.is_empty() {
+            return "Your journal is empty.".into();
+        }
+        (entries.iter())
+            .map(|e| {
+                let mark = if e.done { " (done)" } else { "" };
+                format!("{}{mark}: {}", e.title, e.text)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     fn note_turn(text: String) -> Turn {
         Turn {
             blocks: vec![Block {

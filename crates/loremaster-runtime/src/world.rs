@@ -31,6 +31,8 @@ pub struct World {
     registered: Vec<std::sync::Arc<dyn crate::Behavior>>,
     pub(crate) frames: BTreeMap<Id, CFrame>,
     pub(crate) dialogues: Vec<std::sync::Arc<CDialogue>>,
+    /// The machines with `quest: true`, with the journal text of their states.
+    pub(crate) quests: Vec<CQuest>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
     pub symbols: SymbolTable,
     room_index: BTreeMap<Id, usize>,
@@ -122,6 +124,15 @@ pub(crate) struct CTimer {
 }
 
 /// A dialogue lowered to a dramaturge graph, with its world effects compiled.
+/// A quest machine, compiled: its title and the journal text per state, with
+/// `done` for a finished state.
+#[derive(Debug, Clone)]
+pub(crate) struct CQuest {
+    pub machine: Id,
+    pub title: String,
+    pub states: BTreeMap<String, (CompiledLine, bool)>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct CDialogue {
     pub id: Id,
@@ -528,6 +539,25 @@ impl World {
             .enumerate()
             .map(|(i, t)| (t.id.clone(), i))
             .collect();
+        let quests = story
+            .machines
+            .iter()
+            .filter(|m| m.quest)
+            .map(|m| {
+                let states = (m.states.iter())
+                    .filter_map(|s| Some((s.name(), s.journal()?, s.done())))
+                    .map(|(name, line, done)| {
+                        let at = format!("machine:{}/states/{name}/journal", m.id);
+                        Ok((name.to_string(), (c.line(&at, line)?, done)))
+                    })
+                    .collect::<Result<_, CompileError>>()?;
+                Ok(CQuest {
+                    machine: m.id.clone(),
+                    title: m.title.clone().unwrap_or_else(|| m.id.to_string()),
+                    states,
+                })
+            })
+            .collect::<Result<_, CompileError>>()?;
         let levels = levels(&story);
         Ok(Self {
             levels,
@@ -545,6 +575,7 @@ impl World {
             registered: Vec::new(),
             frames,
             dialogues,
+            quests,
             symbols,
             room_index,
             thing_index,
