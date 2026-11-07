@@ -592,6 +592,15 @@ impl Checker<'_> {
                     }
                 }
                 Effect::Cancel(t) => self.timer_ref(file, &at, t.as_str()),
+                Effect::Call(b) => {
+                    if !self.story().behaviors.contains(b) {
+                        self.error(
+                            file,
+                            &at,
+                            format!("`call: {b}` names no behavior of the story (`behaviors:` in story.yaml or `behaviors/{b}.yaml`)"),
+                        );
+                    }
+                }
                 Effect::Stop | Effect::Emit(_) => {}
             }
         }

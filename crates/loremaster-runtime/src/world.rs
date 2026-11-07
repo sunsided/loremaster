@@ -166,6 +166,7 @@ pub(crate) enum CEffect {
     /// A pause for the host; the fire loop handles it, not `apply`.
     Await(Box<loremaster_model::AwaitSpec>),
     Emit(Id),
+    Call(Id),
     Start(Vec<(Id, Option<u32>)>),
     Cancel(Id),
 }
@@ -298,6 +299,7 @@ impl Compiler {
             }
             Effect::Stop => CEffect::Stop,
             Effect::Emit(e) => CEffect::Emit(e.clone()),
+            Effect::Call(b) => CEffect::Call(b.clone()),
             Effect::Start(t) => CEffect::Start(t.entries()),
             Effect::Cancel(t) => CEffect::Cancel(t.clone()),
         })
@@ -534,6 +536,11 @@ impl World {
             .collect();
         self.manifests = self.behaviors.iter().map(|b| b.manifest()).collect();
         self
+    }
+
+    /// Is a behavior with this id registered, named by the story or not?
+    pub fn is_registered(&self, id: &str) -> bool {
+        self.registered.iter().any(|b| b.id() == id)
     }
 
     /// The manifest of a behavior, as `register` took it.
