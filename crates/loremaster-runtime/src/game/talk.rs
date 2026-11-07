@@ -1,38 +1,26 @@
 //! Talks: a dialogue from `dialogues/` played through dramaturge.
 //!
-//! dramaturge picks the available options and applies their outcomes. The
-//! runtime keeps everything else: it renders the lines (they are loremaster
-//! markup), runs the world effects in `then`, mirrors facts, relations and
-//! memories into the save state, and keeps the talk open until the player
-//! leaves.
+//! dramaturge picks the available options and applies their outcomes. It
+//! writes facts, relations and memories into the save state through the
+//! game's `NarrativeState` (see `narrative.rs`). The runtime keeps everything
+//! else: it renders the lines (they are loremaster markup), runs the world
+//! effects in `then`, logs what changed, and keeps the talk open until the
+//! player leaves.
 
 use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
 use crate::world::CDialogue;
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
-use dramaturge_model::{
-    DialogTarget, DialogueNodeId, DialogueOption, FactValue, Memory, MemoryTag, Outcome,
-    RelationshipAxisId,
-};
+use dramaturge_model::{DialogTarget, DialogueNodeId, DialogueOption, FactValue, Outcome};
 use dramaturge_runtime::{
     ConditionEvaluator, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
-    DefaultRuntime, DialogWorldState, DialogueRuntime, HasDialogWorldState, OutcomeApplier,
+    DefaultRuntime, DialogueRuntime, NarrativeState, OutcomeApplier,
 };
 use loremaster_lang::{ADD_KEY, THEN_KEY};
 use loremaster_model::{Id, Layer, Value};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-
-impl HasDialogWorldState for Game {
-    fn dialog(&self) -> &DialogWorldState {
-        &self.facts
-    }
-
-    fn dialog_mut(&mut self) -> &mut DialogWorldState {
-        &mut self.facts
-    }
-}
 
 /// Answers derived values (`time.phase`, `here`, ...) in dialogue conditions.
 #[derive(Clone, Copy)]
@@ -259,8 +247,7 @@ impl Game {
             .and_then(|n| n.when.clone())
     }
 
-    /// Apply outcomes through dramaturge, then copy what they changed into
-    /// the save state.
+    /// Apply outcomes through dramaturge, then log what they changed.
     fn apply_outcomes(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, outcomes: &[Outcome]) {
         let mut applier = DefaultOutcomeApplier::with_custom(WorldEffects {
             turn,
@@ -269,11 +256,12 @@ impl Game {
         for o in outcomes {
             applier.apply(o, self);
         }
-        self.mirror(turn, outcomes);
+        self.log_outcomes(turn, outcomes);
     }
 
-    /// dramaturge changed its own state; the save state needs the same values.
-    fn mirror(&mut self, turn: &mut Turn, outcomes: &[Outcome]) {
+    /// Log the facts, relations and memories that outcomes changed, with
+    /// their new values. dramaturge already wrote them into the save state.
+    fn log_outcomes(&self, turn: &mut Turn, outcomes: &[Outcome]) {
         let symbols = &self.world.symbols;
         for o in outcomes {
             match o {
@@ -288,7 +276,6 @@ impl Game {
                         kind: "set".into(),
                         text: format!("{} = {value}", fact.id.0),
                     });
-                    self.state.facts.insert(fact.id.0.to_string(), value);
                 }
                 Outcome::AddRelationship {
                     source,
@@ -299,16 +286,12 @@ impl Game {
                     let Some(thing) = symbols.entity_key(*target) else {
                         continue;
                     };
-                    let value = self
-                        .facts
-                        .get_relationship(*source, *target, axis)
-                        .unwrap_or(0);
+                    let value = self.relationship(*source, *target, axis).unwrap_or(0);
                     let key = format!("{thing}.{}", axis.0);
                     turn.log.push(LogEntry {
                         kind: "relation".into(),
                         text: format!("{key} {delta:+} = {value}"),
                     });
-                    self.state.relations.insert(key, value);
                 }
                 Outcome::AddMemory { owner, memory } => {
                     let (Some(thing), Some(key)) =
@@ -320,18 +303,10 @@ impl Game {
                         kind: "memory".into(),
                         text: format!("{thing} remembers {key}"),
                     });
-                    self.state
-                        .memories
-                        .entry(Id::new(thing))
-                        .or_default()
-                        .insert(key.to_string());
                 }
                 _ => {}
             }
         }
-        // The runtime logs every chosen option as an event. loremaster does
-        // not read the log, so it would only grow.
-        self.facts.drain_events();
     }
 
     pub(super) fn end_talk(&mut self) {
@@ -369,7 +344,7 @@ impl Game {
         );
         let target = runtime.choose_option(&option, self);
         drop(runtime);
-        self.mirror(turn, &option.outcomes);
+        self.log_outcomes(turn, &option.outcomes);
         // A world effect can end the story or take the player away.
         let with = d.with.clone();
         let here = self.eval().present(with.as_str());
@@ -525,43 +500,5 @@ impl Game {
             relations,
             memories,
         })
-    }
-
-    /// Rebuild dramaturge's relations and memories from the save state.
-    /// Every relation of every thing starts at 0: dramaturge reports a
-    /// relation that it never saw as missing, and `trust <= 0` would be false.
-    pub(super) fn restore_dialog_state(&mut self) {
-        let world = self.world.clone();
-        let scope = &world.scope;
-        let player = scope.player();
-        for t in &world.story.things {
-            let Some(target) = scope.entity(t.id.as_str()) else {
-                continue;
-            };
-            for axis in &world.story.relations {
-                let value = self
-                    .state
-                    .relations
-                    .get(&format!("{}.{axis}", t.id))
-                    .copied()
-                    .unwrap_or(0);
-                self.facts.add_relationship(
-                    player,
-                    target,
-                    RelationshipAxisId::new(axis.as_str()),
-                    value,
-                );
-            }
-            for key in self.state.memories.get(&t.id).into_iter().flatten() {
-                if let Some(id) = world.symbols.memory(key) {
-                    self.facts.add_memory(
-                        target,
-                        Memory::new(id)
-                            .with_subject(player)
-                            .with_tag(MemoryTag::Custom(key.as_str().into())),
-                    );
-                }
-            }
-        }
     }
 }

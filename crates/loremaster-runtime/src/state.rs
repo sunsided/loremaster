@@ -52,10 +52,12 @@ pub struct State {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub talk: Option<Talk>,
     /// The player's relation to things, keyed `thing.axis`. Only values that
-    /// a dialogue changed; the rest are 0. dramaturge holds the same values.
+    /// a dialogue changed; the rest are 0. dramaturge reads and writes them
+    /// here.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub relations: BTreeMap<String, i32>,
-    /// The memories that things keep, from dialogues. dramaturge holds them too.
+    /// The memories that things keep, from dialogues. dramaturge reads and
+    /// writes them here.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub memories: BTreeMap<Id, BTreeSet<String>>,
     /// Running timers and the turns they have left.

@@ -6,9 +6,11 @@
 //! exactly the same game.
 //!
 //! Conditions are dramaturge [`Condition`](dramaturge_model::Condition)
-//! trees. Story variables and thing properties live as world facts in a
-//! [`DialogWorldState`](dramaturge_runtime::DialogWorldState); derived values
-//! such as the time of day or the player's room are answered by the runtime
+//! trees. The game implements dramaturge's
+//! [`NarrativeState`](dramaturge_runtime::NarrativeState) on the save state:
+//! story variables and thing properties are world facts, and relations and
+//! memories come from dialogues. There is no second store. The runtime
+//! answers derived values, such as the time of day or the player's room,
 //! through dramaturge's `Custom` condition.
 
 mod behavior;
