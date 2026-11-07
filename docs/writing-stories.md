@@ -493,7 +493,7 @@ The fields of a step:
 | `at` | The time of day from which the step is due. The first step is due the first time the clock reaches it; each later step the first time the clock reaches it after the step before was due. A step without `at` is due as soon as the step before it is over. |
 | `place` | The room where the step happens. The actor walks there along the exits, one room per turn. Doors and conditions on exits do not stop it. When no exits lead there, it goes there in one turn. |
 | `when` | A condition. A step with `at` whose condition does not hold when it is due is skipped. A step without `at` waits until its condition holds. |
-| `do` | A command of the actor: `{ verb: open, direct: stove }` or `[open, stove]`. Its `check` and verb rules fire with the actor in the [Command record](#the-command-record). The default responses of the standard verbs are the player's and do not run, so a rule with `actor:` makes the command do something. A `check` rule with `stop` refuses it; then the step is skipped and its `then` does not run. |
+| `do` | A command of the actor: `{ verb: open, direct: stove }` or `[open, stove]`. Its `check` and verb rules fire with the actor in the [Command record](#the-command-record). The default responses of the standard verbs are the player's and do not run, so a rule with `actor:` makes the command do something. A `check` rule with `stop` refuses it; then the step is skipped and its `then` does not run. The refused try takes the actor's turn. |
 | `then` | Effects, as in a rule. `await` does not work here. |
 | `closes` | The endings that the step closes on purpose: after it, the story can no longer reach them. Read below. |
 | `reason` | Why the step closes them. `loremaster check` warns about `closes` without a `reason`. |
@@ -501,7 +501,7 @@ The fields of a step:
 
 How a turn goes for an actor, after the clock moved and the timers and time rules ran:
 
-- An actor does one thing per turn: it walks one room, or it runs one step. A skipped step takes no time.
+- An actor does one thing per turn: it walks one room, runs one step, or tries a `do` that a `check` rule refuses. A step skipped for its `when` takes no time.
 - While the player talks with the actor, the actor waits. Its step runs late, in the turn that ends the talk.
 - The player sees an actor come into the room and leave it ("The lock-keeper comes in.").
 - A step runs once. A save game keeps which steps ran and which were skipped.
@@ -611,6 +611,30 @@ steps:
 In the editor, Atlas › Machines shows each machine: the states in a row, and the steps as numbered arrows. Forward steps are above, steps back are below. The current state is filled. A step that the next event can take is marked. Point at a state or a step to light its connections. Select a state to see its description and its steps in and out on the right. There you can also change the description, rename the state, or delete a state that no step uses. "+ State" under the drawing adds a state. A rename changes the start and the steps of the machine, but not conditions in other files, such as `exorcism == lit`. The checks show these.
 
 The checker finds unknown states and states that no step goes to.
+
+### Quests
+
+A quest is a machine with `quest: true`. Its states give the player's journal: a state with `journal:` text shows the quest in the journal, and `done: true` marks the quest as finished in that state. A state without `journal:` keeps the quest out of the journal, for example before the player hears of it.
+
+```yaml
+# machines/pages.yaml
+quest: true
+title: The missing pages
+start: unknown
+states:
+  - unknown
+  - { name: searching, journal: "Find the pages of the lock log." }
+  - { name: found, journal: "You found the pages.", done: true }
+steps:
+  - { from: unknown, on: { verb: [ask, keeper] }, to: searching }
+  - { from: searching, on: { verb: [take, pages] }, to: found }
+```
+
+- `title` is the name in the journal. Without it, the journal shows the id.
+- The journal text is a line: markup and speech segments work.
+- The steps move the quest, and so does `set: { pages: found }` in a rule or in a dialogue's `then`.
+- The player types `journal` to read it. It takes no turn. Hosts read it with `Session::journal()`, open quests first.
+- The checker warns about a quest without journal text, and about `journal`, `done` or `title` on a machine without `quest: true`.
 
 ## Behaviors in Rust
 

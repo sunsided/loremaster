@@ -10,6 +10,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Quests (decision D8): a machine with `quest: true` and `title`; its states give the journal with `journal:` text and `done: true`. `Session::journal()` (and `journal()` in the web engine) lists the quests whose state has journal text, open ones first, without a step; the player types `journal`. Steps and `set` move a quest. The builder gets `quest` and `journal`.
 - Action phases: `check` rules run before a verb, and the new `stop` effect refuses the action.
 - Rules in thing and room files, `within:` for a thing, room or region, and `priority`. More specific rules run first.
 - Timers (`timers/`, or `timers:` in story.yaml), `timer.<id>` in conditions, and the effects `start` and `cancel`.

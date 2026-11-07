@@ -13,8 +13,9 @@
 //! - The actor is not at the step's `place`: it walks one room towards it.
 //! - Else the step runs: its `do` command, then its `then` effects.
 //!
-//! An actor runs at most one step or walks one room per turn. A skipped step
-//! takes no time.
+//! An actor runs at most one step or walks one room per turn. A step skipped
+//! for its `when` takes no time; a step whose `do` a `check` rule refuses
+//! takes the turn, because the actor tried.
 
 use super::Game;
 use crate::state::StepOutcome;
@@ -101,6 +102,7 @@ impl Game {
             if !self.actor_command(turn, &record) {
                 log(turn, format!("{name} is refused"));
                 self.end_step(actor, &step.key, StepOutcome::Skipped);
+                // The actor tried: the refusal takes its turn.
                 return Move::Rest;
             }
         }

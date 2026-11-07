@@ -347,6 +347,35 @@ impl Game {
         self.world.clone()
     }
 
+    /// The quests whose current state has non-empty journal text, in story order:
+    /// the open ones first, then the finished ones.
+    pub(crate) fn journal(&self) -> Vec<crate::JournalEntry> {
+        let ev = self.eval();
+        let mut out: Vec<crate::JournalEntry> = (self.world.quests.iter())
+            .filter_map(|q| {
+                let state = match self.state.facts.get(q.machine.as_str()) {
+                    Some(Value::Text(s)) => s.clone(),
+                    _ => return None,
+                };
+                let (line, done) = q.states.get(&state)?;
+                // A line whose segments are all gated out shows no entry.
+                let text = crate::text::line_text(&ev, line);
+                if text.trim().is_empty() {
+                    return None;
+                }
+                Some(crate::JournalEntry {
+                    quest: q.machine.to_string(),
+                    title: q.title.clone(),
+                    state,
+                    text,
+                    done: *done,
+                })
+            })
+            .collect();
+        out.sort_by_key(|e| e.done);
+        out
+    }
+
     pub(crate) fn eval(&self) -> Eval<'_> {
         Eval {
             world: &self.world,

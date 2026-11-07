@@ -44,7 +44,9 @@ names a slot of the command.
 - **Commands of actors** fire `check`, `instead` and `verb` rules with the
   actor in the record. The default actions of the standard verbs stay the
   player's: they move things into the player's hands and describe the
-  player's room.
+  player's room. A refused command skips its step but takes the actor's
+  turn, as a walk does: the actor tried. A step skipped for its `when`
+  takes no time.
 - **`closes`** is plain data on a step: a list of ending ids and a `reason`.
   The ending checks (P4-04) compare it with the endings that really drop out.
 - **The save** keeps, for each actor, the steps that are over (`ran` or
