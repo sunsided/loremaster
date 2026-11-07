@@ -1,0 +1,47 @@
+error: expected `bool`, `int` or `text`
+ --> tests/ui/fail/l4_items.rs:7:36
+  |
+7 |         extern { thing stove [hot: float]; }
+  |                                    ^^^^^
+
+error: `replace` stands before a `room`, `thing`, `machine`, `timer`, `ending`, `verb`, `dialogue` or `thread`
+  --> tests/ui/fail/l4_items.rs:14:9
+   |
+14 |         replace rule r on turn { stop; }
+   |         ^^^^^^^
+
+error: `pack <name>;` names the function of the block; it comes first, once
+  --> tests/ui/fail/l4_items.rs:22:9
+   |
+22 |         pack hall;
+   |         ^^^^
+
+error: `score_var` and `ranks` need `score: <max>`
+  --> tests/ui/fail/l4_items.rs:29:15
+   |
+29 |         story "Tiny" { start: hall, ranks { 0 "Beginner" } }
+   |               ^^^^^^
+
+error: expected `open`, `resolved` or `dropped`
+  --> tests/ui/fail/l4_items.rs:36:31
+   |
+36 |         thread t "T" { status closed; }
+   |                               ^^^^^^
+
+error: unknown verb `juggle`; for an id of another pack, write `extern { verb juggle; }`
+  --> tests/ui/fail/l4_items.rs:47:20
+   |
+47 |             before juggle "You lean closer.";
+   |                    ^^^^^^
+
+error: `poker` has no property `bent`
+  --> tests/ui/fail/l4_items.rs:48:26
+   |
+48 |             instead take when stove.hot and poker.bent => "It is too hot.";
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `stove` has no property `cold`
+  --> tests/ui/fail/l4_items.rs:46:23
+   |
+46 |             name when stove.cold => "hot poker";
+   |                       ^^^^^^^^^^

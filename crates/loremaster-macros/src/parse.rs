@@ -1,26 +1,48 @@
-//! The grammar of `world!` (DSL step L3, the core): story header, vars,
-//! rooms, things, rules, machines, timers, endings, verbs and walkthrough
-//! tests, plus `extern` ids of other packs. Read the crate docs for the
+//! The grammar of `world!` (DSL steps L3 and L4): story header, vars,
+//! rooms, things, rules, machines, timers, endings, verbs, dialogues,
+//! threads, behaviors and walkthrough tests, plus `extern` ids of other
+//! packs. Read the crate docs for the
 //! grammar by example.
 
 use crate::ast::*;
 use crate::cond::parse_until;
+use dramaturge_syntax::Place;
+use dramaturge_syntax::tokens::{ParseHost, parse_dialogue};
 use proc_macro2::{Ident, TokenStream};
 use syn::buffer::Cursor;
 use syn::ext::IdentExt;
+use syn::parse::Parser;
 use syn::parse::{Parse, ParseStream};
 use syn::{Error, LitFloat, LitInt, LitStr, Result, Token, braced, bracketed, parenthesized};
 
 /// The items of a block, for the error on an unknown one.
-const ITEMS: &str = "`extern`, `story`, `var`, `room`, `thing`, `rule`, `machine`, `timer`, `ending`, `verb` or `test`";
+const ITEMS: &str = "`extern`, `story`, `var`, `room`, `thing`, `rule`, `machine`, `timer`, `ending`, `verb`, `dialogue`, `thread`, `behavior` or `test`";
+
+/// The items that `replace` can stand before.
+const REPLACEABLE: &[&str] = &[
+    "room", "thing", "machine", "timer", "ending", "verb", "dialogue", "thread",
+];
 
 impl Parse for World {
     fn parse(input: ParseStream) -> Result<Self> {
+        // `pack <name>;` first: the name of the function.
+        let mut name_ = None;
+        if peek_kw(input, "pack") {
+            name(input)?;
+            let n = name(input)?;
+            semi(input)?;
+            name_ = Some(n);
+        }
         let mut items = Vec::new();
         while !input.is_empty() {
+            if peek_kw(input, "pack") {
+                return Err(input.error(
+                    "`pack <name>;` names the function of the block; it comes first, once",
+                ));
+            }
             items.push(item(input)?);
         }
-        Ok(World { items })
+        Ok(World { name: name_, items })
     }
 }
 
@@ -29,40 +51,77 @@ fn item(input: ParseStream) -> Result<Item> {
         input.parse::<Token![extern]>()?;
         return externs(input).map(Item::Extern);
     }
+    let mut replace = false;
+    if peek_kw(input, "replace") {
+        let word = name(input)?;
+        if !peek_word(input).is_some_and(|w| REPLACEABLE.contains(&w.as_str())) {
+            return Err(Error::new(
+                word.span,
+                "`replace` stands before a `room`, `thing`, `machine`, `timer`, `ending`, `verb`, `dialogue` or `thread`",
+            ));
+        }
+        replace = true;
+    }
     let word = peek_word(input).ok_or_else(|| input.error(format!("expected {ITEMS}")))?;
     Ok(match word.as_str() {
         "story" => Item::Story(story(input)?),
         "var" => Item::Var(var(input)?),
-        "room" => Item::Room(room(input)?),
-        "thing" => Item::Thing(thing(input)?),
+        "room" => Item::Room(Room {
+            replace,
+            ..room(input)?
+        }),
+        "thing" => Item::Thing(Thing {
+            replace,
+            ..thing(input)?
+        }),
         "rule" => Item::Rule(rule(input)?),
-        "machine" => Item::Machine(machine(input)?),
-        "timer" => Item::Timer(timer(input)?),
-        "ending" => Item::Ending(ending(input)?),
-        "verb" => Item::Verb(verb(input)?),
+        "machine" => Item::Machine(Machine {
+            replace,
+            ..machine(input)?
+        }),
+        "timer" => Item::Timer(Timer {
+            replace,
+            ..timer(input)?
+        }),
+        "ending" => Item::Ending(Ending {
+            replace,
+            ..ending(input)?
+        }),
+        "verb" => Item::Verb(Verb {
+            replace,
+            ..verb(input)?
+        }),
         "test" => Item::Test(test(input)?),
+        "dialogue" => Item::Dialogue(Dialogue {
+            replace,
+            ..dialogue(input)?
+        }),
+        "thread" => Item::Thread(Thread {
+            replace,
+            ..thread(input)?
+        }),
+        "behavior" => {
+            name(input)?;
+            let id = name(input)?;
+            semi(input)?;
+            Item::Behavior(id)
+        }
         "texts" => {
             return Err(unsupported(
                 input,
                 "text pools (`texts`) are not in `world!` yet: they wait for the text core (R9, P4-01 #78)",
             ));
         }
-        "dialogue" => {
+        "extend" => {
             return Err(unsupported(
                 input,
-                "dialogues are not in `world!` yet: they come with dramaturge's `dialogue!` (R12, DSL step L4, P4-08 #85)",
+                "`extend` is not in `world!` yet: an extension needs the fields as data (later work); write the whole entity with `replace`, or extend it in YAML",
             ));
         }
         "agenda" => {
             return Err(unsupported(
                 input,
                 "agendas are not in `world!` yet: they wait for actors and agendas (D6, P4-02 #79)",
-            ));
-        }
-        "thread" => {
-            return Err(unsupported(
-                input,
-                "threads are not in `world!` yet (DSL step L4, P4-08 #85); write them with the builder",
             ));
         }
         _ => return Err(input.error(format!("expected {ITEMS}"))),
@@ -269,7 +328,36 @@ fn externs(input: ParseStream) -> Result<Vec<Extern>> {
         let id = name(input)?;
         let kind = match kind.value.as_str() {
             "room" => ExternKind::Room,
-            "thing" => ExternKind::Thing,
+            "thing" => {
+                let mut props = Vec::new();
+                if input.peek(syn::token::Bracket) {
+                    let content;
+                    bracketed!(content in input);
+                    while !content.is_empty() {
+                        let prop = name(&content)?;
+                        content.parse::<Token![:]>().map_err(|e| {
+                            Error::new(e.span(), "a property needs its type: `hot: bool`")
+                        })?;
+                        let ty = name(&content)?;
+                        let ty = match ty.value.as_str() {
+                            "bool" => PropType::Bool,
+                            "int" => PropType::Int,
+                            "text" => PropType::Text,
+                            _ => {
+                                return Err(Error::new(
+                                    ty.span,
+                                    "expected `bool`, `int` or `text`",
+                                ));
+                            }
+                        };
+                        props.push((prop, ty));
+                        if !content.is_empty() {
+                            content.parse::<Token![,]>()?;
+                        }
+                    }
+                }
+                ExternKind::Thing(props)
+            }
             "var" => {
                 let ty = if input.peek(Token![:]) {
                     input.parse::<Token![:]>()?;
@@ -302,6 +390,7 @@ fn externs(input: ParseStream) -> Result<Vec<Extern>> {
             "ending" => ExternKind::Ending,
             "verb" => ExternKind::Verb,
             "behavior" => ExternKind::Behavior,
+            "relation" => ExternKind::Relation,
             "texts" => {
                 return Err(Error::new(
                     kind.span,
@@ -311,7 +400,7 @@ fn externs(input: ParseStream) -> Result<Vec<Extern>> {
             _ => {
                 return Err(Error::new(
                     kind.span,
-                    "expected `room`, `thing`, `var`, `machine`, `timer`, `ending`, `verb` or `behavior`",
+                    "expected `room`, `thing`, `var`, `machine`, `timer`, `ending`, `verb`, `behavior` or `relation`",
                 ));
             }
         };
@@ -339,6 +428,10 @@ fn story(input: ParseStream) -> Result<Story> {
         clock_start: None,
         minutes_per_turn: None,
         phases: None,
+        relations: Vec::new(),
+        score: None,
+        score_var: None,
+        ranks: Vec::new(),
         tokens,
     };
     let content;
@@ -347,6 +440,18 @@ fn story(input: ParseStream) -> Result<Story> {
         let field = name(&content)?;
         match field.value.as_str() {
             "clock" => clock(&content, &mut story)?,
+            "ranks" => {
+                let list;
+                braced!(list in content);
+                while !list.is_empty() {
+                    let from = int(&list)?;
+                    let rank = text(&list)?;
+                    story.ranks.push((from, rank));
+                    if !list.is_empty() {
+                        list.parse::<Token![,]>()?;
+                    }
+                }
+            }
             _ => {
                 content.parse::<Token![:]>()?;
                 match field.value.as_str() {
@@ -357,10 +462,13 @@ fn story(input: ParseStream) -> Result<Story> {
                     "death_prompt" => {
                         story.death_prompt = Some(content.parse::<syn::LitBool>()?.value)
                     }
+                    "relations" => story.relations = names(&content)?,
+                    "score" => story.score = Some(int(&content)?),
+                    "score_var" => story.score_var = Some(name(&content)?),
                     _ => {
                         return Err(Error::new(
                             field.span,
-                            "expected `author`, `start`, `seed`, `intro`, `death_prompt` or `clock`",
+                            "expected `author`, `start`, `seed`, `intro`, `death_prompt`, `relations`, `score`, `score_var`, `ranks` or `clock`",
                         ));
                     }
                 }
@@ -369,6 +477,12 @@ fn story(input: ParseStream) -> Result<Story> {
         if !content.is_empty() {
             content.parse::<Token![,]>()?;
         }
+    }
+    if (story.score_var.is_some() || !story.ranks.is_empty()) && story.score.is_none() {
+        return Err(Error::new(
+            story.title.span,
+            "`score_var` and `ranks` need `score: <max>`",
+        ));
     }
     if story.start.is_none() {
         return Err(Error::new(
@@ -528,12 +642,35 @@ fn frag(input: ParseStream) -> Result<Frag> {
     if peek_kw(input, "says") || peek_kw(input, "narrate") || peek_word_then(input, "says") {
         return Err(speech(input));
     }
+    let mut id = None;
+    let mut replaces = false;
+    let mut notes = Vec::new();
+    loop {
+        match peek_word(input).as_deref() {
+            Some("id") => {
+                name(input)?;
+                id = Some(name(input)?);
+            }
+            Some("replaces") => {
+                name(input)?;
+                replaces = true;
+            }
+            Some("note") => {
+                name(input)?;
+                notes.push(text(input)?);
+            }
+            _ => break,
+        }
+    }
     Ok(Frag {
         layer,
         mode,
         when,
         texts,
         variants,
+        id,
+        replaces,
+        notes,
         tokens: since(start, input),
     })
 }
@@ -573,8 +710,23 @@ fn speech(input: ParseStream) -> Error {
 /// error that suggests `narrate` (the lint of #111; YAML loads it with a
 /// warning).
 fn line(input: ParseStream) -> Result<Vec<Segment>> {
+    line_until(input, false)
+}
+
+/// The segments of a line, up to `;`. In a dialogue (`dialogue`), also up
+/// to `{`, `=>` and a `when` without `then`: the node's body, the option's
+/// target and the option's condition.
+fn line_until(input: ParseStream, dialogue: bool) -> Result<Vec<Segment>> {
     let mut segments: Vec<Segment> = Vec::new();
-    while !input.peek(Token![;]) && !input.is_empty() {
+    let end = |input: ParseStream| {
+        input.peek(Token![;])
+            || input.is_empty()
+            || (dialogue
+                && (input.peek(syn::token::Brace)
+                    || input.peek(Token![=>])
+                    || (peek_kw(input, "when") && !when_then(input))))
+    };
+    while !end(input) {
         if segments.is_empty()
             && input.peek(Ident::peek_any)
             && !peek_kw(input, "when")
@@ -607,6 +759,27 @@ fn line(input: ParseStream) -> Result<Vec<Segment>> {
         return Err(input.error("the line needs a text or at least one segment"));
     }
     Ok(segments)
+}
+
+/// `when <cond> then`: the condition of a segment, not of an option. It
+/// looks ahead up to `then`, `;`, `=>` or `{`.
+fn when_then(input: ParseStream) -> bool {
+    let fork = input.fork();
+    if fork.call(Ident::parse_any).is_err() {
+        return false;
+    }
+    while !fork.is_empty() {
+        if peek_kw(&fork, "then") {
+            return true;
+        }
+        if fork.peek(Token![;]) || fork.peek(Token![=>]) || fork.peek(syn::token::Brace) {
+            return false;
+        }
+        if fork.parse::<proc_macro2::TokenTree>().is_err() {
+            return false;
+        }
+    }
+    false
 }
 
 fn segment(input: ParseStream) -> Result<Segment> {
@@ -673,6 +846,22 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
     ))
 }
 
+/// `before <verb> <frag>`, `instead ..` or `after ..`.
+fn frame(input: ParseStream) -> Result<Frame> {
+    let word = name(input)?;
+    let when = match word.value.as_str() {
+        "before" => FrameWhen::Before,
+        "instead" => FrameWhen::Instead,
+        _ => FrameWhen::After,
+    };
+    let verb = name(input)?;
+    Ok(Frame {
+        when,
+        verb,
+        frag: frag(input)?,
+    })
+}
+
 fn note(input: ParseStream, todo: bool) -> Result<Note> {
     name(input)?;
     let text = text(input)?;
@@ -713,9 +902,10 @@ fn room(input: ParseStream) -> Result<Room> {
             }
             Some("note") => return note(input, false).map(RoomPart::Note),
             Some("todo") => return note(input, true).map(RoomPart::Note),
+            Some("before" | "instead" | "after") => RoomPart::Frame(frame(input)?),
             Some(w) if !LAYERS.contains(&w) && !MODES.contains(&w) && w != "when" => {
                 return Err(input.error(
-                    "expected a text, `at`, `exit`, `tag`, `region`, `level`, `note` or `todo`",
+                    "expected a text, `at`, `exit`, `tag`, `region`, `level`, `before`, `instead`, `after`, `note` or `todo`",
                 ));
             }
             _ => RoomPart::Text(frag(input)?),
@@ -724,6 +914,7 @@ fn room(input: ParseStream) -> Result<Room> {
         Ok(part)
     })?;
     Ok(Room {
+        replace: false,
         id,
         name: room_name,
         parts,
@@ -849,9 +1040,11 @@ fn thing(input: ParseStream) -> Result<Thing> {
             }
             Some("note") => return note(input, false).map(ThingPart::Note),
             Some("todo") => return note(input, true).map(ThingPart::Note),
+            Some("before" | "instead" | "after") => ThingPart::Frame(frame(input)?),
+            Some("name") => ThingPart::Name(name_stage(input)?),
             Some(w) if !LAYERS.contains(&w) && !MODES.contains(&w) && w != "when" => {
                 return Err(input.error(
-                    "expected a text, `aliases`, `portable`, `container`, `supporter`, `unlisted`, `proper`, `capacity`, `key`, `prop`, `examine`, `presence`, `also_in`, `note` or `todo`",
+                    "expected a text, `aliases`, `portable`, `container`, `supporter`, `unlisted`, `proper`, `capacity`, `key`, `prop`, `examine`, `presence`, `also_in`, `name`, `before`, `instead`, `after`, `note` or `todo`",
                 ));
             }
             _ => ThingPart::Examine(frag(input)?),
@@ -860,11 +1053,51 @@ fn thing(input: ParseStream) -> Result<Thing> {
         Ok(part)
     })?;
     Ok(Thing {
+        replace: false,
         id,
         name: thing_name,
         location,
         parts,
     })
+}
+
+/// `name [when <cond> =>] "text" [aliases [..]] [proper]`.
+fn name_stage(input: ParseStream) -> Result<NameStage> {
+    let start = input.cursor();
+    name(input)?;
+    let when = if peek_kw(input, "when") {
+        keyword(input, "when")?;
+        let c = parse_until(input, |i| i.peek(Token![=>]) || i.peek(Token![;]))?;
+        input
+            .parse::<Token![=>]>()
+            .map_err(|e| Error::new(e.span(), "expected `=>` and the name after the condition"))?;
+        Some(c)
+    } else {
+        None
+    };
+    let stage_text = text(input)?;
+    let mut stage = NameStage {
+        when,
+        text: stage_text,
+        aliases: Vec::new(),
+        proper: false,
+        tokens: TokenStream::new(),
+    };
+    loop {
+        match peek_word(input).as_deref() {
+            Some("aliases") => {
+                name(input)?;
+                stage.aliases.extend(words(input)?);
+            }
+            Some("proper") => {
+                name(input)?;
+                stage.proper = true;
+            }
+            _ => break,
+        }
+    }
+    stage.tokens = since(start, input);
+    Ok(stage)
 }
 
 fn flag(input: ParseStream, part: ThingPart) -> Result<ThingPart> {
@@ -1014,6 +1247,17 @@ fn effects(input: ParseStream) -> Result<Vec<Effect>> {
 
 fn effect(input: ParseStream) -> Result<Effect> {
     let start = input.cursor();
+    let kind = effect_body(input)?.kind;
+    semi(input)?;
+    Ok(Effect {
+        kind,
+        tokens: since(start, input),
+    })
+}
+
+/// An effect without its `;`.
+fn effect_body(input: ParseStream) -> Result<Effect> {
+    let start = input.cursor();
     let word = name(input)?;
     let kind = match word.value.as_str() {
         "line" => EffectKind::Line(line(input)?),
@@ -1110,7 +1354,6 @@ fn effect(input: ParseStream) -> Result<Effect> {
             ));
         }
     };
-    semi(input)?;
     Ok(Effect {
         kind,
         tokens: since(start, input),
@@ -1124,9 +1367,15 @@ fn machine(input: ParseStream) -> Result<Machine> {
     let start = name(input)?;
     let mut states = Vec::new();
     let mut steps = Vec::new();
+    let mut notes = Vec::new();
     let content;
     braced!(content in input);
     while !content.is_empty() {
+        if peek_kw(&content, "note") || peek_kw(&content, "todo") {
+            let todo = peek_kw(&content, "todo");
+            notes.push(note(&content, todo)?);
+            continue;
+        }
         if peek_kw(&content, "state") {
             name(&content)?;
             let state = name(&content)?;
@@ -1142,10 +1391,12 @@ fn machine(input: ParseStream) -> Result<Machine> {
         steps.push(step(&content)?);
     }
     Ok(Machine {
+        replace: false,
         id,
         start,
         states,
         steps,
+        notes,
     })
 }
 
@@ -1217,12 +1468,14 @@ fn timer(input: ParseStream) -> Result<Timer> {
     keyword(input, "turns")?;
     let turns = int(input)?;
     let mut timer = Timer {
+        replace: false,
         id,
         turns,
         running: false,
         repeat: false,
         runs_while: None,
         at: Vec::new(),
+        notes: Vec::new(),
     };
     if input.peek(Token![;]) {
         input.parse::<Token![;]>()?;
@@ -1249,10 +1502,17 @@ fn timer(input: ParseStream) -> Result<Timer> {
                 let n = int(&content)?;
                 timer.at.push((n, effects(&content)?));
             }
+            "note" | "todo" => {
+                timer.notes.push(Note {
+                    todo: field.value == "todo",
+                    text: text(&content)?,
+                });
+                semi(&content)?;
+            }
             _ => {
                 return Err(Error::new(
                     field.span,
-                    "expected `running;`, `repeat;`, `while <cond>;` or `at <n> { .. }`",
+                    "expected `running;`, `repeat;`, `while <cond>;`, `at <n> { .. }`, `note` or `todo`",
                 ));
             }
         }
@@ -1317,6 +1577,7 @@ fn ending(input: ParseStream) -> Result<Ending> {
         )
     })?;
     Ok(Ending {
+        replace: false,
         id,
         title,
         kind,
@@ -1331,6 +1592,7 @@ fn verb(input: ParseStream) -> Result<Verb> {
     let id = name(input)?;
     let label = text(input)?;
     let mut verb = Verb {
+        replace: false,
         id,
         label,
         words: Vec::new(),
@@ -1504,4 +1766,117 @@ fn expectations(input: ParseStream) -> Result<Vec<Expectation>> {
         }
         input.parse::<Token![,]>()?;
     }
+}
+
+fn thread(input: ParseStream) -> Result<Thread> {
+    keyword(input, "thread")?;
+    let id = name(input)?;
+    let thread_name = text(input)?;
+    let mut thread = Thread {
+        replace: false,
+        id,
+        name: thread_name,
+        status: None,
+        summary: None,
+        tracks: Vec::new(),
+        notes: Vec::new(),
+    };
+    let content;
+    braced!(content in input);
+    while !content.is_empty() {
+        match peek_word(&content).as_deref() {
+            Some("status") => {
+                name(&content)?;
+                let s = name(&content)?;
+                if !["open", "resolved", "dropped"].contains(&s.value.as_str()) {
+                    return Err(Error::new(
+                        s.span,
+                        "expected `open`, `resolved` or `dropped`",
+                    ));
+                }
+                thread.status = Some(s);
+            }
+            Some("summary") => {
+                name(&content)?;
+                thread.summary = Some(text(&content)?);
+            }
+            Some("tracks") => {
+                name(&content)?;
+                thread.tracks.push(path(&content)?);
+            }
+            Some("note") => {
+                thread.notes.push(note(&content, false)?);
+                continue;
+            }
+            Some("todo") => {
+                thread.notes.push(note(&content, true)?);
+                continue;
+            }
+            _ => {
+                return Err(
+                    content.error("expected `status`, `summary`, `tracks`, `note` or `todo`")
+                );
+            }
+        }
+        semi(&content)?;
+    }
+    Ok(thread)
+}
+
+// --------------------------------------------------------------- dialogue
+
+/// loremaster's payloads in dramaturge's token form of a dialogue: a
+/// condition is a `when` of `world!`, a text is a line of segments, and an
+/// effect is `then <effect>`.
+struct Host;
+
+impl ParseHost for Host {
+    type Condition = Cond;
+    type Text = DialogueLine;
+    type Effect = Effect;
+
+    fn condition(&mut self, tokens: TokenStream, _: proc_macro2::Span) -> Result<Cond> {
+        (|input: ParseStream| parse_until(input, |_| false)).parse2(tokens)
+    }
+
+    fn text(&mut self, input: ParseStream) -> Result<DialogueLine> {
+        Ok(DialogueLine {
+            segments: line_until(input, true)?,
+        })
+    }
+
+    fn peek_effect(&self, input: ParseStream) -> bool {
+        peek_kw(input, "then") && !peek_word_then(input, "says")
+    }
+
+    fn effect(&mut self, input: ParseStream) -> Result<Effect> {
+        // `then a, b`: dramaturge reads the effects after a comma without
+        // their `then`.
+        if peek_kw(input, "then") {
+            name(input)?;
+        }
+        effect_body(input)
+    }
+}
+
+/// `dialogue [<id>] with <thing> start [..] { .. }`, in dramaturge's token
+/// form with loremaster's payloads.
+fn dialogue(input: ParseStream) -> Result<Dialogue> {
+    let fork = input.fork();
+    name(&fork)?;
+    let id = if peek_kw(&fork, "with") {
+        None
+    } else {
+        Some(name(&fork)?)
+    };
+    let tree: DialogueTree = parse_dialogue(input, &mut Host)?;
+    let id = id.unwrap_or_else(|| Name {
+        value: tree.dialogue.with.clone(),
+        span: tree.spans.get(&Place::With).copied().unwrap_or(tree.span),
+    });
+    Ok(Dialogue {
+        replace: false,
+        id,
+        tree,
+    })
 }

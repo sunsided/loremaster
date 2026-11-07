@@ -1,0 +1,59 @@
+error: no node `nowhere`
+ --> tests/ui/fail/dialogue_checks.rs:7:44
+  |
+7 |         dialogue with keeper start [stove, nowhere] {
+  |                                            ^^^^^^^
+
+error: no node `who_fed_it`
+ --> tests/ui/fail/dialogue_checks.rs:9:39
+  |
+9 |                 says "Who fed it?" => who_fed_it;
+  |                                       ^^^^^^^^^^
+
+error: a node has one line in loremaster's talks; more lines (`<speaker>: "…";`) are in the dialogue shape, but the talks do not play them yet
+  --> tests/ui/fail/dialogue_checks.rs:23:17
+   |
+23 |                 player: "Hm.";
+   |                 ^^^^^^
+
+error: `-> <node>` (`next`) is in the dialogue shape, but loremaster's talks do not play it yet; give the node an option
+  --> tests/ui/fail/dialogue_checks.rs:24:20
+   |
+24 |                 -> end;
+   |                    ^^^
+
+error: cannot set `ash_is_fresh` to `3`
+  --> tests/ui/fail/dialogue_checks.rs:35:13
+   |
+35 |             stove: "He nods." {
+   |             ^^^^^
+
+error: unknown room `cellar`; for an id of another pack, write `extern { room cellar; }`
+  --> tests/ui/fail/dialogue_checks.rs:40:26
+   |
+40 |                     then goto cellar;
+   |                          ^^^^^^^^^^^
+
+error: `{` is never closed
+  --> tests/ui/fail/dialogue_checks.rs:42:17
+   |
+42 |                 says "{bad" => end;
+   |                 ^^^^^^^^^^^
+
+error: unknown speaker `stranger`: `by` names a thing or `player`
+  --> tests/ui/fail/dialogue_checks.rs:43:17
+   |
+43 |                 stranger says "Hm." => end;
+   |                 ^^^^^^^^
+
+error: unknown name `ash_is_cold`
+  --> tests/ui/fail/dialogue_checks.rs:36:22
+   |
+36 |                 when ash_is_cold;
+   |                      ^^^^^^^^^^^
+
+error: unknown thing `keeper`; for an id of another pack, write `extern { thing keeper; }`
+  --> tests/ui/fail/dialogue_checks.rs:52:23
+   |
+52 |         dialogue with keeper start [stove] {
+   |                       ^^^^^^

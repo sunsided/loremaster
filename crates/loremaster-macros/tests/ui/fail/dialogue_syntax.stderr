@@ -1,0 +1,23 @@
+error: a line from a text pool is not in `world!` yet: it waits for the text core (R9, P4-01 #78)
+  --> tests/ui/fail/dialogue_syntax.rs:10:20
+   |
+10 |             stove: keeper_remark {
+   |                    ^^^^^^^^^^^^^
+
+error: expected `=> target` after the option
+  --> tests/ui/fail/dialogue_syntax.rs:23:35
+   |
+23 |                 says "Good night.";
+   |                                   ^
+
+error: a bare string after `says` reads like more speech; write `narrate "…"` for narration
+  --> tests/ui/fail/dialogue_syntax.rs:34:35
+   |
+34 |             stove: says "Nobody." "He turns the poker." {
+   |                                   ^^^^^^^^^^^^^^^^^^^^^
+
+error: expected an effect: `line`, `set`, `add`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel` or `call`
+  --> tests/ui/fail/dialogue_syntax.rs:47:22
+   |
+47 |                 then jump;
+   |                      ^^^^
