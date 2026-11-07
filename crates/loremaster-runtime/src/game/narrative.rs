@@ -98,6 +98,10 @@ impl NarrativeState for Game {
         axis: RelationshipAxisId,
         delta: i32,
     ) {
+        // A delta of 0 changes nothing, so it stores nothing.
+        if delta == 0 {
+            return;
+        }
         if let Some(key) = self.relation_key(source, target, &axis.0) {
             *self.state.relations.entry(key).or_insert(0) += delta;
         }
@@ -197,6 +201,20 @@ mod tests {
         game.add_relationship(player, blackbeard, trust.clone(), 2);
         check!(game.relationship(player, blackbeard, &trust) == Some(2));
         check!(game.state.relations.get("blackbeard.trust") == Some(&2));
+    }
+
+    #[test]
+    fn a_zero_relation_delta_stores_nothing() {
+        let mut game = cantina();
+        let player = game.world.scope.player();
+        let blackbeard = game.world.scope.entity("blackbeard").unwrap();
+        let trust = RelationshipAxisId::new("trust");
+        game.add_relationship(player, blackbeard, trust.clone(), 0);
+        check!(!game.state.relations.contains_key("blackbeard.trust"));
+        check!(game.relationship(player, blackbeard, &trust) == Some(0));
+        game.add_relationship(player, blackbeard, trust.clone(), 3);
+        game.add_relationship(player, blackbeard, trust.clone(), 0);
+        check!(game.state.relations.get("blackbeard.trust") == Some(&3));
     }
 
     #[test]
