@@ -525,12 +525,16 @@ impl World {
 
     /// The story's thing with this id, by index instead of a linear search.
     pub(crate) fn thing(&self, id: &str) -> Option<&loremaster_model::Thing> {
-        self.thing_index.get(id).and_then(|&i| self.story.things.get(i))
+        self.thing_index
+            .get(id)
+            .and_then(|&i| self.story.things.get(i))
     }
 
     /// The story's room with this id, by index instead of a linear search.
     pub(crate) fn room(&self, id: &str) -> Option<&loremaster_model::Room> {
-        self.room_index.get(id).and_then(|&i| self.story.rooms.get(i))
+        self.room_index
+            .get(id)
+            .and_then(|&i| self.story.rooms.get(i))
     }
 
     /// The dialogue of a thing.
