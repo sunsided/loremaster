@@ -50,17 +50,28 @@ pub fn compile_dialogue(
             ..error
         }),
         Err(LowerError::Check(issues)) => {
-            let Some(issue) = issues.into_iter().find(|i| i.severity == Severity::Error) else {
-                return Err(not_lowered());
+            // `lower` fails on a check error; without one (not possible with
+            // dramaturge 0.3.0-alpha.4) name the first issue in the message,
+            // so `check` does not fold it into the warning of the same issue.
+            let Some(issue) = issues.iter().find(|i| i.severity == Severity::Error) else {
+                let why = (issues.first())
+                    .map_or(String::new(), |i| format!(": {} ({})", i.message, i.path));
+                let error = fail("start:", format!("the dialogue can not be lowered{why}"));
+                return Err(DialogueError {
+                    at: "start".into(),
+                    ..error
+                });
             };
+            // Find the text of the place: a start key, else the node key.
             let source = match issue.place {
-                Place::Start(i) => d.start.get(i).map_or("", String::as_str),
-                _ => "",
+                Place::Start(i) => d.start.get(i).cloned().unwrap_or_default(),
+                _ => (issue.path.strip_prefix("nodes."))
+                    .and_then(|rest| rest.split(['.', '[']).next())
+                    .map_or(String::new(), |k| format!("{k}:")),
             };
-            let at = issue.path;
             Err(DialogueError {
-                at,
-                ..fail(source, issue.message)
+                at: issue.path.clone(),
+                ..fail(&source, issue.message.clone())
             })
         }
         // A kind of error that a later dramaturge adds.
@@ -103,8 +114,13 @@ fn lang(source: &str, error: LangError) -> DialogueError {
     }
 }
 
+/// An error without an issue to show, at the dialogue's `start`.
 fn not_lowered() -> DialogueError {
-    fail("", "the dialogue can not be lowered".into())
+    let error = fail("start:", "the dialogue can not be lowered".into());
+    DialogueError {
+        at: "start".into(),
+        ..error
+    }
 }
 
 fn fail(source: &str, message: String) -> DialogueError {
