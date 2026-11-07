@@ -91,6 +91,11 @@ jobs:
           key: dramaturge-tip
       - name: Patch dramaturge to the tip of feature/0.3
         run: |
+          # A patch applies only when its version satisfies the requirement,
+          # and Cargo.toml pins the released alpha exactly. Allow any 0.3
+          # version here, so the patch also applies after feature/0.3 raised
+          # its version.
+          sed -i -E 's/^(dramaturge-(model|runtime|authoring)) = "=[^"]+"$/\1 = ">=0.3.0-alpha.0, <0.4.0"/' Cargo.toml
           mkdir -p .cargo
           {
             echo '[patch.crates-io]'
@@ -99,6 +104,11 @@ jobs:
             done
           } > .cargo/config.toml
           cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring
+          # The job is worth nothing if cargo fell back to crates.io.
+          for crate in dramaturge-model dramaturge-runtime dramaturge-authoring; do
+            grep -A2 "^name = \"$crate\"$" Cargo.lock | grep -q '^source = "git+https://github.com/sunsided/dramaturge' \
+              || { echo "error: $crate does not come from feature/0.3"; exit 1; }
+          done
       - run: cargo test --workspace --no-default-features
 
   web:

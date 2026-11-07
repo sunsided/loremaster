@@ -57,7 +57,9 @@ loremaster takes the dramaturge crates from crates.io, with an exact version (`=
   dramaturge-authoring = { path = "../dramaturge/crates/dramaturge-authoring" }
   ```
 
-  Then each cargo command rewrites `Cargo.lock` with path sources. Do not commit that file: `task lock:check` (part of `task verify`, and the first step in CI) fails on a staged `Cargo.lock` without the crates.io source.
+  Cargo uses a patch only when its version satisfies the requirement in `Cargo.toml`, which pins the released alpha exactly. Between releases, dramaturge keeps the released version on `feature/0.3` (cargo-release sets the version at the release), so the patch applies. If `../dramaturge` has another version, cargo prints "Patch ... was not used" and builds the crates.io alpha: then relax the pin in `Cargo.toml` locally, and do not commit that change.
+
+  With the patch, each cargo command rewrites `Cargo.lock` with path sources. Do not commit that file: `task lock:check` (part of `task verify`, and the first step in CI) fails on a staged `Cargo.lock` without the crates.io source.
 
 ### Pending tests
 
