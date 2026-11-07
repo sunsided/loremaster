@@ -1,7 +1,7 @@
 //! Conversions for the arguments of the builders, so that a story reads with
 //! plain literals: `false`, `"night"`, `"20:30"`, `["rung", "lit"]`.
 
-use loremaster_model::{Direction, Id, States, TimeOfDay, Value};
+use loremaster_model::{Direction, Id, States, TimeOfDay, Value, VarType};
 
 /// A variable or property value: `bool`, an integer, or text (an enum value).
 pub trait IntoValue {
@@ -47,6 +47,37 @@ impl IntoValue for &str {
 impl IntoValue for String {
     fn into_value(self) -> Value {
         Value::Text(self)
+    }
+}
+
+/// The initial value of a `bool` or `int` variable, with its type. Text is
+/// not one: an enum variable needs its list of values
+/// ([`StoryBuilder::var_enum`](crate::StoryBuilder::var_enum)).
+pub trait IntoVarValue {
+    fn into_var_value(self) -> (VarType, Value);
+}
+
+impl IntoVarValue for bool {
+    fn into_var_value(self) -> (VarType, Value) {
+        (VarType::Bool, Value::Bool(self))
+    }
+}
+
+impl IntoVarValue for i64 {
+    fn into_var_value(self) -> (VarType, Value) {
+        (VarType::Int, Value::Int(self))
+    }
+}
+
+impl IntoVarValue for i32 {
+    fn into_var_value(self) -> (VarType, Value) {
+        (VarType::Int, Value::Int(self.into()))
+    }
+}
+
+impl IntoVarValue for u32 {
+    fn into_var_value(self) -> (VarType, Value) {
+        (VarType::Int, Value::Int(self.into()))
     }
 }
 

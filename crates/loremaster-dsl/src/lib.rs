@@ -55,7 +55,7 @@ mod timer;
 mod verb;
 mod walkthrough;
 
-pub use convert::{IntoDirection, IntoStates, IntoTime, IntoValue};
+pub use convert::{IntoDirection, IntoStates, IntoTime, IntoValue, IntoVarValue};
 pub use dialogue::DialogueBuilder;
 pub use ending::EndingBuilder;
 pub use fragment::{FragmentExt, IntoFragment, frag, variants};
@@ -79,10 +79,11 @@ pub use loremaster_project::{Origin, Pack};
 pub mod prelude {
     pub use crate::{
         BuildPack, Effects, FragmentExt, HasFrames, HasNotes, IntoDirection, IntoFragment,
-        IntoStates, IntoTime, IntoValue, Loremaster, Origin, Pack, frag, on, variants,
+        IntoStates, IntoTime, IntoValue, IntoVarValue, Loremaster, Origin, Pack, frag, on,
+        variants,
     };
     pub use loremaster_model::{
-        Direction, Effect, EndingKind, EventPattern, Fragment, FragmentMode, Layer, Note, NoteRole,
-        ThreadStatus, Value, VerbSlots,
+        Direction, Effect, EndingKind, EventPattern, Fragment, FragmentMode, Layer, NameStage,
+        Note, NoteRole, States, ThreadStatus, TimeOfDay, Value, VerbSlots,
     };
 }

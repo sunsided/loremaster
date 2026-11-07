@@ -1,6 +1,6 @@
 //! The story header: everything of `story.yaml`.
 
-use crate::convert::{IntoTime, IntoValue, id, strings};
+use crate::convert::{IntoTime, IntoVarValue, id, strings};
 use crate::pack::register;
 use crate::{HasFrames, HasNotes, IntoFragment};
 use loremaster_model::{ClockConfig, Frames, Id, Note, Phase, Rank, Score, Value, VarDef, VarType};
@@ -85,26 +85,23 @@ impl<'a> StoryBuilder<'a> {
         mut self,
         phases: impl IntoIterator<Item = (impl Into<String>, T)>,
     ) -> Self {
-        self.header().clock.phases = phases
-            .into_iter()
-            .map(|(name, from)| Phase {
+        // A loop, not a closure: a closure would hide the caller's line
+        // from the panic of a malformed time.
+        let mut list = Vec::new();
+        for (name, from) in phases {
+            list.push(Phase {
                 name: name.into(),
                 from: from.into_time(),
-            })
-            .collect();
+            });
+        }
+        self.header().clock.phases = list;
         self
     }
 
     /// A variable of type `bool` or `int`, with its initial value. The type
     /// comes from the value; use [`var_enum`](Self::var_enum) for an enum.
-    #[track_caller]
-    pub fn var(mut self, var: impl AsRef<str>, initial: impl IntoValue) -> Self {
-        let initial = initial.into_value();
-        let ty = match initial {
-            Value::Bool(_) => VarType::Bool,
-            Value::Int(_) => VarType::Int,
-            Value::Text(_) => panic!("a text value needs `var_enum` with the list of values"),
-        };
+    pub fn var(mut self, var: impl AsRef<str>, initial: impl IntoVarValue) -> Self {
+        let (ty, initial) = initial.into_var_value();
         self.header().vars.push(VarDef {
             id: id(var),
             ty,

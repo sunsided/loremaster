@@ -7,11 +7,13 @@ use loremaster_project::Pack;
 
 /// A dialogue of a pack, from [`BuildPack::dialogue`](crate::BuildPack::dialogue).
 ///
-/// [`node`](Self::node) adds a node and [`option`](Self::option) an answer
-/// to the node added last. [`when`](Self::when) and the outcomes
+/// [`node`](Self::node) adds a node, and [`option`](Self::option) adds an
+/// answer to the node added last. [`when`](Self::when) and the outcomes
 /// ([`set`](Self::set), [`add`](Self::add), [`relation`](Self::relation),
 /// [`remember`](Self::remember), [`then`](Self::then)) change the node or
-/// option added last.
+/// option added last. Thus give the `when` and the outcomes of a node before
+/// its first option, in the order of the YAML file: the node's fields, then
+/// its `options`.
 ///
 /// ```
 /// use loremaster_dsl::prelude::*;
