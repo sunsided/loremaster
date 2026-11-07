@@ -35,7 +35,7 @@ let world = Loremaster::new()
 - Each entity gets an `Origin::Rust` with the file, line and column of the call that made it. A diagnostic about the entity names that place.
 - The test `tests/lighthouse.rs` writes `examples/lighthouse` with the builder and compares the story with the YAML story, value by value and by `model_hash`.
 
-The crate `loremaster` gives this API as `loremaster::dsl` and `loremaster::prelude` with the cargo feature `builder`.
+The crate `loremaster` gives this API as `loremaster::dsl` and `loremaster::prelude` with the cargo feature `dsl`. The `world!` macro of `loremaster-macros` expands to calls of this API.
 
 ## License
 
