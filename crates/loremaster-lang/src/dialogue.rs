@@ -31,9 +31,10 @@ pub struct DialogueError {
 }
 
 /// Lower a dialogue to a dramaturge graph with [`dramaturge_syntax::lower`].
-/// Node and option keys are interned in `symbols` as `<id>/<node>` and
-/// `<id>/<node>#<index>`; the player, things and memories must be in it
-/// already (see [`Scope::symbols`]).
+/// Node keys are interned in `symbols` as `<id>/<node>`, option keys as
+/// `<id>/<option id>`, or `<id>/<node>#<index>` for an option without `id`;
+/// the player, things and memories must be in it already (see
+/// [`Scope::symbols`]).
 ///
 /// The structure (`start`, the targets, the keys) is checked by
 /// [`dramaturge_syntax::check`]; its first error is the error here.
@@ -49,12 +50,11 @@ pub fn compile_dialogue(
             ..error
         }),
         Err(LowerError::Check(issues)) => {
-            let issue = issues
-                .into_iter()
-                .find(|i| i.severity == Severity::Error)
-                .expect("a failed check has an error");
+            let Some(issue) = issues.into_iter().find(|i| i.severity == Severity::Error) else {
+                return Err(not_lowered());
+            };
             let source = match issue.place {
-                Place::Start(i) => d.start[i].as_str(),
+                Place::Start(i) => d.start.get(i).map_or("", String::as_str),
                 _ => "",
             };
             let at = issue.path;
@@ -63,7 +63,8 @@ pub fn compile_dialogue(
                 ..fail(source, issue.message)
             })
         }
-        Err(e) => Err(fail("", format!("{e:?}"))),
+        // A kind of error that a later dramaturge adds.
+        Err(_) => Err(not_lowered()),
     }
 }
 
@@ -100,6 +101,10 @@ fn lang(source: &str, error: LangError) -> DialogueError {
         source,
         error,
     }
+}
+
+fn not_lowered() -> DialogueError {
+    fail("", "the dialogue can not be lowered".into())
 }
 
 fn fail(source: &str, message: String) -> DialogueError {
