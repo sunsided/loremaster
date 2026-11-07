@@ -11,14 +11,16 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mark='#\[ignore = "pending: phase [0-9]+, [^"]+"\]'
-bad=$(grep -rnE --include='*.rs' '#\[ignore' crates examples | grep -vE "$mark" || true)
+# find + grep instead of `grep -r --include`, which BSD and macOS grep lack.
+bad=$(find crates examples -name '*.rs' -exec grep -nHE '#\[ignore' {} + | grep -vE "$mark" || true)
 if [[ -n "$bad" ]]; then
     echo "error: each #[ignore] must be a pending mark: #[ignore = \"pending: phase N, <needs>\"]"
     echo "$bad"
     exit 1
 fi
 
-log=$(mktemp)
+# A template: BSD and macOS mktemp need one.
+log=$(mktemp "${TMPDIR:-/tmp}/pending-tests.XXXXXX")
 trap 'rm -f "$log"' EXIT
 # The exit code is not used: the pending tests are expected to fail.
 cargo test --workspace --no-default-features --no-fail-fast -- --ignored 2>&1 | tee "$log" || true
