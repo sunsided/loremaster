@@ -36,4 +36,4 @@ pub use thing::{Location, NameStage, Thing};
 pub use timer::{StartTimers, Timer};
 pub use value::Value;
 pub use verb::{VerbDef, VerbSlots, standard_verbs};
-pub use walkthrough::{Expect, WalkStep, Walkthrough};
+pub use walkthrough::{Expect, Pending, WalkStep, Walkthrough};

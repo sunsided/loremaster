@@ -594,6 +594,20 @@ expect:
 
 Run `cargo run -p loremaster --no-default-features -- test <folder>`, or `task walkthroughs` for all examples. The command names each step that failed. The Rust tests run the walkthroughs of all examples, so CI runs them too.
 
+A walkthrough for a feature that the engine does not have yet is pending. Mark it with the roadmap phase and the requirement or issue that it waits for:
+
+```yaml
+# tests/undo_after_death.yaml
+pending: { phase: 2, needs: SE-8 }
+steps:
+  - jump into the lock
+  - undo
+expect:
+  room: lock_side
+```
+
+A pending walkthrough must fail. `loremaster test` shows it as `pend` and does not count it as a failure. When it passes, `loremaster test` and the Rust tests fail with "passes, but is marked pending". Then remove the `pending:` line.
+
 ## Write in the game
 
 You can change the story while you play it. The game keeps its state after each change.

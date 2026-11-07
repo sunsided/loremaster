@@ -45,5 +45,5 @@ pub use parser::{Command, Preview};
 pub use state::{FragmentProgress, State, Talk};
 pub use text::{SourcePiece, SourceRole};
 pub use threads::ThreadReach;
-pub use walkthrough::{WalkResult, run_walkthrough};
+pub use walkthrough::{Verdict, WalkResult, run_walkthrough};
 pub use world::{CompileError, World};

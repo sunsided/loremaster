@@ -15,6 +15,26 @@ pub struct Walkthrough {
     /// What must hold after the last step.
     #[serde(default)]
     pub expect: Expect,
+    /// The walkthrough cannot pass yet: `pending: { phase: 2, needs: SE-4 }`.
+    /// The runner expects it to fail, and reports a pass as an error.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<Pending>,
+}
+
+/// Why a test cannot pass yet: the roadmap phase and the requirement that make it pass.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Pending {
+    /// The roadmap phase after which the test must pass.
+    pub phase: u8,
+    /// The requirement id or the issue that the test waits for, for example `SE-4` or `#45`.
+    pub needs: String,
+}
+
+impl std::fmt::Display for Pending {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "pending: phase {}, needs {}", self.phase, self.needs)
+    }
 }
 
 /// One command: `"open drawer"`, or `{ do: "open drawer", see: "an iron key" }`.

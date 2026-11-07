@@ -2,7 +2,7 @@
 //! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
 use loremaster_project::{Project, Severity, check, load, open_todos, read_dir};
-use loremaster_runtime::{BlockKind, Budget, Game, Turn, World};
+use loremaster_runtime::{BlockKind, Budget, Game, Turn, Verdict, World};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -281,7 +281,7 @@ fn walkthroughs(project: Project) -> ExitCode {
         println!("No walkthroughs. Add them as tests/*.yaml.");
         return ExitCode::SUCCESS;
     }
-    let mut failed = 0;
+    let (mut failed, mut pending) = (0, 0);
     for (path, walk) in &walks {
         let stem = path
             .rsplit('/')
@@ -289,21 +289,40 @@ fn walkthroughs(project: Project) -> ExitCode {
             .unwrap_or(path)
             .trim_end_matches(".yaml");
         let result = loremaster_runtime::run_walkthrough(world.clone(), walk, stem);
-        if result.passed() {
-            println!("ok    {} ({path})", result.name);
-        } else {
-            failed += 1;
-            println!("FAIL  {} ({path})", result.name);
-            for f in &result.failures {
-                println!("      {f}");
+        match result.verdict() {
+            Verdict::Passed => println!("ok    {} ({path})", result.name),
+            Verdict::Pending => {
+                pending += 1;
+                let mark = result.pending.as_ref().map(ToString::to_string);
+                println!(
+                    "pend  {} ({path}): {}",
+                    result.name,
+                    mark.unwrap_or_default()
+                );
+            }
+            Verdict::UnexpectedPass => {
+                failed += 1;
+                println!("FAIL  {} ({path})", result.name);
+                println!("      passes, but is marked pending: remove `pending:` from the file");
+            }
+            Verdict::Failed => {
+                failed += 1;
+                println!("FAIL  {} ({path})", result.name);
+                for f in &result.failures {
+                    println!("      {f}");
+                }
             }
         }
     }
-    println!(
-        "{} of {} walkthroughs passed.",
-        walks.len() - failed,
-        walks.len()
-    );
+    let passed = walks.len() - failed - pending;
+    if pending > 0 {
+        println!(
+            "{passed} of {} walkthroughs passed, {pending} pending.",
+            walks.len()
+        );
+    } else {
+        println!("{passed} of {} walkthroughs passed.", walks.len());
+    }
     if failed > 0 {
         ExitCode::FAILURE
     } else {

@@ -1,7 +1,7 @@
 //! Walkthrough tests: play commands and check what shows and what holds.
 
 use crate::{Game, World};
-use loremaster_model::{Expect, Walkthrough};
+use loremaster_model::{Expect, Pending, Walkthrough};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -13,11 +13,42 @@ pub struct WalkResult {
     pub failures: Vec<String>,
     /// The whole game as text, with each command after `> `.
     pub transcript: String,
+    /// The `pending:` mark of the walkthrough: it is expected to fail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<Pending>,
+}
+
+/// What a walkthrough result means, with its `pending:` mark.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    /// All expectations hold.
+    Passed,
+    /// An expectation failed.
+    Failed,
+    /// The walkthrough is pending and fails, as expected.
+    Pending,
+    /// The walkthrough is pending, but all expectations hold: remove the mark.
+    UnexpectedPass,
 }
 
 impl WalkResult {
+    /// All expectations hold. A pending walkthrough can pass too; see [`WalkResult::verdict`].
     pub fn passed(&self) -> bool {
         self.failures.is_empty()
+    }
+
+    pub fn verdict(&self) -> Verdict {
+        match (self.passed(), self.pending.is_some()) {
+            (true, false) => Verdict::Passed,
+            (false, false) => Verdict::Failed,
+            (false, true) => Verdict::Pending,
+            (true, true) => Verdict::UnexpectedPass,
+        }
+    }
+
+    /// The result is as expected: passed, or pending and failed.
+    pub fn ok(&self) -> bool {
+        matches!(self.verdict(), Verdict::Passed | Verdict::Pending)
     }
 }
 
@@ -40,6 +71,7 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
         name: walk.name.clone().unwrap_or_else(|| name.to_string()),
         failures,
         transcript,
+        pending: walk.pending.clone(),
     }
 }
 

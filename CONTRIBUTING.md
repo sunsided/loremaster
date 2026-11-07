@@ -39,7 +39,19 @@ Run these commands before you open a pull request:
 | `task verify` | Examines the format, runs clippy and runs the Rust tests. |
 | `task web:check` | Type-checks the Svelte code and the stories. Run it when you change `web/`. |
 | `task package` | Builds the web editor and packages the crates for crates.io. Run it when you change a `Cargo.toml`. |
+| `task test:pending` | Runs the pending tests. A pending test that passes is an error. Read "Pending tests" below. |
 | `task lint:workflows` | Examines the GitHub workflows with actionlint and zizmor. Run it when you change `.github/`. It needs Docker and uv. |
+
+### Pending tests
+
+Some tests describe a feature before the engine has it, for example the golden slice of the roadmap (phase 0). They are pending:
+
+- A Rust test gets `#[ignore = "pending: phase N, <needs>"]`. `<needs>` is the requirement id or the issue, for example `#[ignore = "pending: phase 1, WO, #44"]`. Each `#[ignore]` in the workspace must have this form.
+- A walkthrough gets `pending: { phase: N, needs: <needs> }`. Read "Walkthrough tests" in `docs/writing-stories.md`.
+
+`cargo test` skips the pending Rust tests. `task test:pending` (the script `scripts/pending-tests.sh`) runs them. A pending test must fail. When one passes, the script fails with "unexpected pass". Then remove the mark in the same pull request.
+
+CI runs the script in the job "Pending tests (not required)". The job is not a required check, so a pending test does not block a merge. A red job means that a pending test passes now.
 
 The crate `loremaster` embeds the web editor by default (the feature `embed-ui`). The editor comes from `crates/loremaster-mcp/ui/`, and git ignores this folder. If the folder is missing, the build stops with an error. Thus the Rust tasks and the Rust CI job use `--no-default-features`. To build with the editor, run `task release:ui` first. The CI web job builds the web app, copies it into the crate and runs `cargo package`.
 
