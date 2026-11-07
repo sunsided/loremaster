@@ -20,6 +20,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - The score (`score:` in story.yaml) and the `score` command.
 - Puzzle machines (`machines/`) with named states and steps, and Atlas › Machines in the editor.
 - Walkthrough tests (`tests/*.yaml`) and `loremaster test`.
+- `model_hash(story)`: the canonical hash of a model (SHA-256 of the story as JSON). The golden slice keeps the hash of its YAML form in `expected/model.hash`.
 - `Pack` and `assemble` in `loremaster-project` (DSL step L1): each source makes a pack, and `assemble` joins packs in their order. An id that two packs define, or a second story header, is an error that names both origins. `load` is one YAML pack, assembled.
 - Save games are an envelope with a format version, the story id, a hash of the story and the state. A restore migrates older saves (also the bare state of 0.1), refuses a newer version or another story with a message, and keeps the valid state of a changed story with a list of what it dropped. Read `docs/adr/0001-save-compatibility.md`.
 - Endings as entities (`endings/`): a kind (`win`, `loss`, `death`, `neutral`), a rank, a title and a text. The save game keeps the ending, `expect: { ending: … }` checks it in a walkthrough, and `loremaster check` reports unknown and unused endings.

@@ -16,12 +16,14 @@
 //! from disk.
 
 mod check;
+mod hash;
 mod load;
 mod notes;
 mod origin;
 mod scaffold;
 
 pub use check::check;
+pub use hash::model_hash;
 pub use load::{Pack, Project, SourceFile, StoryHeader, assemble, load};
 /// The one diagnostic form of loremaster (XP-6). It lives in `loremaster-model`.
 pub use loremaster_model::{Diagnostic, Severity};

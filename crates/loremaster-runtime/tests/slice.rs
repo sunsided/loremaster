@@ -5,7 +5,7 @@
 //! roadmap phase and the requirement or issue that make it pass. Run them with
 //! `task test:pending`. Read `examples/lock-keeper-slice/PENDING.md`.
 
-use loremaster_project::{Project, Severity, SourceFile, check, load, read_dir};
+use loremaster_project::{Project, Severity, SourceFile, check, load, model_hash, read_dir};
 use loremaster_runtime::{Game, WalkResult, World, run_walkthrough};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -162,15 +162,37 @@ fn slice_save_envelope() {
     assert!(text.contains("Committed for trial"), "{text}");
 }
 
+/// The model hash of the YAML form, in today's syntax. A change of the slice
+/// or of the model changes it: then update `expected/model.hash` on purpose.
+fn expected_hash() -> String {
+    std::fs::read_to_string(form("expected/model.hash"))
+        .expect("expected/model.hash")
+        .trim()
+        .to_string()
+}
+
 #[test]
-#[ignore = "pending: phase 1, DS-11..DS-15, P1-06 #47 (DSL step L2)"]
+fn slice_model_hash() {
+    let hash = model_hash(&project(with("yaml", &[])).story);
+    assert_eq!(
+        hash,
+        expected_hash(),
+        "the model of the slice changed; if that is right, write {hash} into examples/lock-keeper-slice/expected/model.hash"
+    );
+}
+
+#[test]
+#[ignore = "pending: phase 3, DS-4, P3-03 #66 (world! core, DSL step L3) and P4-08 #85 (L4)"]
 fn slice_equivalence() {
-    // The three forms must assemble to one canonical model. This compares the
-    // part in today's syntax; the parts with new syntax join when they load.
-    let canonical = |name: &str| serde_json::to_value(project(with(name, &[])).story).unwrap();
-    let yaml = canonical("yaml");
-    assert_eq!(yaml, canonical("mixed"), "yaml and mixed differ");
-    assert_eq!(yaml, canonical("dsl"), "yaml and dsl differ");
+    // The three forms must assemble to one canonical model (DS-11..DS-15).
+    // This compares the part in today's syntax; the parts with new syntax join
+    // when they load. The `world!` files of dsl/ and mixed/ need the macro, so
+    // today's loader cannot read those forms.
+    let hash = |name: &str| model_hash(&project(with(name, &[])).story);
+    let expected = expected_hash();
+    assert_eq!(hash("yaml"), expected, "yaml");
+    assert_eq!(hash("mixed"), expected, "mixed");
+    assert_eq!(hash("dsl"), expected, "dsl");
 }
 
 #[test]
