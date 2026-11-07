@@ -70,3 +70,22 @@ fn conditions_and_outcomes_are_checked() {
     let d = diagnostics(&GOOD.replace("relation: { trust: 1 }", "relation: { fear: 1 }"));
     check!(d[0].message.starts_with("unknown relation `fear`"));
 }
+
+#[test]
+fn a_talk_that_loops_back_is_no_problem() {
+    // meet -> names -> meet is a cycle; talks loop on purpose.
+    let d = diagnostics(&GOOD.replace(
+        "{ say: \"Back.\", go: back }",
+        "{ say: \"Back.\", go: meet }",
+    ));
+    check!(d == vec![], "{d:#?}");
+}
+
+#[test]
+fn a_node_that_no_start_reaches_is_reported_but_a_start_is_not() {
+    let orphan = format!("{GOOD}  lost:\n    say: \"Nobody comes here.\"\n");
+    let d = diagnostics(&orphan);
+    check!(d.len() == 1, "{d:#?}");
+    check!(d[0].at == "nodes.lost");
+    check!(d[0].message.contains("unreachable"), "{}", d[0].message);
+}

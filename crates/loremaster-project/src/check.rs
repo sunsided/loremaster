@@ -508,7 +508,9 @@ impl Checker<'_> {
     /// Dialogues: references, conditions and markup, then the structure of
     /// the graph through dramaturge's validator.
     fn dialogues(&mut self) {
-        use dramaturge_authoring::{GraphValidator, ValidationSeverity};
+        use dramaturge_authoring::{
+            GraphValidator, ValidationIssueKind, ValidationOptions, ValidationSeverity,
+        };
         let story = self.story().clone();
         let mut symbols = self.scope.symbols.clone();
         let mut with = BTreeSet::new();
@@ -566,16 +568,18 @@ impl Checker<'_> {
                     .map(|k| format!("nodes.{k}"))
                     .unwrap_or_default()
             };
-            for issue in GraphValidator::new().validate_with_symbols(&compiled.graph, &symbols) {
-                // dramaturge reports issues as text only; these are by design here:
-                // talks loop back, start nodes other than the first are entered
-                // by their `when`, and facts are set by rules too.
+            // Talks loop back on purpose, so cycles are no issue here.
+            let validator = GraphValidator::with_options(
+                ValidationOptions::new().skip(ValidationIssueKind::Cycle),
+            );
+            for issue in validator.validate_with_symbols(&compiled.graph, &symbols) {
+                // By design here: start nodes other than the first are entered
+                // by their `when`, and facts are set by rules too (Info).
                 let start = issue
                     .node_id
                     .is_some_and(|id| compiled.starts.contains(&id));
                 if issue.severity == ValidationSeverity::Info
-                    || issue.message.contains("is part of a cycle")
-                    || (start && issue.message.contains("is unreachable"))
+                    || (start && issue.kind == ValidationIssueKind::Unreachable)
                 {
                     continue;
                 }

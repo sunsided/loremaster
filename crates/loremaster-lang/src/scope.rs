@@ -52,9 +52,10 @@ pub struct Scope {
     pub symbols: SymbolTable,
 }
 
-/// The entity key of the player. Things use their id as the key; an id can
-/// not start with `@`, so the two never meet.
-pub const PLAYER: &str = "@player";
+/// The entity key of the player, dramaturge's `SymbolTable::PLAYER_KEY`.
+/// Things use their id as the key; an id can not start with `@`, so the two
+/// never meet. Saves keep it, so it must not change.
+pub const PLAYER: &str = SymbolTable::PLAYER_KEY;
 
 impl Scope {
     pub fn from_story(story: &Story) -> Self {
@@ -104,7 +105,10 @@ impl Scope {
             .cloned()
             .collect();
         let mut symbols = SymbolTable::new();
-        symbols.intern_entity(PLAYER);
+        // The player first, so it gets the same id in every story; saves and
+        // `Scope::player` rely on it.
+        let player = symbols.player();
+        debug_assert_eq!(symbols.entity(PLAYER), Some(player));
         for t in &story.things {
             symbols.intern_entity(t.id.as_str());
         }
@@ -171,4 +175,29 @@ pub(crate) fn edit_distance(a: &str, b: &str) -> usize {
         prev = cur;
     }
     prev[b.len()]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dramaturge_model::{EntityId, SymbolTable};
+
+    #[test]
+    fn the_player_is_the_first_entity_under_dramaturges_key() {
+        // Saves store the player under this key; it must not change.
+        assert_eq!(PLAYER, "@player");
+        let story: Story = serde_json::from_value(serde_json::json!({
+            "title": "t", "start": "r",
+            "rooms": [{"id": "r", "name": "R"}],
+            "things": [{"id": "a", "name": "a", "location": "nowhere"}]
+        }))
+        .unwrap();
+        let scope = Scope::from_story(&story);
+        assert_eq!(
+            scope.symbols.entity_key(scope.player()),
+            Some(SymbolTable::PLAYER_KEY)
+        );
+        assert_eq!(scope.player(), EntityId(0));
+        assert_ne!(scope.entity("a"), Some(scope.player()));
+    }
 }

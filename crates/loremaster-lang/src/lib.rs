@@ -23,13 +23,13 @@ mod scope;
 
 pub use derived::{CmpOp, Derived, NameForm, Operand};
 pub use dialogue::{
-    ADD_KEY, CompiledDialogue, DialogueError, THEN_KEY, compile_dialogue, node_key, option_key,
+    CompiledDialogue, DialogueError, THEN_KEY, compile_dialogue, node_key, option_key,
 };
 pub use error::{LangError, Span};
 pub use expr::{Expr, parse_expr};
 pub use highlight::{Token, TokenKind, condition_tokens, markup_tokens};
 pub use line::{CompiledLine, LineError, LinePart, check_speaker, compile_line};
-pub use lower::{compile_condition, memory_tag};
+pub use lower::compile_condition;
 pub use markup::{ChoiceSyntax, Segment, compile_markup};
 pub use reserved::{RESERVED_NAMES, Reserved, is_reserved, reserved};
 pub use scope::{PLAYER, Scope, Ty, closest};
