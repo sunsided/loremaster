@@ -70,3 +70,18 @@ fn a_save_without_an_ending_still_loads() {
     assert_eq!(state.ending, None);
     Game::restore(world, state);
 }
+
+#[test]
+fn a_compile_error_in_an_ending_points_at_the_ending_file() {
+    let mut files = lighthouse();
+    for f in &mut files {
+        if f.path == "endings/beacon_lit.yaml" {
+            f.text = "kind: win\ntitle: \"{nosuchvar ? lit | dark}\"\n".into();
+        }
+    }
+    let project = load(files).unwrap();
+    let err = World::compile(project.story.clone()).unwrap_err();
+    assert_eq!(err.at, "ending:beacon_lit/title");
+    let d = project.locate(loremaster_model::Diagnostic::from(&err));
+    assert_eq!(d.file, "endings/beacon_lit.yaml", "{d}");
+}
