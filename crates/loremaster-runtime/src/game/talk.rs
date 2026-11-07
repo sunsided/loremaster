@@ -339,6 +339,7 @@ impl Game {
             return false;
         };
         let node = d.key_of(start).unwrap_or_default().to_string();
+        let log = turn.log.len();
         turn.log.push(LogEntry {
             kind: "talk".into(),
             text: format!("{} at {node}", d.id),
@@ -348,21 +349,28 @@ impl Game {
             node,
             back: Vec::new(),
         });
-        self.enter(turn, &d, start);
-        true
+        // select_entry checked the node's `when`; should `enter` still refuse
+        // the node, no talk started.
+        let entered = self.enter(turn, &d, start);
+        if !entered {
+            turn.log.truncate(log);
+        }
+        entered
     }
 
     /// Enter a node through dramaturge: show its line, apply its outcomes
     /// and let world rules hear about it. A node whose `when` does not hold
-    /// can not be entered, and the talk ends.
-    fn enter(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, id: DialogueNodeId) {
+    /// can not be entered, and the talk ends. True when the node was entered.
+    fn enter(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, id: DialogueNodeId) -> bool {
         let Some(node) = d.node(id) else {
-            return self.end_talk();
+            self.end_talk();
+            return false;
         };
         let mut runtime = runtime(d);
         let state = Turned { game: self, turn };
         if !DialogueRuntime::<_, Then>::conditions_hold(&runtime, &node.conditions, &state) {
-            return self.end_talk();
+            self.end_talk();
+            return false;
         }
         // The line shows the state before the node's outcomes.
         self.show(turn, d, id);
@@ -374,6 +382,7 @@ impl Game {
         };
         self.fire(turn, &event, 1);
         self.end_without_options();
+        true
     }
 
     /// Show a node's line.
