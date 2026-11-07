@@ -47,10 +47,15 @@ import type {
 export type * from './types.ts';
 
 let ready: Promise<unknown> | undefined;
+/** True once the WASM module is loaded. */
+let loaded = false;
 
 /** Load the WASM module once. */
 export function loadEngine(): Promise<unknown> {
-	ready ??= init();
+	ready ??= init().then((module) => {
+		loaded = true;
+		return module;
+	});
 	return ready;
 }
 
@@ -79,8 +84,13 @@ export class ProjectError extends Error {
 	}
 }
 
-/** Highlighted spans of fragment text, or of a condition. Offsets are UTF-16, as in JavaScript strings. */
+/**
+ * Highlighted spans of fragment text, or of a condition. Offsets are UTF-16, as in JavaScript strings.
+ * Call it after `loadEngine()` has resolved, for example once a `Workbench` is open.
+ */
 export function markupTokens(text: string, condition: boolean): { from: number; to: number; kind: string }[] {
+	// Synchronous for the editor's highlighter, so it cannot wait for the module itself.
+	if (!loaded) throw new Error('markupTokens: the engine is not loaded yet; await loadEngine() first.');
 	return wasmMarkupTokens(text, condition);
 }
 

@@ -16,13 +16,16 @@
 	const request = $derived(awaiting.request);
 	const deathLabels: Record<string, string> = { undo: 'Undo the last turn', restart: 'Start again', restore: 'Restore a save' };
 
-	/** The typed roll, for a roll that the host answers. */
-	let roll = $state<number | null>(null);
-	const rollOk = $derived(request.kind === 'roll' && roll !== null && Number.isInteger(roll) && roll >= request.min && roll <= request.max);
+	/**
+	 * The typed roll, for a roll that the host answers. `bind:value` on a number input gives a number, or
+	 * undefined while the field is empty or invalid.
+	 */
+	let roll = $state<number | undefined>();
+	const rollOk = $derived(request.kind === 'roll' && typeof roll === 'number' && Number.isInteger(roll) && roll >= request.min && roll <= request.max);
 
 	function submitRoll(event: SubmitEvent) {
 		event.preventDefault();
-		if (rollOk && roll !== null) onanswer(roll);
+		if (rollOk && roll !== undefined) onanswer(roll);
 	}
 
 	function randomRoll() {
