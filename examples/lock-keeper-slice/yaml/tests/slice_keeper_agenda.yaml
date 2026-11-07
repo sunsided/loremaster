@@ -1,0 +1,25 @@
+# The keeper's agenda: at midnight he feeds the stove with the pages.
+name: The keeper at midnight
+pending: { phase: 4, needs: "D6, P4-02 #79" }
+steps:
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - { do: wait, see: "He opens the stove and feeds it in." }
+expect:
+  facts: { pages_burned: true, stove.hot: true }
+  room: kitchen

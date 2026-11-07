@@ -21,6 +21,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - Puzzle machines (`machines/`) with named states and steps, and Atlas › Machines in the editor.
 - Walkthrough tests (`tests/*.yaml`) and `loremaster test`.
 - Pending tests: `pending: { phase, needs }` in a walkthrough, `#[ignore = "pending: ..."]` in Rust, `task test:pending`, and a CI job that fails when a pending test passes.
+- The golden slice `examples/lock-keeper-slice`: a part of the Lock-Keeper demo in YAML, with `slice_baseline` and eleven pending tests for the roadmap phases 1 to 4. Read its `PENDING.md`.
 - Behaviors in Rust: the `Behavior` trait, `World::register`, and `behaviors:` in story.yaml or `behaviors/`.
 - `verbs/` for custom verbs in their own files.
 - Zork I: containers, scenery, the score and value of treasures from the importer; the lamp battery, the trophy case, the exorcism, the dam and the thief ported by hand. Read `docs/zork-fit-test.md`.

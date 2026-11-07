@@ -1,0 +1,7 @@
+name: lock-keeper
+aliases: [keeper, man]
+location: { room: kitchen }
+presence:
+  - "The lock-keeper sits by the stove and does not look up."
+description:
+  - "A broad man with tar on his hands. He watches the stove more than he watches you."

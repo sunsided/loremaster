@@ -1,0 +1,8 @@
+# Endings are entities: the game reports the id, kind and rank of the ending.
+name: Accuse without proof
+pending: { phase: 1, needs: "WO, CK, P1-03 #44" }
+steps:
+  - { do: accuse keeper, see: "Released at dawn", not_see: "ashes" }
+expect:
+  facts: { ending: ashes, ending.kind: loss, ending.rank: 3 }
+  ended: true

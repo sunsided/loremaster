@@ -1,0 +1,28 @@
+# Too late: the keeper burns the pages at midnight. The game stays playable,
+# but only the ashes ending is left (the accepted unwinnable edge).
+name: Too late for the pages
+pending: { phase: 4, needs: "P4-07 #84" }
+steps:
+  - { do: examine stove, see: "The stove is cold." }
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - { do: wait, see: "He opens the stove and feeds it in.", facts: { pages_burned: true } }
+  - { do: examine stove, see: "The ash on the grate is fresh.", facts: { ash_is_fresh: true } }
+  - { do: accuse keeper, see: ["Released at dawn", "The ash in the stove was fresh."] }
+expect:
+  facts: { ending: ashes, ending.kind: loss, ending.rank: 3 }
+  ended: true

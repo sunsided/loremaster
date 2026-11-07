@@ -1,0 +1,24 @@
+# The golden slice of the roadmap (phase 0): a small part of the demo
+# "The Lock-Keeper's Night", written before the engine can run all of it.
+# Files in today's syntax load now. Files with new syntax are pending; read
+# ../PENDING.md for which file needs which phase.
+title: The Lock-Keeper's Night (slice)
+author: loremaster golden slice
+start: kitchen
+seed: 11
+
+intro:
+  - "The county sent you to look at the toll books. The lock-keeper did not expect you before morning."
+
+clock:
+  start: "22:30"
+  minutes_per_turn: 5
+  phases:
+    - { name: night, from: "00:00" }
+    - { name: dawn, from: "03:30" }
+    - { name: day, from: "07:00" }
+    - { name: night, from: "21:00" }
+
+vars:
+  - { id: ash_is_fresh, type: bool, initial: false }
+  - { id: pages_burned, type: bool, initial: false }

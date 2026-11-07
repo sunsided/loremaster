@@ -1,0 +1,26 @@
+# New syntax (phase 3, D3 one dialogue format): a node says a text pool.
+with: keeper
+start: [stove]
+nodes:
+  stove:
+    say: { text: keeper_remark }
+    options:
+      - say: '"Who fed it?"'
+        when: ash_is_fresh
+        go: who_fed_it
+      - say: '"What do you burn at night?"'
+        go: what_burns
+      - say: '"Good night."'
+        go: end
+  what_burns:
+    say: '"Coal, when the company sends it. Driftwood, when it does not."'
+    options:
+      - say: '"And paper?"'
+        go: who_fed_it
+      - say: '"Good night."'
+        go: end
+  who_fed_it:
+    say: 'He turns the poker in his hands. "Nobody. The stove was cold all night."'
+    options:
+      - say: '"Good night."'
+        go: end
