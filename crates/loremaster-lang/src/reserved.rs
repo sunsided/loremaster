@@ -127,7 +127,11 @@ mod tests {
             "remembers",
             "seen_by",
         ];
-        assert_eq!(kinds.len(), RESERVED_NAMES.len());
+        // The same names, in any order: the kinds no longer depend on it.
+        let (mut kinds, mut names) = (kinds.to_vec(), RESERVED_NAMES.to_vec());
+        kinds.sort_unstable();
+        names.sort_unstable();
+        assert_eq!(kinds, names);
     }
 
     #[test]
