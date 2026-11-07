@@ -506,6 +506,14 @@ impl World {
         self
     }
 
+    /// The manifest of a behavior, as `register` took it.
+    pub fn manifest(&self, id: &str) -> Option<&crate::Manifest> {
+        self.behaviors
+            .iter()
+            .position(|b| b.id() == id)
+            .map(|i| &self.manifests[i])
+    }
+
     /// Does a behavior of the story react to the passing of time (turn or
     /// time events)? An opaque one may.
     pub fn behaviors_watch_time(&self) -> bool {

@@ -1928,8 +1928,8 @@ impl Game {
                     Some(d) => format!("code in this game: {d}"),
                     None => "code in the game, which this build does not have".to_string(),
                 };
-                if let Some(b) = found {
-                    when.push_str(&format!(" ({})", b.manifest().describe()));
+                if let Some(m) = self.world.manifest(id.as_str()) {
+                    when.push_str(&format!(" ({})", m.describe()));
                 }
                 RuleView {
                     id: format!("behavior:{id}"),
