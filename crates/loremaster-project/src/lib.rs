@@ -17,6 +17,7 @@
 
 mod check;
 mod load;
+mod merge;
 mod notes;
 mod origin;
 mod scaffold;
@@ -25,6 +26,7 @@ pub use check::check;
 pub use load::{Pack, Project, SourceFile, StoryHeader, assemble, load};
 /// The one diagnostic form of loremaster (XP-6). It lives in `loremaster-model`.
 pub use loremaster_model::{Diagnostic, Severity};
+pub use merge::{Extension, MergeMode};
 pub use notes::{NoteRef, ThreadView, notes, open_todos, threads};
 pub use origin::Origin;
 pub use scaffold::{START_TEXT, scaffold};

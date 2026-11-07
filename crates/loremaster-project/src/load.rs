@@ -1,10 +1,11 @@
+use crate::merge::{Extension, MergeMode, extend_entity, merge_mode};
 use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
     ClockConfig, Dialogue, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule, Story, Thing,
     Thread, Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A file of a project, with its path relative to the project folder.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,6 +23,9 @@ pub struct Project {
     pub origins: BTreeMap<String, Origin>,
     /// Walkthrough tests from `tests/`, with their file paths.
     pub walkthroughs: Vec<(String, Walkthrough)>,
+    /// Warnings from joining the packs, for example a replaced entity.
+    /// `check` reports them first.
+    pub assembly: Vec<Diagnostic>,
 }
 
 impl Project {
@@ -115,6 +119,10 @@ pub struct Pack {
     /// Entity key such as `room:cellar` to where it is defined. The key
     /// `story` is the origin of the header.
     pub origins: BTreeMap<String, Origin>,
+    /// Entity keys that this pack replaces on purpose (`replace: true`).
+    pub replaces: BTreeSet<String>,
+    /// Fields that this pack adds to entities of earlier packs (`extend: true`).
+    pub extensions: Vec<Extension>,
 }
 
 impl Pack {
@@ -144,6 +152,8 @@ impl Pack {
         let mut verbs: Vec<VerbDef> = Vec::new();
         let mut timers: Vec<Timer> = Vec::new();
         let mut endings: Vec<Ending> = Vec::new();
+        let mut replaces = BTreeSet::new();
+        let mut extensions = Vec::new();
 
         let mut sorted: Vec<&SourceFile> = files.iter().collect();
         sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -155,15 +165,58 @@ impl Pack {
             };
             let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
             let parse_err = |e: serde_saphyr::Error| parse_diagnostic(path, &e.to_string());
+            let (mode, file_text) = match merge_mode(&file.text) {
+                Ok(found) => found,
+                Err(message) => {
+                    errors.push(parse_diagnostic(path, &message));
+                    continue;
+                }
+            };
+            if let Some(mode) = mode {
+                let Some(kind) = entity_kind(dir) else {
+                    errors.push(parse_diagnostic(
+                        path,
+                        "`extend` and `replace` work only in rooms/, things/, threads/, dialogues/, endings/, timers/, verbs/ and machines/",
+                    ));
+                    continue;
+                };
+                // The id from the parsed file (`id:` in any YAML style), else
+                // the file name.
+                let fields = match serde_saphyr::from_str::<serde_json::Value>(&file_text) {
+                    Ok(fields) => fields,
+                    Err(e) => {
+                        errors.push(parse_err(e));
+                        continue;
+                    }
+                };
+                let id = fields
+                    .get("id")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or(stem);
+                let key = format!("{kind}:{id}");
+                match mode {
+                    MergeMode::Replace => {
+                        replaces.insert(key);
+                    }
+                    MergeMode::Extend => {
+                        extensions.push(Extension {
+                            key,
+                            fields,
+                            origin: Origin::yaml(path),
+                        });
+                        continue;
+                    }
+                }
+            }
             match dir {
-                "" if stem == "story" => match serde_saphyr::from_str::<StoryHeader>(&file.text) {
+                "" if stem == "story" => match serde_saphyr::from_str::<StoryHeader>(&file_text) {
                     Ok(s) => {
                         header = Some(s);
                         header_path = path.to_string();
                     }
                     Err(e) => errors.push(parse_err(e)),
                 },
-                "rooms" => match serde_saphyr::from_str::<Room>(&with_default_id(&file.text, stem))
+                "rooms" => match serde_saphyr::from_str::<Room>(&with_default_id(&file_text, stem))
                 {
                     Ok(mut r) => {
                         origins.insert(format!("room:{}", r.id), Origin::yaml(path));
@@ -176,7 +229,7 @@ impl Pack {
                     Err(e) => errors.push(parse_err(e)),
                 },
                 "things" => {
-                    match serde_saphyr::from_str::<Thing>(&with_default_id(&file.text, stem)) {
+                    match serde_saphyr::from_str::<Thing>(&with_default_id(&file_text, stem)) {
                         Ok(mut t) => {
                             origins.insert(format!("thing:{}", t.id), Origin::yaml(path));
                             for rule in nested_rules(&mut t.rules, &t.id) {
@@ -189,7 +242,7 @@ impl Pack {
                     }
                 }
                 "threads" => {
-                    match serde_saphyr::from_str::<Thread>(&with_default_id(&file.text, stem)) {
+                    match serde_saphyr::from_str::<Thread>(&with_default_id(&file_text, stem)) {
                         Ok(t) => {
                             origins.insert(format!("thread:{}", t.id), Origin::yaml(path));
                             threads.push(t);
@@ -198,7 +251,7 @@ impl Pack {
                     }
                 }
                 "dialogues" => {
-                    match serde_saphyr::from_str::<Dialogue>(&with_default_id(&file.text, stem)) {
+                    match serde_saphyr::from_str::<Dialogue>(&with_default_id(&file_text, stem)) {
                         Ok(d) => {
                             origins.insert(format!("dialogue:{}", d.id), Origin::yaml(path));
                             dialogues.push(d);
@@ -208,7 +261,7 @@ impl Pack {
                 }
                 // Commands such as `n` and `y` are words here, not YAML 1.1 booleans.
                 "tests" => match serde_saphyr::from_str_with_options::<Walkthrough>(
-                    &file.text,
+                    &file_text,
                     serde_saphyr::options! { strict_booleans: true },
                 ) {
                     Ok(w) => walkthroughs.push((path.to_string(), w)),
@@ -220,7 +273,7 @@ impl Pack {
                     behaviors.push(Id::new(stem));
                 }
                 "endings" => {
-                    match serde_saphyr::from_str::<Ending>(&with_default_id(&file.text, stem)) {
+                    match serde_saphyr::from_str::<Ending>(&with_default_id(&file_text, stem)) {
                         Ok(e) => {
                             origins.insert(format!("ending:{}", e.id), Origin::yaml(path));
                             endings.push(e);
@@ -229,7 +282,7 @@ impl Pack {
                     }
                 }
                 "timers" => {
-                    match serde_saphyr::from_str::<Timer>(&with_default_id(&file.text, stem)) {
+                    match serde_saphyr::from_str::<Timer>(&with_default_id(&file_text, stem)) {
                         Ok(t) => {
                             origins.insert(format!("timer:{}", t.id), Origin::yaml(path));
                             timers.push(t);
@@ -238,7 +291,7 @@ impl Pack {
                     }
                 }
                 "verbs" => {
-                    match serde_saphyr::from_str::<VerbDef>(&with_default_id(&file.text, stem)) {
+                    match serde_saphyr::from_str::<VerbDef>(&with_default_id(&file_text, stem)) {
                         Ok(v) => {
                             origins.insert(format!("verb:{}", v.id), Origin::yaml(path));
                             verbs.push(v);
@@ -247,7 +300,7 @@ impl Pack {
                     }
                 }
                 "machines" => {
-                    match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
+                    match serde_saphyr::from_str::<Machine>(&with_default_id(&file_text, stem)) {
                         Ok(m) => {
                             origins.insert(format!("machine:{}", m.id), Origin::yaml(path));
                             machines.push(m);
@@ -256,16 +309,15 @@ impl Pack {
                     }
                 }
                 "rules" => {
-                    let list = file
-                        .text
+                    let list = file_text
                         .lines()
                         .map(str::trim_start)
                         .find(|l| !l.is_empty() && !l.starts_with('#'))
                         .is_some_and(|l| l.starts_with('-'));
                     let parsed = if list {
-                        serde_saphyr::from_str::<Vec<Rule>>(&file.text)
+                        serde_saphyr::from_str::<Vec<Rule>>(&file_text)
                     } else {
-                        serde_saphyr::from_str::<Rule>(&with_default_id(&file.text, stem))
+                        serde_saphyr::from_str::<Rule>(&with_default_id(&file_text, stem))
                             .map(|r| vec![r])
                     };
                     match parsed {
@@ -307,8 +359,25 @@ impl Pack {
             endings,
             files,
             origins,
+            replaces,
+            extensions,
         })
     }
+}
+
+/// The entity kind of a folder, for `extend` and `replace`.
+fn entity_kind(dir: &str) -> Option<&'static str> {
+    Some(match dir {
+        "rooms" => "room",
+        "things" => "thing",
+        "threads" => "thread",
+        "dialogues" => "dialogue",
+        "endings" => "ending",
+        "timers" => "timer",
+        "verbs" => "verb",
+        "machines" => "machine",
+        _ => return None,
+    })
 }
 
 fn no_story() -> Diagnostic {
@@ -328,6 +397,7 @@ fn no_story() -> Diagnostic {
 /// merge, so they are the same for each source.
 pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut errors = Vec::new();
+    let mut assembly = Vec::new();
     let mut origins: BTreeMap<String, Origin> = BTreeMap::new();
     let mut owner: BTreeMap<String, usize> = BTreeMap::new();
     let mut header: Option<StoryHeader> = None;
@@ -344,8 +414,64 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut timers: Vec<Timer> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
     for (i, pack) in packs.into_iter().enumerate() {
+        // A replaced room or thing takes its nested rules with it: they come
+        // from the replaced file and run `within` the entity.
+        for key in &pack.replaces {
+            let Some(first) = origins.get(key).cloned() else {
+                continue;
+            };
+            let Some(id) = key
+                .strip_prefix("room:")
+                .or_else(|| key.strip_prefix("thing:"))
+            else {
+                continue;
+            };
+            let nested: Vec<String> = rules
+                .iter()
+                .filter(|r: &&Rule| r.within.as_ref().is_some_and(|w| w.as_str() == id))
+                .map(|r| format!("rule:{}", r.id))
+                .filter(|k| origins.get(k) == Some(&first))
+                .collect();
+            rules.retain(|r| !nested.contains(&format!("rule:{}", r.id)));
+            for k in &nested {
+                origins.remove(k);
+                owner.remove(k);
+            }
+        }
         for (key, origin) in pack.origins {
             // Within one pack, the checks report a duplicate, as before.
+            if let Some(&j) = owner.get(&key)
+                && j != i
+                && pack.replaces.contains(&key)
+            {
+                let first = &origins[&key];
+                assembly.push(Diagnostic::warning(
+                    origin.file(),
+                    "",
+                    format!("`{key}` replaces the one in {first}"),
+                ));
+                remove_entity(
+                    &key,
+                    &mut rooms,
+                    &mut things,
+                    &mut threads,
+                    &mut dialogues,
+                    &mut endings,
+                    &mut timers,
+                    &mut verbs,
+                    &mut machines,
+                );
+                owner.insert(key.clone(), i);
+                origins.insert(key, origin);
+                continue;
+            }
+            if pack.replaces.contains(&key) {
+                errors.push(Diagnostic::error(
+                    origin.file(),
+                    "",
+                    format!("`{key}` replaces an entity that no earlier pack defines"),
+                ));
+            }
             if let Some(&j) = owner.get(&key)
                 && j != i
             {
@@ -383,6 +509,28 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         timers.extend(pack.timers);
         endings.extend(pack.endings);
         files.extend(pack.files);
+        for ext in pack.extensions {
+            let found = extend_with(
+                &ext,
+                &mut rooms,
+                &mut things,
+                &mut threads,
+                &mut dialogues,
+                &mut endings,
+                &mut timers,
+                &mut verbs,
+                &mut machines,
+            );
+            let message = match found {
+                Ok(true) => continue,
+                Ok(false) => format!(
+                    "`{}` extends an entity that no earlier pack defines",
+                    ext.key
+                ),
+                Err(why) => format!("`{}` cannot be extended: {why}", ext.key),
+            };
+            errors.push(Diagnostic::error(ext.origin.file(), "", message));
+        }
     }
     let header_origin = origins
         .get("story")
@@ -461,7 +609,82 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         files,
         origins,
         walkthroughs,
+        assembly,
     })
+}
+
+/// Take the entity of `key` (`room:cellar`) out of its list.
+#[allow(clippy::too_many_arguments)]
+fn remove_entity(
+    key: &str,
+    rooms: &mut Vec<Room>,
+    things: &mut Vec<Thing>,
+    threads: &mut Vec<Thread>,
+    dialogues: &mut Vec<Dialogue>,
+    endings: &mut Vec<Ending>,
+    timers: &mut Vec<Timer>,
+    verbs: &mut Vec<VerbDef>,
+    machines: &mut Vec<Machine>,
+) {
+    let Some((kind, id)) = key.split_once(':') else {
+        return;
+    };
+    match kind {
+        "room" => rooms.retain(|e| e.id.as_str() != id),
+        "thing" => things.retain(|e| e.id.as_str() != id),
+        "thread" => threads.retain(|e| e.id.as_str() != id),
+        "dialogue" => dialogues.retain(|e| e.id.as_str() != id),
+        "ending" => endings.retain(|e| e.id.as_str() != id),
+        "timer" => timers.retain(|e| e.id.as_str() != id),
+        "verb" => verbs.retain(|e| e.id.as_str() != id),
+        "machine" => machines.retain(|e| e.id.as_str() != id),
+        _ => {}
+    }
+}
+
+/// Add the fields of `ext` to the entity it names. `Ok(false)` when no
+/// earlier pack defines the entity.
+#[allow(clippy::too_many_arguments)]
+fn extend_with(
+    ext: &Extension,
+    rooms: &mut [Room],
+    things: &mut [Thing],
+    threads: &mut [Thread],
+    dialogues: &mut [Dialogue],
+    endings: &mut [Ending],
+    timers: &mut [Timer],
+    verbs: &mut [VerbDef],
+    machines: &mut [Machine],
+) -> Result<bool, String> {
+    fn one<T: serde::Serialize + serde::de::DeserializeOwned>(
+        list: &mut [T],
+        id: &str,
+        id_of: fn(&T) -> &Id,
+        fields: &serde_json::Value,
+    ) -> Result<bool, String> {
+        match list.iter_mut().find(|e| id_of(e).as_str() == id) {
+            Some(e) => extend_entity(e, fields).map(|()| true),
+            None => Ok(false),
+        }
+    }
+    let Some((kind, id)) = ext.key.split_once(':') else {
+        return Ok(false);
+    };
+    if ext.fields.get("rules").is_some() {
+        return Err("put new rules in rules/, with `within`".into());
+    }
+    let f = &ext.fields;
+    match kind {
+        "room" => one(rooms, id, |e| &e.id, f),
+        "thing" => one(things, id, |e| &e.id, f),
+        "thread" => one(threads, id, |e| &e.id, f),
+        "dialogue" => one(dialogues, id, |e| &e.id, f),
+        "ending" => one(endings, id, |e| &e.id, f),
+        "timer" => one(timers, id, |e| &e.id, f),
+        "verb" => one(verbs, id, |e| &e.id, f),
+        "machine" => one(machines, id, |e| &e.id, f),
+        _ => Ok(false),
+    }
 }
 
 /// The rules of a machine: one for each step. A step holds in one of its

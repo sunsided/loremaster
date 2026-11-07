@@ -480,6 +480,7 @@ dependencies = [
  "loremaster-model",
  "serde",
  "serde-saphyr",
+ "serde_json",
  "thiserror",
 ]
 

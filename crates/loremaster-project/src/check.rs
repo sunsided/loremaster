@@ -11,7 +11,7 @@ pub fn check(project: &Project) -> Vec<Diagnostic> {
     let mut c = Checker {
         project,
         scope: Scope::from_story(&project.story),
-        out: Vec::new(),
+        out: project.assembly.clone(),
     };
     c.run();
     c.out
