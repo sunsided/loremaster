@@ -544,6 +544,15 @@ fn peek_word_then(input: ParseStream, kw: &str) -> bool {
     fork.call(Ident::parse_any).is_ok() && peek_kw(&fork, kw)
 }
 
+/// `<speaker> says "…"` starts here: a word, the word `says`, a string.
+fn peek_speaker(input: ParseStream) -> bool {
+    let fork = input.fork();
+    fork.call(Ident::parse_any).is_ok()
+        && peek_kw(&fork, "says")
+        && fork.call(Ident::parse_any).is_ok()
+        && fork.peek(LitStr)
+}
+
 fn speech(input: ParseStream) -> Error {
     input.error(
         "speech segments (`says`, `narrate`) belong in a `line` effect; a description or a presence is one text",
@@ -571,7 +580,7 @@ fn line(input: ParseStream) -> Result<Vec<Segment>> {
             && !peek_kw(input, "when")
             && !peek_kw(input, "narrate")
             && !peek_kw(input, "says")
-            && !peek_word_then(input, "says")
+            && !peek_speaker(input)
         {
             return Err(input.error(
                 "a line from a text pool is not in `world!` yet: it waits for the text core (R9, P4-01 #78)",
@@ -612,10 +621,11 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
         when: None,
         tokens: TokenStream::new(),
     };
-    // `<speaker> says` first: a speaker may have the id of a keyword of
-    // segments (`narrate says "…"`), and `narrate "…"` and `when <cond>`
-    // never have `says` as their second word.
-    if peek_word_then(input, "says") {
+    // `<speaker> says "…"` first: a speaker may have the id of a keyword of
+    // segments (`narrate says "…"`). It needs the string right after `says`,
+    // so a condition that starts with an id `says` (`when says then "…"`)
+    // stays a condition.
+    if peek_speaker(input) {
         let speaker = name(input)?;
         name(input)?;
         return Ok(plain(SegmentVoice::Says(Some(speaker)), text(input)?));
