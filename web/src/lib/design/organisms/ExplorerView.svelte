@@ -43,6 +43,11 @@
 	const seen = $derived(result?.rooms.find((r) => r.id === matrix?.room)?.seen ?? null);
 
 	const unreached = $derived(result?.rooms.filter((r) => !r.reached) ?? []);
+	const checks = $derived(result?.ending_checks?.ran ? result.ending_checks : null);
+
+	function ranked(ending: string | null, rank: number | null): string {
+		return ending && rank != null ? `${ending} (rank ${rank})` : 'endings without a rank';
+	}
 
 	/** `*word*` in story text is emphasis. */
 	function pieces(text: string): { text: string; em: boolean }[] {
@@ -106,13 +111,56 @@
 						<Button size="compact" variant="quiet" onclick={() => onreplay(ending.path)}>Replay this path</Button>
 					</div>
 				{/each}
-				{#if result.stuck}
+				{#if result.stuck && !checks?.dead_ends.length}
 					<div class="item stuck">
 						<p>{result.stuck} states cannot reach an ending. The shortest way into one:</p>
 						{@render path(result.stuck_path)}
 						<Button size="compact" variant="quiet" onclick={() => onreplay(result.stuck_path)}>Replay this path</Button>
 					</div>
 				{/if}
+			</section>
+		{/if}
+
+		{#if checks}
+			<section class="group" aria-label="Ending checks">
+				<SectionRule title="ending checks" />
+				{#if !checks.proven}
+					<p class="warning">
+						Not proven: the budget stopped the walk, and {checks.unproven} states have ways on that it did not finish. A dead end or a
+						point of no return after them is not shown.
+					</p>
+				{:else if !checks.dead_ends.length && !checks.no_return.length}
+					<p class="muted">No dead end and no point of no return, over all states.</p>
+				{/if}
+				{#each checks.dead_ends as d, i (i)}
+					<div class="item stuck">
+						<p>
+							<strong>Dead end.</strong> After this, in {d.room}, no ending can be reached{d.rule ? ` (rule ${d.rule})` : ''}.
+							{d.turns > 1 ? `${d.turns} turns lead into dead ends this way.` : ''}
+						</p>
+						{@render path(d.path)}
+						<Button size="compact" variant="quiet" onclick={() => onreplay(d.path)}>Replay this path</Button>
+					</div>
+				{/each}
+				{#each checks.no_return as p, i (i)}
+					<div class="item" class:stuck={p.unaccepted.length > 0}>
+						<p>
+							<strong>Point of no return{p.unaccepted.length ? '' : ', accepted'}.</strong>
+							After this, in {p.room}, the best ending gets worse: {ranked(p.best_before, p.rank_before)} to {ranked(p.best_after, p.rank_after)}.
+							{p.lost.join(', ')} can no longer be reached{p.rule ? ` (rule ${p.rule})` : ''}.
+						</p>
+						{#if p.unaccepted.length}
+							<p class="muted">If this is on purpose, name {p.unaccepted.join(', ')} in <code>closes</code> of the step, with a <code>reason</code>.</p>
+						{:else}
+							<p class="muted"><code>closes</code> of {p.accepted_by.join(', ')}: {p.reason ?? ''}</p>
+						{/if}
+						{@render path(p.path)}
+						<Button size="compact" variant="quiet" onclick={() => onreplay(p.path)}>Replay this path</Button>
+					</div>
+				{/each}
+				{#each checks.stale as s (s.rule)}
+					<p class="warning"><code>closes</code> of {s.rule} names {s.endings.join(', ')}, but no explored turn of the rule loses it.</p>
+				{/each}
 			</section>
 		{/if}
 

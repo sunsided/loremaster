@@ -398,6 +398,33 @@ fn explore(project: Project) -> ExitCode {
             result.stuck_path.join(", ")
         );
     }
+    // The ending checks: dead ends, points of no return, `closes`.
+    let checks = &result.ending_checks;
+    if checks.ran {
+        for p in checks.no_return.iter().filter(|p| p.accepted()) {
+            println!(
+                "Point of no return after {} (accepted by `closes` of {}: {}).",
+                p.path.join(", "),
+                p.accepted_by.join(", "),
+                p.reason.as_deref().unwrap_or("")
+            );
+        }
+        for d in checks.diagnostics() {
+            println!("{}", project.locate(d));
+        }
+        if checks.proven {
+            println!(
+                "Ending checks: proven over all states: {} dead ends, {} points of no return.",
+                checks.dead_ends.len(),
+                checks.no_return.iter().filter(|p| !p.accepted()).count()
+            );
+        } else {
+            println!(
+                "Ending checks: not proven (the budget stopped the walk; {} states not finished).",
+                checks.unproven
+            );
+        }
+    }
     for f in &result.never_shown {
         println!("Never shown: {f}");
     }
