@@ -583,15 +583,9 @@ impl Checker<'_> {
             let validator = GraphValidator::with_options(
                 ValidationOptions::new().skip(ValidationIssueKind::Cycle),
             );
-            for issue in validator.validate_with_symbols(&compiled.graph, &symbols) {
-                // By design here: start nodes other than the first are entered
-                // by their `when`, and facts are set by rules too (Info).
-                let start = issue
-                    .node_id
-                    .is_some_and(|id| compiled.starts.contains(&id));
-                if issue.severity == ValidationSeverity::Info
-                    || (start && issue.kind == ValidationIssueKind::Unreachable)
-                {
+            for issue in validator.validate_with_symbols(&compiled, &symbols) {
+                // By design here: facts are set by rules too (Info).
+                if issue.severity == ValidationSeverity::Info {
                     continue;
                 }
                 let at = issue.node_id.map(node_at).unwrap_or_default();

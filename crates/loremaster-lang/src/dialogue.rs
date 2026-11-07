@@ -4,34 +4,21 @@ use crate::{
 };
 use dramaturge_model::{
     CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
-    DialogueOption, DialogueOptionId, Fact, FactId, FactScope, FactValue, Memory, Outcome,
+    DialogueOption, EntityId, Fact, FactId, FactScope, FactValue, Memory, Outcome,
     RelationshipAxisId, SymbolTable,
 };
 use loremaster_model::PLAYER_SPEAKER;
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
-use std::collections::BTreeMap;
-
-/// The custom-outcome key for `then`: world effects that the runtime applies.
-pub const THEN_KEY: &str = "loremaster.then";
 
 /// A dialogue lowered to a dramaturge graph.
 ///
-/// dramaturge holds the structure, the conditions and the outcomes. The text
-/// stays loremaster markup: the graph holds the line as written as
-/// [`DialogText::Inline`], and `node_say` / `option_say` hold the compiled
-/// lines that the runtime renders. The speech of a node is spoken by the
-/// dialogue's thing, the speech of an option by the player, unless a segment
-/// names its speaker with `by`.
-#[derive(Debug, Clone)]
-pub struct CompiledDialogue {
-    pub graph: DialogueGraph,
-    /// The start nodes, in order.
-    pub starts: Vec<DialogueNodeId>,
-    /// The `then` lists, by the index that their `THEN_KEY` outcome carries.
-    pub effects: Vec<Vec<Effect>>,
-    pub node_say: BTreeMap<DialogueNodeId, CompiledLine>,
-    pub option_say: BTreeMap<DialogueOptionId, CompiledLine>,
-}
+/// dramaturge holds the structure, the conditions and the outcomes. The start
+/// nodes are the entry nodes, in order. A `then` list is a host outcome
+/// ([`Outcome::Host`]) that the runtime applies. A line is host text
+/// ([`DialogText::Host`]): the compiled line that the runtime renders. The
+/// speech of a node is spoken by the dialogue's thing, the speech of an
+/// option by the player, unless a segment names its speaker with `by`.
+pub type CompiledDialogue = DialogueGraph<Vec<Effect>, CompiledLine>;
 
 /// A problem in a dialogue, with the place it was found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,13 +73,7 @@ pub fn compile_dialogue(
         ));
     };
     let speaker = CharacterId::new(with);
-    let mut out = CompiledDialogue {
-        graph: DialogueGraph::new(),
-        starts: Vec::new(),
-        effects: Vec::new(),
-        node_say: BTreeMap::new(),
-        option_say: BTreeMap::new(),
-    };
+    let mut out = CompiledDialogue::typed();
     let ids: Vec<DialogueNodeId> = d
         .nodes
         .iter()
@@ -102,50 +83,40 @@ pub fn compile_dialogue(
         let at = format!("nodes.{}", n.key);
         let say =
             compile_line(&n.say, Some(d.with.as_str()), scope).map_err(|e| line_fail(&at, e))?;
-        out.node_say.insert(id, say);
-        let mut node = DialogueNode {
-            id,
-            speaker,
-            text: DialogText::Inline(n.say.source()),
-            conditions: Vec::new(),
-            outcomes_on_enter: Vec::new(),
-            options: Vec::new(),
-        };
+        let mut node = DialogueNode::typed(id.0, speaker, DialogText::Host(say));
         if let Some(when) = &n.when {
             node.conditions.push(
                 compile_condition(when, scope).map_err(|e| fail(format!("{at}.when"), when, e))?,
             );
         }
-        node.outcomes_on_enter = outcomes(d, &n.outcomes, scope, &mut out.effects)
+        node.outcomes_on_enter = outcomes(with, &n.outcomes, scope)
             .map_err(|(source, e)| fail(at.clone(), &source, e))?;
         for (i, o) in n.options.iter().enumerate() {
             let at = format!("{at}.options[{i}]");
             let oid = symbols.intern_option(&option_key(d.id.as_str(), &n.key, i));
             let say =
                 compile_line(&o.say, Some(PLAYER_SPEAKER), scope).map_err(|e| line_fail(&at, e))?;
-            out.option_say.insert(oid, say);
             let target = match o.go.as_str() {
                 "end" => DialogTarget::End,
                 "back" => DialogTarget::Return,
                 key => DialogTarget::Node(symbols.intern_node(&node_key(d.id.as_str(), key))),
             };
-            let mut option =
-                DialogueOption::new(oid.0, DialogText::Inline(o.say.source()), target, id);
+            let mut option = DialogueOption::typed(oid.0, DialogText::Host(say), target, id);
             if let Some(when) = &o.when {
                 option.conditions.push(
                     compile_condition(when, scope)
                         .map_err(|e| fail(format!("{at}.when"), when, e))?,
                 );
             }
-            option.outcomes = outcomes(d, &o.outcomes, scope, &mut out.effects)
+            option.outcomes = outcomes(with, &o.outcomes, scope)
                 .map_err(|(source, e)| fail(at.clone(), &source, e))?;
             node.options.push(option);
         }
-        out.graph.nodes.push(node);
+        out.nodes.push(node);
     }
     for (i, key) in d.start.iter().enumerate() {
         match d.nodes.iter().position(|n| &n.key == key) {
-            Some(index) => out.starts.push(ids[index]),
+            Some(index) => out.entry_nodes.push(ids[index]),
             None => {
                 return Err(fail(
                     format!("start[{i}]"),
@@ -155,21 +126,16 @@ pub fn compile_dialogue(
             }
         }
     }
-    // dramaturge has one entry node; loremaster has a list of start nodes. The
-    // first one is the entry, so the validator walks the graph from it.
-    out.graph.entry_node = out.starts.first().copied();
     Ok(out)
 }
 
+/// The outcomes of a node or an option of a dialogue with the thing `with`.
 fn outcomes(
-    d: &Dialogue,
+    with: EntityId,
     o: &Outcomes,
     scope: &Scope,
-    effects: &mut Vec<Vec<Effect>>,
-) -> Result<Vec<Outcome>, (String, LangError)> {
+) -> Result<Vec<Outcome<Vec<Effect>>>, (String, LangError)> {
     let player = scope.player();
-    // `compile_dialogue` checked `with`.
-    let with = scope.entity(d.with.as_str()).unwrap_or(player);
     let mut out = Vec::new();
     for (name, value) in &o.set {
         fact_name(name, scope)?;
@@ -223,11 +189,7 @@ fn outcomes(
         });
     }
     if !o.then.is_empty() {
-        out.push(Outcome::Custom {
-            key: THEN_KEY.into(),
-            args: vec![FactValue::Int(effects.len() as i64)],
-        });
-        effects.push(o.then.clone());
+        out.push(Outcome::Host(o.then.clone()));
     }
     Ok(out)
 }
@@ -288,12 +250,16 @@ mod tests {
         let scope = Scope::from_story(&story);
         let mut symbols = scope.symbols.clone();
         let c = compile_dialogue(&story.dialogues[0], &scope, &mut symbols).unwrap();
-        check!(c.graph.nodes.len() == 3);
-        check!(c.starts.len() == 2);
-        check!(c.graph.entry_node == Some(c.starts[0]));
+        check!(c.nodes.len() == 3);
+        // The start nodes, in order: again, meet.
+        check!(c.entry_nodes == [c.nodes[0].id, c.nodes[1].id]);
         // serde_json sorts map keys: again, meet, names.
-        let meet = &c.graph.nodes[1];
-        check!(meet.options[0].target == DialogTarget::Node(c.graph.nodes[2].id));
+        let meet = &c.nodes[1];
+        check!(meet.options[0].target == DialogTarget::Node(c.nodes[2].id));
+        // The lines are compiled markup in the graph.
+        let line = meet.text.as_host().expect("host text");
+        check!(line.len() == 1);
+        check!(line[0].text == vec![crate::Segment::Text("Sit.".into())]);
         check!(meet.options[1].target == DialogTarget::Return);
         check!(meet.options[2].target == DialogTarget::End);
         assert!(let [Outcome::AddRelationship { delta: 1, .. }] = meet.options[0].outcomes.as_slice());
@@ -301,7 +267,7 @@ mod tests {
             meet.options[1].conditions[0],
             Condition::RelationshipAtLeast { value: 1, .. }
         ));
-        let names = &c.graph.nodes[2];
+        let names = &c.nodes[2];
         check!(matches!(
             names.outcomes_on_enter[0],
             Outcome::SetFact { .. }
@@ -311,11 +277,10 @@ mod tests {
             Outcome::AddFact { scope: FactScope::World, fact_id, delta: 2 } if fact_id.0.as_ref() == "visits_bb"
         ));
         check!(
-            matches!(&names.outcomes_on_enter[2], Outcome::Custom { key, .. } if key == THEN_KEY)
+            matches!(&names.outcomes_on_enter[2], Outcome::Host(then) if matches!(then.as_slice(), [Effect::Goto(room)] if room.as_str() == "bar"))
         );
-        check!(c.effects.len() == 1);
         check!(matches!(
-            c.graph.nodes[0].conditions[0],
+            c.nodes[0].conditions[0],
             Condition::HasMemory { .. }
         ));
         check!(symbols.node_key(names.id) == Some("bb/names"));

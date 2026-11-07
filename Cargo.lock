@@ -229,24 +229,24 @@ dependencies = [
 
 [[package]]
 name = "dramaturge-authoring"
-version = "0.3.0-alpha.2"
+version = "0.3.0-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7d57af93d10735a70c3e02738212324da34f9d3c1e5dbc3abf75f7f8f7a51f6"
+checksum = "96516989ca71b7dc3ed785d6f69fd5892ec3fb6b4ff5ae7cec138f1c600524ad"
 dependencies = [
  "dramaturge-model",
 ]
 
 [[package]]
 name = "dramaturge-model"
-version = "0.3.0-alpha.2"
+version = "0.3.0-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba5be8dbba477803e14d7bc158249c818387183b9f83b6081f333682578d27a9"
+checksum = "3b269c390f90a2f70ab3b04729e4d803f46081b940f1c17b60ab6acc38759638"
 
 [[package]]
 name = "dramaturge-runtime"
-version = "0.3.0-alpha.2"
+version = "0.3.0-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8293705bd6143eb77f651441d5855d1a55e0d9dda2d20cafa549ad723eb87e04"
+checksum = "4e08fc87a254b7defcfdda59ab568837026259e3a1937153361b401d4ce42b58"
 dependencies = [
  "dramaturge-model",
 ]
