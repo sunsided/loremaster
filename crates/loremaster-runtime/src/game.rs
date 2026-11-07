@@ -1876,6 +1876,7 @@ impl Game {
                         }
                         loremaster_model::Effect::Stop => "stop the action".to_string(),
                         loremaster_model::Effect::Emit(e) => format!("send the event {e}"),
+                        loremaster_model::Effect::Call(b) => format!("run the behavior {b}"),
                         loremaster_model::Effect::Start(t) => format!(
                             "start {}",
                             t.entries()
@@ -2380,6 +2381,31 @@ impl Game {
         say(turn, "Done.".into());
     }
 
+    /// Run a behavior at this place in a rule (`call`). A direct call does not
+    /// depend on the event kinds of the manifest. `Flow::Stop` works as the
+    /// `stop` effect.
+    fn call_behavior(&mut self, turn: &mut Turn, rule: &Id, id: &Id, depth: u8) {
+        let world = self.world.clone();
+        let Some(i) = world.behaviors.iter().position(|b| b.id() == id.as_str()) else {
+            turn.log.push(LogEntry {
+                kind: "author".into(),
+                text: format!("{rule} calls {id}, which this build does not have"),
+            });
+            return;
+        };
+        let (b, manifest) = (&world.behaviors[i], &world.manifests[i]);
+        let mut cx = crate::Cx {
+            owner: Id::new(format!("behavior:{id}")),
+            game: self,
+            turn,
+            depth: depth + 1,
+            manifest,
+        };
+        if b.handle(&Event::Call(rule.clone()), &mut cx) == crate::Flow::Stop {
+            self.stopped = true;
+        }
+    }
+
     fn apply(&mut self, turn: &mut Turn, rule: &Id, effect: &CEffect, depth: u8) {
         match effect {
             CEffect::Set(values) => {
@@ -2424,6 +2450,7 @@ impl Game {
                 self.state.ending = Some(ending.clone());
             }
             CEffect::Stop => self.stopped = true,
+            CEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             CEffect::Emit(name) => {
                 turn.log.push(LogEntry {
                     kind: "event".into(),

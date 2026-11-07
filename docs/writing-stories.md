@@ -269,6 +269,7 @@ The effects:
 | `emit: name` | Sends a custom event. Rules `on: { event: name }` fire immediately. |
 | `start: fuse` or `start: { fuse: 6 }` | Starts a timer, with its own turns or with a number of turns. |
 | `cancel: fuse` | Stops a timer. Its rules do not fire. |
+| `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 
 More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response.
 
@@ -449,7 +450,7 @@ Some logic is too large for rules, for example a character that walks the map an
 
 A build without the code, such as the editor or `loremaster play`, plays the story without the behavior. The rules view shows the behavior as code, and the terminal commands show a note.
 
-`Flow::Stop` from `handle` works as the `stop` effect. The example is the thief of Zork I: `examples/zork1/thief.rs`. Run `cargo run -p loremaster-runtime --example zork` to play Zork I with it.
+A rule can run a behavior at a place of its own with `call: thief`: the behavior gets `Event::Call` with the id of the rule, whatever its manifest says about events, and `Flow::Stop` stops the rule. `loremaster check` gives an error for a `call` that names no behavior of story.yaml. `Flow::Stop` from `handle` works as the `stop` effect. The example is the thief of Zork I: `examples/zork1/thief.rs`. Run `cargo run -p loremaster-runtime --example zork` to play Zork I with it.
 
 ## Author notes and threads
 

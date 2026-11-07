@@ -82,6 +82,9 @@ pub enum Effect {
     Stop,
     /// Send a custom event. Rules `on: { event: name }` fire at once.
     Emit(Id),
+    /// Run a behavior here, at this place in the rule. It gets the event
+    /// `Event::Call` with the id of the rule.
+    Call(Id),
     /// Start timers, or start them again from the beginning.
     Start(StartTimers),
     /// Stop a timer. Its rules do not fire.

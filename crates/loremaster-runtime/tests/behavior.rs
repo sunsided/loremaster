@@ -217,3 +217,106 @@ fn the_rules_view_and_the_explorer_use_the_manifest() {
 fn world_thief() -> Arc<World> {
     world(true)
 }
+
+/// Says where it was called from; stops when the fact `block` is true.
+#[derive(Debug)]
+struct Gate;
+
+impl loremaster_runtime::Behavior for Gate {
+    fn id(&self) -> &str {
+        "gate"
+    }
+
+    fn manifest(&self) -> loremaster_runtime::Manifest {
+        loremaster_runtime::Manifest::new().reads(["block"])
+    }
+
+    fn handle(
+        &self,
+        event: &loremaster_runtime::Event,
+        cx: &mut loremaster_runtime::Cx<'_>,
+    ) -> loremaster_runtime::Flow {
+        let loremaster_runtime::Event::Call(rule) = event else {
+            return loremaster_runtime::Flow::Continue;
+        };
+        cx.say(format!("The gate hears {rule}."));
+        if cx.fact("block") == Some(&loremaster_model::Value::Bool(true)) {
+            loremaster_runtime::Flow::Stop
+        } else {
+            loremaster_runtime::Flow::Continue
+        }
+    }
+}
+
+fn gate_files(behaviors: &str) -> Vec<SourceFile> {
+    [
+        (
+            "story.yaml",
+            format!("title: Gate\nstart: hall\nbehaviors: [{behaviors}]\nvars:\n  - {{ id: block, type: bool, initial: false }}\n"),
+        ),
+        ("rooms/hall.yaml", "name: Hall\ndescription: [\"A hall.\"]\n".into()),
+        ("verbs/knock.yaml", "label: Knock\nwords: [knock]\nslots: none\n".into()),
+        ("verbs/bar.yaml", "label: Bar\nwords: [bar]\nslots: none\n".into()),
+        (
+            "rules/knock.yaml",
+            "- id: knock\n  on: { verb: [knock] }\n  instead: true\n  then:\n    - say: \"You knock.\"\n    - call: gate\n    - say: \"It opens.\"\n- id: bar\n  on: { verb: [bar] }\n  instead: true\n  then: [{ set: { block: true } }]\n".into(),
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text,
+    })
+    .into()
+}
+
+#[test]
+fn call_runs_a_behavior_at_its_place_in_the_rule() {
+    let mut world = World::compile(load(gate_files("gate")).unwrap().story).unwrap();
+    world.register(Gate);
+    let world = Arc::new(world);
+    let mut game = Game::new(world.clone());
+    game.start();
+    let text = game.input("knock").plain_text();
+    let (a, b, c) = (
+        text.find("You knock.").unwrap(),
+        text.find("The gate hears knock.").unwrap(),
+        text.find("It opens.").unwrap(),
+    );
+    assert!(a < b && b < c, "{text}");
+
+    // `Flow::Stop` stops the rule, like `stop`.
+    let mut game = Game::new(world);
+    game.start();
+    game.input("bar");
+    let text = game.input("knock").plain_text();
+    assert!(text.contains("The gate hears knock."), "{text}");
+    assert!(!text.contains("It opens."), "{text}");
+}
+
+#[test]
+fn a_call_without_the_behavior_is_a_note_and_a_wrong_call_is_an_error() {
+    let world = Arc::new(World::compile(load(gate_files("gate")).unwrap().story).unwrap());
+    let mut game = Game::new(world);
+    game.start();
+    let turn = game.input("knock");
+    assert!(turn.plain_text().contains("It opens."));
+    assert!(
+        turn.log
+            .iter()
+            .any(|l| l.kind == "author" && l.text.contains("knock calls gate")),
+        "{:?}",
+        turn.log
+    );
+
+    let project = load(gate_files("other")).unwrap();
+    let errors: Vec<_> = loremaster_project::check(&project)
+        .into_iter()
+        .map(|d| d.message)
+        .collect();
+    assert!(
+        errors
+            .iter()
+            .any(|m| m.contains("`call: gate` names no behavior")),
+        "{errors:?}"
+    );
+}

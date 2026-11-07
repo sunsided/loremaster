@@ -164,6 +164,7 @@ pub(crate) enum CEffect {
     },
     Stop,
     Emit(Id),
+    Call(Id),
     Start(Vec<(Id, Option<u32>)>),
     Cancel(Id),
 }
@@ -266,6 +267,7 @@ impl Compiler {
             }
             Effect::Stop => CEffect::Stop,
             Effect::Emit(e) => CEffect::Emit(e.clone()),
+            Effect::Call(b) => CEffect::Call(b.clone()),
             Effect::Start(t) => CEffect::Start(t.entries()),
             Effect::Cancel(t) => CEffect::Cancel(t.clone()),
         })

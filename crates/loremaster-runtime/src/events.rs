@@ -37,6 +37,8 @@ pub enum Event {
     Timer(Id),
     /// An `emit` effect.
     Custom(Id),
+    /// A rule runs the behavior with a `call` effect. The id is the rule's.
+    Call(Id),
     /// A dialogue reaches a node.
     Talk {
         dialogue: Id,
@@ -57,6 +59,7 @@ pub enum EventKind {
     Verb,
     Timer,
     Custom,
+    Call,
     Talk,
 }
 
@@ -71,6 +74,7 @@ impl Event {
             Event::Verb { .. } => EventKind::Verb,
             Event::Timer(_) => EventKind::Timer,
             Event::Custom(_) => EventKind::Custom,
+            Event::Call(_) => EventKind::Call,
             Event::Talk { .. } => EventKind::Talk,
         }
     }
