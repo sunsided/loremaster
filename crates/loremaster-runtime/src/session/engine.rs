@@ -3,6 +3,7 @@
 
 use super::{Input, Session};
 use crate::{Command, Game, Turn, World};
+use loremaster_model::Value;
 use std::sync::Arc;
 
 impl Session {
@@ -55,6 +56,51 @@ impl Session {
             Input::Choice(index) => self.game.act(Command::Choose { index }),
             Input::Tick => self.game.tick(),
         };
+        self.remember(before);
+        turn
+    }
+
+    /// The answer to a paused rule or the death prompt as a whole turn, with
+    /// the rule log. `undo` can go back to the state before it.
+    pub(crate) fn resume_turn(&mut self, await_id: &str, value: Value) -> Result<Turn, String> {
+        if let Some(prompt) = self.death_prompt()
+            && prompt.id == await_id
+        {
+            prompt.request.accepts(&value)?;
+            return match value {
+                Value::Text(answer) => self.death_turn(&answer),
+                _ => Err("the death prompt takes a text answer".into()),
+            };
+        }
+        let before = self.before();
+        let turn = self.game.resume(await_id, value)?;
+        self.remember(before);
+        Ok(turn)
+    }
+
+    /// Back to the state before the last input, as a turn: a note and the
+    /// room as it is now.
+    pub(crate) fn undo_turn(&mut self) -> Turn {
+        match self.history.pop_back() {
+            Some(state) => {
+                self.game.set_state(state);
+                self.here_turn("Undone.")
+            }
+            None => Self::note_turn("There is nothing to undo.".into()),
+        }
+    }
+
+    /// The story from its start again, as the opening turn. `undo` can go
+    /// back to the state before it.
+    pub(crate) fn restart_turn(&mut self) -> Turn {
+        let before = self.before();
+        let host_rolls = self.game.host_rolls;
+        let mut game = Game::new(self.game.world_arc());
+        game.state_mut().rng = self.seed;
+        game.host_rolls = host_rolls;
+        self.game = game;
+        self.started = true;
+        let turn = self.game.start();
         self.remember(before);
         turn
     }

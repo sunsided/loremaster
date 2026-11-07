@@ -31,6 +31,7 @@ mod checks;
 mod inspect;
 mod rules;
 
+use loremaster_model::Value;
 use loremaster_runtime::authoring::{self, Inspector};
 use loremaster_runtime::{Input, Session, State, Turn, World};
 use std::sync::Arc;
@@ -43,7 +44,9 @@ pub use loremaster_runtime::authoring::{
     FramePart, FrameUse, MAX_CELLS, MatrixCell, PartView, RoomCoverage, RoomMatrix, RoomParts,
     TalkOptionView, TalkView, TextVariant, ThreadReach,
 };
-pub use loremaster_runtime::{ExitInfo, Scene, ThingInfo, VerbInfo};
+pub use loremaster_runtime::{
+    DialogueOutline, ExitInfo, OutlineNode, OutlineOption, Scene, ThingInfo, VerbInfo,
+};
 pub use rules::{MachineStepView, MachineView, RuleView};
 
 /// A running game with the authoring views.
@@ -103,6 +106,24 @@ impl Workbench {
         authoring::play(&mut self.session, input)
     }
 
+    /// The answer to a paused rule or to the death prompt, as a whole turn
+    /// with the rule log. Read [`Session::resume`].
+    pub fn resume(&mut self, await_id: &str, value: Value) -> Result<Turn, String> {
+        authoring::resume(&mut self.session, await_id, value)
+    }
+
+    /// Go back to the state before the last input, as a whole turn: a note
+    /// and the room as it is now. Read [`Session::undo`].
+    pub fn undo(&mut self) -> Turn {
+        authoring::undo(&mut self.session)
+    }
+
+    /// Start the story again, as the opening turn with the rule log. `undo`
+    /// can go back to the state before it. Read [`Session::restart`].
+    pub fn restart(&mut self) -> Turn {
+        authoring::restart(&mut self.session)
+    }
+
     /// Run an author command: go to a room, set a value, set the time, give a
     /// thing, or try one combination of the room matrix. It changes the state
     /// directly, and its turn shows as an author action.
@@ -141,6 +162,11 @@ impl Workbench {
     /// All rules with their state now.
     pub fn rules(&self) -> Vec<RuleView> {
         rules::rules(self.ins())
+    }
+
+    /// Every dialogue as an outline of nodes, options and their targets.
+    pub fn dialogues(&self) -> Vec<DialogueOutline> {
+        self.world().dialogue_outlines()
     }
 
     /// The puzzle machines with their states and steps.
