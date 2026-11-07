@@ -194,9 +194,16 @@ impl CustomHandler<Turned<'_>> for WorldEffects {
                 else {
                     return;
                 };
+                // A `stop` (or `Flow::Stop` of a called behavior) ends the
+                // node's effects, as it ends a rule.
+                let outer = std::mem::replace(&mut game.stopped, false);
                 for effect in effects {
                     game.apply(turn, &owner, effect, 1);
+                    if game.stopped || game.state.ended {
+                        break;
+                    }
                 }
+                game.stopped = outer;
             }
             _ => {}
         }

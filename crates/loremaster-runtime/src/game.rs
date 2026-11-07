@@ -2601,12 +2601,20 @@ impl Game {
                 _ => self.state.timers.insert(t.id.clone(), left),
             };
             let owner = Id::new(format!("timer:{}", t.id));
+            // A `stop` (or `Flow::Stop` of a called behavior) ends this step's
+            // effects; the timer's rules still fire when it runs out.
+            let outer = std::mem::replace(&mut self.stopped, false);
             for effect in world.timers[ti].at.get(&left).into_iter().flatten() {
                 self.apply(turn, &owner, effect, 1);
                 if self.state.ended {
+                    self.stopped = outer;
                     return;
                 }
+                if self.stopped {
+                    break;
+                }
             }
+            self.stopped = outer;
             if left == 0 {
                 turn.log.push(LogEntry {
                     kind: "timer".into(),
