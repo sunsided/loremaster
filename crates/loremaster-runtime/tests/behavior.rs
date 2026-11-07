@@ -439,6 +439,23 @@ fn gate_owners_world() -> Arc<World> {
                 "turns: 1\nrunning: true\nat:\n  0: [{ call: gate }, { say: \"The clock ticks on.\" }]\n",
             ),
             (
+                "rules/clock.yaml",
+                "- id: clock_done\n  on: { timer: clock }\n  then: [{ say: \"The clock has run out.\" }]\n",
+            ),
+            (
+                "timers/bell.yaml",
+                "turns: 1\nrunning: true\nat:\n  0: [{ say: \"A bell rings.\" }]\n",
+            ),
+            (
+                "dialogues/sexton.yaml",
+                "with: sexton\nstart: [hi]\nnodes:\n  hi:\n    say: \"Hm?\"\n    options:\n      - say: \"Goodbye.\"\n        then: [{ end: drowned }, { say: \"After the end.\" }]\n        go: end\n",
+            ),
+            ("things/sexton.yaml", "name: sexton\nlocation: { room: hall }\n"),
+            (
+                "endings/drowned.yaml",
+                "kind: death\ntitle: Drowned\n",
+            ),
+            (
                 "things/keeper.yaml",
                 "name: keeper\nlocation: { room: hall }\n",
             ),
@@ -465,9 +482,24 @@ fn a_call_in_a_timer_or_a_dialogue_names_its_owner_and_can_stop() {
     let text = s.submit(Input::Text("wait".into())).plain_text();
     assert!(text.contains("The gate hears timer:clock."), "{text}");
     assert!(!text.contains("The clock ticks on."), "{text}");
+    // The stop ends only the clock's step: its rules still fire when it runs
+    // out, and the next timer of the same tick runs its effects.
+    assert!(text.contains("The clock has run out."), "{text}");
+    assert!(text.contains("A bell rings."), "{text}");
 
     s.submit(Input::Text("talk to keeper".into()));
     let text = s.choose(0).plain_text();
     assert!(text.contains("The gate hears dialogue:keeper."), "{text}");
     assert!(!text.contains("The keeper opens."), "{text}");
+}
+
+#[test]
+fn an_end_in_a_dialogue_ends_the_effects_after_it() {
+    use loremaster_runtime::{Input, Session};
+    let mut s = Session::new(gate_owners_world());
+    s.start();
+    s.submit(Input::Text("talk to sexton".into()));
+    let text = s.choose(0).plain_text();
+    assert!(s.state().ended);
+    assert!(!text.contains("After the end."), "{text}");
 }
