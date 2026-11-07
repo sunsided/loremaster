@@ -210,8 +210,26 @@ fn the_rules_view_and_the_explorer_use_the_manifest() {
         "{}",
         view.when
     );
-    // The thief walks on turns: waiting matters.
-    assert!(world_thief().behaviors_watch_time());
+    // The thief declares start and turn events: waiting matters.
+    let thief = world_thief();
+    assert_eq!(
+        thief.manifest("thief").unwrap().events,
+        Some(vec![
+            loremaster_runtime::EventKind::Start,
+            loremaster_runtime::EventKind::Turn
+        ])
+    );
+    assert!(thief.behaviors_watch_time());
+}
+
+#[test]
+fn manifest_new_handles_every_event_until_events_narrows_it() {
+    use loremaster_runtime::{EventKind, Manifest};
+    let m = Manifest::new().reads(["here"]);
+    assert!(m.handles(EventKind::Turn) && m.handles(EventKind::Custom));
+    let m = m.events([EventKind::Custom]);
+    assert!(!m.handles(EventKind::Turn) && m.handles(EventKind::Custom));
+    assert!(!m.may_write("here"));
 }
 
 fn world_thief() -> Arc<World> {

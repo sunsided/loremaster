@@ -48,8 +48,12 @@ pub trait Behavior: Send + Sync + std::fmt::Debug {
 
 /// What a behavior reads, what it writes and which events it handles (XP-4).
 ///
-/// Names are facts (`beacon_lit`, `lamp.lit`) or the place of a thing
-/// (`thief.location`). `None` means unknown: the behavior is opaque there.
+/// Names are facts (`beacon_lit`, `lamp.lit`), the place of a thing
+/// (`thief.location`), or the parts of the state that `Cx` reads without a
+/// fact name: `here` (the player's room, which `goto` writes), `carried`
+/// (what the player has), `turns`, `minutes`, `visits` and `random` (the
+/// random numbers, which `roll` reads and writes). `None` means unknown:
+/// the behavior is opaque there. `Cx::unstable` is outside the manifest.
 /// The session sends a behavior only the events of its kinds, and the
 /// explorer and the checks use the lists for code they cannot look into.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -66,14 +70,14 @@ impl Manifest {
         Self::default()
     }
 
-    /// A behavior that reads and writes nothing and handles no event, to
+    /// A behavior that reads and writes nothing and handles every event, to
     /// build on with [`Manifest::reads`], [`Manifest::writes`] and
-    /// [`Manifest::events`].
+    /// [`Manifest::events`]. `events` narrows it to the kinds it names.
     pub fn new() -> Self {
         Self {
             reads: Some(Vec::new()),
             writes: Some(Vec::new()),
-            events: Some(Vec::new()),
+            events: None,
         }
     }
 
@@ -248,6 +252,7 @@ impl Cx<'_> {
 
     /// Move the player. Leave and enter rules fire.
     pub fn goto(&mut self, room: Id) {
+        self.check_write("here");
         self.game.move_player(self.turn, room, self.depth + 1);
     }
 
@@ -260,6 +265,7 @@ impl Cx<'_> {
     /// A number from 0 to `n - 1`, from the random numbers in the save state,
     /// so play replays.
     pub fn roll(&mut self, n: u32) -> u32 {
+        self.check_write("random");
         crate::rng::below(&mut self.game.state_mut().rng, n as usize) as u32
     }
 
