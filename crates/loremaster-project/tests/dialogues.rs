@@ -47,13 +47,14 @@ fn a_good_dialogue_has_no_problems() {
 }
 
 #[test]
-fn a_missing_node_is_an_error_from_the_graph_validator() {
+fn a_missing_node_is_an_error_from_the_dialogue_check() {
+    // dramaturge-syntax's check finds it, at the `go` of the option.
     let d = diagnostics(&GOOD.replace("go: names, relation", "go: nmes, relation"));
     check!(d.len() == 1, "{d:#?}");
     check!(d[0].severity == Severity::Error);
     check!(d[0].file == "dialogues/bb.yaml");
-    check!(d[0].at == "nodes.meet");
-    check!(d[0].message.contains("targets nonexistent node 'nmes'"));
+    check!(d[0].at == "nodes.meet.options[0].go");
+    check!(d[0].message == "no node `nmes`");
 }
 
 #[test]

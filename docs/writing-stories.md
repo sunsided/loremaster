@@ -174,7 +174,7 @@ nodes:
   - `relation`: add to the relation of the player to the thing, for example `{ trust: 1 }`. Declare each relation in `relations` in `story.yaml`.
   - `remember`: memories that the thing keeps.
   - `then`: world effects, as in a rule: `move`, `goto`, `say`, `end`.
-- `say` is a [line](#lines-and-speech): a text, or a list of narration and speech. The speech of a node is spoken by the thing (`with`), the speech of an option by the player. `line:` is the same key.
+- `say` is a [line](#lines-and-speech): a text, or a list of narration and speech. The speech of a node is spoken by the thing (`with`), the speech of an option by the player. In a dialogue the key is always `say`.
 
 Conditions can read the new values:
 
@@ -190,11 +190,13 @@ During a talk:
 - Other commands do not run. To leave the talk, type `bye` or `leave`, or push Escape.
 - A talk ends when the player chooses an answer that ends it, when a node has no answer that shows, or when an effect takes the player away.
 
-`loremaster check` examines each dialogue: conditions, markup, speakers, targets of `go`, and nodes that no start node leads to.
+The shape of a dialogue is the one of dramaturge's `dramaturge-syntax` (decision D3). Options can have an `id` (the key of the option), and the dialogue, nodes and options can have `notes`. The shape also has `lines`, `next`, and the option fields `hint`, `tags` and `intentions`; loremaster's talks do not play them yet, and `loremaster check` reports them as errors.
+
+`loremaster check` examines each dialogue: keys, `start`, targets of `go`, conditions, markup, speakers, and nodes that no start node leads to.
 
 ### Lines and speech
 
-A text that shows is a line: the `say` of a rule effect, of a dialogue node, of an option and of a machine step. `line:` is the same key as `say:`. A line is one text, which is narration:
+A text that shows is a line: the `say` of a rule effect, of a dialogue node, of an option and of a machine step. `line:` is the same key as `say:` in rules and machine steps; a dialogue writes `say:` (its shape is the one of dramaturge, see below). A line is one text, which is narration:
 
 ```yaml
 say: "The lock-keeper shrugs."

@@ -13,6 +13,7 @@ keywords = ["text-adventure", "interactive-fiction", "world-model", "game"]
 categories = ["game-development", "data-structures"]
 
 [dependencies]
+dramaturge-syntax.workspace = true
 serde.workspace = true
 
 [dev-dependencies]

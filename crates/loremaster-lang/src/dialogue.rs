@@ -3,12 +3,12 @@ use crate::{
     CompiledLine, LangError, LineError, Operand, Scope, compile_condition, compile_line, parse_expr,
 };
 use dramaturge_model::{
-    CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
-    DialogueOption, EntityId, Fact, FactId, FactScope, FactValue, Memory, Outcome,
+    Condition, DialogText, DialogueGraph, EntityId, Fact, FactId, FactScope, Memory, Outcome,
     RelationshipAxisId, SymbolTable,
 };
-use loremaster_model::PLAYER_SPEAKER;
-use loremaster_model::{Dialogue, Effect, Outcomes, Value};
+use dramaturge_syntax::lower::fact_value;
+use dramaturge_syntax::{Cx, Lower, LowerError, Place, Severity, Value, lower};
+use loremaster_model::{Dialogue, Effect, Line, PLAYER_SPEAKER};
 
 /// A dialogue lowered to a dramaturge graph.
 ///
@@ -30,288 +30,186 @@ pub struct DialogueError {
     pub error: LangError,
 }
 
-/// The symbol key of a node.
-pub fn node_key(dialogue: &str, node: &str) -> String {
-    format!("{dialogue}/{node}")
-}
-
-/// The symbol key of an option.
-pub fn option_key(dialogue: &str, node: &str, index: usize) -> String {
-    format!("{dialogue}/{node}#{index}")
-}
-
-/// Lower a dialogue to a dramaturge graph. Node and option keys are interned
-/// in `symbols`; the player, things and memories must be in it already (see
-/// [`Scope::symbols`]).
+/// Lower a dialogue to a dramaturge graph with [`dramaturge_syntax::lower`].
+/// Node and option keys are interned in `symbols` as `<id>/<node>` and
+/// `<id>/<node>#<index>`; the player, things and memories must be in it
+/// already (see [`Scope::symbols`]).
 ///
-/// A `go` to a node that does not exist is not an error here: it gets an id
-/// that no node has, and the graph validator reports it.
+/// The structure (`start`, the targets, the keys) is checked by
+/// [`dramaturge_syntax::check`]; its first error is the error here.
 pub fn compile_dialogue(
     d: &Dialogue,
     scope: &Scope,
     symbols: &mut SymbolTable,
 ) -> Result<CompiledDialogue, DialogueError> {
-    let fail = |at: String, source: &str, error: LangError| DialogueError {
-        at,
-        source: source.to_string(),
-        error,
-    };
-    let line_fail = |at: &str, e: LineError| DialogueError {
-        at: if e.at.is_empty() {
-            at.to_string()
-        } else {
-            format!("{at}.say{}", e.at)
-        },
-        source: e.source,
-        error: e.error,
-    };
-    let Some(with) = scope.entity(d.with.as_str()) else {
-        return Err(fail(
-            "with".into(),
-            d.with.as_str(),
-            LangError::new(format!("unknown thing `{}`", d.with), 0..0),
-        ));
-    };
-    let speaker = CharacterId::new(with);
-    let mut out = CompiledDialogue::typed();
-    let ids: Vec<DialogueNodeId> = d
-        .nodes
-        .iter()
-        .map(|n| symbols.intern_node(&node_key(d.id.as_str(), &n.key)))
-        .collect();
-    for (n, &id) in d.nodes.iter().zip(&ids) {
-        let at = format!("nodes.{}", n.key);
-        let say =
-            compile_line(&n.say, Some(d.with.as_str()), scope).map_err(|e| line_fail(&at, e))?;
-        let mut node = DialogueNode::typed(id.0, speaker, DialogText::Host(say));
-        if let Some(when) = &n.when {
-            node.conditions.push(
-                compile_condition(when, scope).map_err(|e| fail(format!("{at}.when"), when, e))?,
-            );
-        }
-        node.outcomes_on_enter = outcomes(with, &n.outcomes, scope)
-            .map_err(|(source, e)| fail(at.clone(), &source, e))?;
-        for (i, o) in n.options.iter().enumerate() {
-            let at = format!("{at}.options[{i}]");
-            let oid = symbols.intern_option(&option_key(d.id.as_str(), &n.key, i));
-            let say =
-                compile_line(&o.say, Some(PLAYER_SPEAKER), scope).map_err(|e| line_fail(&at, e))?;
-            let target = match o.go.as_str() {
-                "end" => DialogTarget::End,
-                "back" => DialogTarget::Return,
-                key => DialogTarget::Node(symbols.intern_node(&node_key(d.id.as_str(), key))),
+    match lower(d, symbols, &mut Host { d, scope }) {
+        Ok(lowered) => Ok(lowered.graph),
+        Err(LowerError::Host { place, error, .. }) => Err(DialogueError {
+            at: at(d, &place, &error.at),
+            ..error
+        }),
+        Err(LowerError::Check(issues)) => {
+            let issue = issues
+                .into_iter()
+                .find(|i| i.severity == Severity::Error)
+                .expect("a failed check has an error");
+            let source = match issue.place {
+                Place::Start(i) => d.start[i].as_str(),
+                _ => "",
             };
-            let mut option = DialogueOption::typed(oid.0, DialogText::Host(say), target, id);
-            if let Some(when) = &o.when {
-                option.conditions.push(
-                    compile_condition(when, scope)
-                        .map_err(|e| fail(format!("{at}.when"), when, e))?,
-                );
-            }
-            option.outcomes = outcomes(with, &o.outcomes, scope)
-                .map_err(|(source, e)| fail(at.clone(), &source, e))?;
-            node.options.push(option);
+            let at = issue.path;
+            Err(DialogueError {
+                at,
+                ..fail(source, issue.message)
+            })
         }
-        out.nodes.push(node);
+        Err(e) => Err(fail("", format!("{e:?}"))),
     }
-    for (i, key) in d.start.iter().enumerate() {
-        match d.nodes.iter().position(|n| &n.key == key) {
-            Some(index) => out.entry_nodes.push(ids[index]),
-            None => {
-                return Err(fail(
-                    format!("start[{i}]"),
-                    key,
-                    LangError::new(format!("no node `{key}`"), 0..key.len()),
-                ));
-            }
-        }
-    }
-    Ok(out)
 }
 
-/// The outcomes of a node or an option of a dialogue with the thing `with`.
-fn outcomes(
-    with: EntityId,
-    o: &Outcomes,
-    scope: &Scope,
-) -> Result<Vec<Outcome<Vec<Effect>>>, (String, LangError)> {
-    let player = scope.player();
-    let mut out = Vec::new();
-    for (name, value) in &o.set {
-        fact_name(name, scope)?;
-        out.push(Outcome::SetFact {
-            scope: FactScope::World,
-            fact: Fact::new(
-                FactId::new(name.as_str()),
-                match value {
-                    Value::Bool(b) => FactValue::Bool(*b),
-                    Value::Int(i) => FactValue::Int(*i),
-                    Value::Text(t) => FactValue::Text(t.clone()),
-                },
-            ),
-        });
+/// The place of an error as loremaster's diagnostics name it: a line error
+/// is at its node or option (`.say[i]` inside a line with segments), an
+/// outcome error at the node or option that has the outcome.
+fn at(d: &Dialogue, place: &Place, inner: &str) -> String {
+    let base = match place {
+        Place::NodeSay(n) | Place::NodeOutcome(n, _) => Place::Node(*n),
+        Place::OptionOutcome(n, o, _) => Place::Option(*n, *o),
+        other => other.clone(),
+    };
+    let path = base.path(d);
+    match place {
+        Place::NodeSay(_) | Place::Line(..) | Place::Option(..) if !inner.is_empty() => {
+            format!("{path}.say{inner}")
+        }
+        _ => path,
     }
-    for (name, n) in &o.add {
-        fact_name(name, scope)?;
-        out.push(Outcome::AddFact {
-            scope: FactScope::World,
-            fact_id: FactId::new(name.as_str()),
-            delta: *n,
-        });
+}
+
+/// loremaster's payloads for dramaturge's lowering. A hook error has the
+/// place inside a line in `at` (see [`LineError::at`]).
+struct Host<'a> {
+    d: &'a Dialogue,
+    scope: &'a Scope,
+}
+
+/// An error in `source`, with its place to be filled in.
+fn lang(source: &str, error: LangError) -> DialogueError {
+    let source = source.to_string();
+    DialogueError {
+        at: String::new(),
+        source,
+        error,
     }
-    for (axis, delta) in &o.relation {
-        if !scope.relations.contains(axis) {
-            return Err((
-                axis.clone(),
-                LangError::new(
-                    format!("unknown relation `{axis}`; declare it in `relations` in story.yaml"),
-                    0..axis.len(),
-                ),
+}
+
+fn fail(source: &str, message: String) -> DialogueError {
+    lang(source, LangError::new(message, 0..source.len()))
+}
+
+impl Host<'_> {
+    /// The default speaker of the line at `place`: the node's speaker (the
+    /// dialogue's thing), the line's speaker, or the player for an option.
+    fn speaker(&self, place: &Place) -> &str {
+        let node = |n: &usize| &self.d.nodes[*n];
+        match place {
+            Place::NodeSay(n) => node(n).speaker.as_deref().unwrap_or(&self.d.with),
+            Place::Line(n, l) => &node(n).lines[*l].speaker,
+            _ => PLAYER_SPEAKER,
+        }
+    }
+
+    /// A name that `set` or `add` can change: a story variable or a thing
+    /// property. It is a world fact with the full name.
+    fn fact_name(&self, name: &str) -> Result<FactId, DialogueError> {
+        let lang = |e| lang(name, e);
+        match resolve(&parse_expr(name).map_err(lang)?, self.scope).map_err(lang)? {
+            (Operand::Fact(_), _) => Ok(FactId::new(name)),
+            _ => Err(fail(
+                name,
+                format!("`{name}` is computed by the game; it can not be set"),
+            )),
+        }
+    }
+}
+
+type Outcomes = Result<Vec<Outcome<Vec<Effect>>>, DialogueError>;
+
+impl Lower<String, Line, Effect> for Host<'_> {
+    type Host = Vec<Effect>;
+    type Text = CompiledLine;
+    type Error = DialogueError;
+
+    fn condition(&mut self, _: &mut Cx<'_>, when: &String) -> Result<Condition, DialogueError> {
+        compile_condition(when, self.scope).map_err(|e| lang(when, e))
+    }
+
+    fn text(
+        &mut self,
+        cx: &mut Cx<'_>,
+        say: &Line,
+    ) -> Result<DialogText<CompiledLine>, DialogueError> {
+        let speaker = self.speaker(&cx.place);
+        compile_line(say, Some(speaker), self.scope)
+            .map(DialogText::Host)
+            .map_err(|LineError { at, source, error }| DialogueError { at, source, error })
+    }
+
+    fn effects(&mut self, _: &mut Cx<'_>, then: &[Effect]) -> Outcomes {
+        Ok(vec![Outcome::Host(then.to_vec())])
+    }
+
+    fn set(&mut self, _: &mut Cx<'_>, name: &str, value: &Value) -> Outcomes {
+        let fact = Fact::new(self.fact_name(name)?, fact_value(value));
+        Ok(vec![Outcome::SetFact {
+            scope: FactScope::World,
+            fact,
+        }])
+    }
+
+    fn add(&mut self, _: &mut Cx<'_>, name: &str, delta: i64) -> Outcomes {
+        Ok(vec![Outcome::AddFact {
+            scope: FactScope::World,
+            fact_id: self.fact_name(name)?,
+            delta,
+        }])
+    }
+
+    /// The relation of the player to the dialogue's thing, of a declared axis.
+    fn relation(&mut self, cx: &mut Cx<'_>, axis: &str, delta: i32) -> Outcomes {
+        if !self.scope.relations.contains(axis) {
+            return Err(fail(
+                axis,
+                format!("unknown relation `{axis}`; declare it in `relations` in story.yaml"),
             ));
         }
-        out.push(Outcome::AddRelationship {
-            source: player,
-            target: with,
-            axis: RelationshipAxisId::new(axis.as_str()),
-            delta: *delta,
-        });
+        Ok(vec![Outcome::AddRelationship {
+            source: cx.player,
+            target: cx.with,
+            axis: RelationshipAxisId::new(axis),
+            delta,
+        }])
     }
-    for key in &o.remember {
-        let id = scope.symbols.memory(key).ok_or_else(|| {
-            (
-                key.clone(),
-                LangError::new(format!("unknown memory `{key}`"), 0..key.len()),
-            )
-        })?;
-        out.push(Outcome::AddMemory {
-            owner: with,
-            memory: Memory::new(id).with_subject(player),
-        });
-    }
-    if !o.then.is_empty() {
-        out.push(Outcome::Host(o.then.clone()));
-    }
-    Ok(out)
-}
 
-/// A name that `set` or `add` can change: a story variable or a thing property.
-fn fact_name(name: &str, scope: &Scope) -> Result<(), (String, LangError)> {
-    let expr = parse_expr(name).map_err(|e| (name.to_string(), e))?;
-    match resolve(&expr, scope) {
-        Ok((Operand::Fact(_), _)) => Ok(()),
-        Ok(_) => Err((
-            name.to_string(),
-            LangError::new(
-                format!("`{name}` is computed by the game; it can not be set"),
-                0..name.len(),
-            ),
-        )),
-        Err(e) => Err((name.to_string(), e)),
+    /// A memory that some condition can ask for, kept by the dialogue's thing.
+    fn remember(&mut self, cx: &mut Cx<'_>, key: &str) -> Outcomes {
+        let Some(id) = self.scope.symbols.memory(key) else {
+            return Err(fail(key, format!("unknown memory `{key}`")));
+        };
+        Ok(vec![Outcome::AddMemory {
+            owner: cx.with,
+            memory: Memory::new(id).with_subject(cx.player),
+        }])
+    }
+
+    fn entity(&mut self, _: &mut Cx<'_>, key: &str) -> Result<EntityId, DialogueError> {
+        if key == PLAYER_SPEAKER {
+            return Ok(self.scope.player());
+        }
+        self.scope
+            .entity(key)
+            .ok_or_else(|| fail(key, format!("unknown thing `{key}`")))
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use assert2::{assert, check};
-    use dramaturge_model::Condition;
-    use loremaster_model::Story;
-
-    pub(super) fn story() -> Story {
-        serde_json::from_value(serde_json::json!({
-            "title": "t",
-            "start": "bar",
-            "relations": ["trust"],
-            "vars": [{"id": "known", "type": "bool", "initial": false}, {"id": "visits_bb", "type": "int", "initial": 0}],
-            "rooms": [{"id": "bar", "name": "Bar"}],
-            "things": [{"id": "bb", "name": "man", "location": {"room": "bar"}}],
-            "dialogues": [{
-                "id": "bb", "with": "bb", "start": ["again", "meet"],
-                "nodes": {
-                    "meet": {
-                        "say": "Sit.",
-                        "options": [
-                            {"say": "Who?", "go": "names", "relation": {"trust": 1}},
-                            {"say": "Ship?", "when": "bb.trust >= 1", "remember": ["asked"], "go": "back"},
-                            {"say": "Bye."}
-                        ]
-                    },
-                    "names": {"say": "Blackbeard.", "set": {"known": true}, "add": {"visits_bb": 2}, "then": [{"goto": "bar"}]},
-                    "again": {"say": "Again.", "when": "remembers(bb, asked)"}
-                }
-            }]
-        }))
-        .unwrap()
-    }
-
-    #[test]
-    fn a_dialogue_becomes_a_graph() {
-        let story = story();
-        let scope = Scope::from_story(&story);
-        let mut symbols = scope.symbols.clone();
-        let c = compile_dialogue(&story.dialogues[0], &scope, &mut symbols).unwrap();
-        check!(c.nodes.len() == 3);
-        // The start nodes, in order: again, meet.
-        check!(c.entry_nodes == [c.nodes[0].id, c.nodes[1].id]);
-        // serde_json sorts map keys: again, meet, names.
-        let meet = &c.nodes[1];
-        check!(meet.options[0].target == DialogTarget::Node(c.nodes[2].id));
-        // The lines are compiled markup in the graph.
-        let line = meet.text.as_host().expect("host text");
-        check!(line.len() == 1);
-        check!(line[0].text == vec![crate::Segment::Text("Sit.".into())]);
-        check!(meet.options[1].target == DialogTarget::Return);
-        check!(meet.options[2].target == DialogTarget::End);
-        assert!(let [Outcome::AddRelationship { delta: 1, .. }] = meet.options[0].outcomes.as_slice());
-        check!(matches!(
-            meet.options[1].conditions[0],
-            Condition::RelationshipAtLeast { value: 1, .. }
-        ));
-        let names = &c.nodes[2];
-        check!(matches!(
-            names.outcomes_on_enter[0],
-            Outcome::SetFact { .. }
-        ));
-        check!(matches!(
-            &names.outcomes_on_enter[1],
-            Outcome::AddFact { scope: FactScope::World, fact_id, delta: 2 } if fact_id.0.as_ref() == "visits_bb"
-        ));
-        check!(
-            matches!(&names.outcomes_on_enter[2], Outcome::Host(then) if matches!(then.as_slice(), [Effect::Goto(room)] if room.as_str() == "bar"))
-        );
-        check!(matches!(
-            c.nodes[0].conditions[0],
-            Condition::HasMemory { .. }
-        ));
-        check!(symbols.node_key(names.id) == Some("bb/names"));
-    }
-
-    #[test]
-    fn errors_name_their_place() {
-        let mut story = story();
-        story.dialogues[0].nodes[1].options[1].when = Some("bb.trsut >= 1".into());
-        let scope = Scope::from_story(&story);
-        let err =
-            compile_dialogue(&story.dialogues[0], &scope, &mut scope.symbols.clone()).unwrap_err();
-        check!(err.at == "nodes.meet.options[1].when");
-        check!(err.error.message.contains("trust"));
-
-        let mut story = self::story();
-        story.dialogues[0].nodes[1].options[0]
-            .outcomes
-            .relation
-            .insert("fear".into(), 1);
-        let scope = Scope::from_story(&story);
-        let err =
-            compile_dialogue(&story.dialogues[0], &scope, &mut scope.symbols.clone()).unwrap_err();
-        check!(err.error.message.starts_with("unknown relation `fear`"));
-    }
-
-    #[test]
-    fn remembers_needs_a_known_memory() {
-        let story = story();
-        let scope = Scope::from_story(&story);
-        let err = compile_condition("remembers(bb, forgot)", &scope).unwrap_err();
-        check!(err.message == "no dialogue remembers `forgot`");
-    }
-}
+mod tests;

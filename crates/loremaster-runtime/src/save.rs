@@ -298,9 +298,8 @@ fn reconcile(
 
     let talk_ok = state.talk.as_ref().is_none_or(|t| {
         story
-            .dialogues
-            .iter()
-            .any(|d| d.id == t.dialogue && d.node(&t.node).is_some())
+            .dialogue(t.dialogue.as_str())
+            .is_some_and(|d| d.node(&t.node).is_some())
     });
     if !talk_ok && let Some(t) = state.talk.take() {
         dropped.push(format!("dialogue:{}", t.dialogue));
@@ -308,7 +307,7 @@ fn reconcile(
     // The nodes before the current one, for `go: back`: keep only the nodes
     // that the dialogue still has.
     if let Some(t) = &mut state.talk
-        && let Some(d) = story.dialogues.iter().find(|d| d.id == t.dialogue)
+        && let Some(d) = story.dialogue(t.dialogue.as_str())
     {
         let dialogue = t.dialogue.clone();
         t.back.retain(|node| {

@@ -1,5 +1,5 @@
 use crate::World;
-use loremaster_model::{Dialogue, Outcomes};
+use loremaster_model::{Dialogue, DialogueId, DialogueTarget, Line, Outcomes, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -56,16 +56,14 @@ impl DialogueOutline {
                 continue;
             }
             if let Some(n) = d.node(key) {
-                queue.extend(
-                    n.options
-                        .iter()
-                        .map(|o| o.go.as_str())
-                        .filter(|g| keys.contains(g)),
-                );
+                queue.extend(n.options.iter().filter_map(|o| match &o.go {
+                    DialogueTarget::Node(g) if keys.contains(g.as_str()) => Some(g.as_str()),
+                    _ => None,
+                }));
             }
         }
         Self {
-            id: d.id.to_string(),
+            id: d.id_str().to_string(),
             with: d.with.to_string(),
             start: d.start.clone(),
             nodes: d
@@ -81,11 +79,10 @@ impl DialogueOutline {
                         .options
                         .iter()
                         .map(|o| OutlineOption {
-                            say: o.say.source(),
+                            say: o.say.as_ref().map(Line::source).unwrap_or_default(),
                             when: o.when.clone(),
-                            go: o.go.clone(),
-                            missing: !matches!(o.go.as_str(), "end" | "back")
-                                && !keys.contains(o.go.as_str()),
+                            go: o.go.as_key().to_string(),
+                            missing: matches!(&o.go, DialogueTarget::Node(g) if !keys.contains(g.as_str())),
                             outcomes: describe(&o.outcomes),
                         })
                         .collect(),
@@ -111,7 +108,11 @@ impl World {
 pub(crate) fn describe(o: &Outcomes) -> Vec<String> {
     use loremaster_model::Effect;
     let mut out: Vec<String> = Vec::new();
-    out.extend(o.set.iter().map(|(k, v)| format!("set {k} = {v}")));
+    out.extend(
+        o.set
+            .iter()
+            .map(|(k, v)| format!("set {k} = {}", Value::from(v))),
+    );
     out.extend(o.add.iter().map(|(k, n)| format!("add {k} {n:+}")));
     out.extend(o.relation.iter().map(|(k, n)| format!("{k} {n:+}")));
     out.extend(o.remember.iter().map(|k| format!("remember {k}")));

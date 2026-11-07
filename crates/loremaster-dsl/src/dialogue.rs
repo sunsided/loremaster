@@ -1,8 +1,10 @@
 //! Dialogues with a thing.
 
 use crate::convert::{IntoValue, id, strings};
-use crate::pack::{register, replaceable, with_notes};
-use loremaster_model::{Dialogue, DialogueNode, DialogueOption, Effect, Id, Line, Outcomes};
+use crate::pack::{register, with_notes};
+use loremaster_model::{
+    Dialogue, DialogueNode, DialogueOption, DialogueTarget, Effect, Id, Line, Outcomes,
+};
 use loremaster_project::Pack;
 
 /// A dialogue of a pack, from [`BuildPack::dialogue`](crate::BuildPack::dialogue).
@@ -38,13 +40,8 @@ impl<'a> DialogueBuilder<'a> {
     #[track_caller]
     pub(crate) fn new(pack: &'a mut Pack, id: Id, with: Id) -> Self {
         register(pack, format!("dialogue:{id}"));
-        pack.dialogues.push(Dialogue {
-            id,
-            with,
-            start: Vec::new(),
-            nodes: Vec::new(),
-            notes: Vec::new(),
-        });
+        pack.dialogues
+            .push(Dialogue::new(with.as_str()).with_id(id.as_str()));
         let i = pack.dialogues.len() - 1;
         DialogueBuilder { pack, i }
     }
@@ -81,13 +78,8 @@ impl<'a> DialogueBuilder<'a> {
     /// A node: the other character's line: a text, or a [`Line`] of
     /// segments, whose speech the dialogue's thing speaks.
     pub fn node(mut self, key: impl Into<String>, say: impl Into<Line>) -> Self {
-        self.dialogue().nodes.push(DialogueNode {
-            key: key.into(),
-            when: None,
-            say: say.into(),
-            outcomes: Outcomes::default(),
-            options: Vec::new(),
-        });
+        let node = DialogueNode::new(key, say.into());
+        self.dialogue().nodes.push(node);
         self
     }
 
@@ -95,12 +87,8 @@ impl<'a> DialogueBuilder<'a> {
     /// node key, `end` or `back`). The speech of the line is the player's.
     #[track_caller]
     pub fn option(mut self, say: impl Into<Line>, go: impl Into<String>) -> Self {
-        self.last_node().options.push(DialogueOption {
-            say: say.into(),
-            when: None,
-            outcomes: Outcomes::default(),
-            go: go.into(),
-        });
+        let option = DialogueOption::new(say.into(), DialogueTarget::parse(&go.into()));
+        self.last_node().options.push(option);
         self
     }
 
@@ -119,7 +107,8 @@ impl<'a> DialogueBuilder<'a> {
     /// `set:` a variable or property.
     #[track_caller]
     pub fn set(mut self, name: impl Into<String>, value: impl IntoValue) -> Self {
-        self.outcomes().set.insert(name.into(), value.into_value());
+        let value = value.into_value().into();
+        self.outcomes().set.insert(name.into(), value);
         self
     }
 
@@ -158,5 +147,14 @@ impl<'a> DialogueBuilder<'a> {
     }
 }
 
-replaceable!(DialogueBuilder, dialogues, "dialogue");
+impl DialogueBuilder<'_> {
+    /// This dialogue replaces the one with the same id from an earlier pack
+    /// (`replace: true` in YAML). [`assemble`](loremaster_project::assemble)
+    /// warns about it.
+    pub fn replace(self) -> Self {
+        let id = self.pack.dialogues[self.i].id.clone().unwrap_or_default();
+        crate::pack::replace(self.pack, format!("dialogue:{id}"));
+        self
+    }
+}
 with_notes!(DialogueBuilder, dialogues);

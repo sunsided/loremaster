@@ -9,7 +9,7 @@ use std::fmt;
 pub const PLAYER_SPEAKER: &str = "player";
 
 /// A text that shows: the `say:` of a rule effect, of a dialogue node or of an
-/// option. `line:` is the same key.
+/// option. `line:` is the same key, except in a dialogue (dramaturge's shape).
 ///
 /// A line is one string (narration), or a list of segments:
 ///

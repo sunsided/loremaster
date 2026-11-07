@@ -1,8 +1,8 @@
 use crate::merge::{Extension, MergeMode, extend_entity, merge_mode};
 use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
-    ClockConfig, Dialogue, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule, Story, Thing,
-    Thread, Timer, VarDef, VerbDef, Walkthrough,
+    ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule,
+    Story, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -281,9 +281,14 @@ impl Pack {
                     }
                 }
                 "dialogues" => {
-                    match serde_saphyr::from_str::<Dialogue>(&with_default_id(&file_text, stem)) {
+                    // An `id` in the file wins over the file stem.
+                    match serde_saphyr::from_str::<Dialogue>(&file_text) {
                         Ok(d) => {
-                            origins.insert(format!("dialogue:{}", d.id), Origin::yaml(path));
+                            let d = match d.id {
+                                Some(_) => d,
+                                None => d.with_id(stem),
+                            };
+                            origins.insert(format!("dialogue:{}", d.id_str()), Origin::yaml(path));
                             dialogues.push(d);
                         }
                         Err(e) => errors.push(parse_err(e)),
@@ -740,7 +745,7 @@ fn remove_entity(
         "room" => rooms.retain(|e| e.id.as_str() != id),
         "thing" => things.retain(|e| e.id.as_str() != id),
         "thread" => threads.retain(|e| e.id.as_str() != id),
-        "dialogue" => dialogues.retain(|e| e.id.as_str() != id),
+        "dialogue" => dialogues.retain(|e| e.id_str() != id),
         "ending" => endings.retain(|e| e.id.as_str() != id),
         "timer" => timers.retain(|e| e.id.as_str() != id),
         "verb" => verbs.retain(|e| e.id.as_str() != id),
@@ -766,10 +771,10 @@ fn extend_with(
     fn one<T: serde::Serialize + serde::de::DeserializeOwned>(
         list: &mut [T],
         id: &str,
-        id_of: fn(&T) -> &Id,
+        id_of: fn(&T) -> &str,
         fields: &serde_json::Value,
     ) -> Result<bool, String> {
-        match list.iter_mut().find(|e| id_of(e).as_str() == id) {
+        match list.iter_mut().find(|e| id_of(e) == id) {
             Some(e) => extend_entity(e, fields).map(|()| true),
             None => Ok(false),
         }
@@ -782,14 +787,14 @@ fn extend_with(
     }
     let f = &ext.fields;
     match kind {
-        "room" => one(rooms, id, |e| &e.id, f),
-        "thing" => one(things, id, |e| &e.id, f),
-        "thread" => one(threads, id, |e| &e.id, f),
-        "dialogue" => one(dialogues, id, |e| &e.id, f),
-        "ending" => one(endings, id, |e| &e.id, f),
-        "timer" => one(timers, id, |e| &e.id, f),
-        "verb" => one(verbs, id, |e| &e.id, f),
-        "machine" => one(machines, id, |e| &e.id, f),
+        "room" => one(rooms, id, |e| e.id.as_str(), f),
+        "thing" => one(things, id, |e| e.id.as_str(), f),
+        "thread" => one(threads, id, |e| e.id.as_str(), f),
+        "dialogue" => one(dialogues, id, |e| e.id_str(), f),
+        "ending" => one(endings, id, |e| e.id.as_str(), f),
+        "timer" => one(timers, id, |e| e.id.as_str(), f),
+        "verb" => one(verbs, id, |e| e.id.as_str(), f),
+        "machine" => one(machines, id, |e| e.id.as_str(), f),
         _ => Ok(false),
     }
 }
