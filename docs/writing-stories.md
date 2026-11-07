@@ -174,7 +174,7 @@ nodes:
   - `relation`: add to the relation of the player to the thing, for example `{ trust: 1 }`. Declare each relation in `relations` in `story.yaml`.
   - `remember`: memories that the thing keeps.
   - `then`: world effects, as in a rule: `move`, `goto`, `say`, `end`.
-- `say` is a [line](#lines-and-speech): a text, or a list of narration and speech. The speech of a node is spoken by the thing (`with`), the speech of an option by the player. In a dialogue the key is always `say`.
+- `say` is a [line](#lines-and-speech): a text, or a list of narration and speech. The speech of a node is spoken by the thing (`with`), or by the node's `speaker`; the speech of an option by the player. The key of a node's or an option's line is always `say`.
 
 Conditions can read the new values:
 
@@ -196,7 +196,7 @@ The shape of a dialogue is the one of dramaturge's `dramaturge-syntax` (decision
 
 ### Lines and speech
 
-A text that shows is a line: the `say` of a rule effect, of a dialogue node, of an option and of a machine step. `line:` is the same key as `say:` in rules and machine steps; a dialogue writes `say:` (its shape is the one of dramaturge, see below). A line is one text, which is narration:
+A text that shows is a line: the `say` of a rule effect, of a dialogue node, of an option and of a machine step. `line:` is the same key as `say:` in effects (of rules, timers and a dialogue's `then`) and in machine steps. The `say` of a dialogue node or option is always `say:`: the dialogue shape is the one of dramaturge (see above). A line is one text, which is narration:
 
 ```yaml
 say: "The lock-keeper shrugs."
