@@ -139,6 +139,119 @@ fn the_header_origin_names_the_file_that_gave_it() {
     );
 }
 
+/// A second YAML pack with one file.
+fn second(path: &str, text: &str) -> Pack {
+    Pack::from_files(vec![SourceFile {
+        path: path.into(),
+        text: text.into(),
+    }])
+    .unwrap()
+}
+
+#[test]
+fn replace_takes_the_place_of_the_earlier_entity_with_a_warning() {
+    let extra = second(
+        "rooms/shore.yaml",
+        "replace: true\nname: The Beach\ndescription: [\"Sand.\"]\nexits:\n  - { direction: north, to: cottage }\n",
+    );
+    assert!(extra.replaces.contains("room:shore"));
+    let project = assemble(vec![Pack::from_files(lighthouse()).unwrap(), extra]).unwrap();
+    let shore = project.story.room("shore").unwrap();
+    assert_eq!(shore.name, "The Beach");
+    assert_eq!(
+        project
+            .story
+            .rooms
+            .iter()
+            .filter(|r| r.id.as_str() == "shore")
+            .count(),
+        1
+    );
+    let warnings: Vec<_> = loremaster_project::check(&project)
+        .into_iter()
+        .filter(|d| d.message.contains("replaces"))
+        .map(|d| d.message)
+        .collect();
+    assert_eq!(
+        warnings,
+        ["`room:shore` replaces the one in rooms/shore.yaml"]
+    );
+}
+
+#[test]
+fn extend_adds_fragments_and_exits_to_the_earlier_entity() {
+    let extra = second(
+        "rooms/cottage.yaml",
+        "extend: true\ndescription: [\"A gull sits on the sill.\"]\n",
+    );
+    assert_eq!(extra.extensions.len(), 1);
+    let base = load(lighthouse()).unwrap();
+    let project = assemble(vec![Pack::from_files(lighthouse()).unwrap(), extra]).unwrap();
+    let before = base.story.room("cottage").unwrap().description.len();
+    let after = &project.story.room("cottage").unwrap().description;
+    assert_eq!(after.len(), before + 1);
+    assert_eq!(
+        project.story.room("cottage").unwrap().name,
+        base.story.room("cottage").unwrap().name
+    );
+}
+
+#[test]
+fn extend_and_replace_report_conflicts_and_missing_entities() {
+    let yaml = || Pack::from_files(lighthouse()).unwrap();
+    let conflict = second("rooms/cottage.yaml", "extend: true\nname: The Hut\n");
+    assert_eq!(
+        messages(assemble(vec![yaml(), conflict])),
+        ["`room:cottage` cannot be extended: both packs set `name`"]
+    );
+    let nowhere = second(
+        "rooms/attic.yaml",
+        "extend: true\ndescription: [\"Dust.\"]\n",
+    );
+    assert_eq!(
+        messages(assemble(vec![yaml(), nowhere])),
+        ["`room:attic` extends an entity that no earlier pack defines"]
+    );
+    let nothing = second("rooms/attic.yaml", "replace: true\nname: Attic\n");
+    assert_eq!(
+        messages(assemble(vec![yaml(), nothing])),
+        ["`room:attic` replaces an entity that no earlier pack defines"]
+    );
+}
+
+#[test]
+fn the_id_of_an_extension_comes_from_the_parsed_file() {
+    // Flow style: the id is not on a line of its own.
+    let extra = second(
+        "rooms/other_name.yaml",
+        "extend: true\n{ id: cottage, description: [\"A gull sits on the sill.\"] }\n",
+    );
+    assert_eq!(extra.extensions[0].key, "room:cottage");
+}
+
+#[test]
+fn replace_drops_the_nested_rules_of_the_replaced_file() {
+    // rooms/cellar.yaml with a nested rule, then a replacement without it.
+    let mut files = lighthouse();
+    files.push(SourceFile {
+        path: "rooms/cellar.yaml".into(),
+        text: "name: Cellar\nrules:\n  - id: cellar_drip\n    on: { enter: cellar }\n    then: [{ say: \"Drip.\" }]\n".into(),
+    });
+    let first = Pack::from_files(files).unwrap();
+    assert!(first.rules.iter().any(|r| r.id.as_str() == "cellar_drip"));
+    let extra = second("rooms/cellar.yaml", "replace: true\nname: Dry Cellar\n");
+    let project = assemble(vec![first, extra]).unwrap();
+    assert!(
+        !project
+            .story
+            .rules
+            .iter()
+            .any(|r| r.id.as_str() == "cellar_drip")
+    );
+    assert!(!project.origins.contains_key("rule:cellar_drip"));
+    assert_eq!(project.story.room("cellar").unwrap().name, "Dry Cellar");
+}
+
 #[test]
 fn the_model_hash_does_not_depend_on_the_order_of_files_or_packs() {
     use loremaster_project::model_hash;

@@ -575,6 +575,8 @@ The runtime finds the values in these locations:
 
 For a number, the runtime tries the values next to each limit in a condition. For example, `talked > 0` gives 0 and 1. The matrix renders not more than 256 combinations.
 
+A relation of the player to a thing, such as `blackbeard.trust`, is a number dimension too, from conditions and from inserts such as `{blackbeard.trust}`. A relation that no dialogue changed reads as 0. Memories (`remembers(thing, key)`) are not a dimension yet.
+
 The view shows each different text one time, with the combinations that give it. It marks these possible problems:
 
 - No room text.
