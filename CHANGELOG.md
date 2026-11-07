@@ -20,6 +20,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - The score (`score:` in story.yaml) and the `score` command.
 - Puzzle machines (`machines/`) with named states and steps, and Atlas › Machines in the editor.
 - Walkthrough tests (`tests/*.yaml`) and `loremaster test`.
+- Pending tests: `pending: { phase, needs }` in a walkthrough, `#[ignore = "pending: ..."]` in Rust, `task test:pending`, and a CI job that fails when a pending test passes.
 - Behaviors in Rust: the `Behavior` trait, `World::register`, and `behaviors:` in story.yaml or `behaviors/`.
 - `verbs/` for custom verbs in their own files.
 - Zork I: containers, scenery, the score and value of treasures from the importer; the lamp battery, the trophy case, the exorcism, the dam and the thief ported by hand. Read `docs/zork-fit-test.md`.
