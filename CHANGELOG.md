@@ -34,6 +34,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Changed
 
+- The turn log of a talk shows what a dialogue really changed, in the order of the changes, with the new values. Removed facts and forgotten memories get a line; a relation change of 0 and a fact outside the world scope do not.
 - The room matrix and the text matrix try the player's relations to things (`blackbeard.trust`) as a dimension.
 - One diagnostic form (XP-6): `Diagnostic` and `Severity` live in `loremaster-model` (`loremaster-project` re-exports them) and can be deserialized. A compile error becomes a `Diagnostic` with `Diagnostic::from(&error)`, and `Project::locate` gives it the file of its entity. The CLI, the web engine and the AI tools report compile errors with their file now.
 - **Breaking (library):** `Project::origins` maps to the `Origin` enum (`Yaml { path }`, `Rust { file, line, column, pack }`, non-exhaustive) instead of a path string. `Origin::file()` gives the path.

@@ -230,6 +230,7 @@ dependencies = [
 [[package]]
 name = "dramaturge-authoring"
 version = "0.3.0-alpha.1"
+source = "git+https://github.com/sunsided/dramaturge?branch=feature%2F0.3#b108f0584c9d7b6daac9750b4f8d3188907743f4"
 dependencies = [
  "dramaturge-model",
 ]
@@ -237,10 +238,12 @@ dependencies = [
 [[package]]
 name = "dramaturge-model"
 version = "0.3.0-alpha.1"
+source = "git+https://github.com/sunsided/dramaturge?branch=feature%2F0.3#b108f0584c9d7b6daac9750b4f8d3188907743f4"
 
 [[package]]
 name = "dramaturge-runtime"
 version = "0.3.0-alpha.1"
+source = "git+https://github.com/sunsided/dramaturge?branch=feature%2F0.3#b108f0584c9d7b6daac9750b4f8d3188907743f4"
 dependencies = [
  "dramaturge-model",
 ]
