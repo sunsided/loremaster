@@ -34,6 +34,7 @@ mod world;
 pub use behavior::{Behavior, Cx, Flow, Unstable};
 pub use events::{Event, Phase};
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
+pub use game::{ARRIVED, REFUSED};
 pub use game::{
     AtlasRoom, AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game,
     Inspect, MachineStepView, MachineView, MapLink, MapRoom, MapView, MarkupCheck, PartView,
@@ -46,7 +47,7 @@ pub use output::{Block, BlockKind, Choice, Link, LinkKind, LogEntry, Run, Source
 pub use parser::{Command, Preview};
 pub use save::{Restored, SAVE_FORMAT, SAVE_VERSION, Save, SaveError, StoryStamp};
 pub use session::{Effect, EndingInfo, Input, Loaded, Session, Status, Step};
-pub use state::{FragmentProgress, State, Talk};
+pub use state::{AwaitOptionInfo, AwaitRequest, Awaiting, FragmentProgress, State, Talk};
 pub use text::{SourcePiece, SourceRole};
 pub use threads::ThreadReach;
 pub use walkthrough::{Verdict, WalkResult, run_walkthrough};

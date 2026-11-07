@@ -29,6 +29,14 @@ Read [How to write a story](https://github.com/sunsided/loremaster/blob/main/doc
 
 In a git checkout, the editor is in the build only after `task release:ui`. To build without it, use `cargo build -p loremaster --no-default-features`. Then `loremaster serve` tells you to use the hosted editor at <https://sunsided.github.io/loremaster/>.
 
+## Stories in Rust
+
+With the cargo feature `builder`, the crate is also a library: `loremaster::prelude` gives the builder API of `loremaster-dsl`. Write a story in plain Rust, join it with YAML folders, and build the world:
+
+```toml
+loremaster = { version = "0.1", default-features = false, features = ["builder"] }
+```
+
 ## License
 
 EUPL-1.2. Read [LICENSE](LICENSE).

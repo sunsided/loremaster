@@ -193,6 +193,22 @@ fn frames_and_rules_are_not_notices() {
 }
 
 #[test]
+fn a_relation_change_is_a_notice() {
+    let mut s = Session::new(world("cantina"));
+    s.start();
+    s.submit(text("in"));
+    s.submit(text("talk to figure"));
+    // "Who are you?" goes to `names`, which adds trust.
+    let step = s.choose(0);
+    assert!(
+        step.effects
+            .iter()
+            .any(|e| matches!(e, Effect::Notice { entry } if entry.kind == "relation")),
+        "{step:?}"
+    );
+}
+
+#[test]
 fn a_second_start_starts_nothing() {
     let mut s = Session::new(world("lighthouse"));
     s.start();
