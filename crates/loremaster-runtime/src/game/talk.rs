@@ -12,7 +12,11 @@ use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
 use crate::world::CDialogue;
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
-use dramaturge_model::{DialogTarget, DialogueNodeId, DialogueOption, FactValue, Outcome};
+use dramaturge_model::{
+    AlignmentAxisId, AlignmentPoleId, DialogTagKind, DialogTarget, DialogueNodeId, DialogueOption,
+    EntityId, EventKind, Fact, FactId, FactScope, FactValue, Memory, MemoryId, MemoryQuery,
+    Outcome, RelationshipAxisId,
+};
 use dramaturge_runtime::{
     ConditionEvaluator, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
     DefaultRuntime, DialogueRuntime, NarrativeState, OutcomeApplier,
@@ -20,6 +24,7 @@ use dramaturge_runtime::{
 use loremaster_lang::{ADD_KEY, THEN_KEY};
 use loremaster_model::{Id, Layer, Value};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::sync::Arc;
 
 /// Answers derived values (`time.phase`, `here`, ...) in dialogue conditions.
@@ -32,19 +37,153 @@ impl CustomHandler<Game> for DerivedValues {
     }
 }
 
+impl CustomHandler<Turned<'_>> for DerivedValues {
+    fn condition(&self, key: &str, args: &[FactValue], state: &Turned<'_>) -> bool {
+        state.game.eval().custom(key, args)
+    }
+}
+
+/// The game during one turn of a talk: dramaturge applies outcomes to it.
+/// Each read goes to the game. Each change goes to the game too, and the turn
+/// log gets a line with the new value, in the order of the changes. A change
+/// that stores nothing (a 0 delta, a fact outside the world scope) gets no line.
+struct Turned<'a> {
+    game: &'a mut Game,
+    turn: &'a mut Turn,
+}
+
+impl Turned<'_> {
+    fn log(&mut self, kind: &str, text: String) {
+        self.turn.log.push(LogEntry {
+            kind: kind.into(),
+            text,
+        });
+    }
+}
+
+impl NarrativeState for Turned<'_> {
+    fn fact(&self, scope: &FactScope, id: &FactId) -> Option<Cow<'_, FactValue>> {
+        NarrativeState::fact(&*self.game, scope, id)
+    }
+
+    fn set_fact(&mut self, scope: FactScope, fact: Fact) {
+        let stored = scope == FactScope::World;
+        let line = match &fact.value {
+            FactValue::Bool(b) => Some(Value::Bool(*b)),
+            FactValue::Int(i) => Some(Value::Int(*i)),
+            FactValue::Text(t) => Some(Value::Text(t.clone())),
+            _ => None,
+        }
+        .map(|value| format!("{} = {value}", fact.id.0));
+        NarrativeState::set_fact(&mut *self.game, scope, fact);
+        if stored && let Some(line) = line {
+            self.log("set", line);
+        }
+    }
+
+    fn remove_fact(&mut self, scope: &FactScope, id: &FactId) -> bool {
+        let removed = NarrativeState::remove_fact(&mut *self.game, scope, id);
+        if removed {
+            self.log("set", format!("{} removed", id.0));
+        }
+        removed
+    }
+
+    fn alignment(&self, axis: &AlignmentAxisId, pole: &AlignmentPoleId) -> Option<i32> {
+        NarrativeState::alignment(&*self.game, axis, pole)
+    }
+
+    fn add_alignment(&mut self, axis: AlignmentAxisId, pole: AlignmentPoleId, delta: i32) {
+        NarrativeState::add_alignment(&mut *self.game, axis, pole, delta);
+    }
+
+    fn relationship(
+        &self,
+        source: EntityId,
+        target: EntityId,
+        axis: &RelationshipAxisId,
+    ) -> Option<i32> {
+        NarrativeState::relationship(&*self.game, source, target, axis)
+    }
+
+    fn add_relationship(
+        &mut self,
+        source: EntityId,
+        target: EntityId,
+        axis: RelationshipAxisId,
+        delta: i32,
+    ) {
+        NarrativeState::add_relationship(&mut *self.game, source, target, axis.clone(), delta);
+        if delta == 0 {
+            return;
+        }
+        let Some(thing) = self
+            .game
+            .world
+            .symbols
+            .entity_key(target)
+            .map(str::to_string)
+        else {
+            return;
+        };
+        let value = NarrativeState::relationship(&*self.game, source, target, &axis).unwrap_or(0);
+        self.log(
+            "relation",
+            format!("{thing}.{} {delta:+} = {value}", axis.0),
+        );
+    }
+
+    fn add_memory(&mut self, owner: EntityId, memory: Memory) {
+        let symbols = &self.game.world.symbols;
+        let line = symbols
+            .entity_key(owner)
+            .zip(symbols.memory_key(memory.id))
+            .map(|(thing, key)| format!("{thing} remembers {key}"));
+        NarrativeState::add_memory(&mut *self.game, owner, memory);
+        if let Some(line) = line {
+            self.log("memory", line);
+        }
+    }
+
+    fn remove_memory(&mut self, owner: EntityId, id: MemoryId) -> bool {
+        let symbols = &self.game.world.symbols;
+        let line = symbols
+            .entity_key(owner)
+            .zip(symbols.memory_key(id))
+            .map(|(thing, key)| format!("{thing} forgets {key}"));
+        let removed = NarrativeState::remove_memory(&mut *self.game, owner, id);
+        if removed && let Some(line) = line {
+            self.log("memory", line);
+        }
+        removed
+    }
+
+    fn matches_memory_query(&self, owner: EntityId, query: &MemoryQuery) -> bool {
+        NarrativeState::matches_memory_query(&*self.game, owner, query)
+    }
+
+    fn has_tag_available(&self, tag: &DialogTagKind) -> bool {
+        NarrativeState::has_tag_available(&*self.game, tag)
+    }
+
+    fn emit_event(&mut self, kind: EventKind) {
+        NarrativeState::emit_event(&mut *self.game, kind);
+    }
+}
+
 /// Applies the outcomes that dramaturge can not: `add`, and the world effects
-/// of `then`. They write into the turn, so the handler holds it.
-struct WorldEffects<'t> {
-    turn: &'t mut Turn,
+/// of `then`. They write into the turn of the [`Turned`] state.
+struct WorldEffects {
     dialogue: Arc<CDialogue>,
 }
 
-impl CustomHandler<Game> for WorldEffects<'_> {
-    fn outcome(&mut self, key: &str, args: &[FactValue], game: &mut Game) {
+impl CustomHandler<Turned<'_>> for WorldEffects {
+    fn outcome(&mut self, key: &str, args: &[FactValue], state: &mut Turned<'_>) {
+        let Turned { game, turn } = state;
         match (key, args) {
             (ADD_KEY, [FactValue::Text(name), FactValue::Int(n)]) => {
                 let now = game.state.facts.get(name).and_then(Value::as_int);
-                game.set_fact(self.turn, name, Value::Int(now.unwrap_or(0) + n));
+                game.set_fact(turn, name, Value::Int(now.unwrap_or(0) + n));
             }
             (THEN_KEY, [FactValue::Int(i)]) => {
                 let owner = Id::new(format!("dialogue:{}", self.dialogue.id));
@@ -55,7 +194,7 @@ impl CustomHandler<Game> for WorldEffects<'_> {
                     return;
                 };
                 for effect in effects {
-                    game.apply(self.turn, &owner, effect, 1);
+                    game.apply(turn, &owner, effect, 1);
                 }
             }
             _ => {}
@@ -247,65 +386,14 @@ impl Game {
             .and_then(|n| n.when.clone())
     }
 
-    /// Apply outcomes through dramaturge, then log what they changed.
+    /// Apply outcomes through dramaturge. The [`Turned`] state logs each change.
     fn apply_outcomes(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, outcomes: &[Outcome]) {
         let mut applier = DefaultOutcomeApplier::with_custom(WorldEffects {
-            turn,
             dialogue: d.clone(),
         });
+        let mut state = Turned { game: self, turn };
         for o in outcomes {
-            applier.apply(o, self);
-        }
-        self.log_outcomes(turn, outcomes);
-    }
-
-    /// Log the facts, relations and memories that outcomes changed, with
-    /// their new values. dramaturge already wrote them into the save state.
-    fn log_outcomes(&self, turn: &mut Turn, outcomes: &[Outcome]) {
-        let symbols = &self.world.symbols;
-        for o in outcomes {
-            match o {
-                Outcome::SetFact { fact, .. } => {
-                    let value = match &fact.value {
-                        FactValue::Bool(b) => Value::Bool(*b),
-                        FactValue::Int(i) => Value::Int(*i),
-                        FactValue::Text(t) => Value::Text(t.clone()),
-                        _ => continue,
-                    };
-                    turn.log.push(LogEntry {
-                        kind: "set".into(),
-                        text: format!("{} = {value}", fact.id.0),
-                    });
-                }
-                Outcome::AddRelationship {
-                    source,
-                    target,
-                    axis,
-                    delta,
-                } => {
-                    let Some(thing) = symbols.entity_key(*target) else {
-                        continue;
-                    };
-                    let value = self.relationship(*source, *target, axis).unwrap_or(0);
-                    let key = format!("{thing}.{}", axis.0);
-                    turn.log.push(LogEntry {
-                        kind: "relation".into(),
-                        text: format!("{key} {delta:+} = {value}"),
-                    });
-                }
-                Outcome::AddMemory { owner, memory } => {
-                    let (Some(thing), Some(key)) =
-                        (symbols.entity_key(*owner), symbols.memory_key(memory.id))
-                    else {
-                        continue;
-                    };
-                    turn.log.push(LogEntry {
-                        kind: "memory".into(),
-                        text: format!("{thing} remembers {key}"),
-                    });
-                }
-                _ => {}
-            }
+            applier.apply(o, &mut state);
         }
     }
 
@@ -338,13 +426,10 @@ impl Game {
         let mut runtime = DefaultRuntime::with_parts(
             evaluator(),
             DefaultOutcomeApplier::with_custom(WorldEffects {
-                turn,
                 dialogue: d.clone(),
             }),
         );
-        let target = runtime.choose_option(&option, self);
-        drop(runtime);
-        self.log_outcomes(turn, &option.outcomes);
+        let target = runtime.choose_option(&option, &mut Turned { game: self, turn });
         // A world effect can end the story or take the player away.
         let with = d.with.clone();
         let here = self.eval().present(with.as_str());
