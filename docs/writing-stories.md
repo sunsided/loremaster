@@ -640,6 +640,16 @@ expect:
 
 A pending walkthrough must fail. `loremaster test` shows it as `pend` and does not count it as a failure. When it passes, `loremaster test` and the Rust tests fail with "passes, but is marked pending". Then remove the `pending:` line.
 
+## Save games
+
+A save game keeps the state of a game, together with the version of its format and a fingerprint of the story. You can change your story, and a player's old save still loads:
+
+- Values that the story still has keep their saved value. New variables, things and timers start as at the start of a game.
+- Values that the story no longer has are dropped. The restore lists them, for example `fact:lamp.lit` or `thing:key`.
+- A save of another story, or of a newer loremaster, does not load. The message says why.
+
+Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
+
 ## Write in the game
 
 You can change the story while you play it. The game keeps its state after each change.

@@ -6,7 +6,7 @@
 //! `task test:pending`. Read `examples/lock-keeper-slice/PENDING.md`.
 
 use loremaster_project::{Project, Severity, SourceFile, check, load, read_dir};
-use loremaster_runtime::{Game, State, WalkResult, World, run_walkthrough};
+use loremaster_runtime::{Game, WalkResult, World, run_walkthrough};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -128,7 +128,6 @@ fn slice_endings() {
 }
 
 #[test]
-#[ignore = "pending: phase 1, SE, D5, P1-04 #45"]
 fn slice_save_envelope() {
     // A save from the middle of slice_best: the pages are taken.
     let project = project(with("yaml", &[]));
@@ -148,15 +147,16 @@ fn slice_save_envelope() {
     ] {
         game.input(command);
     }
-    let save = serde_json::to_value(game.state()).unwrap();
+    let save = serde_json::to_value(game.save()).unwrap();
     assert_eq!(
         save["format"], "loremaster-save",
         "no save envelope: {save:#}"
     );
     assert!(save["version"].is_u64(), "no save version: {save:#}");
 
-    let state: State = serde_json::from_value(save["state"].clone()).unwrap();
-    let mut game = Game::restore(world, state);
+    let restored = Game::load_save(world, save).unwrap();
+    assert!(!restored.story_changed);
+    let mut game = restored.game;
     game.input("w");
     let text = game.input("accuse keeper").plain_text();
     assert!(text.contains("Committed for trial"), "{text}");

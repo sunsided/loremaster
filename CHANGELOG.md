@@ -20,6 +20,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - The score (`score:` in story.yaml) and the `score` command.
 - Puzzle machines (`machines/`) with named states and steps, and Atlas › Machines in the editor.
 - Walkthrough tests (`tests/*.yaml`) and `loremaster test`.
+- Save games are an envelope with a format version, the story id, a hash of the story and the state. A restore migrates older saves (also the bare state of 0.1), refuses a newer version or another story with a message, and keeps the valid state of a changed story with a list of what it dropped. Read `docs/adr/0001-save-compatibility.md`.
 - Endings as entities (`endings/`): a kind (`win`, `loss`, `death`, `neutral`), a rank, a title and a text. The save game keeps the ending, `expect: { ending: … }` checks it in a walkthrough, and `loremaster check` reports unknown and unused endings.
 - Pending tests: `pending: { phase, needs }` in a walkthrough, `#[ignore = "pending: ..."]` in Rust, `task test:pending`, and a CI job that fails when a pending test passes.
 - The golden slice `examples/lock-keeper-slice`: a part of the Lock-Keeper demo in YAML, with `slice_baseline` and eleven pending tests for the roadmap phases 1 to 4. Read its `PENDING.md`.
@@ -30,8 +31,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Changed
 
+- `Game::save` and `Game::load_save` read and write save games. The web engine's `save()` and `restore()` and the AI tools `save` and `session_start` use the envelope; `restore()` returns the dropped ids.
 - **Breaking:** the `end` effect names an ending from `endings/` (`end: beacon_lit`) instead of a text. Move the text into `endings/<id>.yaml` with a `kind` and a `title`. The lighthouse and the tower examples show it.
-
 - `carried(x)` is also true for a thing in a carried container.
 - The ZIL importer writes containers, surfaces and local-global scenery, and reads `machines/` and `timers/` for the flags that they use.
 

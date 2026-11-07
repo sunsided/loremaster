@@ -3,7 +3,7 @@
 //! shaped like the runtime's serde types.
 
 use loremaster_project::{Diagnostic, Severity, SourceFile, check, load};
-use loremaster_runtime::{AuthorCommand, Budget, Command, Game, State, World};
+use loremaster_runtime::{AuthorCommand, Budget, Command, Game, World};
 use serde::Serialize;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -359,14 +359,22 @@ impl Engine {
         to_js(&self.game.describe_preview())
     }
 
+    /// The game as a save: an envelope with the format version, the story and the state.
     pub fn save(&self) -> Result<JsValue, JsValue> {
-        to_js(self.game.state())
+        to_js(&self.game.save())
     }
 
-    pub fn restore(&mut self, state: JsValue) -> Result<(), JsValue> {
-        let state: State = from_js(state)?;
-        self.game = Game::restore(self.world.clone(), state);
-        Ok(())
+    /// Restore a save, also an older version or one of an earlier version of the
+    /// story. Returns `{ storyChanged, dropped }`: the ids that the story no longer has.
+    pub fn restore(&mut self, save: JsValue) -> Result<JsValue, JsValue> {
+        let save: serde_json::Value = from_js(save)?;
+        let restored = Game::load_save(self.world.clone(), save)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.game = restored.game;
+        to_js(&serde_json::json!({
+            "storyChanged": restored.story_changed,
+            "dropped": restored.dropped,
+        }))
     }
 
     /// Start over from the beginning.

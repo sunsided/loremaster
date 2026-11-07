@@ -3,7 +3,7 @@
 use crate::{Args, ToolResult, Workspace, err, json};
 use loremaster_model::{Effect, Layer, Location};
 use loremaster_project::SourceFile;
-use loremaster_runtime::{AuthorCommand, Budget, Command, Game, State, Turn};
+use loremaster_runtime::{AuthorCommand, Budget, Command, Game, Turn};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -305,7 +305,7 @@ pub fn tools() -> Vec<ToolDef> {
         ),
         def(
             "save",
-            "The state of the session, to give back to `session_start` later.",
+            "The session as a save game (an envelope with the format version, the story and the state), to give back to `session_start` later.",
             session_only(),
             true,
         ),
@@ -373,13 +373,16 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
                 Some(id) => ws.proposal_world(id)?,
                 None => ws.world()?.clone(),
             };
-            let state: Option<State> = a.opt_value("state")?;
+            let save: Option<serde_json::Value> = a.opt_value("state")?;
             let name = a.session().to_string();
-            let (game, opening) = match state {
-                Some(state) => {
-                    let game = Game::restore(world, state);
-                    let text = game.describe_preview().plain_text();
-                    (game, text)
+            let mut dropped = Vec::new();
+            let (game, opening) = match save {
+                Some(save) => {
+                    let restored = Game::load_save(world, save)
+                        .map_err(|e| crate::ToolError(e.to_string()))?;
+                    dropped = restored.dropped;
+                    let text = restored.game.describe_preview().plain_text();
+                    (restored.game, text)
                 }
                 None => {
                     let mut game = Game::new(world);
@@ -389,7 +392,9 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
             };
             ws.sessions.insert(name.clone(), game);
             let game = ws.session(&name)?;
-            Ok(json!({ "session": name, "text": opening, "scene": brief(game) }))
+            Ok(
+                json!({ "session": name, "text": opening, "scene": brief(game), "dropped": dropped }),
+            )
         }
         "input" => {
             let text = a.str("text")?;
@@ -453,7 +458,7 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
         "rules" => json(&ws.session(a.session())?.rules()),
         "verbs" => json(&ws.session(a.session())?.verbs()),
         "map" => json(&ws.session(a.session())?.map()),
-        "save" => json(ws.session(a.session())?.state()),
+        "save" => json(&ws.session(a.session())?.save()),
         _ => Err(err(format!("There is no tool `{name}`."))),
     }
 }
