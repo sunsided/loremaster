@@ -528,7 +528,7 @@ impl Checker<'_> {
             let validator = GraphValidator::with_options(
                 ValidationOptions::new().skip(ValidationIssueKind::Cycle),
             );
-            for issue in validator.validate_with_symbols(&compiled.graph, &symbols) {
+            for issue in validator.validate_with_symbols(&compiled, &symbols) {
                 // By design here: facts are set by rules too (Info).
                 if issue.severity == ValidationSeverity::Info {
                     continue;

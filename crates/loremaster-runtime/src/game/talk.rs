@@ -10,10 +10,10 @@
 use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
-use crate::world::{CDialogue, CEffect};
+use crate::world::{CDialogue, CEffect, COption};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
 use dramaturge_model::{
-    AlignmentAxisId, AlignmentPoleId, DialogTagKind, DialogTarget, DialogueNodeId, DialogueOption,
+    AlignmentAxisId, AlignmentPoleId, DialogTagKind, DialogTarget, DialogText, DialogueNodeId,
     EntityId, EventKind, Fact, FactId, FactScope, FactValue, Memory, MemoryId, MemoryQuery,
     Outcome, RelationshipAxisId,
 };
@@ -21,6 +21,7 @@ use dramaturge_runtime::{
     AvailableOptionsIter, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
     DefaultRuntime, DialogueRuntime, HostHandler, NarrativeState, OutcomeApplier, select_entry,
 };
+use loremaster_lang::Segment;
 use loremaster_model::{Id, Layer, Value};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -248,7 +249,7 @@ impl Game {
     }
 
     /// The options the player can choose now.
-    fn available(&self) -> Vec<DialogueOption<Arc<[CEffect]>>> {
+    fn available(&self) -> Vec<COption> {
         let Some(talk) = &self.state.talk else {
             return Vec::new();
         };
@@ -270,24 +271,12 @@ impl Game {
         if self.state.awaiting.is_some() {
             return self.await_choices();
         }
-        let Some(d) = self
-            .state
-            .talk
-            .as_ref()
-            .and_then(|t| self.world.dialogue(t.dialogue.as_str()))
-        else {
-            return Vec::new();
-        };
         self.available()
             .iter()
             .enumerate()
             .map(|(index, o)| Choice {
                 index,
-                text: d
-                    .option_say
-                    .get(&o.id)
-                    .map(|s| self.render(s))
-                    .unwrap_or_default(),
+                text: self.line(&o.text),
             })
             .collect()
     }
@@ -332,28 +321,25 @@ impl Game {
     /// Show a node's line and, the first time, apply its outcomes. A node
     /// with no option to choose ends the talk.
     fn enter(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, id: DialogueNodeId, outcomes: bool) {
-        let Some(node) = d.node(id).cloned() else {
+        let Some(node) = d.node(id) else {
             self.end_talk();
             return;
         };
         let key = d.key_of(id).unwrap_or_default().to_string();
-        if let Some(say) = d.node_say.get(&id) {
-            let text = self.render(say);
-            turn.push(
-                BlockKind::Speech,
-                vec![Run {
-                    text,
-                    source: Some(Source {
-                        owner: format!("dialogue:{}", d.id),
-                        fragment: d.keys.iter().position(|k| *k == key).unwrap_or(0),
-                        layer: Layer::Characters,
-                        condition: self.node_when(d, &key),
-                        variant: 0,
-                    }),
-                    link: None,
-                }],
-            );
-        }
+        turn.push(
+            BlockKind::Speech,
+            vec![Run {
+                text: self.line(&node.text),
+                source: Some(Source {
+                    owner: format!("dialogue:{}", d.id),
+                    fragment: d.keys.iter().position(|k| *k == key).unwrap_or(0),
+                    layer: Layer::Characters,
+                    condition: self.node_when(d, &key),
+                    variant: 0,
+                }),
+                link: None,
+            }],
+        );
         if outcomes {
             self.apply_outcomes(turn, d, &node.outcomes_on_enter);
             // World rules hear about the node, after its outcomes.
@@ -394,6 +380,11 @@ impl Game {
         }
     }
 
+    /// A line of the dialogue: its markup, rendered now.
+    fn line(&self, text: &DialogText<Vec<Segment>>) -> String {
+        text.as_host().map(|s| self.render(s)).unwrap_or_default()
+    }
+
     pub(super) fn end_talk(&mut self) {
         self.state.talk = None;
     }
@@ -410,11 +401,7 @@ impl Game {
             self.end_talk();
             return;
         };
-        let line = d
-            .option_say
-            .get(&option.id)
-            .map(|s| self.render(s))
-            .unwrap_or_default();
+        let line = self.line(&option.text);
         turn.push(
             BlockKind::Said,
             vec![rule_run(line, &Id::new(format!("dialogue:{}", d.id)))],

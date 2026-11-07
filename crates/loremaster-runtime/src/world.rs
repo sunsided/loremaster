@@ -1,4 +1,4 @@
-use dramaturge_model::{Condition, DialogueGraph, DialogueNodeId, DialogueOptionId, SymbolTable};
+use dramaturge_model::{Condition, DialogueGraph, DialogueNodeId, SymbolTable};
 use loremaster_lang::{
     LangError, Scope, Segment, compile_condition, compile_dialogue, compile_markup,
 };
@@ -126,10 +126,9 @@ pub(crate) struct CTimer {
 pub(crate) struct CDialogue {
     pub id: Id,
     pub with: Id,
-    /// The graph; a `then` list is a host outcome with the compiled effects.
-    pub graph: DialogueGraph<Arc<[CEffect]>>,
-    pub node_say: BTreeMap<DialogueNodeId, Vec<Segment>>,
-    pub option_say: BTreeMap<DialogueOptionId, Vec<Segment>>,
+    /// The graph; a `then` list is a host outcome with the compiled effects,
+    /// and a line is host text, the compiled markup.
+    pub graph: DialogueGraph<Arc<[CEffect]>, Vec<Segment>>,
     /// The node keys, in the order of the graph's nodes.
     pub keys: Vec<String>,
 }
@@ -151,7 +150,10 @@ impl CDialogue {
 }
 
 /// A dialogue node with its compiled `then` lists.
-pub(crate) type CNode = dramaturge_model::DialogueNode<Arc<[CEffect]>>;
+pub(crate) type CNode = dramaturge_model::DialogueNode<Arc<[CEffect]>, Vec<Segment>>;
+
+/// A dialogue option with its compiled `then` list and line.
+pub(crate) type COption = dramaturge_model::DialogueOption<Arc<[CEffect]>, Vec<Segment>>;
 
 #[derive(Debug, Clone)]
 pub(crate) enum CEffect {
@@ -456,13 +458,13 @@ impl World {
             .iter()
             .map(|d| {
                 let owner = format!("dialogue:{}", d.id);
-                let compiled =
+                let lowered =
                     compile_dialogue(d, &c.scope, &mut symbols).map_err(|e| CompileError {
                         at: format!("{owner}/{}", e.at),
                         error: e.error,
                     })?;
                 let mut failed = None;
-                let graph = compiled.graph.map_host(|then| {
+                let graph = lowered.map_host(|then| {
                     then.iter()
                         .map(|e| c.effect(&owner, e))
                         .collect::<Result<_, _>>()
@@ -478,8 +480,6 @@ impl World {
                     id: d.id.clone(),
                     with: d.with.clone(),
                     graph,
-                    node_say: compiled.node_say,
-                    option_say: compiled.option_say,
                     keys: d.nodes.iter().map(|n| n.key.clone()).collect(),
                 }))
             })

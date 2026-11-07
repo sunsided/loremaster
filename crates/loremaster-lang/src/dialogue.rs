@@ -2,26 +2,18 @@ use crate::lower::resolve;
 use crate::{LangError, Operand, Scope, Segment, compile_condition, compile_markup, parse_expr};
 use dramaturge_model::{
     CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
-    DialogueOption, DialogueOptionId, Fact, FactId, FactScope, FactValue, Memory, Outcome,
-    RelationshipAxisId, SymbolTable,
+    DialogueOption, Fact, FactId, FactScope, FactValue, Memory, Outcome, RelationshipAxisId,
+    SymbolTable,
 };
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
-use std::collections::BTreeMap;
 
 /// A dialogue lowered to a dramaturge graph.
 ///
-/// dramaturge holds the structure, the conditions and the outcomes. A `then`
-/// list is a host outcome ([`Outcome::Host`]) that the runtime applies. The text
-/// stays loremaster markup: the graph holds the source as
-/// [`DialogText::Inline`], and `node_say` / `option_say` hold the compiled
-/// markup that the runtime renders.
-#[derive(Debug, Clone)]
-pub struct CompiledDialogue {
-    /// The start nodes are its entry nodes, in order.
-    pub graph: DialogueGraph<Vec<Effect>>,
-    pub node_say: BTreeMap<DialogueNodeId, Vec<Segment>>,
-    pub option_say: BTreeMap<DialogueOptionId, Vec<Segment>>,
-}
+/// dramaturge holds the structure, the conditions and the outcomes. The start
+/// nodes are the entry nodes, in order. A `then` list is a host outcome
+/// ([`Outcome::Host`]) that the runtime applies. A line is host text
+/// ([`DialogText::Host`]): the compiled markup that the runtime renders.
+pub type CompiledDialogue = DialogueGraph<Vec<Effect>, Vec<Segment>>;
 
 /// A problem in a dialogue, with the place it was found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,11 +59,7 @@ pub fn compile_dialogue(
         ));
     };
     let speaker = CharacterId::new(with);
-    let mut out = CompiledDialogue {
-        graph: DialogueGraph::typed(),
-        node_say: BTreeMap::new(),
-        option_say: BTreeMap::new(),
-    };
+    let mut out = CompiledDialogue::typed();
     let ids: Vec<DialogueNodeId> = d
         .nodes
         .iter()
@@ -80,17 +68,7 @@ pub fn compile_dialogue(
     for (n, &id) in d.nodes.iter().zip(&ids) {
         let at = format!("nodes.{}", n.key);
         let say = compile_markup(&n.say, scope).map_err(|e| fail(at.clone(), &n.say, e))?;
-        out.node_say.insert(id, say);
-        let mut node = DialogueNode {
-            id,
-            speaker,
-            text: DialogText::Inline(n.say.clone()),
-            conditions: Vec::new(),
-            outcomes_on_enter: Vec::new(),
-            options: Vec::new(),
-            lines: Vec::new(),
-            next: None,
-        };
+        let mut node = DialogueNode::typed(id.0, speaker, DialogText::Host(say));
         if let Some(when) = &n.when {
             node.conditions.push(
                 compile_condition(when, scope).map_err(|e| fail(format!("{at}.when"), when, e))?,
@@ -102,14 +80,12 @@ pub fn compile_dialogue(
             let at = format!("{at}.options[{i}]");
             let oid = symbols.intern_option(&option_key(d.id.as_str(), &n.key, i));
             let say = compile_markup(&o.say, scope).map_err(|e| fail(at.clone(), &o.say, e))?;
-            out.option_say.insert(oid, say);
             let target = match o.go.as_str() {
                 "end" => DialogTarget::End,
                 "back" => DialogTarget::Return,
                 key => DialogTarget::Node(symbols.intern_node(&node_key(d.id.as_str(), key))),
             };
-            let mut option =
-                DialogueOption::typed(oid.0, DialogText::Inline(o.say.clone()), target, id);
+            let mut option = DialogueOption::typed(oid.0, DialogText::Host(say), target, id);
             if let Some(when) = &o.when {
                 option.conditions.push(
                     compile_condition(when, scope)
@@ -120,11 +96,11 @@ pub fn compile_dialogue(
                 .map_err(|(source, e)| fail(at.clone(), &source, e))?;
             node.options.push(option);
         }
-        out.graph.nodes.push(node);
+        out.nodes.push(node);
     }
     for (i, key) in d.start.iter().enumerate() {
         match d.nodes.iter().position(|n| &n.key == key) {
-            Some(index) => out.graph.entry_nodes.push(ids[index]),
+            Some(index) => out.entry_nodes.push(ids[index]),
             None => {
                 return Err(fail(
                     format!("start[{i}]"),
@@ -259,12 +235,14 @@ mod tests {
         let scope = Scope::from_story(&story);
         let mut symbols = scope.symbols.clone();
         let c = compile_dialogue(&story.dialogues[0], &scope, &mut symbols).unwrap();
-        check!(c.graph.nodes.len() == 3);
+        check!(c.nodes.len() == 3);
         // The start nodes, in order: again, meet.
-        check!(c.graph.entry_nodes == [c.graph.nodes[0].id, c.graph.nodes[1].id]);
+        check!(c.entry_nodes == [c.nodes[0].id, c.nodes[1].id]);
         // serde_json sorts map keys: again, meet, names.
-        let meet = &c.graph.nodes[1];
-        check!(meet.options[0].target == DialogTarget::Node(c.graph.nodes[2].id));
+        let meet = &c.nodes[1];
+        check!(meet.options[0].target == DialogTarget::Node(c.nodes[2].id));
+        // The lines are compiled markup in the graph.
+        check!(meet.text == DialogText::Host(vec![Segment::Text("Sit.".into())]));
         check!(meet.options[1].target == DialogTarget::Return);
         check!(meet.options[2].target == DialogTarget::End);
         assert!(let [Outcome::AddRelationship { delta: 1, .. }] = meet.options[0].outcomes.as_slice());
@@ -272,7 +250,7 @@ mod tests {
             meet.options[1].conditions[0],
             Condition::RelationshipAtLeast { value: 1, .. }
         ));
-        let names = &c.graph.nodes[2];
+        let names = &c.nodes[2];
         check!(matches!(
             names.outcomes_on_enter[0],
             Outcome::SetFact { .. }
@@ -285,7 +263,7 @@ mod tests {
             matches!(&names.outcomes_on_enter[2], Outcome::Host(then) if matches!(then.as_slice(), [Effect::Goto(room)] if room.as_str() == "bar"))
         );
         check!(matches!(
-            c.graph.nodes[0].conditions[0],
+            c.nodes[0].conditions[0],
             Condition::HasMemory { .. }
         ));
         check!(symbols.node_key(names.id) == Some("bb/names"));
