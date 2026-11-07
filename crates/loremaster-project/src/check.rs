@@ -406,11 +406,14 @@ impl Checker<'_> {
 
     /// Variables, machines, rooms and things must not take a built-in name
     /// of conditions, such as `here` or `turns`: conditions would read the
-    /// built-in instead (P2-12).
+    /// built-in instead (P2-12). A variable or machine must not take the name
+    /// of a phase of the story's clock either: it would hide the phase.
     fn reserved_names(&mut self) {
         let story = self.story().clone();
+        let phases = story.clock.phase_names();
         for v in &story.vars {
-            if !loremaster_lang::is_reserved(v.id.as_str()) {
+            let phase = phases.contains(&v.id.as_str());
+            if !phase && !loremaster_lang::is_reserved(v.id.as_str()) {
                 continue;
             }
             let (file, at, kind) = if story.machines.iter().any(|m| m.id == v.id) {
@@ -424,7 +427,20 @@ impl Checker<'_> {
             } else {
                 (self.file_of("story"), format!("vars.{}", v.id), "variable")
             };
-            self.reserved(&file, &at, kind, v.id.as_str());
+            if phase {
+                // A bare phase name tests the time of day only while no
+                // variable has that name (`lower_bool` in loremaster-lang).
+                self.error(
+                    &file,
+                    &at,
+                    format!(
+                        "the {kind} `{}` has the name of a phase of the clock, so conditions would read it instead of the phase; choose another id",
+                        v.id
+                    ),
+                );
+            } else {
+                self.reserved(&file, &at, kind, v.id.as_str());
+            }
         }
         for r in &story.rooms {
             if loremaster_lang::is_reserved(r.id.as_str()) {

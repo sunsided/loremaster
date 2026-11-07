@@ -97,6 +97,47 @@ fn a_variable_or_machine_with_a_reserved_name_is_an_error_at_its_declaration() {
 }
 
 #[test]
+fn a_variable_or_machine_with_a_phase_name_is_an_error() {
+    // A bare `dusk` tests the phase only while no variable is named `dusk`.
+    let mut files = lighthouse();
+    let story = files.iter_mut().find(|f| f.path == "story.yaml").unwrap();
+    story.text = story.text.replacen(
+        "vars:\n",
+        "vars:\n  - { id: dusk, type: bool, initial: false }\n",
+        1,
+    );
+    let found = errors(files);
+    assert!(
+        found.iter().any(|d| d.file == "story.yaml"
+            && d.at == "vars.dusk"
+            && d.message
+                .starts_with("the variable `dusk` has the name of a phase")),
+        "{found:#?}"
+    );
+
+    let files = with(
+        lighthouse(),
+        "machines/dawn.yaml",
+        "start: low\nsteps:\n  - { from: low, on: turn, to: high }\n",
+    );
+    let found = errors(files);
+    assert!(
+        found.iter().any(|d| d.file == "machines/dawn.yaml"
+            && d.message
+                .starts_with("the machine `dawn` has the name of a phase")),
+        "{found:#?}"
+    );
+
+    // A room may have a phase name: a bare name reads the phase, and a room
+    // is never a flag.
+    let files = with(lighthouse(), "rooms/day.yaml", "name: Day\n");
+    assert!(
+        !errors(files).iter().any(|d| d.message.contains("phase")),
+        "a room with a phase name is reported"
+    );
+}
+
+#[test]
 fn the_list_holds_the_derived_values_and_the_functions() {
     for name in [
         "here",

@@ -21,9 +21,13 @@ pub fn id(zil: &str) -> String {
     if out.starts_with(|c: char| c.is_ascii_digit()) {
         out.insert(0, '_');
     }
-    // Names that the condition language uses for itself, and `night`, a
-    // phase of the default clock: a variable of that name hides the phase.
-    if loremaster_lang::is_reserved(&out) || out == "night" {
+    // Names that the condition language uses for itself, and the phases of
+    // the default clock, which the imported story uses: a variable of such a
+    // name hides the phase.
+    let phase = loremaster_model::ClockConfig::default()
+        .phase_names()
+        .contains(&out.as_str());
+    if loremaster_lang::is_reserved(&out) || phase {
         out.push_str("_zil");
     }
     out
@@ -471,6 +475,9 @@ mod tests {
         check!(id("HERE") == "here_zil");
         check!(id("LEVEL") == "level_zil");
         check!(id("NIGHT") == "night_zil");
+        check!(id("DAWN") == "dawn_zil");
+        check!(id("DAY") == "day_zil");
+        check!(id("DUSK") == "dusk_zil");
     }
 
     #[test]
