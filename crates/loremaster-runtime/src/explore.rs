@@ -211,6 +211,18 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
                 ));
             }
         }
+        // A search reveals what is concealed in or on the thing (WO-2).
+        if game
+            .state()
+            .contents(id.as_str())
+            .iter()
+            .any(|c| game.state().flag(&format!("{c}.concealed")))
+        {
+            out.push((
+                label("search", std::slice::from_ref(&id)),
+                verb("search", vec![id.clone()]),
+            ));
+        }
         if let Some(key) = &t.key
             && scope.contains(key)
         {
