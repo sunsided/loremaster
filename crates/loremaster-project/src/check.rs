@@ -231,6 +231,7 @@ impl Checker<'_> {
             }
         }
 
+        self.reserved_names();
         self.threads();
         self.dialogues();
         self.timers();
@@ -322,6 +323,56 @@ impl Checker<'_> {
                 self.condition(&file, "when", when);
             }
             self.effects(&file, "then", &rule.then);
+        }
+    }
+
+    /// Variables, machines, rooms and things must not take a built-in name
+    /// of conditions, such as `here` or `turns`: conditions would read the
+    /// built-in instead (P2-12).
+    fn reserved_names(&mut self) {
+        let story = self.story().clone();
+        let mut found: Vec<(String, String, &str, &str)> = Vec::new();
+        for v in &story.vars {
+            let machine = format!("machine:{}", v.id);
+            let (file, at, kind) = if story.machines.iter().any(|m| m.id == v.id) {
+                (
+                    self.file_of(&machine),
+                    format!("machines.{}", v.id),
+                    "machine",
+                )
+            } else if story.score.as_ref().is_some_and(|s| s.var == v.id) {
+                (self.file_of("story"), "score.var".into(), "score variable")
+            } else {
+                (self.file_of("story"), format!("vars.{}", v.id), "variable")
+            };
+            found.push((file, at, kind, v.id.as_str()));
+        }
+        for r in &story.rooms {
+            found.push((
+                self.file_of(&format!("room:{}", r.id)),
+                "id".into(),
+                "room",
+                r.id.as_str(),
+            ));
+        }
+        for t in &story.things {
+            found.push((
+                self.file_of(&format!("thing:{}", t.id)),
+                "id".into(),
+                "thing",
+                t.id.as_str(),
+            ));
+        }
+        for (file, at, kind, id) in found {
+            if loremaster_lang::is_reserved(id) {
+                self.error(
+                    &file,
+                    &at,
+                    format!(
+                        "the {kind} `{id}` has a name that conditions use for a built-in, so they would not read it; choose another id"
+                    ),
+                );
+            }
         }
     }
 

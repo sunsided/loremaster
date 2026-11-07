@@ -74,6 +74,8 @@ Conditions use variables, thing properties and values that the runtime calculate
 
 Use `and`, `or`, `not` and parentheses to join conditions.
 
+These names are built-ins of conditions: `and`, `or`, `not`, `true`, `false`, `here`, `turns`, `level`, `first_visit`, `time`, `action`, `timer`, `in`, `carried`, `present`, `visited`, `visits`, `chance`, `remembers` and `seen_by` (planned). A variable, machine, room or thing must not use one of them as its id: conditions would read the built-in instead. The checker reports such an id as an error at its declaration.
+
 ## Action frames
 
 An action frame adds author text around the response to a verb. Frames are optional. A story without frames plays as before.

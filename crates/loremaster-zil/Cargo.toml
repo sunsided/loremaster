@@ -11,6 +11,9 @@ publish = false
 name = "loremaster-zil"
 path = "src/main.rs"
 
+[dependencies]
+loremaster-lang.workspace = true
+
 [dev-dependencies]
 assert2.workspace = true
 

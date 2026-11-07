@@ -21,11 +21,9 @@ pub fn id(zil: &str) -> String {
     if out.starts_with(|c: char| c.is_ascii_digit()) {
         out.insert(0, '_');
     }
-    // Names that the condition language uses for itself.
-    if matches!(
-        out.as_str(),
-        "here" | "turns" | "time" | "night" | "action" | "first_visit" | "true" | "false"
-    ) {
+    // Names that the condition language uses for itself, and `night`, a
+    // phase of the default clock: a variable of that name hides the phase.
+    if loremaster_lang::is_reserved(&out) || out == "night" {
         out.push_str("_zil");
     }
     out
@@ -471,6 +469,8 @@ mod tests {
     fn makes_ids() {
         check!(id("WEST-OF-HOUSE") == "west_of_house");
         check!(id("HERE") == "here_zil");
+        check!(id("LEVEL") == "level_zil");
+        check!(id("NIGHT") == "night_zil");
     }
 
     #[test]
