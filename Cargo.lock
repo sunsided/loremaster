@@ -564,6 +564,8 @@ name = "loremaster-zil"
 version = "0.1.0"
 dependencies = [
  "assert2",
+ "loremaster-lang",
+ "loremaster-model",
 ]
 
 [[package]]

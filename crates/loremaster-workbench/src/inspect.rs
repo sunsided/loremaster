@@ -37,7 +37,7 @@ pub struct PhaseView {
 
 /// Facts about a thing, for an author tooltip. Does not change any state.
 pub(crate) fn inspect_thing(ins: Inspector<'_>, id: &str) -> Option<Inspect> {
-    let t = ins.world().story.thing(id)?;
+    let t = ins.thing(id)?;
     let mut facts: Vec<(String, String)> = vec![("id".into(), t.id.to_string())];
     match ins.name_stage(id) {
         Some(current) => {
@@ -63,8 +63,6 @@ pub(crate) fn inspect_thing(ins: Inspector<'_>, id: &str) -> Option<Inspect> {
     }
     let location = match ins.state().location_of(id) {
         Some(Location::Room(r)) => ins
-            .world()
-            .story
             .room(r.as_str())
             .map_or(r.to_string(), |room| format!("{} ({r})", room.name)),
         Some(Location::Carried) => "carried by the player".into(),
@@ -130,7 +128,7 @@ pub(crate) fn inspect_thing(ins: Inspector<'_>, id: &str) -> Option<Inspect> {
 
 /// Facts about an exit of the current room, for an author tooltip.
 pub(crate) fn inspect_exit(ins: Inspector<'_>, direction: &str) -> Option<Inspect> {
-    let room = ins.world().story.room(ins.state().room.as_str())?;
+    let room = ins.room(ins.state().room.as_str())?;
     let (ei, exit) = room
         .exits
         .iter()
@@ -138,8 +136,6 @@ pub(crate) fn inspect_exit(ins: Inspector<'_>, direction: &str) -> Option<Inspec
         .find(|(_, e)| e.direction.name() == direction)?;
     let to = match &exit.to {
         Some(to) => ins
-            .world()
-            .story
             .room(to.as_str())
             .map_or(to.to_string(), |r| format!("{} ({})", r.name, r.id)),
         None => "nowhere: a message exit".to_string(),
@@ -173,8 +169,6 @@ pub(crate) fn inspect_exit(ins: Inspector<'_>, direction: &str) -> Option<Inspec
     }
     if let Some(to) = &exit.to {
         let back = ins
-            .world()
-            .story
             .room(to.as_str())
             .is_some_and(|t| t.exits.iter().any(|e| e.to.as_ref() == Some(&room.id)));
         facts.push((

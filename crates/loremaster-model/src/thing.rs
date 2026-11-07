@@ -57,6 +57,7 @@ impl Location {
 /// `lit` is a light source. Every property is world state, readable in
 /// conditions as `thing.prop`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Thing {
     pub id: Id,
     pub name: String,
@@ -116,6 +117,7 @@ pub struct Thing {
 /// One stage of a thing's name, for example "shadow", then "grim-looking man",
 /// then "Blackbeard".
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct NameStage {
     pub text: String,
     /// Extra nouns for this stage.

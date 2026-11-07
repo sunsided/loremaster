@@ -2,7 +2,7 @@
 //! the CLI through this API. Values cross the boundary as plain JS objects
 //! shaped like the runtime's serde types.
 
-use loremaster_project::{Diagnostic, Severity, SourceFile, check, load};
+use loremaster_project::{Diagnostic, SourceFile, check_files, load};
 use loremaster_runtime::{Command, Input, Session, World};
 use loremaster_workbench::{AuthorCommand, Budget, MarkupCheck, Workbench};
 use serde::Serialize;
@@ -42,11 +42,7 @@ fn init() {
 #[wasm_bindgen(js_name = checkProject)]
 pub fn check_project(files: JsValue) -> Result<JsValue, JsValue> {
     let files: Vec<SourceFile> = from_js(files)?;
-    let diags = match load(files) {
-        Ok(project) => check(&project),
-        Err(diags) => diags,
-    };
-    to_js(&diags)
+    to_js(&check_files(files).diagnostics)
 }
 
 /// The files of a new story with this title (`[{ path, text }]`).
@@ -90,11 +86,11 @@ impl Engine {
     #[wasm_bindgen(constructor)]
     pub fn new(files: JsValue) -> Result<Engine, JsValue> {
         let files: Vec<SourceFile> = from_js(files)?;
-        let project = load(files).map_err(|d| to_js(&d).unwrap_or(JsValue::NULL))?;
-        let diags = check(&project);
-        if diags.iter().any(|d| d.severity == Severity::Error) {
-            return Err(to_js(&diags)?);
-        }
+        let checked = check_files(files);
+        let project = match checked.project {
+            Some(project) if !checked.has_errors() => project,
+            _ => return Err(to_js(&checked.diagnostics)?),
+        };
         let world = World::compile(project.story.clone()).map_err(|e| {
             to_js(&vec![project.locate(Diagnostic::from(&e))]).unwrap_or(JsValue::NULL)
         })?;

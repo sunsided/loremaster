@@ -49,6 +49,16 @@ impl<'a> Inspector<'a> {
         self.game.state()
     }
 
+    /// The story's thing with this id, found by index.
+    pub fn thing(&self, id: &str) -> Option<&'a loremaster_model::Thing> {
+        self.game.world().thing(id)
+    }
+
+    /// The story's room with this id, found by index.
+    pub fn room(&self, id: &str) -> Option<&'a loremaster_model::Room> {
+        self.game.world().room(id)
+    }
+
     /// The names that conditions and markup can use, to compile what the
     /// author types.
     pub fn scope(&self) -> &'a Scope {

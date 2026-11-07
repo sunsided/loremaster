@@ -144,12 +144,19 @@ impl Scope {
     }
 
     pub fn suggest(&self, name: &str) -> Option<&str> {
-        self.names()
-            .map(|n| (n, edit_distance(n, name)))
-            .filter(|(_, d)| *d <= 2)
-            .min_by_key(|(_, d)| *d)
-            .map(|(n, _)| n)
+        closest(name, self.names())
     }
+}
+
+/// The candidate nearest to a misspelled `name`, for a "did you mean" hint:
+/// at most two edits away.
+pub fn closest<'a>(name: &str, candidates: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
+    candidates
+        .into_iter()
+        .map(|n| (n, edit_distance(n, name)))
+        .filter(|(_, d)| *d <= 2)
+        .min_by_key(|(_, d)| *d)
+        .map(|(n, _)| n)
 }
 
 pub(crate) fn edit_distance(a: &str, b: &str) -> usize {

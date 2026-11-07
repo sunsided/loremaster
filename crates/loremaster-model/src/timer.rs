@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 /// A counter that goes down by one each turn, for example a lamp battery or a
 /// fuse. Its value is world state: `timer.lamp_battery` in conditions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Timer {
     pub id: Id,
     /// Turns from the start value to zero.
