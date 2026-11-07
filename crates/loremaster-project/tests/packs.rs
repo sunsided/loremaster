@@ -251,3 +251,19 @@ fn replace_drops_the_nested_rules_of_the_replaced_file() {
     assert!(!project.origins.contains_key("rule:cellar_drip"));
     assert_eq!(project.story.room("cellar").unwrap().name, "Dry Cellar");
 }
+
+#[test]
+fn the_model_hash_does_not_depend_on_the_order_of_files_or_packs() {
+    use loremaster_project::model_hash;
+    let one = load(lighthouse()).unwrap();
+    // The oil lamp first, in a pack of its own: the things come in another order.
+    let (lamp, rest): (Vec<_>, Vec<_>) = lighthouse()
+        .into_iter()
+        .partition(|f| f.path == "things/oil_lamp.yaml");
+    let mut lamp_first = Pack::from_files(lamp).unwrap();
+    let rest = Pack::from_files(rest).unwrap();
+    lamp_first.header = None;
+    let two = assemble(vec![lamp_first, rest]).unwrap();
+    assert_ne!(one.story.things, two.story.things, "the order differs");
+    assert_eq!(model_hash(&one.story), model_hash(&two.story));
+}
