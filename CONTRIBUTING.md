@@ -149,7 +149,7 @@ A release is not one operation. Step 4 uploads 6 crates and pushes the tag befor
 
 ### The first release
 
-crates.io lets you make only 5 new crates at one time. After that, it lets you make 1 new crate each 10 minutes. Step 4 uploads 6 new crates. Thus, for the first release, step 4 stops at the sixth crate, because crates.io refuses it (HTTP 429). Wait 10 minutes, then continue as in "If step 4 stops after some uploads". Then wait 20 minutes before step 5. From the second release on, no crate is new, and you do not have to wait.
+crates.io lets you make only 5 new crates at one time. After that, it lets you make 1 new crate each 10 minutes. Step 4 uploads 5 new crates. Thus, for the first release, wait 20 minutes between step 4 and step 5. From the second release on, only a crate that is new in that release counts, for example `loremaster-dsl` in the release after 0.1.0. One new crate is in the limit, and you do not have to wait.
 
 ### Size of the package
 
