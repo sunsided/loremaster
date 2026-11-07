@@ -7,7 +7,7 @@
 mod thief;
 
 use loremaster_project::{load, read_dir};
-use loremaster_runtime::{Input, Session, World};
+use loremaster_runtime::{Input, Session, Status, World};
 use std::io::{BufRead, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -29,7 +29,9 @@ fn main() {
         }
         let step = session.submit(Input::Text(line.trim().into()));
         println!("{}", step.plain_text());
-        if session.state().ended {
+        // The death prompt waits as `Status::Await` after a death ending:
+        // the player answers it with `undo` or `restart` on the next line.
+        if matches!(step.status, Status::Ended { .. }) {
             break;
         }
     }
