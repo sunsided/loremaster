@@ -30,6 +30,7 @@ pub struct Extension {
 /// errors stay right.
 pub(crate) fn merge_mode(text: &str) -> (Option<MergeMode>, String) {
     let mut mode = None;
+    let mut conflict = false;
     let kept: Vec<&str> = text
         .lines()
         .map(|line| {
@@ -39,6 +40,7 @@ pub(crate) fn merge_mode(text: &str) -> (Option<MergeMode>, String) {
                 _ => None,
             };
             if found.is_some() {
+                conflict |= mode.is_some_and(|m| Some(m) != found);
                 mode = found;
                 ""
             } else {
@@ -47,6 +49,8 @@ pub(crate) fn merge_mode(text: &str) -> (Option<MergeMode>, String) {
         })
         .collect();
     match mode {
+        // Both modes: keep the text, so the parser reports the unknown keys.
+        Some(_) if conflict => (None, text.to_string()),
         Some(m) => (Some(m), kept.join("\n") + "\n"),
         None => (None, text.to_string()),
     }
@@ -117,6 +121,9 @@ mod tests {
         let (mode, text) = merge_mode(nested);
         assert_eq!(mode, None);
         assert_eq!(text, nested);
+        // Both modes in one file: no mode, and the text stays for the parser.
+        let both = "extend: true\nreplace: true\nname: Cellar\n";
+        assert_eq!(merge_mode(both), (None, both.to_string()));
     }
 
     #[test]
