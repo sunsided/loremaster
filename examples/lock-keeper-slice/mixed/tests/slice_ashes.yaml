@@ -1,5 +1,6 @@
 # Too late: the keeper burns the pages at midnight. The game stays playable,
-# but only the ashes ending is left (the accepted unwinnable edge).
+# but only the ashes ending is left (a point of no return, marked with
+# `closes` in the agenda).
 name: Too late for the pages
 pending: { phase: 4, needs: "P4-07 #84" }
 steps:

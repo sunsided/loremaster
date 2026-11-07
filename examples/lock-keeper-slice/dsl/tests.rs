@@ -25,8 +25,8 @@ world! {
     }
 
     // Too late: the keeper burns the pages at midnight. The game stays
-    // playable, but only the ashes ending is left (the accepted unwinnable
-    // edge).
+    // playable, but only the ashes ending is left (a point of no return that
+    // the agenda step marks with `closes`).
     // draft: `test <id> "<name>"`. The id is the file name in yaml/tests/.
     // The DSL doc gives a test only a name.
     // draft: `pending phase <n>, needs "<ids>";` is YAML `pending:`.

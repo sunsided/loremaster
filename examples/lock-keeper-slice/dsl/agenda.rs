@@ -12,6 +12,7 @@ world! {
         thing keeper;
         thing pages;
         thing gear_housing;
+        ending committed;
         thing stove;
         room kitchen;
         var pages_burned;
@@ -27,9 +28,11 @@ world! {
             set stove.hot = true, pages_burned = true;
             say "{here == kitchen ? The lock-keeper comes in from the lock with something wrapped in oilcloth. He opens the stove and feeds it in. | You smell smoke from the kitchen.}";
         }
-        // draft: `allow_unwinnable` after the step body. The winnable check
-        // (phase 4, CK) reports this step: after it, the best ending cannot
-        // be reached. The mark accepts the edge.
-        allow_unwinnable "The keeper burns the pages at midnight. A late player gets the ashes ending.";
+        // draft: `closes [<endings>] because "<reason>"` after the step body.
+        // A point of no return, not a dead end: after this step the best
+        // ending (committed) cannot be reached, but the ashes ending still
+        // can. The ending check (phase 4, CK) reports such a rank drop as a
+        // warning; the mark names the endings that the step closes on purpose.
+        closes [committed] because "The keeper burns the pages at midnight. A late player gets the ashes ending.";
     }
 }
