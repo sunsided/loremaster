@@ -728,14 +728,18 @@ impl Checker<'_> {
         let Some(into) = &spec.into else {
             return;
         };
-        let answers: Vec<String> = if spec.choice.is_empty() {
-            spec.results.iter().map(|r| r.to_string()).collect()
-        } else {
+        let answers: Vec<String> = if !spec.choice.is_empty() {
             spec.choice.iter().map(|o| o.id().to_string()).collect()
+        } else if spec.walk_to.is_some() {
+            vec!["arrived".into(), "refused".into()]
+        } else {
+            spec.results.iter().map(|r| r.to_string()).collect()
         };
         match (self.ty_of(into), spec.roll.is_some()) {
             (None, _) => self.error(file, at, format!("`into: {into}` names no variable")),
             (Some(Ty::Int), true) | (Some(Ty::Text), false) => {}
+            // An action without results: the host answers with any value.
+            (Some(_), false) if spec.action.is_some() && spec.results.is_empty() => {}
             (Some(Ty::Enum(values)), false) => {
                 for a in answers.iter().filter(|a| !values.contains(a)) {
                     self.error(file, at, format!("`{into}` cannot hold the answer `{a}`"));

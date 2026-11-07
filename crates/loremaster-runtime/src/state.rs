@@ -186,7 +186,8 @@ impl AwaitRequest {
             (AwaitRequest::Roll { min, max, dice }, _) => {
                 Err(format!("a roll of {dice} is a number from {min} to {max}"))
             }
-            (AwaitRequest::Action { results, .. }, Value::Text(_)) if results.is_empty() => Ok(()),
+            // Without a list of results, the host answers with any value.
+            (AwaitRequest::Action { results, .. }, _) if results.is_empty() => Ok(()),
             (_, a) if self.answers().iter().any(|(v, _)| v == a) => Ok(()),
             _ => {
                 let list: Vec<String> = self.answers().iter().map(|(v, _)| v.to_string()).collect();
