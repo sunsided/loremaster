@@ -2,8 +2,8 @@ use crate::lower::resolve;
 use crate::{LangError, Operand, Scope, Segment, compile_condition, compile_markup, parse_expr};
 use dramaturge_model::{
     CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
-    DialogueOption, Fact, FactId, FactScope, FactValue, Memory, Outcome, RelationshipAxisId,
-    SymbolTable,
+    DialogueOption, EntityId, Fact, FactId, FactScope, FactValue, Memory, Outcome,
+    RelationshipAxisId, SymbolTable,
 };
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
 
@@ -74,8 +74,8 @@ pub fn compile_dialogue(
                 compile_condition(when, scope).map_err(|e| fail(format!("{at}.when"), when, e))?,
             );
         }
-        node.outcomes_on_enter =
-            outcomes(d, &n.outcomes, scope).map_err(|(source, e)| fail(at.clone(), &source, e))?;
+        node.outcomes_on_enter = outcomes(with, &n.outcomes, scope)
+            .map_err(|(source, e)| fail(at.clone(), &source, e))?;
         for (i, o) in n.options.iter().enumerate() {
             let at = format!("{at}.options[{i}]");
             let oid = symbols.intern_option(&option_key(d.id.as_str(), &n.key, i));
@@ -92,7 +92,7 @@ pub fn compile_dialogue(
                         .map_err(|e| fail(format!("{at}.when"), when, e))?,
                 );
             }
-            option.outcomes = outcomes(d, &o.outcomes, scope)
+            option.outcomes = outcomes(with, &o.outcomes, scope)
                 .map_err(|(source, e)| fail(at.clone(), &source, e))?;
             node.options.push(option);
         }
@@ -113,14 +113,13 @@ pub fn compile_dialogue(
     Ok(out)
 }
 
+/// The outcomes of a node or an option of a dialogue with the thing `with`.
 fn outcomes(
-    d: &Dialogue,
+    with: EntityId,
     o: &Outcomes,
     scope: &Scope,
 ) -> Result<Vec<Outcome<Vec<Effect>>>, (String, LangError)> {
     let player = scope.player();
-    // `compile_dialogue` checked `with`.
-    let with = scope.entity(d.with.as_str()).unwrap_or(player);
     let mut out = Vec::new();
     for (name, value) in &o.set {
         fact_name(name, scope)?;
