@@ -95,7 +95,7 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         &s.facts,
         &s.locations,
         &s.fired,
-        game.scene().phase,
+        game.eval().phase(),
         s.ended,
         visited,
         cap(&s.talked),
