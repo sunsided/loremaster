@@ -538,6 +538,11 @@ impl World {
         self
     }
 
+    /// Is a behavior with this id registered, named by the story or not?
+    pub fn is_registered(&self, id: &str) -> bool {
+        self.registered.iter().any(|b| b.id() == id)
+    }
+
     /// The manifest of a behavior, as `register` took it.
     pub fn manifest(&self, id: &str) -> Option<&crate::Manifest> {
         self.behaviors

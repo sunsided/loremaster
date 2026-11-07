@@ -597,7 +597,7 @@ impl Checker<'_> {
                         self.error(
                             file,
                             &at,
-                            format!("`call: {b}` names no behavior of story.yaml"),
+                            format!("`call: {b}` names no behavior of the story (`behaviors:` in story.yaml or `behaviors/{b}.yaml`)"),
                         );
                     }
                 }

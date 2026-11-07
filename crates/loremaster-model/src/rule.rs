@@ -83,8 +83,9 @@ pub enum Effect {
     Stop,
     /// Send a custom event. Rules `on: { event: name }` fire at once.
     Emit(Id),
-    /// Run a behavior here, at this place in the rule. It gets the event
-    /// `Event::Call` with the id of the rule.
+    /// Run a behavior here, at this place in the effects. It gets the event
+    /// `Event::Call` with the id of the owner: the rule's id, or
+    /// `dialogue:<id>` / `timer:<id>` in a dialogue or a timer.
     Call(Id),
     /// Stop the rule, ask the host, and go on with the answer (SE-5, SE-6).
     Await(Box<AwaitSpec>),

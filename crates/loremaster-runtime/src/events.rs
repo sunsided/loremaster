@@ -37,7 +37,8 @@ pub enum Event {
     Timer(Id),
     /// An `emit` effect.
     Custom(Id),
-    /// A rule runs the behavior with a `call` effect. The id is the rule's.
+    /// A `call` effect runs the behavior. The id is the owner of the effect:
+    /// the rule's id, or `dialogue:<id>` / `timer:<id>`.
     Call(Id),
     /// A dialogue reaches a node.
     Talk {

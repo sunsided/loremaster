@@ -388,3 +388,19 @@ fn a_call_without_the_behavior_is_a_note_and_a_wrong_call_is_an_error() {
         "{errors:?}"
     );
 }
+
+#[test]
+fn a_call_to_a_registered_but_unnamed_behavior_says_so() {
+    let mut world = World::compile(load(gate_files("other")).unwrap().story).unwrap();
+    world.register(Gate);
+    let mut game = Game::new(Arc::new(world));
+    game.start();
+    let turn = game.input("knock");
+    assert!(
+        turn.log
+            .iter()
+            .any(|l| l.kind == "author" && l.text.contains("does not name")),
+        "{:?}",
+        turn.log
+    );
+}

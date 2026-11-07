@@ -2455,7 +2455,11 @@ impl Game {
         let Some(i) = world.behaviors.iter().position(|b| b.id() == id.as_str()) else {
             turn.log.push(LogEntry {
                 kind: "author".into(),
-                text: format!("{rule} calls {id}, which this build does not have"),
+                text: if world.is_registered(id.as_str()) {
+                    format!("{rule} calls {id}, which the story does not name under `behaviors`")
+                } else {
+                    format!("{rule} calls {id}, which this build does not have")
+                },
             });
             return;
         };
