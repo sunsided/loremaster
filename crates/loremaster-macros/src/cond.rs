@@ -52,8 +52,7 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
     while i < tokens.len() {
         match &tokens[i] {
             TokenTree::Ident(ident) => {
-                let word = ident.to_string();
-                let word = word.strip_prefix("r#").unwrap_or(&word).to_string();
+                let word = unraw(ident);
                 space(&mut out, &last);
                 out.push_str(&word);
                 last = Some(Piece::Word);
@@ -62,7 +61,7 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
                     && let Some(TokenTree::Ident(room)) = tokens.get(i + 1)
                 {
                     out.push('(');
-                    out.push_str(&room.to_string());
+                    out.push_str(&unraw(room));
                     out.push(')');
                     last = Some(Piece::Call);
                     i += 1;
@@ -134,6 +133,12 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
     Ok(out)
 }
 
+/// An identifier without the raw prefix: `r#type` is the id `type`.
+fn unraw(ident: &proc_macro2::Ident) -> String {
+    let s = ident.to_string();
+    s.strip_prefix("r#").map(str::to_string).unwrap_or(s)
+}
+
 /// One space before the next piece, unless it follows a `.`, a unary
 /// operator, or starts the text.
 fn space(out: &mut String, last: &Option<Piece>) {
@@ -168,6 +173,7 @@ mod tests {
             ("!beacon_lit || x < -1", "!beacon_lit || x < -1"),
             ("(a or b) and c", "(a or b) and c"),
             ("mood == \"calm\"", "mood == \"calm\""),
+            ("in r#type and r#loop.lit", "in(type) and loop.lit"),
         ] {
             assert_eq!(cond(tokens), want, "{tokens}");
         }
