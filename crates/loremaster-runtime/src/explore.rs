@@ -122,6 +122,19 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     let story = &world.story;
     let scope = game.in_scope();
     let mut out: Vec<(String, Command)> = Vec::new();
+    // A rule waits: only its answers run.
+    if game.awaiting().is_some() {
+        return game
+            .choices()
+            .into_iter()
+            .map(|c| {
+                (
+                    format!("answer {}", c.text),
+                    Command::Choose { index: c.index },
+                )
+            })
+            .collect();
+    }
     // In a talk, only the answers and leaving run.
     if game.talk().is_some() {
         out.extend(game.choices().into_iter().map(|c| {

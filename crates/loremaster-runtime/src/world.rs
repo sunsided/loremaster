@@ -161,6 +161,8 @@ pub(crate) enum CEffect {
         text: Vec<Segment>,
     },
     Stop,
+    /// A pause for the host; the fire loop handles it, not `apply`.
+    Await(Box<loremaster_model::AwaitSpec>),
     Emit(Id),
     Start(Vec<(Id, Option<u32>)>),
     Cancel(Id),
@@ -241,6 +243,19 @@ impl Compiler {
 impl Compiler {
     fn effect(&self, at: &str, e: &Effect) -> Result<CEffect, CompileError> {
         Ok(match e {
+            Effect::Await(spec) => {
+                if spec
+                    .roll
+                    .as_deref()
+                    .is_some_and(|d| loremaster_model::Dice::parse(d).is_none())
+                {
+                    return Err(CompileError {
+                        at: at.to_string(),
+                        error: loremaster_lang::LangError::new("dice such as `2d6` expected", 0..0),
+                    });
+                }
+                CEffect::Await(spec.clone())
+            }
             Effect::Set(m) => CEffect::Set(m.clone()),
             Effect::Add(m) => CEffect::Add(m.clone()),
             Effect::Say(s) => CEffect::Say(self.markup(at, s)?),

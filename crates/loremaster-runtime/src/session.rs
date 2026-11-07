@@ -6,7 +6,9 @@
 //! HTML, CSS or pixel positions; the host decides how to show them.
 
 use crate::output::{Block, Choice, LogEntry, TalkInfo};
+use crate::state::Awaiting;
 use crate::{Command, Game, Restored, Save, SaveError, State, Turn, World};
+use loremaster_model::Value;
 use loremaster_model::{EndingKind, Id};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -63,6 +65,8 @@ pub enum Status {
     Ready,
     /// The story has ended. `ending` is `None` for a story without endings.
     Ended { ending: Option<EndingInfo> },
+    /// A rule waits for the host (SE-5). Answer with `resume(id, value)`.
+    Await { awaiting: Awaiting },
 }
 
 /// The result of one call: the effects in order, then the status.
@@ -155,6 +159,19 @@ impl Session {
         self.step(turn)
     }
 
+    /// Answer the request of a rule that waits, and run the rest of the rule
+    /// (SE-6). This is not a new turn: the clock and the timers do not move.
+    pub fn resume(&mut self, await_id: &str, value: Value) -> Result<Step, String> {
+        let turn = self.game.resume(await_id, value)?;
+        Ok(self.step(turn))
+    }
+
+    /// Let the host answer rolls (SE-7). Without it, the session answers a
+    /// roll from its own RNG in the same step.
+    pub fn set_host_rolls(&mut self, host_rolls: bool) {
+        self.game.host_rolls = host_rolls;
+    }
+
     /// Choose an answer: a short form of `submit(Input::Choice(index))`.
     pub fn choose(&mut self, index: usize) -> Step {
         self.submit(Input::Choice(index))
@@ -207,7 +224,13 @@ impl Session {
                 choices: turn.choices,
             });
         }
-        let status = if self.game.state().ended {
+        let status = if let Some(awaiting) = self.game.awaiting()
+            && !self.game.state().ended
+        {
+            Status::Await {
+                awaiting: awaiting.clone(),
+            }
+        } else if self.game.state().ended {
             let ending = self.ending();
             if let Some(ending) = &ending
                 && turn.ended
