@@ -4,6 +4,8 @@ This crate is part of [loremaster](https://github.com/sunsided/loremaster), a wo
 
 This crate is the runtime. It is pure and deterministic. It takes a story and a save state, and a command (typed, or from the verb bar). It gives the output and the new state. It has no input or output of its own, no clock and no global random numbers. Thus the editor, the web player and the terminal player show the same game.
 
+Hosts play through `Session`: input goes down, effects come back as data. The authoring views of the editor (Atlas, rules, checks, room matrix, explorer) are in [loremaster-workbench](https://crates.io/crates/loremaster-workbench).
+
 The public API uses types from [dramaturge](https://crates.io/crates/dramaturge-model) 0.2. A new major version of dramaturge thus can also be a breaking change of this crate.
 
 ## License

@@ -1,6 +1,6 @@
 # Zork I fit test: puzzle logic
 
-This report tells how five puzzles of Zork I are ported to loremaster, and which part of loremaster each one uses. The ports are in `examples/zork1`. The tests are in `crates/loremaster-runtime/tests/zork.rs` and `examples/zork1/tests/`.
+This report tells how five puzzles of Zork I are ported to loremaster, and which part of loremaster each one uses. The ports are in `examples/zork1`. The tests are in `crates/loremaster-workbench/tests/workbench/zork.rs` and `examples/zork1/tests/`.
 
 The test checks the levels of the concept "Loremaster puzzle logic": world parts first, then stronger rules, then puzzle machines, then behaviors in Rust.
 
