@@ -223,4 +223,42 @@ fn the_checks_reject_await_outside_rules_and_wrong_shapes() {
         wrong.iter().any(|m| m.contains("number variable")),
         "{wrong:?}"
     );
+
+    let walk = messages(vec![file(
+        "rules/walk.yaml",
+        "- id: walk\n  on: { verb: [pull, lever] }\n  then:\n    - await: { walk_to: hall, into: path }\n",
+    )]);
+    assert!(
+        walk.iter()
+            .any(|m| m.contains("cannot hold the answer `arrived`")),
+        "{walk:?}"
+    );
+}
+
+#[test]
+fn an_action_without_results_takes_any_answer_and_time_waits() {
+    let rule = r#"
+- id: pull_lever
+  on: { verb: [pull, lever] }
+  instead: true
+  then:
+    - await: { action: open_sluice, into: total }
+    - say: "The sluice opened {total} times."
+"#;
+    let mut s = session(rule);
+    let (id, _) = awaiting(&s.submit(Input::Text("pull lever".into())));
+    let turns = s.state().turns;
+    let tick = s.submit(Input::Tick);
+    assert!(
+        tick.plain_text().contains("The story waits"),
+        "{}",
+        tick.plain_text()
+    );
+    assert_eq!(s.state().turns, turns, "time waits with the rule");
+    let done = s.resume(&id, Value::Int(3)).unwrap();
+    assert!(
+        done.plain_text().contains("opened 3 times"),
+        "{}",
+        done.plain_text()
+    );
 }
