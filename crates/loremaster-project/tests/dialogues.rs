@@ -58,6 +58,27 @@ fn a_missing_node_is_an_error_from_the_dialogue_check() {
 }
 
 #[test]
+fn an_unknown_speaker_of_a_node_is_an_error() {
+    let d =
+        diagnostics(&GOOD.replace("    say: \"Sit.\"", "    speaker: ghost\n    say: \"Sit.\""));
+    check!(d.len() == 1, "{d:#?}");
+    check!(d[0].at == "nodes.meet.speaker");
+    check!(d[0].message == "unknown thing `ghost`");
+}
+
+#[test]
+fn a_terminal_node_does_not_hide_other_problems() {
+    // A node without options ends the talk; the other checks still run.
+    let d = diagnostics(
+        &GOOD
+            .replace("    options:\n      - { say: \"Back.\", go: back }\n", "")
+            .replace("bb.talked > 1", "bb.trsut > 1"),
+    );
+    check!(d.len() == 1, "{d:#?}");
+    check!(d[0].at == "nodes.again.when");
+}
+
+#[test]
 fn conditions_and_outcomes_are_checked() {
     let d = diagnostics(&GOOD.replace("bb.talked > 1", "bb.trsut > 1"));
     check!(d[0].at == "nodes.again.when");

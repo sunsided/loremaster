@@ -537,11 +537,12 @@ impl Checker<'_> {
             }
             // Keys, start nodes, targets and labels. A node without options
             // ends the talk in loremaster by design, so `NoWayOn` is no issue.
-            let issues = dramaturge_syntax::check(d);
+            let mut issues = dramaturge_syntax::check(d);
+            issues.retain(|i| i.kind != IssueKind::NoWayOn);
             let broken = issues
                 .iter()
                 .any(|i| i.severity == dramaturge_syntax::Severity::Error);
-            for issue in issues.iter().filter(|i| i.kind != IssueKind::NoWayOn) {
+            for issue in &issues {
                 match issue.severity {
                     dramaturge_syntax::Severity::Error => {
                         self.error(&file, &issue.path, issue.message.clone())
