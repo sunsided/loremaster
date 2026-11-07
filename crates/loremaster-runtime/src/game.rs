@@ -2398,7 +2398,7 @@ impl Game {
             owner: Id::new(format!("behavior:{id}")),
             game: self,
             turn,
-            depth: depth + 1,
+            depth,
             manifest,
         };
         if b.handle(&Event::Call(rule.clone()), &mut cx) == crate::Flow::Stop {

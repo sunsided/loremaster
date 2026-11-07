@@ -133,7 +133,7 @@ pub(crate) fn describe(o: &Outcomes) -> Vec<String> {
         ),
         Effect::Stop => "stop".into(),
         Effect::Emit(e) => format!("send {e}"),
-        Effect::Call(b) => format!("run {b}"),
+        Effect::Call(b) => format!("run the behavior {b}"),
         Effect::Start(t) => format!(
             "start {}",
             t.entries()
