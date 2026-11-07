@@ -407,3 +407,30 @@ fn packs_join_and_check() {
         "{errors:#?}"
     );
 }
+
+/// A condition that starts with an id `says` is a condition, not a speaker:
+/// `<speaker> says` needs a string right after `says`.
+mod says_var {
+    use loremaster::prelude::*;
+
+    world! {
+        story "Tiny" { start: hall }
+        var says: bool = false;
+        room hall "Hall" {}
+        rule dark on turn {
+            line when says then "Dark." when not says then says "Light.";
+        }
+    }
+}
+
+#[test]
+fn a_condition_can_start_with_an_id_says() {
+    use loremaster::dsl::model::{Line, LineSegment};
+    let p = says_var::pack();
+    assert!(
+        matches!(&p.rules[0].then[0], Effect::Say(l) if *l == Line::new(vec![
+            LineSegment::narrate("Dark.").when("says"),
+            LineSegment::says("Light.").when("not says"),
+        ]))
+    );
+}

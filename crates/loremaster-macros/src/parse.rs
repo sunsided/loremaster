@@ -544,6 +544,15 @@ fn peek_word_then(input: ParseStream, kw: &str) -> bool {
     fork.call(Ident::parse_any).is_ok() && peek_kw(&fork, kw)
 }
 
+/// `<speaker> says "…"` starts here: a word, the word `says`, a string.
+fn peek_speaker(input: ParseStream) -> bool {
+    let fork = input.fork();
+    fork.call(Ident::parse_any).is_ok()
+        && peek_kw(&fork, "says")
+        && fork.call(Ident::parse_any).is_ok()
+        && fork.peek(LitStr)
+}
+
 fn speech(input: ParseStream) -> Error {
     input.error(
         "speech segments (`says`, `narrate`) belong in a `line` effect; a description or a presence is one text",
@@ -571,6 +580,8 @@ fn line(input: ParseStream) -> Result<Vec<Segment>> {
             && !peek_kw(input, "when")
             && !peek_kw(input, "narrate")
             && !peek_kw(input, "says")
+            // Two words are enough here: `keeper says foo` is a segment
+            // with a missing string, not a text pool.
             && !peek_word_then(input, "says")
         {
             return Err(input.error(
@@ -612,10 +623,11 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
         when: None,
         tokens: TokenStream::new(),
     };
-    // `<speaker> says` first: a speaker may have the id of a keyword of
-    // segments (`narrate says "…"`), and `narrate "…"` and `when <cond>`
-    // never have `says` as their second word.
-    if peek_word_then(input, "says") {
+    // `<speaker> says "…"` first: a speaker may have the id of a keyword of
+    // segments (`narrate says "…"`). It needs the string right after `says`,
+    // so a condition that starts with an id `says` (`when says then "…"`)
+    // stays a condition.
+    if peek_speaker(input) {
         let speaker = name(input)?;
         name(input)?;
         return Ok(plain(SegmentVoice::Says(Some(speaker)), text(input)?));
@@ -649,6 +661,12 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
     if peek_kw(input, "says") {
         name(input)?;
         return Ok(plain(SegmentVoice::Says(None), text(input)?));
+    }
+    // `<speaker> says` without its string: report the missing string.
+    if peek_word_then(input, "says") {
+        name(input)?;
+        name(input)?;
+        text(input)?;
     }
     Err(input.error(
         "expected a segment: a string, `narrate \"…\"`, `says \"…\"`, `<speaker> says \"…\"` or `when <cond> then <segment>`, or `;`",
