@@ -167,7 +167,7 @@ nodes:
 - `with` is the id of the thing.
 - `start` is a list of node keys. The talk starts at the first node whose `when` holds.
 - A node is one line of the thing (`say`). Its `options` are the answers of the player.
-- A node with a `when` can only be entered while its `when` holds. When a `go` leads to a node whose `when` does not hold, the talk ends.
+- A node with a `when` can only be entered while its `when` holds. When a `go` leads to a node whose `when` does not hold, the talk ends. `go: back` is no new entry: it returns to the node before and shows its line again, without a check and without its outcomes.
 - An option has a `say` (the line of the player, and the text of the choice), an optional `when`, and `go`. `go` is a node key, `end` or `back` (the node before). Without `go`, the option ends the talk.
 - A node or an option can change the state when it applies:
   - `set` and `add`: as in a rule.
