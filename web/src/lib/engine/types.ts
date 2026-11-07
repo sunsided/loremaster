@@ -20,6 +20,8 @@ export interface Run {
 	text: string;
 	source?: Source;
 	link?: Link;
+	/** Who speaks the run, when it is speech: a thing id or `player`. The text has its quotes already. */
+	speaker?: string;
 }
 
 export type BlockKind =

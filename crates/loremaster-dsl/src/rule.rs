@@ -190,8 +190,8 @@ pub trait Effects: Sized {
         self
     }
 
-    /// `say:` a text.
-    fn say(self, text: impl Into<String>) -> Self {
+    /// `say:` a line: a text, or a [`Line`](loremaster_model::Line) of segments.
+    fn say(self, text: impl Into<loremaster_model::Line>) -> Self {
         self.effect(Effect::Say(text.into()))
     }
 

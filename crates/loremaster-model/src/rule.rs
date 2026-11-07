@@ -1,4 +1,4 @@
-use crate::{AwaitSpec, Id, Note, StartTimers, TimeOfDay, Value};
+use crate::{AwaitSpec, Id, Line, Note, StartTimers, TimeOfDay, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -70,8 +70,10 @@ pub enum Effect {
     Set(BTreeMap<String, Value>),
     /// Add to integer variables.
     Add(BTreeMap<String, i64>),
-    /// Print text (inline markup).
-    Say(String),
+    /// Show a line: a text in inline markup, or a list of narration and
+    /// speech segments. `line:` is the same key.
+    #[serde(alias = "line")]
+    Say(Line),
     /// Move things: `{ lamp: cellar }`, `carried` or `nowhere` are special targets.
     Move(BTreeMap<Id, Id>),
     /// Move the player.

@@ -3,7 +3,7 @@
 use crate::Effects;
 use crate::convert::IntoStates;
 use crate::pack::{register, replaceable, with_notes};
-use loremaster_model::{Effect, EventPattern, Id, Machine, StateDef, Step};
+use loremaster_model::{Effect, EventPattern, Id, Line, Machine, StateDef, Step};
 use loremaster_project::Pack;
 
 /// A machine of a pack, from [`BuildPack::machine`](crate::BuildPack::machine).
@@ -104,7 +104,7 @@ impl<'a> MachineBuilder<'a> {
     /// step's own field; [`Effects::effect`] with [`Effect::Say`] adds a text
     /// among the effects.
     #[track_caller]
-    pub fn say(mut self, text: impl Into<String>) -> Self {
+    pub fn say(mut self, text: impl Into<Line>) -> Self {
         self.last_step().say = Some(text.into());
         self
     }

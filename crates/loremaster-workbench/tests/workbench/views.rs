@@ -74,3 +74,26 @@ fn a_verb_rule_without_a_verb_does_not_break_the_rules_view() {
     let rules = bench.rules();
     assert!(rules.iter().any(|r| r.id == "odd"));
 }
+
+#[test]
+fn the_rules_view_shows_a_line_as_it_reads() {
+    let files = [
+        ("story.yaml", STORY),
+        ("rooms/hall.yaml", HALL),
+        ("rooms/yard.yaml", YARD),
+        (
+            "rules/talk.yaml",
+            "- id: plain\n  on: { verb: [wait] }\n  then: [{ say: \"Odd.\" }]\n- id: speech\n  on: { verb: [wait] }\n  then: [{ say: [\"He nods.\", { says: \"Yes?\" }] }]\n",
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    });
+    let world = World::compile(load(files.into()).unwrap().story).unwrap();
+    let bench = Workbench::new(Arc::new(world));
+    let rules = bench.rules();
+    let then = |id: &str| rules.iter().find(|r| r.id == id).unwrap().then.clone();
+    assert_eq!(then("plain"), ["say \"Odd.\""]);
+    assert_eq!(then("speech"), ["say He nods. \"Yes?\""]);
+}

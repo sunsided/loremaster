@@ -142,26 +142,26 @@ with: blackbeard
 start: [again, meet]
 nodes:
   meet:
-    say: 'The figure looks up. "Sit, if you like."'
+    say: ["The figure looks up.", { says: "Sit, if you like." }]
     options:
-      - say: '"Who are you?"'
+      - say: [{ says: "Who are you?" }]
         go: names
-      - say: '"Not tonight."'
+      - say: [{ says: "Not tonight." }]
         go: end
   names:
-    say: '"They call me Blackbeard."'
+    say: [{ says: "They call me Blackbeard." }]
     set: { knows_blackbeard_name: true }
     relation: { trust: 1 }
     options:
-      - say: '"Where did the *Marigold* go?"'
+      - say: [{ says: "Where did the *Marigold* go?" }]
         when: blackbeard.trust >= 1
         remember: [asked_marigold]
         go: back
   again:
     when: blackbeard.talked > 1
-    say: '"Back again."'
+    say: [{ says: "Back again." }]
     options:
-      - { say: '"Goodbye."', go: end }
+      - { say: [{ says: "Goodbye." }], go: end }
 ```
 
 - `with` is the id of the thing.
@@ -173,7 +173,7 @@ nodes:
   - `relation`: add to the relation of the player to the thing, for example `{ trust: 1 }`. Declare each relation in `relations` in `story.yaml`.
   - `remember`: memories that the thing keeps.
   - `then`: world effects, as in a rule: `move`, `goto`, `say`, `end`.
-- `say` uses inline markup.
+- `say` is a [line](#lines-and-speech): a text, or a list of narration and speech. The speech of a node is spoken by the thing (`with`), the speech of an option by the player. `line:` is the same key.
 
 Conditions can read the new values:
 
@@ -189,7 +189,40 @@ During a talk:
 - Other commands do not run. To leave the talk, type `bye` or `leave`, or push Escape.
 - A talk ends when the player chooses an answer that ends it, when a node has no answer that shows, or when an effect takes the player away.
 
-`loremaster check` examines each dialogue: conditions, markup, targets of `go`, and nodes that no start node leads to.
+`loremaster check` examines each dialogue: conditions, markup, speakers, targets of `go`, and nodes that no start node leads to.
+
+### Lines and speech
+
+A text that shows is a line: the `say` of a rule effect, of a dialogue node, of an option and of a machine step. `line:` is the same key as `say:`. A line is one text, which is narration:
+
+```yaml
+say: "The lock-keeper shrugs."
+```
+
+Or a list of segments:
+
+```yaml
+say:
+  - "The lock-keeper shrugs."                  # a bare string: narration
+  - { says: "Prove it,", by: keeper }          # speech
+  - { narrate: "he says." }                    # narration, written out
+```
+
+- `{ says: "…" }` is speech. The game puts straight double quotes around it, so write it without quotes: the line above shows `The lock-keeper shrugs. "Prove it," he says.`
+- `by` names the speaker: a thing id or `player`. `player` always means the player, so in a story with speech, a thing with the id `player` gets a warning. Without `by`, the speaker is the thing of the dialogue in a node, the player in an option, and nobody in a rule. Front ends get the speaker with the text and can style the speech by it.
+- `{ narrate: "…" }` and a bare string are both narration. Right after `says`, a bare string reads like more speech, so `loremaster check` warns there and suggests `narrate`.
+- The segments that show join with one space. Each segment's text uses inline markup.
+- A segment with `when` shows only while its condition holds. Use it instead of a choice with an empty branch:
+
+  ```yaml
+  say:
+    - { narrate: "The chamber is empty.", when: in(lock_chamber) }
+    - { narrate: "Water roars far below.", when: not in(lock_chamber) }
+  ```
+
+  There is no `else`: for the other case, write a second segment with the opposite condition. A bare string has no `when`; write `{ narrate: … }`.
+
+`loremaster check` examines the markup and the `when` of each segment, and that each `by` names a thing or `player`.
 
 ![A talk with Blackbeard in the web player. The story text shows what is said. The answers are numbered buttons in the verb bar.](images/talk.png)
 
@@ -265,7 +298,7 @@ The effects:
 | --- | --- |
 | `set: { name: value }` | Sets variables and properties. |
 | `add: { name: 1 }` | Adds to number variables. |
-| `say: "text"` | Shows the text. Inline markup is permitted. |
+| `say: "text"` | Shows the text. Inline markup is permitted. The text can also be a list of narration and speech: read [Lines and speech](#lines-and-speech). `line:` is the same key. |
 | `move: { thing: place }` | Moves things. The place is a room, `carried`, `nowhere`, `in:box` or `on:table`. |
 | `goto: room` | Moves the player. Leave and enter rules fire. |
 | `end: beacon_lit` | Ends the game with an ending from `endings/`. Read [Endings](#endings). |
