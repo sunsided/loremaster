@@ -1,4 +1,4 @@
-// The whole slice in world!, one pack per part. This file joins the packs in
+// The whole slice in world!, one pack per part (the files in dsl/). This file joins the packs in
 // a fixed order, as the DSL doc proposes (Pack and assemble, DS-1, DSL step
 // L1; the builder API, DS-3, step L2). A test can load today's pack plus only
 // the parts that it needs, as crates/loremaster-runtime/tests/slice.rs does
@@ -9,15 +9,26 @@
 
 #![cfg(feature = "dsl")]
 
+// The test target loads this file with `#[path]`, so its child modules name
+// their files explicitly (no mod.rs: this file sits next to dsl/).
+
 use loremaster::prelude::*;
 
+#[path = "dsl/agenda.rs"]
 pub mod agenda;
+#[path = "dsl/dialogue.rs"]
 pub mod dialogue;
+#[path = "dsl/endings.rs"]
 pub mod endings;
+#[path = "dsl/keeper_rule.rs"]
 pub mod keeper_rule;
+#[path = "dsl/stove.rs"]
 pub mod stove;
+#[path = "dsl/tests.rs"]
 pub mod tests;
+#[path = "dsl/texts.rs"]
 pub mod texts;
+#[path = "dsl/today.rs"]
 pub mod today;
 
 /// The parts of the slice with new syntax. The names match the parts table

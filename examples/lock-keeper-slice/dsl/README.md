@@ -16,6 +16,6 @@ Each part of the parts table in `../PENDING.md` is one file with one `world!` bl
 | `keeper_rule.rs` | Keeper rule | The rule `keeper_comments` |
 | `agenda.rs` | Agenda | The keeper's agenda step at midnight |
 | `tests.rs` | | The walkthroughs of `../yaml/tests/`, as test blocks |
-| `mod.rs` | | Joins the packs in a fixed order; `with(parts)` and `world()` |
+| `../dsl.rs` | | Joins the packs in a fixed order; `with(parts)` and `world()` |
 
 The ids that a file uses from another pack are in an `extern { ... }` block. The check finds them at load time. A difference to the YAML form: `today.rs` names the endings in `end committed`, so it needs the endings pack to pass the check. Today's YAML gives `end:` a text and loads without `endings/`.

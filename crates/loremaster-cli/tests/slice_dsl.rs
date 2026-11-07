@@ -4,8 +4,8 @@
 //! `slice_equivalence` in loremaster-runtime compares the forms.
 #![cfg(feature = "dsl")]
 
-#[path = "../../../examples/lock-keeper-slice/dsl/mod.rs"]
+#[path = "../../../examples/lock-keeper-slice/dsl.rs"]
 mod dsl;
 
-#[path = "../../../examples/lock-keeper-slice/mixed/mod.rs"]
+#[path = "../../../examples/lock-keeper-slice/mixed.rs"]
 mod mixed;
