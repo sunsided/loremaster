@@ -51,7 +51,7 @@ loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.2 (`drama
 
 ## Commands
 
-Install [go-task](https://taskfile.dev), Trunk, Node.js and pnpm before you start.
+Install [go-task](https://taskfile.dev), Trunk and Node.js before you start, and run `corepack enable` once. Corepack gives the Yarn version that `web/package.json` pins.
 
 | Command | What it does |
 | --- | --- |
@@ -72,7 +72,7 @@ If you do not use go-task:
 
 1. Play in the terminal with `cargo run -p loremaster --no-default-features -- play examples/lighthouse`.
 2. For the web app, run `trunk watch` in `crates/loremaster-wasm`.
-3. At the same time, run `pnpm dev` in `web/`.
+3. At the same time, run `yarn dev` in `web/`.
 
 ## How Trunk and SvelteKit work together
 
