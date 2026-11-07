@@ -1,0 +1,14 @@
+# New syntax (phase 4, D6 actors and agendas). One step: at midnight the
+# keeper feeds the stove with the pages, if the player has not taken them.
+actor: keeper
+steps:
+  - at: "00:00"
+    place: kitchen
+    when: not pages.carried
+    then:
+      - move: { pages: nowhere }
+      - set: { stove.hot: true, pages_burned: true }
+      - say: "{here == kitchen ? The lock-keeper comes in from the lock with something wrapped in oilcloth. He opens the stove and feeds it in. | You smell smoke from the kitchen.}"
+    # The winnable check (phase 4, CK) reports this step: after it, the best
+    # ending cannot be reached. The mark accepts the edge.
+    allow_unwinnable: "The keeper burns the pages at midnight. A late player gets the ashes ending."

@@ -1,0 +1,5 @@
+label: Jump
+words: [jump, jump in, jump into]
+slots: none
+bar: false
+default: "You jump on the spot. Nothing happens."

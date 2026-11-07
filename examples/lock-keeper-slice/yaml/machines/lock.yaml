@@ -1,0 +1,19 @@
+# The lock chamber empties when the player opens the lower paddles with the
+# windlass. The pages are in the gear housing at the bottom.
+start: full
+states:
+  - { name: full, description: The chamber is full. The gear housing is under water. }
+  - { name: emptying, description: The lower paddles are open. The chamber is empty in 3 turns (timer lock_drain). }
+  - { name: empty, description: The chamber is empty. The player can open the gear housing. }
+steps:
+  - from: full
+    on: { verb: [open, lower_paddles] }
+    when: windlass.carried
+    to: emptying
+    instead: true
+    say: "You fit the windlass and turn. Water roars out under the lower gate."
+    then: [{ start: lock_drain }]
+  - from: emptying
+    on: { timer: lock_drain }
+    to: empty
+    say: "{here == lock_chamber ? The chamber is empty. Wet ladder rungs go down into the dark. | }"

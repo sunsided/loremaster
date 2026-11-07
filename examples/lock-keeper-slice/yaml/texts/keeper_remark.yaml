@@ -1,0 +1,11 @@
+# New syntax (phase 4, R9): a named text pool. Rules and dialogue call it by id.
+pick: best
+one_of:
+  - "Mind your step."
+  - when: here == kitchen
+    text: '"Do not touch the stove," the lock-keeper says.'
+  - when: here == kitchen and ash_is_fresh
+    mode: sticky
+    variants:
+      - '"I let it go out at midnight," he says. He does not look at you.'
+      - '"Cold stove, cold supper," he says.'

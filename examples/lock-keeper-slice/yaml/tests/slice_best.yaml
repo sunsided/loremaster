@@ -1,0 +1,21 @@
+# The best path: take the pages before midnight and accuse the keeper.
+name: The pages before midnight
+pending: { phase: 4, needs: "P4-07 #84" }
+steps:
+  - { do: examine stove, see: "The stove is cold." }
+  - up
+  - take windlass
+  - down
+  - e
+  - open lower paddles
+  - wait
+  - { do: wait, see: "The chamber is empty." }
+  - open gear housing
+  - take pages
+  - w
+  - { do: examine stove, see: '"Do not touch the stove," the lock-keeper says.' }
+  - { do: accuse keeper, see: "Committed for trial" }
+expect:
+  facts: { ending: committed, ending.kind: win, ending.rank: 1, pages_burned: false }
+  not_see: "You smell smoke"
+  ended: true
