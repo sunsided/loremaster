@@ -1,13 +1,13 @@
-use dramaturge_model::{Condition, DialogueNodeId, SymbolTable};
+use dramaturge_model::{Condition, DialogueGraph, DialogueNodeId, SymbolTable};
 use loremaster_lang::{
-    CompiledDialogue, LangError, Scope, Segment, compile_condition, compile_dialogue,
-    compile_markup,
+    CompiledLine, LangError, Scope, Segment, compile_condition, compile_dialogue, compile_markup,
 };
 use loremaster_model::{
     Effect, Fragment, FragmentMode, Id, Layer, Story, Value, VerbDef, standard_verbs,
 };
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
 /// A story with every condition and piece of markup compiled. Immutable
 /// during play and shared by any number of games.
@@ -126,28 +126,34 @@ pub(crate) struct CTimer {
 pub(crate) struct CDialogue {
     pub id: Id,
     pub with: Id,
-    pub graph: CompiledDialogue,
-    /// The compiled `then` lists, by the index in their custom outcome.
-    pub effects: Vec<Vec<CEffect>>,
+    /// The graph; a `then` list is a host outcome with the compiled effects,
+    /// and a line is host text, the compiled line.
+    pub graph: DialogueGraph<Arc<[CEffect]>, CompiledLine>,
     /// The node keys, in the order of the graph's nodes.
     pub keys: Vec<String>,
 }
 
 impl CDialogue {
-    pub fn node(&self, id: DialogueNodeId) -> Option<&dramaturge_model::DialogueNode> {
-        self.graph.graph.nodes.iter().find(|n| n.id == id)
+    pub fn node(&self, id: DialogueNodeId) -> Option<&CNode> {
+        self.graph.node(id)
     }
 
-    pub fn node_by_key(&self, key: &str) -> Option<&dramaturge_model::DialogueNode> {
+    pub fn node_by_key(&self, key: &str) -> Option<&CNode> {
         let i = self.keys.iter().position(|k| k == key)?;
-        self.graph.graph.nodes.get(i)
+        self.graph.nodes.get(i)
     }
 
     pub fn key_of(&self, id: DialogueNodeId) -> Option<&str> {
-        let i = self.graph.graph.nodes.iter().position(|n| n.id == id)?;
+        let i = self.graph.nodes.iter().position(|n| n.id == id)?;
         self.keys.get(i).map(String::as_str)
     }
 }
+
+/// A dialogue node with its compiled `then` lists.
+pub(crate) type CNode = dramaturge_model::DialogueNode<Arc<[CEffect]>, CompiledLine>;
+
+/// A dialogue option with its compiled `then` list and line.
+pub(crate) type COption = dramaturge_model::DialogueOption<Arc<[CEffect]>, CompiledLine>;
 
 #[derive(Debug, Clone)]
 pub(crate) enum CEffect {
@@ -469,21 +475,28 @@ impl World {
             .iter()
             .map(|d| {
                 let owner = format!("dialogue:{}", d.id);
-                let graph =
+                let lowered =
                     compile_dialogue(d, &c.scope, &mut symbols).map_err(|e| CompileError {
                         at: format!("{owner}/{}", e.at),
                         error: e.error,
                     })?;
-                let effects = graph
-                    .effects
-                    .iter()
-                    .map(|list| list.iter().map(|e| c.effect(&owner, e)).collect())
-                    .collect::<Result<_, CompileError>>()?;
-                Ok(std::sync::Arc::new(CDialogue {
+                let mut failed = None;
+                let graph = lowered.map_host(|then| {
+                    then.iter()
+                        .map(|e| c.effect(&owner, e))
+                        .collect::<Result<_, _>>()
+                        .unwrap_or_else(|e| {
+                            failed.get_or_insert(e);
+                            Arc::from([])
+                        })
+                });
+                if let Some(e) = failed {
+                    return Err(e);
+                }
+                Ok(Arc::new(CDialogue {
                     id: d.id.clone(),
                     with: d.with.clone(),
                     graph,
-                    effects,
                     keys: d.nodes.iter().map(|n| n.key.clone()).collect(),
                 }))
             })

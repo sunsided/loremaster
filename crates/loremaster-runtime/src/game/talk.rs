@@ -11,18 +11,18 @@ use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
 use crate::text;
-use crate::world::CDialogue;
+use crate::world::{CDialogue, CEffect, COption};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
 use dramaturge_model::{
-    AlignmentAxisId, AlignmentPoleId, DialogTagKind, DialogTarget, DialogueNodeId, DialogueOption,
+    AlignmentAxisId, AlignmentPoleId, DialogTagKind, DialogTarget, DialogText, DialogueNodeId,
     EntityId, EventKind, Fact, FactId, FactScope, FactValue, Memory, MemoryId, MemoryQuery,
-    Outcome, RelationshipAxisId,
+    RelationshipAxisId,
 };
 use dramaturge_runtime::{
-    ConditionEvaluator, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
-    DefaultRuntime, DialogueRuntime, NarrativeState, OutcomeApplier,
+    AvailableOptionsIter, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
+    DefaultRuntime, DialogCursor, DialogueRuntime, HostHandler, NarrativeState, select_entry,
 };
-use loremaster_lang::THEN_KEY;
+use loremaster_lang::CompiledLine;
 use loremaster_model::{Id, Layer, Value};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -173,29 +173,22 @@ impl NarrativeState for Turned<'_> {
     }
 }
 
-/// Applies the world effects of `then`, which dramaturge can not. They write into the turn of the [`Turned`] state.
+/// Applies the world effects of `then` (a host outcome), which dramaturge
+/// can not. They write into the turn of the [`Turned`] state.
 struct WorldEffects {
-    dialogue: Arc<CDialogue>,
+    owner: Id,
 }
 
-impl CustomHandler<Turned<'_>> for WorldEffects {
-    fn outcome(&mut self, key: &str, args: &[FactValue], state: &mut Turned<'_>) {
+impl CustomHandler<Turned<'_>> for WorldEffects {}
+
+impl HostHandler<Then, Turned<'_>> for WorldEffects {
+    fn host_outcome(&mut self, effects: &Then, state: &mut Turned<'_>) {
         let Turned { game, turn } = state;
-        let (THEN_KEY, [FactValue::Int(i)]) = (key, args) else {
-            return;
-        };
-        let owner = Id::new(format!("dialogue:{}", self.dialogue.id));
-        let Some(effects) = usize::try_from(*i)
-            .ok()
-            .and_then(|i| self.dialogue.effects.get(i))
-        else {
-            return;
-        };
         // A `stop` (or `Flow::Stop` of a called behavior) ends the
         // node's effects, as it ends a rule.
         let outer = std::mem::replace(&mut game.stopped, false);
-        for effect in effects {
-            game.apply(turn, &owner, effect, 1);
+        for effect in effects.iter() {
+            game.apply(turn, &self.owner, effect, 1);
             if game.stopped || game.state.ended {
                 break;
             }
@@ -206,6 +199,42 @@ impl CustomHandler<Turned<'_>> for WorldEffects {
 
 fn evaluator() -> DefaultConditionEvaluator<DerivedValues> {
     DefaultConditionEvaluator::with_custom(DerivedValues)
+}
+
+type Runtime =
+    DefaultRuntime<DefaultConditionEvaluator<DerivedValues>, DefaultOutcomeApplier<WorldEffects>>;
+
+/// The compiled effects of a `then` list: the host outcome of a dialogue.
+type Then = Arc<[CEffect]>;
+
+/// dramaturge for a turn of a talk, with the world effects of the dialogue.
+fn runtime(d: &CDialogue) -> Runtime {
+    DefaultRuntime::with_parts(
+        evaluator(),
+        DefaultOutcomeApplier::with_custom(WorldEffects {
+            owner: Id::new(format!("dialogue:{}", d.id)),
+        }),
+    )
+}
+
+/// The talk as a dramaturge cursor. The save keeps node keys, which stay
+/// valid when a story changes (see `save.rs`); the cursor uses node ids.
+fn cursor(d: &CDialogue, talk: &Talk) -> Option<DialogCursor> {
+    let id = |key: &str| d.node_by_key(key).map(|n| n.id);
+    let mut cursor = DialogCursor::new(id(&talk.node)?);
+    cursor.back = talk.back.iter().filter_map(|k| id(k)).collect();
+    Some(cursor)
+}
+
+/// Store the cursor in the talk, as node keys. An id without a node is
+/// not stored: the talk keeps its node, and the return stack skips it.
+fn keep(d: &CDialogue, cursor: &DialogCursor, talk: &mut Talk) {
+    let key = |id| d.key_of(id).map(str::to_string);
+    let Some(node) = key(cursor.current) else {
+        return;
+    };
+    talk.node = node;
+    talk.back = cursor.back.iter().filter_map(|id| key(*id)).collect();
 }
 
 /// The state of an option in the current node, for the inspector.
@@ -257,7 +286,7 @@ impl Game {
     }
 
     /// The options the player can choose now.
-    fn available(&self) -> Vec<DialogueOption> {
+    fn available(&self) -> Vec<COption> {
         let Some(talk) = &self.state.talk else {
             return Vec::new();
         };
@@ -268,8 +297,9 @@ impl Game {
         else {
             return Vec::new();
         };
-        let runtime = DefaultRuntime::with_parts(evaluator(), DefaultOutcomeApplier::new());
-        runtime.available_options(node, self).cloned().collect()
+        AvailableOptionsIter::new(node, &evaluator(), self)
+            .cloned()
+            .collect()
     }
 
     /// The answers the player can choose now, numbered from 0: the answers
@@ -278,24 +308,15 @@ impl Game {
         if self.state.awaiting.is_some() {
             return self.await_choices();
         }
-        let Some(d) = self
-            .state
-            .talk
-            .as_ref()
-            .and_then(|t| self.world.dialogue(t.dialogue.as_str()))
-        else {
-            return Vec::new();
-        };
         self.available()
             .iter()
             .enumerate()
             .map(|(index, o)| Choice {
                 index,
-                text: d
-                    .graph
-                    .option_say
-                    .get(&o.id)
-                    .map(|s| text::line_text(&self.eval(), s))
+                text: o
+                    .text
+                    .as_host()
+                    .map(|l| text::line_text(&self.eval(), l))
                     .unwrap_or_default(),
             })
             .collect()
@@ -318,64 +339,78 @@ impl Game {
         let Some(d) = self.world.dialogue_with(thing.as_str()).cloned() else {
             return false;
         };
-        let ev = evaluator();
-        let start = d.graph.starts.iter().copied().find(|id| {
-            d.node(*id)
-                .is_some_and(|n| n.conditions.iter().all(|c| ev.evaluate(c, &*self)))
-        });
-        let Some(start) = start else {
+        let Some(start) = select_entry(&d.graph, &evaluator(), &*self) else {
             return false;
         };
-        self.state.talk = Some(Talk {
-            dialogue: d.id.clone(),
-            node: d.key_of(start).unwrap_or_default().to_string(),
-            back: Vec::new(),
-        });
+        let node = d.key_of(start).unwrap_or_default().to_string();
+        let log = turn.log.len();
         turn.log.push(LogEntry {
             kind: "talk".into(),
-            text: format!(
-                "{} at {}",
-                d.id,
-                self.state.talk.as_ref().map_or("", |t| &t.node)
-            ),
+            text: format!("{} at {node}", d.id),
         });
-        self.enter(turn, &d, start, true);
+        self.state.talk = Some(Talk {
+            dialogue: d.id.clone(),
+            node,
+            back: Vec::new(),
+        });
+        // select_entry checked the node's `when`; should `enter` still refuse
+        // the node, no talk started.
+        let entered = self.enter(turn, &d, start);
+        if !entered {
+            turn.log.truncate(log);
+        }
+        entered
+    }
+
+    /// Enter a node through dramaturge: show its line, apply its outcomes
+    /// and let world rules hear about it. A node whose `when` does not hold
+    /// can not be entered, and the talk ends. True when the node was entered.
+    fn enter(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, id: DialogueNodeId) -> bool {
+        let Some(node) = d.node(id) else {
+            self.end_talk();
+            return false;
+        };
+        let mut runtime = runtime(d);
+        let state = Turned { game: self, turn };
+        if !DialogueRuntime::<_, Then>::conditions_hold(&runtime, &node.conditions, &state) {
+            self.end_talk();
+            return false;
+        }
+        // The line shows the state before the node's outcomes.
+        self.show(turn, d, id);
+        runtime.enter_node(node, &mut Turned { game: self, turn });
+        // World rules hear about the node, after its outcomes.
+        let event = crate::Event::Talk {
+            dialogue: d.id.clone(),
+            node: d.key_of(id).unwrap_or_default().to_string(),
+        };
+        self.fire(turn, &event, 1);
+        self.end_without_options();
         true
     }
 
-    /// Show a node's line and, the first time, apply its outcomes. A node
-    /// with no option to choose ends the talk.
-    fn enter(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, id: DialogueNodeId, outcomes: bool) {
-        let Some(node) = d.node(id).cloned() else {
-            self.end_talk();
-            return;
+    /// Show a node's line.
+    fn show(&mut self, turn: &mut Turn, d: &CDialogue, id: DialogueNodeId) {
+        let Some(node) = d.node(id) else { return };
+        let key = d.key_of(id).unwrap_or_default();
+        let base = Run {
+            text: String::new(),
+            source: Some(Source {
+                owner: format!("dialogue:{}", d.id),
+                fragment: d.keys.iter().position(|k| k == key).unwrap_or(0),
+                layer: Layer::Characters,
+                condition: self.node_when(d, key),
+                variant: 0,
+            }),
+            link: None,
+            speaker: None,
         };
-        let key = d.key_of(id).unwrap_or_default().to_string();
-        if let Some(say) = d.graph.node_say.get(&id) {
-            let base = Run {
-                text: String::new(),
-                source: Some(Source {
-                    owner: format!("dialogue:{}", d.id),
-                    fragment: d.keys.iter().position(|k| *k == key).unwrap_or(0),
-                    layer: Layer::Characters,
-                    condition: self.node_when(d, &key),
-                    variant: 0,
-                }),
-                link: None,
-                speaker: None,
-            };
-            let runs = text::line_runs(&self.eval(), say, &base);
-            turn.push(BlockKind::Speech, runs);
-        }
-        if outcomes {
-            self.apply_outcomes(turn, d, &node.outcomes_on_enter);
-            // World rules hear about the node, after its outcomes.
-            let event = crate::Event::Talk {
-                dialogue: d.id.clone(),
-                node: key.clone(),
-            };
-            self.fire(turn, &event, 1);
-        }
+        let runs = self.line(&node.text, &base);
+        turn.push(BlockKind::Speech, runs);
+    }
+
+    /// A node with no option to choose ends the talk.
+    fn end_without_options(&mut self) {
         if self.state.talk.is_some() && self.available().is_empty() {
             self.end_talk();
         }
@@ -391,15 +426,11 @@ impl Game {
             .and_then(|n| n.when.clone())
     }
 
-    /// Apply outcomes through dramaturge. The [`Turned`] state logs each change.
-    fn apply_outcomes(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, outcomes: &[Outcome]) {
-        let mut applier = DefaultOutcomeApplier::with_custom(WorldEffects {
-            dialogue: d.clone(),
-        });
-        let mut state = Turned { game: self, turn };
-        for o in outcomes {
-            applier.apply(o, &mut state);
-        }
+    /// A line of the dialogue, rendered now, as runs like `base`.
+    fn line(&self, text: &DialogText<CompiledLine>, base: &Run) -> Vec<Run> {
+        text.as_host()
+            .map(|l| text::line_runs(&self.eval(), l, base))
+            .unwrap_or_default()
     }
 
     pub(super) fn end_talk(&mut self) {
@@ -410,7 +441,7 @@ impl Game {
     /// and the talk goes where the option leads. One turn passes.
     pub(super) fn choose(&mut self, turn: &mut Turn, index: usize) {
         let options = self.available();
-        let Some(option) = options.get(index).cloned() else {
+        let Some(option) = options.get(index) else {
             self.refuse(turn);
             return;
         };
@@ -419,49 +450,31 @@ impl Game {
             return;
         };
         let base = rule_run(String::new(), &Id::new(format!("dialogue:{}", d.id)));
-        let runs = d
-            .graph
-            .option_say
-            .get(&option.id)
-            .map(|s| text::line_runs(&self.eval(), s, &base))
-            .unwrap_or_default();
+        let runs = self.line(&option.text, &base);
         turn.push(BlockKind::Said, runs);
-        let mut runtime = DefaultRuntime::with_parts(
-            evaluator(),
-            DefaultOutcomeApplier::with_custom(WorldEffects {
-                dialogue: d.clone(),
-            }),
-        );
-        let target = runtime.choose_option(&option, &mut Turned { game: self, turn });
+        let target = runtime(&d).choose_option(option, &mut Turned { game: self, turn });
         // A world effect can end the story or take the player away.
-        let with = d.with.clone();
-        let here = self.eval().present(with.as_str());
-        if self.state.ended || !here {
-            self.end_talk();
-        } else {
-            match target {
-                DialogTarget::Node(next) if d.node(next).is_some() => {
-                    if let Some(talk) = &mut self.state.talk {
-                        let from = std::mem::take(&mut talk.node);
-                        talk.back.push(from);
-                        talk.node = d.key_of(next).unwrap_or_default().to_string();
-                    }
-                    self.enter(turn, &d, next, true);
+        let here = self.eval().present(d.with.as_str());
+        let mut cursor = self.state.talk.as_ref().and_then(|t| cursor(&d, t));
+        let next = match &mut cursor {
+            Some(cursor) if here && !self.state.ended => cursor.follow(&target),
+            _ => None,
+        };
+        match (next.filter(|id| d.node(*id).is_some()), cursor) {
+            (Some(next), Some(cursor)) => {
+                if let Some(talk) = &mut self.state.talk {
+                    keep(&d, &cursor, talk);
                 }
-                DialogTarget::Return => {
-                    let previous = self.state.talk.as_mut().and_then(|t| t.back.pop());
-                    match previous.and_then(|key| d.node_by_key(&key).map(|n| (key, n.id))) {
-                        Some((key, id)) => {
-                            if let Some(talk) = &mut self.state.talk {
-                                talk.node = key;
-                            }
-                            self.enter(turn, &d, id, false);
-                        }
-                        None => self.end_talk(),
-                    }
+                if target == DialogTarget::Return {
+                    // Back to a node the talk was at: its line shows again,
+                    // its outcomes do not apply again.
+                    self.show(turn, &d, next);
+                    self.end_without_options();
+                } else {
+                    self.enter(turn, &d, next);
                 }
-                _ => self.end_talk(),
             }
+            _ => self.end_talk(),
         }
         self.advance(turn);
     }

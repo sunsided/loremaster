@@ -57,3 +57,58 @@ fn a_zero_delta_changes_nothing_and_logs_nothing() {
     assert_eq!(lines, ["set knows_blackbeard_name = true"], "{lines:?}");
     assert!(!game.state().relations.contains_key("blackbeard.trust"));
 }
+
+#[test]
+fn go_back_shows_the_node_again_without_its_outcomes() {
+    let mut game = cantina(|t| {
+        t.replace(
+            "relation: { trust: -1 }\n        go: end",
+            "relation: { trust: -1 }\n        go: back",
+        )
+    });
+    // meet -> marigold (remembers asked_marigold) -> names.
+    assert_eq!(
+        changes(&mut game, "2"),
+        ["memory blackbeard remembers asked_marigold"]
+    );
+    input(&mut game, "who");
+    let talk = game.state().talk.clone().expect("in a talk");
+    assert_eq!((talk.node.as_str(), talk.back.len()), ("names", 2));
+
+    // Back to marigold: its line shows again, its `remember` does not apply again.
+    let turn = input(&mut game, "just");
+    let lines: Vec<String> = turn
+        .log
+        .iter()
+        .filter(|e| e.kind != "rule")
+        .map(|e| format!("{} {}", e.kind, e.text))
+        .collect();
+    assert_eq!(lines, ["relation blackbeard.trust -1 = 0"]);
+    let text = format!("{:?}", turn.blocks);
+    assert!(text.contains("Ships come and go"), "{text}");
+    let talk = game.state().talk.clone().expect("still in the talk");
+    assert_eq!(
+        (talk.node.as_str(), talk.back.clone()),
+        ("marigold", vec!["meet".to_string()])
+    );
+}
+
+#[test]
+fn a_go_to_a_node_whose_when_does_not_hold_ends_the_talk() {
+    let mut game = cantina(|t| {
+        t.replace(
+            "  marigold:\n",
+            "  marigold:\n    when: knows_blackbeard_name\n",
+        )
+    });
+    let turn = input(&mut game, "2");
+    assert!(game.state().talk.is_none());
+    // The node is not entered: no line, no `remember`.
+    let text = format!("{:?}", turn.blocks);
+    assert!(!text.contains("Ships come and go"), "{text}");
+    assert!(
+        !turn.log.iter().any(|e| e.kind == "memory"),
+        "{:?}",
+        turn.log
+    );
+}

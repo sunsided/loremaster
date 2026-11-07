@@ -74,10 +74,12 @@ fn conditions_and_outcomes_are_checked() {
 #[test]
 fn a_talk_that_loops_back_is_no_problem() {
     // meet -> names -> meet is a cycle; talks loop on purpose.
-    let d = diagnostics(&GOOD.replace(
+    let looping = GOOD.replace(
         "{ say: \"Back.\", go: back }",
         "{ say: \"Back.\", go: meet }",
-    ));
+    );
+    assert!(looping != GOOD, "the replace must build the loop");
+    let d = diagnostics(&looping);
     check!(d == vec![], "{d:#?}");
 }
 
