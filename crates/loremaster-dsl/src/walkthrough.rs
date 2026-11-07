@@ -7,9 +7,12 @@ use loremaster_project::{Origin, Pack};
 
 /// A walkthrough of a pack, from [`BuildPack::test`](crate::BuildPack::test).
 ///
-/// [`step`](Self::step) adds a command; [`sees`](Self::sees) and
-/// [`not_sees`](Self::not_sees) check the response of the step added last.
-/// The `expect_` methods check the game after the last step.
+/// [`step`](Self::step) adds a command. [`sees`](Self::sees),
+/// [`not_sees`](Self::not_sees), [`fact`](Self::fact),
+/// [`in_room`](Self::in_room), [`ended`](Self::ended) and
+/// [`ending`](Self::ending) check the step added last, as
+/// `{ do: …, see: …, facts: … }` in YAML. The `expect_` methods check the
+/// game after the last step (`expect:` in YAML).
 ///
 /// ```
 /// use loremaster_dsl::prelude::*;
@@ -31,11 +34,21 @@ pub struct WalkthroughBuilder<'a> {
 impl<'a> WalkthroughBuilder<'a> {
     #[track_caller]
     pub(crate) fn new(pack: &'a mut Pack, name: String) -> Self {
-        // A YAML test has its path as key; a Rust test has its file and line.
-        let key = match here(pack) {
-            Origin::Rust { file, line, .. } => format!("{file}:{line}"),
+        // A YAML test has its path as key; a Rust test has its file, line
+        // and column. A second test from the same place (a loop) gets `#2`,
+        // and so on, so that each key names one test.
+        let place = match here(pack) {
+            Origin::Rust {
+                file, line, column, ..
+            } => format!("{file}:{line}:{column}"),
             other => other.file().to_string(),
         };
+        let mut key = place.clone();
+        let mut n = 1;
+        while pack.walkthroughs.iter().any(|(k, _)| *k == key) {
+            n += 1;
+            key = format!("{place}#{n}");
+        }
         pack.walkthroughs.push((
             key,
             Walkthrough {
@@ -93,6 +106,36 @@ impl<'a> WalkthroughBuilder<'a> {
     #[track_caller]
     pub fn not_sees(mut self, text: impl Into<String>) -> Self {
         self.step_expect().not_see.push(text.into());
+        self
+    }
+
+    /// After the last step, a variable or property has this value.
+    #[track_caller]
+    pub fn fact(mut self, name: impl Into<String>, value: impl IntoValue) -> Self {
+        self.step_expect()
+            .facts
+            .insert(name.into(), value.into_value());
+        self
+    }
+
+    /// After the last step, the player is in this room.
+    #[track_caller]
+    pub fn in_room(mut self, room: impl AsRef<str>) -> Self {
+        self.step_expect().room = Some(id(room));
+        self
+    }
+
+    /// After the last step, the game has ended (or not).
+    #[track_caller]
+    pub fn ended(mut self, ended: bool) -> Self {
+        self.step_expect().ended = Some(ended);
+        self
+    }
+
+    /// After the last step, the game has ended with this ending.
+    #[track_caller]
+    pub fn ending(mut self, ending: impl AsRef<str>) -> Self {
+        self.step_expect().ending = Some(id(ending));
         self
     }
 
