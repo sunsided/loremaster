@@ -8,9 +8,9 @@
 //! turns with the rule log for the editor's transcript (the Workbench API).
 //! Their methods call only `Session` and `Workbench`.
 
-use loremaster_model::Value;
+use loremaster_model::{Value, Walkthrough};
 use loremaster_project::{Diagnostic, SourceFile, check_files, load};
-use loremaster_runtime::{Input, Session, Snapshot, World};
+use loremaster_runtime::{HintBook, Input, Session, Snapshot, World};
 use loremaster_workbench::{AuthorCommand, Budget, MarkupCheck, Workbench};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -48,10 +48,11 @@ fn or_null<T: Serialize>(value: Option<T>) -> Result<JsValue, JsValue> {
     }
 }
 
-/// A compiled story and the file of each entity.
+/// A compiled story, the file of each entity, and the walkthroughs.
 struct Story {
     world: Arc<World>,
     origins: BTreeMap<String, String>,
+    walkthroughs: Vec<(String, Walkthrough)>,
 }
 
 /// Build the story of project files (`[{ path, text }]`). Throws an array of
@@ -67,6 +68,7 @@ fn compile(files: JsValue) -> Result<Story, JsValue> {
         .map_err(|e| to_js(&vec![project.locate(Diagnostic::from(&e))]).unwrap_or(JsValue::NULL))?;
     Ok(Story {
         world: Arc::new(world),
+        walkthroughs: project.walkthroughs,
         // The editor opens files by path. Origins in Rust (DSL step L6) get
         // their own field when the editor shows them as read-only.
         origins: project
@@ -135,6 +137,17 @@ pub fn project_notes(files: JsValue) -> Result<JsValue, JsValue> {
     }
 }
 
+/// The quality report of the project files (CK-8): `{ findings, widths, verbs,
+/// deferred }`. Null when the files do not load.
+#[wasm_bindgen(js_name = qualityReport)]
+pub fn quality_report(files: JsValue) -> Result<JsValue, JsValue> {
+    let files: Vec<SourceFile> = from_js(files)?;
+    match load(files) {
+        Ok(project) => to_js(&loremaster_project::quality(&project)),
+        Err(_) => Ok(JsValue::NULL),
+    }
+}
+
 /// All threads of the project files, with their beats. Empty when the files do not load.
 #[wasm_bindgen(js_name = projectThreads)]
 pub fn project_threads(files: JsValue) -> Result<JsValue, JsValue> {
@@ -151,6 +164,8 @@ pub fn project_threads(files: JsValue) -> Result<JsValue, JsValue> {
 pub struct JsSession {
     world: Arc<World>,
     session: Session,
+    /// The hint ladder of the walkthroughs, also for a session from a save.
+    hints: HintBook,
 }
 
 #[wasm_bindgen(js_class = Session)]
@@ -160,9 +175,13 @@ impl JsSession {
     #[wasm_bindgen(constructor)]
     pub fn new(files: JsValue) -> Result<JsSession, JsValue> {
         let story = compile(files)?;
+        let hints = HintBook::new(story.world.clone(), &story.walkthroughs);
+        let mut session = Session::new(story.world.clone());
+        session.set_hints(hints.clone());
         Ok(JsSession {
-            session: Session::new(story.world.clone()),
+            session,
             world: story.world,
+            hints,
         })
     }
 
@@ -250,7 +269,8 @@ impl JsSession {
     /// Continue from a save. Returns `{ story_changed, from_version, dropped }`.
     /// Throws when the save cannot be read.
     pub fn load(&mut self, save: JsValue) -> Result<JsValue, JsValue> {
-        let (session, loaded) = load_save(&self.world, save)?;
+        let (mut session, loaded) = load_save(&self.world, save)?;
+        session.set_hints(self.hints.clone());
         self.session = session;
         Ok(loaded)
     }
@@ -258,6 +278,18 @@ impl JsSession {
     /// What the session waits for now.
     pub fn status(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.status())
+    }
+
+    /// The hint ladder of the current room: `[{ step, shown, command?, levels }]`,
+    /// the steps not done yet whose needs are done.
+    pub fn hints(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.session.hints())
+    }
+
+    /// Show the next hint level, of `step` or of the first step with a level
+    /// left. Returns a step with the hint as a note. It is no turn.
+    pub fn hint(&mut self, step: Option<String>) -> Result<JsValue, JsValue> {
+        to_js(&self.session.hint(step.as_deref()))
     }
 
     pub fn scene(&self) -> Result<JsValue, JsValue> {
@@ -291,6 +323,7 @@ impl JsSession {
 pub struct JsWorkbench {
     world: Arc<World>,
     origins: BTreeMap<String, String>,
+    walkthroughs: Vec<(String, Walkthrough)>,
     bench: Workbench,
 }
 
@@ -301,10 +334,13 @@ impl JsWorkbench {
     #[wasm_bindgen(constructor)]
     pub fn new(files: JsValue) -> Result<JsWorkbench, JsValue> {
         let story = compile(files)?;
+        let mut bench = Workbench::new(story.world.clone());
+        bench.set_walkthroughs(story.walkthroughs.clone());
         Ok(JsWorkbench {
-            bench: Workbench::new(story.world.clone()),
+            bench,
             world: story.world,
             origins: story.origins,
+            walkthroughs: story.walkthroughs,
         })
     }
 
@@ -401,6 +437,7 @@ impl JsWorkbench {
     pub fn load(&mut self, save: JsValue) -> Result<JsValue, JsValue> {
         let (session, loaded) = load_save(&self.world, save)?;
         self.bench = Workbench::from_session(session);
+        self.bench.set_walkthroughs(self.walkthroughs.clone());
         Ok(loaded)
     }
 
@@ -408,6 +445,23 @@ impl JsWorkbench {
     #[wasm_bindgen(js_name = carryOver)]
     pub fn carry_over(&mut self, from: &JsWorkbench) {
         self.bench = from.bench.carried_to(self.world.clone());
+        self.bench.set_walkthroughs(self.walkthroughs.clone());
+    }
+
+    /// The hint ladder of the current room, as `Session.hints`.
+    pub fn hints(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.session().hints())
+    }
+
+    /// Show the next hint level, as `Session.hint`, as a turn.
+    pub fn hint(&mut self, step: Option<String>) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.hint(step.as_deref()))
+    }
+
+    /// The dependency chart of each walkthrough with step ids (CK-7):
+    /// `[{ walkthrough, name, steps: [{ id, command, index, at?, needs, depth, width, hints }], max_width }]`.
+    pub fn charts(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.charts())
     }
 
     // ---- views -------------------------------------------------------------

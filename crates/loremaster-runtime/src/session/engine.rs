@@ -25,6 +25,8 @@ impl Session {
         let mut next = Self::of(game, self.seed);
         next.undo_depth = self.undo_depth;
         next.started = self.started;
+        next.hints = self.hints.clone();
+        next.revealed = self.revealed.clone();
         next
     }
 
@@ -60,12 +62,14 @@ impl Session {
             return turn;
         }
         let before = self.before();
+        let candidates = self.step_candidates(&input);
         let turn = match input {
             Input::Text(text) => self.game.input(&text),
             Input::Command(cmd) => self.game.act(cmd),
             Input::Choice(index) => self.game.act(Command::Choose { index }),
             Input::Tick => self.game.tick(),
         };
+        self.mark_steps(candidates);
         self.remember(before);
         turn
     }

@@ -222,6 +222,12 @@ pub fn undo(session: &mut Session) -> Turn {
     session.undo_turn()
 }
 
+/// The next level of the hint ladder, as a turn with a note. Read
+/// [`Session::hint`].
+pub fn hint(session: &mut Session, step: Option<&str>) -> Turn {
+    session.hint_turn(step)
+}
+
 /// [`Session::restart`] as a whole turn, with the rule log of the opening.
 pub fn restart(session: &mut Session) -> Turn {
     session.restart_turn()
