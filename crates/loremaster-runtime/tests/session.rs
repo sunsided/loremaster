@@ -247,3 +247,40 @@ fn a_session_restores_from_a_save() {
     let (typed, _) = Session::from_save(w, &s.save()).unwrap();
     assert_eq!(typed.state(), s.state());
 }
+
+#[test]
+fn a_dialogue_add_adds_and_logs_the_new_value() {
+    use loremaster_project::SourceFile;
+    let file = |path: &str, text: &str| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    };
+    let files = vec![
+        file(
+            "story.yaml",
+            "title: Tip\nstart: bar\nvars:\n  - { id: coins, type: int, initial: 1 }\n",
+        ),
+        file("rooms/bar.yaml", "name: Bar\n"),
+        file("things/bb.yaml", "name: man\nlocation: { room: bar }\n"),
+        file(
+            "dialogues/bb.yaml",
+            "with: bb\nstart: [hi]\nnodes:\n  hi:\n    say: \"Hm?\"\n    options:\n      - { say: \"Take this.\", add: { coins: 2 }, go: end }\n",
+        ),
+    ];
+    let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    s.submit(text("talk to man"));
+    let step = s.choose(0);
+    assert_eq!(
+        s.state().facts.get("coins"),
+        Some(&loremaster_model::Value::Int(3))
+    );
+    assert!(
+        step.effects.iter().any(|e| matches!(
+            e,
+            Effect::Notice { entry } if entry.kind == "set" && entry.text == "coins = 3"
+        )),
+        "{step:?}"
+    );
+}

@@ -244,7 +244,7 @@ mod tests {
             "title": "t",
             "start": "bar",
             "relations": ["trust"],
-            "vars": [{"id": "known", "type": "bool", "initial": false}],
+            "vars": [{"id": "known", "type": "bool", "initial": false}, {"id": "visits_bb", "type": "int", "initial": 0}],
             "rooms": [{"id": "bar", "name": "Bar"}],
             "things": [{"id": "bb", "name": "man", "location": {"room": "bar"}}],
             "dialogues": [{
@@ -258,7 +258,7 @@ mod tests {
                             {"say": "Bye."}
                         ]
                     },
-                    "names": {"say": "Blackbeard.", "set": {"known": true}, "then": [{"goto": "bar"}]},
+                    "names": {"say": "Blackbeard.", "set": {"known": true}, "add": {"visits_bb": 2}, "then": [{"goto": "bar"}]},
                     "again": {"say": "Again.", "when": "remembers(bb, asked)"}
                 }
             }]
@@ -290,8 +290,12 @@ mod tests {
             names.outcomes_on_enter[0],
             Outcome::SetFact { .. }
         ));
+        check!(matches!(
+            &names.outcomes_on_enter[1],
+            Outcome::AddFact { scope: FactScope::World, fact_id, delta: 2 } if fact_id.0.as_ref() == "visits_bb"
+        ));
         check!(
-            matches!(&names.outcomes_on_enter[1], Outcome::Custom { key, .. } if key == THEN_KEY)
+            matches!(&names.outcomes_on_enter[2], Outcome::Custom { key, .. } if key == THEN_KEY)
         );
         check!(c.effects.len() == 1);
         check!(matches!(

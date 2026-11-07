@@ -136,6 +136,11 @@ impl NarrativeState for Game {
         removed
     }
 
+    /// The save keeps memories by key only, so the memory rebuilt here has an
+    /// id and the player as subject, nothing more. That answers the queries
+    /// that loremaster lowers (`MemoryQuery::by_id`); a query on tags,
+    /// confidence or facts would never match. Keep more in the save first if
+    /// a condition needs them.
     fn matches_memory_query(&self, owner: EntityId, query: &MemoryQuery) -> bool {
         let symbols = &self.world.symbols;
         let Some(keys) = symbols
