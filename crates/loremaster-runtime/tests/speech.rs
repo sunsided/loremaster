@@ -53,6 +53,13 @@ const RULES: &str = r#"
         - { narrate: "It is late.", when: late }
         - { says: "Go to bed.", by: keeper, when: late }
         - { says: "{late ? | }" }
+- id: hidden
+  on: { verb: [inventory] }
+  instead: true
+  then:
+    - say:
+        - { narrate: "He waits. ", when: late }
+        - "The kettle hums. "
 "#;
 
 const DIALOGUE: &str = r#"
@@ -326,4 +333,19 @@ fn line_is_an_alias_of_say() {
         "- id: both\n  on: { verb: [wait] }\n  then:\n    - { say: \"A.\", line: \"B.\" }\n",
     )]);
     assert!(load(both).is_err());
+}
+
+#[test]
+fn a_hidden_segment_does_not_change_the_text_of_the_others() {
+    // Only one segment shows, so the line renders as a one-text line would:
+    // untrimmed, as before segments existed.
+    let mut game = game();
+    let turn = input(&mut game, "inventory");
+    let texts: Vec<String> = turn
+        .blocks
+        .iter()
+        .filter(|b| b.kind == BlockKind::Narration)
+        .map(|b| b.plain_text())
+        .collect();
+    assert!(texts.iter().any(|t| t == "The kettle hums. "), "{texts:#?}");
 }
