@@ -109,3 +109,41 @@ Keep dramaturge for dialogue structure, option filtering, relations and memories
 5. Relation defaults, `MemoryQuery::by_id`, and a validator issue kind.
 
 Without these changes, the cost stays in loremaster: about 900 lines of glue with tests (`talk.rs`, `dialogue.rs`) and a second state store that every state tool must learn.
+
+## Update: dramaturge 0.3 (phase 3)
+
+This section is from 2026-11-07, after loremaster moved to dramaturge 0.3.0-alpha.4. The report above describes dramaturge 0.2 and stays as it was, as the record of the test.
+
+Each point of the report, and what happened to it:
+
+| Point | Status | Where |
+| --- | --- | --- |
+| 1. Two text systems | Solved. A dialogue line is host text in the graph (`DialogText::Host`, dramaturge R8); the side tables `node_say` and `option_say` are gone. | dramaturge #91; loremaster #150 (P3-08) |
+| 2. Facts are stored twice | Solved. loremaster implements dramaturge's `NarrativeState` on its own state (ADR 0002); `DialogWorldState`, `Game::mirror` and the restore rebuild are gone. | phase 1 (P1-01) |
+| 3. The explorer and the room matrix do not see relations and memories | Solved. Both read relations and memories from the one store. | phase 1 (P1-02) |
+| 4. One entry node, but a list of start nodes | Solved. `start` is the graph's entry node list, `select_entry` picks the first that holds, and the unreachable-start filter is gone. | dramaturge #87 (R1); loremaster #150 (P3-09) |
+| 5. `Outcome::Custom` is untyped | Solved. `then` is a typed host outcome (`Outcome::Host(Vec<Effect>)`, R3), and `add` is `Outcome::AddFact`. `THEN_KEY`, `ADD_KEY` and the effects index are gone. | dramaturge #86 (R3), alpha.2 (R0e); loremaster #147 (P3-06), #150 (P3-07) |
+| 6. The player needs a reserved entity | Solved. loremaster uses `SymbolTable::PLAYER_KEY` and `SymbolTable::player()`; the key `@player` is the same, so saves stay compatible. | alpha.2 (R0c); loremaster #147 (P3-13) |
+| 7.1 A relation that was never set is "missing" | Solved. Unset relations read as 0; no start-of-game zero fill. | alpha.2 (R4); phase 1 |
+| 7.2 Memories are found by query, not by id | Solved. `remembers()` queries `MemoryQuery::by_id`; memories carry no key tag. | alpha.2 (R5); loremaster #147 (P3-11) |
+| 7.3 No "enter node" in the runtime | Solved. Nodes are entered with `enter_node`, which checks the node's conditions and applies its enter outcomes. A `go` to a node whose `when` does not hold now ends the talk. | dramaturge #88 (R7); loremaster #150 (P3-12) |
+| 7.4 No "back" | Solved. `go` and `go: back` move a `DialogCursor` with a return stack. The save keeps the node keys (`Talk::back`), so old saves load. | dramaturge #88 (R7); loremaster #150 (P3-12) |
+| 7.5 The event log grows | Solved. The event log is optional; loremaster does not keep it. | alpha.2 (R0c) |
+| 7.6 Validator issues are text only | Solved. The checker filters by `ValidationIssueKind` and skips cycles through `ValidationOptions`. | alpha.2 (R6); loremaster #147 (P3-10) |
+| 7.7 Orphaned facts are noise for a host with rules | Unchanged, on purpose. The issue is `Info`, and `check.rs` drops `Info` issues. | — |
+
+In addition, decision D3 made loremaster's YAML dialogue shape the shape of dramaturge 0.3: both read dialogues into one AST in `dramaturge-syntax` (R12). loremaster lowers it through a `Lower` host (`crates/loremaster-lang/src/dialogue.rs`), and dramaturge has a `dialogue!` macro for the same shape (loremaster #153, P3-02; dramaturge #93).
+
+### The glue now
+
+| File | 0.2 | 0.3 |
+| --- | --- | --- |
+| `crates/loremaster-runtime/src/game/talk.rs` | about 600 lines | 264 lines |
+| `crates/loremaster-lang/src/dialogue.rs` | about 335 lines | 215 lines |
+
+Not all of the drop in `talk.rs` is removed code. The logging `NarrativeState` wrapper, the inspector view and the talk input moved into `game/talk/turned.rs`, `view.rs` and `input.rs`. The code that went away is the glue that the table above names: the side tables, the custom outcome keys, the effects index, the double store, the start-node and validator filters, and the host-side enter and back logic.
+
+### Still open
+
+- Auto-continue nodes and lines with their own speaker (R2) are in dramaturge 0.3, but loremaster does not play them yet. loremaster shows each line before the node's outcomes and sends a talk event per node, so `advance` needs its own design in loremaster. `check` reports `lines` and `next` as errors until then.
+- Text pools with selection (R9) are the next dramaturge item (phase 4). The keeper's remark in the golden slice waits for it (`slice_keeper_dialogue`).
