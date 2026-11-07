@@ -100,7 +100,7 @@ impl fmt::Display for SaveError {
 impl std::error::Error for SaveError {}
 
 /// A restored game, and what the restore had to change.
-pub struct Restored {
+pub(crate) struct Restored {
     pub game: Game,
     /// The save was made with a different version of the story.
     pub story_changed: bool,

@@ -17,11 +17,9 @@ pub use talk::{TalkOptionView, TalkView};
 /// A game in progress: the engine behind [`Session`](crate::Session).
 ///
 /// Hosts use the Session API, and authoring tools the crate
-/// `loremaster-workbench` (ADR 0003). `Game` is public only for the tests of
-/// this crate and goes `pub(crate)` once they play through `Session` (P2-09).
-#[doc(hidden)]
+/// `loremaster-workbench` (ADR 0003).
 #[derive(Debug, Clone)]
-pub struct Game {
+pub(crate) struct Game {
     world: Arc<World>,
     state: State,
     /// The room fragments in the last description the player saw, so the

@@ -6,8 +6,14 @@ mod thief;
 
 use loremaster_model::{Id, Location};
 use loremaster_project::{SourceFile, load};
-use loremaster_runtime::{Game, State, World};
+use loremaster_runtime::authoring;
+use loremaster_runtime::{Input, Session, State, Turn, World};
 use std::sync::Arc;
+
+/// One typed command as a whole turn.
+fn input(session: &mut Session, text: &str) -> Turn {
+    authoring::play(session, Input::Text(text.into()))
+}
 
 fn world(with_thief: bool) -> Arc<World> {
     let files = [
@@ -48,10 +54,10 @@ fn world(with_thief: bool) -> Arc<World> {
 
 /// Wait until the gem is gone, at most 60 turns. Returns the turn it went and the state.
 fn wait_for_theft(world: Arc<World>) -> (Option<u32>, State) {
-    let mut game = Game::new(world);
-    game.start();
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
     for _ in 0..60 {
-        game.input("wait");
+        input(&mut game, "wait");
         if game.state().location_of("gem") == Some(&Location::In(Id::new("thief"))) {
             return (Some(game.state().turns), game.state().clone());
         }
@@ -81,16 +87,16 @@ fn without_the_code_the_story_plays_without_the_thief() {
 #[test]
 fn a_saved_game_goes_on_like_the_game_it_saved() {
     let w = world(true);
-    let mut game = Game::new(w.clone());
-    game.start();
+    let mut game = Session::new(w.clone());
+    authoring::start(&mut game);
     for _ in 0..5 {
-        game.input("wait");
+        input(&mut game, "wait");
     }
     let save = serde_json::to_string(game.state()).unwrap();
-    let mut restored = Game::restore(w, serde_json::from_str(&save).unwrap());
+    let mut restored = authoring::session_of(w, serde_json::from_str(&save).unwrap());
     for _ in 0..30 {
-        let a = game.input("wait").plain_text();
-        let b = restored.input("wait").plain_text();
+        let a = input(&mut game, "wait").plain_text();
+        let b = input(&mut restored, "wait").plain_text();
         assert_eq!(a, b);
     }
     assert_eq!(game.state(), restored.state());
@@ -170,16 +176,16 @@ fn counter_world() -> Arc<World> {
 
 #[test]
 fn a_behavior_gets_only_the_events_of_its_manifest() {
-    let mut game = Game::new(counter_world());
-    game.start();
-    game.input("wait");
-    game.input("wait");
+    let mut game = Session::new(counter_world());
+    authoring::start(&mut game);
+    input(&mut game, "wait");
+    input(&mut game, "wait");
     assert_eq!(
         game.state().facts.get("seen"),
         Some(&loremaster_model::Value::Int(0)),
         "no turn events"
     );
-    let turn = game.input("ring");
+    let turn = input(&mut game, "ring");
     assert_eq!(
         game.state().facts.get("seen"),
         Some(&loremaster_model::Value::Int(1))
@@ -282,10 +288,10 @@ fn a_behavior_reads_the_narrow_view_and_rolls_through_cx() {
     world.register(Watcher);
     let world = Arc::new(world);
     let play = || {
-        let mut game = Game::new(world.clone());
-        game.start();
-        let first = game.input("wait").plain_text();
-        let second = game.input("e").plain_text();
+        let mut game = Session::new(world.clone());
+        authoring::start(&mut game);
+        let first = input(&mut game, "wait").plain_text();
+        let second = input(&mut game, "e").plain_text();
         (first, second, game.state().rng)
     };
     let (first, second, rng) = play();
@@ -356,9 +362,9 @@ fn call_runs_a_behavior_at_its_place_in_the_rule() {
     let mut world = World::compile(load(gate_files("gate")).unwrap().story).unwrap();
     world.register(Gate);
     let world = Arc::new(world);
-    let mut game = Game::new(world.clone());
-    game.start();
-    let text = game.input("knock").plain_text();
+    let mut game = Session::new(world.clone());
+    authoring::start(&mut game);
+    let text = input(&mut game, "knock").plain_text();
     let (a, b, c) = (
         text.find("You knock.").unwrap(),
         text.find("The gate hears knock.").unwrap(),
@@ -367,10 +373,10 @@ fn call_runs_a_behavior_at_its_place_in_the_rule() {
     assert!(a < b && b < c, "{text}");
 
     // `Flow::Stop` stops the rule, like `stop`.
-    let mut game = Game::new(world);
-    game.start();
-    game.input("bar");
-    let text = game.input("knock").plain_text();
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    input(&mut game, "bar");
+    let text = input(&mut game, "knock").plain_text();
     assert!(text.contains("The gate hears knock."), "{text}");
     assert!(!text.contains("It opens."), "{text}");
 }
@@ -378,9 +384,9 @@ fn call_runs_a_behavior_at_its_place_in_the_rule() {
 #[test]
 fn a_call_without_the_behavior_is_a_note_and_a_wrong_call_is_an_error() {
     let world = Arc::new(World::compile(load(gate_files("gate")).unwrap().story).unwrap());
-    let mut game = Game::new(world);
-    game.start();
-    let turn = game.input("knock");
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    let turn = input(&mut game, "knock");
     assert!(turn.plain_text().contains("It opens."));
     assert!(
         turn.log
@@ -407,9 +413,9 @@ fn a_call_without_the_behavior_is_a_note_and_a_wrong_call_is_an_error() {
 fn a_call_to_a_registered_but_unnamed_behavior_says_so() {
     let mut world = World::compile(load(gate_files("other")).unwrap().story).unwrap();
     world.register(Gate);
-    let mut game = Game::new(Arc::new(world));
-    game.start();
-    let turn = game.input("knock");
+    let mut game = Session::new(Arc::new(world));
+    authoring::start(&mut game);
+    let turn = input(&mut game, "knock");
     assert!(
         turn.log
             .iter()

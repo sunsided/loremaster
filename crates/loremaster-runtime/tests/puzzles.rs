@@ -1,8 +1,14 @@
 //! Puzzle logic: action phases, rule scope and priority, timers, chance and events.
 
 use loremaster_project::{SourceFile, check, load};
-use loremaster_runtime::{Game, World};
+use loremaster_runtime::authoring;
+use loremaster_runtime::{Input, Session, Turn, World};
 use std::sync::Arc;
+
+/// One typed command as a whole turn.
+fn input(session: &mut Session, text: &str) -> Turn {
+    authoring::play(session, Input::Text(text.into()))
+}
 
 const STORY: &str = r#"
 title: Puzzles
@@ -105,7 +111,7 @@ const RULES: &str = r#"
     - say: "BOOM."
 "#;
 
-fn game() -> Game {
+fn game() -> Session {
     let files = [
         ("story.yaml", STORY),
         ("rooms/hall.yaml", HALL),
@@ -121,13 +127,13 @@ fn game() -> Game {
     let project = load(files.into()).unwrap_or_else(|e| panic!("{e:#?}"));
     let problems = check(&project);
     assert!(problems.is_empty(), "{problems:#?}");
-    let mut game = Game::new(Arc::new(World::compile(project.story).unwrap()));
-    game.start();
+    let mut game = Session::new(Arc::new(World::compile(project.story).unwrap()));
+    authoring::start(&mut game);
     game
 }
 
-fn say(game: &mut Game, cmd: &str) -> String {
-    game.input(cmd).plain_text()
+fn say(game: &mut Session, cmd: &str) -> String {
+    input(game, cmd).plain_text()
 }
 
 #[test]
@@ -232,10 +238,10 @@ vars:
     let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
     let world = Arc::new(World::compile(project.story).unwrap());
     let run = || {
-        let mut g = Game::new(world.clone());
-        g.start();
+        let mut g = Session::new(world.clone());
+        authoring::start(&mut g);
         for _ in 0..100 {
-            g.input("wait");
+            input(&mut g, "wait");
         }
         g.state().facts["heads"].as_int().unwrap()
     };
@@ -262,8 +268,8 @@ fn world_rules_hear_when_a_dialogue_reaches_a_node() {
     let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
     let problems = check(&project);
     assert!(problems.is_empty(), "{problems:#?}");
-    let mut g = Game::new(Arc::new(World::compile(project.story).unwrap()));
-    g.start();
+    let mut g = Session::new(Arc::new(World::compile(project.story).unwrap()));
+    authoring::start(&mut g);
     say(&mut g, "in");
     say(&mut g, "talk to shadow");
     let text = say(&mut g, "1");
@@ -271,7 +277,7 @@ fn world_rules_hear_when_a_dialogue_reaches_a_node() {
     assert!(text.contains("The barkeep looks up at the name."), "{text}");
 }
 
-fn world_of(files: &[(&str, &str)]) -> Game {
+fn world_of(files: &[(&str, &str)]) -> Session {
     let files = files
         .iter()
         .map(|(path, text)| SourceFile {
@@ -282,12 +288,12 @@ fn world_of(files: &[(&str, &str)]) -> Game {
     let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
     let problems = check(&project);
     assert!(problems.is_empty(), "{problems:#?}");
-    let mut game = Game::new(Arc::new(World::compile(project.story).unwrap()));
-    game.start();
+    let mut game = Session::new(Arc::new(World::compile(project.story).unwrap()));
+    authoring::start(&mut game);
     game
 }
 
-fn museum() -> Game {
+fn museum() -> Session {
     world_of(&[
         (
             "story.yaml",
@@ -382,7 +388,7 @@ fn scenery_is_in_every_room_of_its_region() {
     assert!(text.contains("Plaster."), "{text}");
 }
 
-fn chapel() -> Game {
+fn chapel() -> Session {
     world_of(&[
         (
             "story.yaml",

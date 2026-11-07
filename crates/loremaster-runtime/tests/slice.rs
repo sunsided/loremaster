@@ -6,9 +6,15 @@
 //! `task test:pending`. Read `examples/lock-keeper-slice/PENDING.md`.
 
 use loremaster_project::{Project, Severity, SourceFile, check, load, model_hash, read_dir};
-use loremaster_runtime::{Game, WalkResult, World, run_walkthrough};
+use loremaster_runtime::authoring;
+use loremaster_runtime::{Input, Session, Turn, WalkResult, World, run_walkthrough};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+/// One typed command as a whole turn.
+fn input(session: &mut Session, text: &str) -> Turn {
+    authoring::play(session, Input::Text(text.into()))
+}
 
 /// The parts of the slice that use syntax the model does not know yet. Today's
 /// loader rejects them, or skips their folder with a warning. Each test loads
@@ -134,8 +140,8 @@ fn slice_save_envelope() {
     // A save from the middle of slice_best: the pages are taken.
     let project = project(with("yaml", &[]));
     let world = Arc::new(World::compile(project.story).unwrap());
-    let mut game = Game::new(world.clone());
-    game.start();
+    let mut game = Session::new(world.clone());
+    authoring::start(&mut game);
     for command in [
         "up",
         "take windlass",
@@ -147,7 +153,7 @@ fn slice_save_envelope() {
         "open gear housing",
         "take pages",
     ] {
-        game.input(command);
+        input(&mut game, command);
     }
     let save = serde_json::to_value(game.save()).unwrap();
     assert_eq!(
@@ -156,11 +162,10 @@ fn slice_save_envelope() {
     );
     assert!(save["version"].is_u64(), "no save version: {save:#}");
 
-    let restored = Game::load_save(world, save).unwrap();
-    assert!(!restored.story_changed);
-    let mut game = restored.game;
-    game.input("w");
-    let text = game.input("accuse keeper").plain_text();
+    let (mut game, loaded) = Session::load(world, save).unwrap();
+    assert!(!loaded.story_changed);
+    input(&mut game, "w");
+    let text = input(&mut game, "accuse keeper").plain_text();
     assert!(text.contains("Committed for trial"), "{text}");
 }
 
