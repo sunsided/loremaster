@@ -1,26 +1,25 @@
-use crate::{State, World};
+use crate::{Game, State, World};
 use dramaturge_model::{Condition, FactValue};
-use dramaturge_runtime::{
-    ConditionEvaluator, CustomHandler, DefaultConditionEvaluator, DialogWorldState,
-};
+use dramaturge_runtime::{ConditionEvaluator, CustomHandler, DefaultConditionEvaluator};
 use loremaster_lang::{CmpOp, Derived, NameForm, Operand};
 use loremaster_model::{Location, TimeOfDay, Value};
 
-/// Evaluates conditions against a game: stored facts through dramaturge's
-/// default evaluator, derived values (`Condition::Custom`) here, through
+/// Evaluates conditions against a game: stored facts, relations and memories
+/// through dramaturge's default evaluator, which reads the save state through
+/// the game's `NarrativeState`, derived values (`Condition::Custom`) here, through
 /// dramaturge's `CustomHandler` hook. dramaturge walks `All` / `Any` / `Not`,
 /// so a derived value nested in them reaches the handler too.
 pub(crate) struct Eval<'a> {
     pub world: &'a World,
     pub state: &'a State,
-    pub facts: &'a DialogWorldState,
+    pub game: &'a Game,
 }
 
 /// Answers the derived values of an [`Eval`] for dramaturge.
 struct DerivedValues<'e, 'a>(&'e Eval<'a>);
 
-impl CustomHandler<DialogWorldState> for DerivedValues<'_, '_> {
-    fn condition(&self, key: &str, args: &[FactValue], _: &DialogWorldState) -> bool {
+impl CustomHandler<Game> for DerivedValues<'_, '_> {
+    fn condition(&self, key: &str, args: &[FactValue], _: &Game) -> bool {
         match Derived::from_condition(key, args) {
             Some((d, op, value)) => compare(&self.0.derived(&d), op, &value),
             None => false,
@@ -31,11 +30,11 @@ impl CustomHandler<DialogWorldState> for DerivedValues<'_, '_> {
 impl Eval<'_> {
     /// A `Custom` condition, as dramaturge hands it over.
     pub fn custom(&self, key: &str, args: &[FactValue]) -> bool {
-        DerivedValues(self).condition(key, args, self.facts)
+        DerivedValues(self).condition(key, args, self.game)
     }
 
     pub fn holds(&self, c: &Condition) -> bool {
-        DefaultConditionEvaluator::with_custom(DerivedValues(self)).evaluate(c, self.facts)
+        DefaultConditionEvaluator::with_custom(DerivedValues(self)).evaluate(c, self.game)
     }
 
     pub fn holds_opt(&self, c: &Option<Condition>) -> bool {
@@ -219,18 +218,11 @@ impl Eval<'_> {
 
     /// The player's relation to a thing on an axis, 0 when no dialogue changed it.
     pub fn relation(&self, thing: &str, axis: &str) -> i32 {
-        let scope = &self.world.scope;
-        match scope.entity(thing) {
-            Some(target) => self
-                .facts
-                .get_relationship(
-                    scope.player(),
-                    target,
-                    &dramaturge_model::RelationshipAxisId::new(axis),
-                )
-                .unwrap_or(0),
-            None => 0,
-        }
+        self.state
+            .relations
+            .get(&format!("{thing}.{axis}"))
+            .copied()
+            .unwrap_or(0)
     }
 }
 

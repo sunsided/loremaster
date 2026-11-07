@@ -1,15 +1,14 @@
-use crate::eval::{Eval, to_fact_value};
+use crate::eval::Eval;
 use crate::parser::{ParseScope, parse};
 use crate::text::{self, SourcePiece, article};
 use crate::world::{CEffect, CFragment, Within};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
 use crate::{Event, Phase};
-use dramaturge_model::{Fact, FactId, FactScope};
-use dramaturge_runtime::DialogWorldState;
 use loremaster_model::{EventPattern, Id, Location, TimeOfDay, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod narrative;
 mod talk;
 pub use talk::{TalkOptionView, TalkView};
 
@@ -18,7 +17,6 @@ pub use talk::{TalkOptionView, TalkView};
 pub struct Game {
     world: Arc<World>,
     state: State,
-    facts: DialogWorldState,
     /// The room fragments in the last description the player saw, so the
     /// assembly panel matches the screen even after once-only text is used up.
     last_shown: Option<(Id, Vec<usize>)>,
@@ -479,27 +477,14 @@ impl Game {
 
     /// Continue from a saved state.
     pub fn restore(world: Arc<World>, state: State) -> Self {
-        let mut facts = DialogWorldState::new();
-        for (id, value) in &state.facts {
-            facts.set_fact(
-                FactScope::World,
-                Fact {
-                    id: FactId::new(id.as_str()),
-                    value: to_fact_value(value),
-                },
-            );
-        }
-        let mut game = Self {
+        Self {
             world,
             state,
-            facts,
             last_shown: None,
             last_fired: Vec::new(),
             last_frame: None,
             stopped: false,
-        };
-        game.restore_dialog_state();
-        game
+        }
     }
 
     pub fn state(&self) -> &State {
@@ -514,7 +499,7 @@ impl Game {
         Eval {
             world: &self.world,
             state: &self.state,
-            facts: &self.facts,
+            game: self,
         }
     }
 
@@ -2159,13 +2144,6 @@ impl Game {
             kind: "set".into(),
             text: format!("{name} = {value}"),
         });
-        self.facts.set_fact(
-            FactScope::World,
-            Fact {
-                id: FactId::new(name),
-                value: to_fact_value(&value),
-            },
-        );
         self.state.facts.insert(name.to_string(), value);
     }
 
