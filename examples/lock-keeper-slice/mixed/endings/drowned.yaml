@@ -1,0 +1,4 @@
+# kind: death sends the death prompt (restore, undo, restart) in phase 2 (SE-9).
+kind: death
+title: Drowned
+text: "The lock keeps what falls into it."

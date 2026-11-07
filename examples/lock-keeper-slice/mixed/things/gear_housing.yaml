@@ -1,0 +1,8 @@
+name: gear housing
+aliases: [housing, gears, box]
+location: { room: lock_chamber }
+listed: false
+container: true
+props: { open: false }
+description:
+  - "An iron box at the bottom of the chamber, bolted to the stone. {lock == empty ? You can reach it now. | It is under water.}"

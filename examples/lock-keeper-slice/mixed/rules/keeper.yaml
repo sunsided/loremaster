@@ -1,0 +1,6 @@
+# New syntax: the Command record in the event (D6) and a text pool in `say` (R9).
+- id: keeper_comments
+  on: { verb: examine, direct: stove }
+  when: present(keeper)
+  then:
+    - say: { text: keeper_remark }

@@ -1,0 +1,8 @@
+name: windlass
+aliases: [handle, crank]
+location: { room: keepers_room }
+portable: true
+description:
+  - "An iron handle that turns the lock paddles. The square socket is worn bright."
+presence:
+  - "A windlass hangs on the hook by the door."

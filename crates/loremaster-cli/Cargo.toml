@@ -26,6 +26,10 @@ loremaster-runtime.workspace = true
 # In a git checkout, run `task release:ui` first, or build with `--no-default-features`.
 default = ["embed-ui"]
 embed-ui = ["loremaster-mcp/embed-ui"]
+# The draft world! forms of the golden slice (examples/lock-keeper-slice/dsl
+# and mixed). They do not compile until DSL step L2. Only the test target
+# tests/slice_dsl.rs uses this feature.
+dsl = []
 
 [lints]
 workspace = true

@@ -1,0 +1,15 @@
+# `end: <id>` names an ending in endings/ (phase 1, P1-03). Today the
+# runtime shows the id as the ending text.
+- id: accuse_with_pages
+  on: { verb: [accuse, keeper] }
+  when: pages.carried
+  then:
+    - say: "You lay the pages on the table. The lock-keeper looks at them for a long time."
+    - end: committed
+
+- id: accuse_without_pages
+  on: { verb: [accuse, keeper] }
+  when: not pages.carried
+  then:
+    - say: "The lock-keeper shrugs. \"Prove it,\" he says."
+    - end: ashes

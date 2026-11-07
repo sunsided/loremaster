@@ -1,0 +1,6 @@
+name: Lock Chamber
+position: [1, 0]
+description:
+  - "Stone walls drop into the lock. {lock == full ? Black water fills the chamber to the brim. | }{lock == emptying ? The water falls fast and the walls shine wet. | }{lock == empty ? The chamber is empty. Wet ladder rungs go down to the gear housing. | }"
+exits:
+  - { direction: west, to: kitchen }

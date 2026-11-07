@@ -1,0 +1,7 @@
+# Singular name: loremaster has no plural articles yet ("a ledger pages").
+name: oilcloth packet
+aliases: [packet, pages, ledger pages, oilcloth]
+location: { in: gear_housing }
+portable: true
+description:
+  - "Four pages torn from a toll ledger, dry inside the oilcloth. The sums on them do not match the sums in the book."

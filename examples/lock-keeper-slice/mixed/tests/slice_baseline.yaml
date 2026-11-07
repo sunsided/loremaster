@@ -1,0 +1,17 @@
+# Passes today: rooms, things, the lock machine and its timer in today's syntax.
+name: Empty the lock and take the pages
+steps:
+  - up
+  - take windlass
+  - down
+  - e
+  - { do: open gear housing, see: "under black water" }
+  - { do: open lower paddles, see: "Water roars out", facts: { lock: emptying } }
+  - wait
+  - { do: wait, see: "The chamber is empty." }
+  - { do: open gear housing, see: "oilcloth packet" }
+  - take pages
+expect:
+  facts: { lock: empty, ash_is_fresh: false }
+  room: lock_chamber
+  ended: false
