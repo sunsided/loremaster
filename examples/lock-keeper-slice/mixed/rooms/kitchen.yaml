@@ -1,0 +1,13 @@
+name: Kitchen
+position: [0, 0]
+description:
+  - "A low room under the lock house, with a black iron stove against the wall."
+  - layer: ambient
+    when: night
+    mode: cycle
+    variants:
+      - "Water knocks against the lock gate."
+      - "Somewhere a rope creaks."
+exits:
+  - { direction: up, to: keepers_room }
+  - { direction: east, to: lock_chamber }

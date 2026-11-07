@@ -22,6 +22,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - Walkthrough tests (`tests/*.yaml`) and `loremaster test`.
 - Pending tests: `pending: { phase, needs }` in a walkthrough, `#[ignore = "pending: ..."]` in Rust, `task test:pending`, and a CI job that fails when a pending test passes.
 - The golden slice `examples/lock-keeper-slice`: a part of the Lock-Keeper demo in YAML, with `slice_baseline` and eleven pending tests for the roadmap phases 1 to 4. Read its `PENDING.md`.
+- The draft `world!` forms of the golden slice (`dsl/`, `mixed/`), behind the new cargo feature `dsl` of the crate `loremaster`. They do not compile until DSL step L2.
 - Behaviors in Rust: the `Behavior` trait, `World::register`, and `behaviors:` in story.yaml or `behaviors/`.
 - `verbs/` for custom verbs in their own files.
 - Zork I: containers, scenery, the score and value of treasures from the importer; the lamp battery, the trophy case, the exorcism, the dam and the thief ported by hand. Read `docs/zork-fit-test.md`.

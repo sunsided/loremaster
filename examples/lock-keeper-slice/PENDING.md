@@ -7,8 +7,8 @@ The golden slice of the roadmap (phase 0). It is a small part of the demo "The L
 | Folder | Contents | Status |
 | --- | --- | --- |
 | `yaml/` | The whole slice in YAML | This folder |
-| `dsl/` | The same slice in `world!`, behind the cargo feature `dsl` | P0-02 (#34) |
-| `mixed/` | Rooms and texts in YAML, the agenda and the lock machine in `world!` | P0-03 (#35) |
+| `dsl/` | The same slice in `world!`, one pack per part, behind the cargo feature `dsl` of the crate `loremaster` | Draft syntax; compiles after DSL step L2 |
+| `mixed/` | The YAML folder, with the lock machine and the agenda in `world!` instead | Draft syntax; compiles after DSL step L2 |
 | `expected/` | `model.hash` and `slice_best.transcript` | When `slice_equivalence` (P1-06) and `slice_best` (P4-07) pass |
 
 The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine with its timer, the stove with the text of the D2 side note, the keeper with one dialogue and one agenda step (he burns the pages at midnight), and three endings: a win, a loss, and a death. The roadmap names two endings; the death ending is for `slice_undo_after_death`.
@@ -63,4 +63,13 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | YAML | `slice_keeper_dialogue` is phase 3 in the spec, but its dialogue says a text pool, which is R9 (phase 4). | Either an inline `say` in phase 3, or the test moves to phase 4. |
 | 2026-11-07 | YAML | Two candidates of the D2 sketch can never show to the player: "too hot to touch" (when the player examines, `seen_by(player)` is true, so the fresh-ash text scores higher) and "Mind your step." (the keeper never leaves the kitchen). | Keep them as D2 wrote them. `seen_by` matters only with several perceivers (D6); the winnable and quality checks of phase 4 should report a candidate that no state can show. |
 | 2026-11-07 | YAML | The agenda step "comes in from the lock" in one turn, but `place:` names only where it ends. | D6: a step with a route, or a step that takes several turns. |
+| 2026-11-07 | DSL | Almost every keeper line needs `\"` escapes. That is hard to read and hard to compare with the YAML. | Accept raw strings `r#"…"#` in the grammar, and use them in the examples. |
+| 2026-11-07 | DSL | 6 of the 8 part files start with an `extern` list. Conditions and markup (`not pages.carried`, `{lock == empty ? …}`) cannot use Rust paths, so path ids do not help. | A `uses today;` line that brings the ids of a pack into scope for conditions and markup. |
+| 2026-11-07 | DSL | `today.rs` cannot pass the check alone: `end committed` names an ending of another pack. | Move the accuse and jump rules into the endings part, or keep `end "<text>"` until P1-03 and switch both forms in one PR. |
+| 2026-11-07 | DSL | `in <id>` does not say if the place is a room or a container; the draft uses `inside`. A later `on table` clashes with `on verb(…)`. | Decide the location words in L3: `in` for a room, `inside` and `upon` for things. |
+| 2026-11-07 | DSL | Aliases and verb words with a space need strings in a list of idents: `["iron stove", grate, ash]`. | One form in L3, for example strings only. |
+| 2026-11-07 | DSL | The DSL doc makes each test block a `#[test]` over all packs. That does not fit tests that load only some parts. `wait * 17` keeps the walkthroughs readable. | Test blocks as data that the slice tests run with the parts they choose. A matching `{ wait: 17 }` step in YAML. |
+| 2026-11-07 | Mixed | A third to half of each Rust file is `extern` lines for YAML ids, and the macro checks nothing across the seam until load time. | Sealed mode `world!(yaml = "..")` for mixed forms, or accept that mixed pays off only for large Rust parts. |
+| 2026-11-07 | Mixed | The agenda id comes from the file name in YAML, but from `agenda for keeper` in Rust. Parallel file names needed `#[path]` in `mod.rs`. | An explicit id in both forms: `agenda keeper for keeper`, or `id:` in YAML. |
+| 2026-11-07 | DSL | The draft uses `loremaster::prelude::*`, but the crate `loremaster` has no library target yet. | L1 decides which crate exports `world!` and `Pack`. |
 | 2026-11-07 | YAML | The roadmap wants Markus to write one part in each form and note how it felt. | Open: Markus. |

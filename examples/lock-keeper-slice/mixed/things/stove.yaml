@@ -1,0 +1,18 @@
+# New syntax (phase 4, R9 text core): one_of, pick: best, seen_by, learn.
+# The D2 sketch puts this group into the kitchen description; here it is the
+# description of the stove, so that the kitchen loads in today's syntax.
+name: stove
+aliases: [iron stove, grate, ash]
+location: { room: kitchen }
+listed: false
+props: { hot: false }
+description:
+  - id: stove_state
+    pick: best
+    one_of:
+      - "The stove is cold."
+      - when: stove.hot
+        text: "The stove is still too hot to touch."
+      - when: stove.hot and seen_by(player)
+        text: "Someone fed the stove after midnight. The ash on the grate is fresh."
+        learn: [ash_is_fresh]

@@ -1,0 +1,6 @@
+name: Keeper's Room
+position: [0, -1]
+description:
+  - "A narrow room under the roof. A cot, a chair, and an iron hook by the door."
+exits:
+  - { direction: down, to: kitchen }

@@ -1,0 +1,10 @@
+# One dialogue format: a dialogue node says a named text pool, and an option
+# shows only after the player learned a fact.
+name: Ask the keeper about the stove
+pending: { phase: 3, needs: "D3, P3-01 #64" }
+steps:
+  - { do: talk to keeper, see: '"Do not touch the stove," the lock-keeper says.', not_see: "Who fed it?" }
+  - { do: "1", see: "Coal, when the company sends it." }
+  - { do: "2", ended: false }
+expect:
+  room: kitchen

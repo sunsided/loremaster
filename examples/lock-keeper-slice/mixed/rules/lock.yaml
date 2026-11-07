@@ -1,0 +1,20 @@
+- id: paddles_need_windlass
+  on: { check: [open, lower_paddles] }
+  when: not windlass.carried
+  then:
+    - say: "The paddles turn only with a windlass."
+    - stop
+
+- id: housing_under_water
+  on: { check: [open, gear_housing] }
+  when: lock != empty
+  then:
+    - say: "The gear housing is under black water."
+    - stop
+
+- id: jump_into_the_lock
+  on: { verb: [jump] }
+  when: here == lock_chamber and lock == full
+  then:
+    - say: "The water closes over you, colder than anything."
+    - end: drowned

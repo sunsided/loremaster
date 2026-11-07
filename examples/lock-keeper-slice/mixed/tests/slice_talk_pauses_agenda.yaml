@@ -1,0 +1,29 @@
+# The keeper is in a talk at midnight. His agenda step waits for the talk to
+# end, then runs late.
+# Midnight is after command 18 (22:30 + 18 × 5 minutes): the talk starts then.
+name: Talk through midnight
+pending: { phase: 4, needs: "D6, P4-02 #79" }
+steps:
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - { do: talk to keeper, see: '"Do not touch the stove," the lock-keeper says.' }
+  - { do: "1", see: "Coal, when the company sends it.", not_see: "feeds it in" }
+  - { do: "1", see: "The stove was cold all night.", not_see: "feeds it in" }
+  - { do: "1", see: "He opens the stove and feeds it in." }
+expect:
+  facts: { pages_burned: true, stove.hot: true }
