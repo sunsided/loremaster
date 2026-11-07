@@ -62,6 +62,13 @@ world! {
         expect lock == empty, ash_is_fresh == false, room == lock_chamber, not ended;
     }
 
+    // Jumping into the full lock ends the game; only the rule's text shows.
+    test slice_drowning "Jump into the full lock" {
+        jump sees "Nothing happens." expect not ended;
+        e;
+        jump sees "The water closes over you" not_sees "Nothing happens." expect ended;
+    }
+
     // The best path: take the pages before midnight and accuse the keeper.
     test slice_best "The pages before midnight" {
         pending phase 4, needs "P4-07 #84";

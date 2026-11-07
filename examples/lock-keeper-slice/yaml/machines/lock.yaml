@@ -16,4 +16,4 @@ steps:
   - from: emptying
     on: { timer: lock_drain }
     to: empty
-    say: "{here == lock_chamber ? The chamber is empty. Wet ladder rungs go down into the dark. | }"
+    say: "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }"

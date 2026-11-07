@@ -33,7 +33,7 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`. Each one loads
 
 | Test | It proves | Loads | Passes after | Issue |
 | --- | --- | --- | --- | --- |
-| `slice_baseline` | Rooms, things and the lock machine load and play in today's syntax | Today | Phase 0 (passes now) | #37 |
+| `slice_baseline` | Rooms, things and the lock machine load and play in today's syntax; every walkthrough without a pending mark passes (`slice_baseline`, `slice_drowning`) | Today | Phase 0 (passes now) | #37 |
 | `slice_endings` | Endings are entities with id, kind and rank | + Endings | Phase 1 | P1-03 #44 |
 | `slice_save_envelope` | A save from the middle of `slice_best` has an envelope and restores | + Endings | Phase 1 | P1-04 #45 |
 | `slice_equivalence` | YAML, DSL and mixed give one model | Today, per form | Phase 1 and DSL step L2 | P1-06 #47 |
@@ -77,4 +77,6 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | All | `rules/accuse.yaml` is in today's syntax, so its line stays a plain string with quotes, while the DSL form uses a speech segment. The two forms give different models for the same rendered text. | #111: the canonical model of `slice_equivalence` keeps segments, so the YAML file switches to `says` when #111 lands. |
 | 2026-11-07 | DSL | `keeper says "Prove it," "he says."` reads as if both strings were speech. | `narrate "…"`, the opposite of `says` (Markus): segments in any order, `says "Nobody." narrate "He turns the poker."`. A bare string after `says` gets a lint that suggests `narrate`. Done in the slice. |
 | 2026-11-07 | DSL | `say "The lock-keeper shrugs." keeper says "Prove it,"` reads like a stutter. | The effect is `line` in the DSL (Markus): a line is made of narration, `says` and `narrate` segments. YAML keeps `say:` for now; #111 decides on a `line:` alias. Done in the drafts. |
+| 2026-11-07 | All | `here == kitchen` is long for "the player is in the kitchen". | Use the existing built-in `in(kitchen)` (Markus): done in the slice. A form without parentheses (`when in kitchen`) is DSL sugar for L3, together with the location keywords. |
+| 2026-11-07 | YAML | The jump rule showed "Nothing happens." before the drowning: it lacked `instead: true`. No passing test played it. | Fixed; `slice_drowning` plays it now. A lint could warn when a verb rule that ends the game is not `instead`. |
 | 2026-11-07 | YAML | The roadmap wants Markus to write one part in each form and note how it felt. | Open: Markus. |

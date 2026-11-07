@@ -21,8 +21,8 @@ world! {
     // `narrate` there (and a lint would suggest it).
     texts keeper_remark best {
         "Mind your step.";
-        when here == kitchen => keeper says "Do not touch the stove," narrate "the lock-keeper says.";
-        sticky when here == kitchen and ash_is_fresh => [
+        when in(kitchen) => keeper says "Do not touch the stove," narrate "the lock-keeper says.";
+        sticky when in(kitchen) and ash_is_fresh => [
             keeper says "I let it go out at midnight," narrate "he says. He does not look at you.",
             keeper says "Cold stove, cold supper," narrate "he says.",
         ];

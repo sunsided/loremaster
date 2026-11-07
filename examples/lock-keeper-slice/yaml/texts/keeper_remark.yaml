@@ -5,9 +5,9 @@
 pick: best
 one_of:
   - "Mind your step."
-  - when: here == kitchen
+  - when: in(kitchen)
     text: [{ keeper says: "Do not touch the stove," }, "the lock-keeper says."]
-  - when: here == kitchen and ash_is_fresh
+  - when: in(kitchen) and ash_is_fresh
     mode: sticky
     variants:
       - [{ keeper says: "I let it go out at midnight," }, "he says. He does not look at you."]

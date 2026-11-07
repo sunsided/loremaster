@@ -14,7 +14,8 @@
 
 - id: jump_into_the_lock
   on: { verb: [jump] }
-  when: here == lock_chamber and lock == full
+  when: in(lock_chamber) and lock == full
+  instead: true
   then:
     - say: "The water closes over you, colder than anything."
     - end: drowned

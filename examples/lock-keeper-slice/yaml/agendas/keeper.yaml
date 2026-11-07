@@ -10,7 +10,7 @@ steps:
     then:
       - move: { pages: nowhere }
       - set: { stove.hot: true, pages_burned: true }
-      - say: "{here == kitchen ? The lock-keeper comes in from the lock with something wrapped in oilcloth. He opens the stove and feeds it in. | You smell smoke from the kitchen.}"
+      - say: "{in(kitchen) ? The lock-keeper comes in from the lock with something wrapped in oilcloth. He opens the stove and feeds it in. | You smell smoke from the kitchen.}"
     # A point of no return, not a dead end: after this step the best ending
     # (committed) cannot be reached, but the ashes ending still can. The
     # ending check (phase 4, CK) reports such a rank drop as a warning;

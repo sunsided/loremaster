@@ -110,7 +110,7 @@ world! {
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
-            line "{here == lock_chamber ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
+            line "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
         }
     }
 
@@ -133,7 +133,7 @@ world! {
 
     // draft: `end <ident>` names an ending entity (P1-03). `end "<text>"` in
     // the DSL doc is today's form, with a text.
-    rule jump_into_the_lock on verb(jump) when here == lock_chamber and lock == full {
+    rule jump_into_the_lock on verb(jump) instead when in(lock_chamber) and lock == full {
         line "The water closes over you, colder than anything.";
         end drowned;
     }

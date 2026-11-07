@@ -30,7 +30,7 @@ world! {
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
-            line "{here == lock_chamber ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
+            line "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
         }
     }
 }
