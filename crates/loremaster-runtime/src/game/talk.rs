@@ -114,7 +114,8 @@ impl NarrativeState for Turned<'_> {
         delta: i32,
     ) {
         NarrativeState::add_relationship(&mut *self.game, source, target, axis.clone(), delta);
-        if delta == 0 {
+        // The game keeps only relations from the player; others store nothing.
+        if delta == 0 || source != self.game.world.scope.player() {
             return;
         }
         let Some(thing) = self
