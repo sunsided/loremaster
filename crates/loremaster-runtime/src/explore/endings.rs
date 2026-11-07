@@ -81,9 +81,10 @@ pub struct NoReturn {
     /// The ranked endings in `lost` that no `closes` names. Empty when the
     /// point of no return is accepted.
     pub unaccepted: Vec<String>,
-    /// The rules whose `closes` accept the drop, with their reasons.
+    /// The rules whose `closes` accept the drop.
     pub accepted_by: Vec<String>,
-    pub reason: Option<String>,
+    /// The `reason` of each rule in `accepted_by`, in the same order.
+    pub reasons: Vec<String>,
     /// How many explored turns have this cause.
     pub turns: usize,
 }
@@ -215,7 +216,7 @@ pub(super) struct Graph<'a> {
     pub edges: &'a [Vec<(u32, u32)>],
     pub open: &'a [bool],
     pub closers: &'a HashMap<String, u32>,
-    /// The turns on which a rule with `closes` fired: (state, next state, rule).
+    /// The turns on which a rule with `closes` fired: (state, command, rule).
     pub closed: &'a [(u32, u32, u32)],
 }
 
@@ -227,13 +228,14 @@ pub(super) struct Outcome {
 
 /// The rules with `closes`, numbered.
 pub(super) fn closers(story: &Story) -> HashMap<String, u32> {
-    story
-        .rules
-        .iter()
-        .filter(|r| !r.closes.is_empty())
-        .enumerate()
-        .map(|(i, r)| (r.id.to_string(), i as u32))
-        .collect()
+    let mut out: HashMap<String, u32> = HashMap::new();
+    // Numbered by the map's size, so that two rules with one id (a check
+    // error, but `explore` may run without `check`) keep the numbers dense.
+    for r in story.rules.iter().filter(|r| !r.closes.is_empty()) {
+        let next = out.len() as u32;
+        out.entry(r.id.to_string()).or_insert(next);
+    }
+    out
 }
 
 /// A set of small numbers per state, in one flat vector.
@@ -407,9 +409,9 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
     }
     let mut ahead = Sets::new(n, closer_ids.len());
     let mut on_turn: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
-    for &(i, j, r) in g.closed {
+    for &(i, c, r) in g.closed {
         ahead.insert(i as usize, r as usize);
-        on_turn.entry((i, j)).or_default().push(r);
+        on_turn.entry((i, c)).or_default().push(r);
     }
     if !g.closed.is_empty() {
         ahead.close(&preds);
@@ -499,17 +501,17 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
         }
     }
 
-    // Points of no return: proven turns into states that are not ended and
-    // not dead, after which the best rank is worse.
+    // Points of no return: turns between proven states into states that are
+    // not ended and not dead, after which the best rank is worse. A state
+    // that can reach a cut state has an incomplete set: it proves nothing.
     let mut no_return: Vec<NoReturn> = Vec::new();
-    let mut no_return_at: BTreeMap<(Option<String>, Vec<usize>), usize> = BTreeMap::new();
+    // By cause: the blamed rule, the lost endings, the unaccepted ones.
+    type Cause = (Option<String>, Vec<usize>, Vec<usize>);
+    let mut no_return_at: BTreeMap<Cause, usize> = BTreeMap::new();
     let mut lost_by: Vec<Vec<bool>> = vec![vec![false; ids.len()]; closer_ids.len()];
-    for i in (0..n).filter(|&i| !ended[i]) {
+    for i in (0..n).filter(|&i| !ended[i] && !unproven[i]) {
         for &(j, c) in &g.edges[i] {
             let ju = j as usize;
-            if ended[ju] || dead[ju] || unproven[ju] {
-                continue;
-            }
             let pairs = || reach.of(i).iter().zip(reach.of(ju));
             if pairs().all(|(a, b)| a & !b == 0) {
                 // Most turns lose nothing.
@@ -522,7 +524,7 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
             }
             // The rules with `closes` that this turn fires, or that can still fire after it.
             let mut candidates: Vec<usize> = on_turn
-                .get(&(i as u32, j))
+                .get(&(i as u32, c))
                 .map(|v| v.iter().map(|&r| r as usize).collect())
                 .unwrap_or_default();
             for r in members(ahead.of(ju)) {
@@ -530,10 +532,15 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                     candidates.push(r);
                 }
             }
+            // Every turn counts for the stale `closes` check, also one into
+            // an ending or a dead end.
             for &r in &candidates {
                 for &e in &lost {
                     lost_by[r][e] = true;
                 }
+            }
+            if ended[ju] || dead[ju] {
+                continue;
             }
             let (before, after) = (best(i), best(ju));
             if !worse(rank(before), rank(after)) {
@@ -555,7 +562,7 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                 .first()
                 .map(|&r| closer_ids[r].clone())
                 .or_else(|| fired.iter().find(|r| changes(r)).cloned());
-            let key = (rule.clone(), lost.clone());
+            let key = (rule.clone(), lost.clone(), unaccepted.clone());
             match no_return_at.get(&key) {
                 Some(&k) => no_return[k].turns += 1,
                 None => {
@@ -565,10 +572,15 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                     } else {
                         Vec::new()
                     };
-                    let reason = accepted_by
-                        .first()
-                        .and_then(|r| rules.get(r.as_str()))
-                        .and_then(|r| r.reason.clone());
+                    let reasons = accepted_by
+                        .iter()
+                        .map(|r| {
+                            rules
+                                .get(r.as_str())
+                                .and_then(|r| r.reason.clone())
+                                .unwrap_or_default()
+                        })
+                        .collect();
                     no_return.push(NoReturn {
                         path: path_of(i, c),
                         room: room_of(i),
@@ -581,7 +593,7 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                         lost: lost.iter().map(|&e| ids[e].clone()).collect(),
                         unaccepted: unaccepted.iter().map(|&e| ids[e].clone()).collect(),
                         accepted_by,
-                        reason,
+                        reasons,
                         turns: 1,
                     });
                 }

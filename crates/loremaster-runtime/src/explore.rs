@@ -278,13 +278,14 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
 
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut nodes: Vec<(Game, Vec<String>)> = Vec::new();
-    // The graph for the ending checks: for each state, the states after it,
-    // each with the index of its command in `commands` of the state.
+    // The graph for the ending checks: for each state, one edge per command
+    // (the next state, and the index of the command in `commands` of the
+    // state), so that two commands into one state stay two turns.
     let mut edges: Vec<Vec<(u32, u32)>> = Vec::new();
     // States whose future the walk did not finish: the depth cut them, or the
     // budget dropped a state after them.
     let mut open: Vec<bool> = Vec::new();
-    // The rules with `closes`, and the turns on which they fired: (state, next state, rule).
+    // The rules with `closes`, and the turns on which they fired: (state, command, rule).
     let closers = endings::closers(&start.world().story);
     let mut closed: Vec<(u32, u32, u32)> = Vec::new();
     let mut shown: BTreeSet<(String, usize)> = BTreeSet::new();
@@ -374,7 +375,11 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             continue;
         }
         if path.len() >= budget.max_depth {
-            // The depth stops the walk here: what comes after is not known.
+            // The depth stops the walk here: what comes after is not known,
+            // unless nothing can come after it.
+            if commands(&game).is_empty() {
+                continue;
+            }
             open[i] = true;
             truncated = true;
             continue;
@@ -432,11 +437,9 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                     j
                 }
             };
-            let (from, to) = (i as u32, j as u32);
-            if !edges[i].iter().any(|&(k, _)| k == to) {
-                edges[i].push((to, c as u32));
-            }
-            closed.extend(closing.into_iter().map(|r| (from, to, r)));
+            let (from, c) = (i as u32, c as u32);
+            edges[i].push((j as u32, c));
+            closed.extend(closing.into_iter().map(|r| (from, c, r)));
         }
     }
 

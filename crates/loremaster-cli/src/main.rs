@@ -406,7 +406,7 @@ fn explore(project: Project) -> ExitCode {
                 "Point of no return after {} (accepted by `closes` of {}: {}).",
                 p.path.join(", "),
                 p.accepted_by.join(", "),
-                p.reason.as_deref().unwrap_or("")
+                p.reasons.join("; ")
             );
         }
         for d in checks.diagnostics() {

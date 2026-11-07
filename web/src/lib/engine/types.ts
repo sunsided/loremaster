@@ -541,7 +541,8 @@ export interface NoReturn {
 	unaccepted: string[];
 	/** The rules whose `closes` accept the drop. */
 	accepted_by: string[];
-	reason: string | null;
+	/** The `reason` of each rule in `accepted_by`, in the same order. */
+	reasons: string[];
 	turns: number;
 }
 

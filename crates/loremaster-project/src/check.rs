@@ -672,7 +672,7 @@ impl Checker<'_> {
                 ),
             );
         }
-        if rule.closes.is_empty() && rule.reason.is_some() {
+        if rule.closes.is_empty() && reason {
             self.warning(
                 file,
                 "reason",

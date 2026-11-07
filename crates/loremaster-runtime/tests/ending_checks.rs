@@ -164,8 +164,8 @@ fn closes_accepts_the_point_of_no_return() {
     assert!(point.accepted(), "{point:#?}");
     assert_eq!(point.accepted_by, ["burn_map"]);
     assert_eq!(
-        point.reason.as_deref(),
-        Some("Burning the map strands the player on purpose.")
+        point.reasons,
+        ["Burning the map strands the player on purpose."]
     );
     assert!(diagnostics.is_empty(), "{diagnostics:#?}");
 }
@@ -384,4 +384,217 @@ fn closes_needs_a_known_ending_and_a_reason() {
         messages.iter().any(|m| m.contains("needs a `reason`")),
         "{messages:#?}"
     );
+
+    // A blank `reason` without `closes` is no reason at all: no warning.
+    let rules = format!("{ESCAPE}{SURRENDER}{BURN}  reason: \"   \"\n");
+    let found = check(&cell(&rules, &[]));
+    assert!(
+        !found.iter().any(|d| d.message.contains("without `closes`")),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn two_commands_into_one_state_are_two_turns() {
+    // After `burn, cool, torch`, both `burn` and `torch` lead to the same
+    // state. Only `burn` closes the way out on purpose: the `torch` turn
+    // into that state is its own, unaccepted point of no return.
+    let files = vec![
+        file(
+            "story.yaml",
+            "title: Cell\nstart: cell\nvars:\n  - { id: heat, type: int, initial: 0 }\n  - { id: cooled, type: bool, initial: false }\n",
+        ),
+        file("rooms/cell.yaml", "name: Cell\ndescription: [\"Stone.\"]\n"),
+        file(
+            "endings/escaped.yaml",
+            "kind: win\nrank: 1\ntitle: Escaped\n",
+        ),
+        file(
+            "endings/caught.yaml",
+            "kind: loss\nrank: 3\ntitle: Caught\n",
+        ),
+        file(
+            "verbs/escape.yaml",
+            "label: Escape\nwords: [escape]\nslots: none\n",
+        ),
+        file(
+            "verbs/surrender.yaml",
+            "label: Surrender\nwords: [surrender]\nslots: none\n",
+        ),
+        file(
+            "verbs/burn.yaml",
+            "label: Burn\nwords: [burn]\nslots: none\n",
+        ),
+        file(
+            "verbs/torch.yaml",
+            "label: Torch\nwords: [torch]\nslots: none\n",
+        ),
+        file(
+            "verbs/cool.yaml",
+            "label: Cool\nwords: [cool]\nslots: none\n",
+        ),
+        file(
+            "rules/cell.yaml",
+            "- id: escape\n  on: { verb: [escape] }\n  when: heat < 2\n  then: [{ end: escaped }]\n\
+- id: surrender\n  on: { verb: [surrender] }\n  then: [{ end: caught }]\n\
+- id: burn_map\n  on: { verb: [burn] }\n  when: heat < 2\n  then: [{ add: { heat: 1 } }]\n  closes: [escaped]\n  reason: On purpose.\n\
+- id: torch_map\n  on: { verb: [torch] }\n  when: heat < 2 and cooled\n  then: [{ add: { heat: 1 } }]\n\
+- id: cool\n  on: { verb: [cool] }\n  when: heat == 1 and not cooled\n  then: [{ add: { heat: -1 } }, { set: { cooled: true } }]\n",
+        ),
+    ];
+    let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
+    let (result, _) = full(&project);
+    let checks = &result.ending_checks;
+    assert!(checks.proven, "{checks:#?}");
+    let turns = |rule: &str| {
+        checks
+            .no_return
+            .iter()
+            .filter(|p| p.rule.as_deref() == Some(rule))
+            .map(|p| (p.accepted(), p.turns))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(turns("burn_map"), [(true, 3)], "{checks:#?}");
+    assert_eq!(turns("torch_map"), [(false, 2)], "{checks:#?}");
+}
+
+const BURN: &str = "- id: burn_map\n  on: { verb: [burn] }\n  when: not burned\n  then: [{ set: { burned: true } }]\n";
+
+#[test]
+fn a_turn_from_an_unfinished_state_proves_nothing() {
+    // `wander` runs into the depth limit, so every state before a burn can
+    // reach a cut state: its set of endings is incomplete, and the rank drop
+    // of `burn` is not reported.
+    let rules = format!(
+        "{ESCAPE}{SURRENDER}{BURN}- id: wander\n  on: {{ verb: [wander] }}\n  when: not burned\n  then: [{{ add: {{ steps: 1 }} }}]\n"
+    );
+    let project = cell(
+        &rules,
+        &[(
+            "verbs/wander.yaml",
+            "label: Wander\nwords: [wander]\nslots: none\n",
+        )],
+    );
+    let (result, diagnostics) = run(
+        &project,
+        Budget {
+            max_states: 2000,
+            max_depth: 5,
+        },
+    );
+    let checks = &result.ending_checks;
+    assert!(!checks.proven);
+    assert!(checks.no_return.is_empty(), "{checks:#?}");
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|d| d.message.starts_with("point of no return")),
+        "{diagnostics:#?}"
+    );
+}
+
+#[test]
+fn closes_into_a_dead_end_is_not_stale() {
+    // The burn closes the only ending: a dead end, and the `closes` list
+    // names what the rule really loses.
+    let rules = format!("{ESCAPE}{BURN}  closes: [escaped]\n  reason: On purpose.\n");
+    let (result, diagnostics) = full(&cell(&rules, &[]));
+    let checks = &result.ending_checks;
+    assert!(checks.proven && checks.dead_ends.len() == 1, "{checks:#?}");
+    assert!(checks.stale.is_empty(), "{checks:#?}");
+    assert_eq!(
+        diagnostics.iter().filter(|d| d.is_error()).count(),
+        1,
+        "{diagnostics:#?}"
+    );
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|d| d.message.contains("no explored turn")),
+        "{diagnostics:#?}"
+    );
+}
+
+#[test]
+fn two_closes_rules_with_one_id_do_not_crash() {
+    // A duplicate id is a project error, but `explore` can run without `check`.
+    let rules = format!(
+        "{ESCAPE}{SURRENDER}{BURN}  closes: [escaped]\n  reason: On purpose.\n- id: torch_map\n  on: {{ verb: [torch] }}\n  then: [{{ set: {{ burned: true }} }}]\n  closes: [escaped]\n  reason: Also.\n"
+    );
+    let mut project = cell(
+        &rules,
+        &[(
+            "verbs/torch.yaml",
+            "label: Torch\nwords: [torch]\nslots: none\n",
+        )],
+    );
+    let burn = project
+        .story
+        .rules
+        .iter()
+        .find(|r| r.id.as_str() == "burn_map")
+        .unwrap()
+        .clone();
+    project.story.rules.insert(0, burn);
+    let (result, _) = full(&project);
+    assert!(result.ending_checks.ran);
+}
+
+#[test]
+fn a_state_without_commands_at_the_depth_limit_is_finished() {
+    // The pit has no way out and nothing to do: it is a dead end, also
+    // where the depth limit stops the walk.
+    let files = vec![
+        file("story.yaml", "title: Pit\nstart: edge\n"),
+        file(
+            "rooms/edge.yaml",
+            "name: Edge\ndescription: [\"A ledge.\"]\nexits:\n  - { direction: down, to: pit }\n  - { direction: north, to: road }\n",
+        ),
+        file(
+            "rooms/pit.yaml",
+            "name: Pit\ndescription: [\"Smooth walls.\"]\n",
+        ),
+        file(
+            "rooms/road.yaml",
+            "name: Road\ndescription: [\"The road home.\"]\n",
+        ),
+        file("endings/home.yaml", "kind: win\nrank: 1\ntitle: Home\n"),
+        file(
+            "rules/road.yaml",
+            "- id: home\n  on: { enter: road }\n  then: [{ end: home }]\n",
+        ),
+    ];
+    let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
+    let (result, diagnostics) = run(
+        &project,
+        Budget {
+            max_states: 2000,
+            max_depth: 1,
+        },
+    );
+    assert!(result.ending_checks.proven, "{:#?}", result.ending_checks);
+    assert_eq!(result.stuck, 1);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.message.contains("\"go down\"")),
+        "{diagnostics:#?}"
+    );
+}
+
+#[test]
+fn a_fragment_key_with_hash_finds_its_own_room() {
+    // `room:vault#1` is fragment 1 of the room `vault`, also when a room
+    // with the id `vault#1` exists; only rule keys are taken whole.
+    let mut project = cell(ESCAPE, &[]);
+    project.origins.insert(
+        "room:vault".into(),
+        loremaster_project::Origin::yaml("rooms/vault.yaml"),
+    );
+    project.origins.insert(
+        "room:vault#1".into(),
+        loremaster_project::Origin::yaml("rooms/other.yaml"),
+    );
+    let d = project.locate(Diagnostic::warning("", "room:vault#1/when", "x"));
+    assert_eq!(d.file, "rooms/vault.yaml");
 }

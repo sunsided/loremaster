@@ -101,7 +101,7 @@
 			<p class="warning">The budget stopped the walk. The results are incomplete: more states can exist.</p>
 		{/if}
 
-		{#if result.endings.length || result.stuck}
+		{#if result.endings.length || (result.stuck && !checks?.dead_ends.length)}
 			<section class="group">
 				<SectionRule title="endings" />
 				{#each result.endings as ending, i (i)}
@@ -152,7 +152,9 @@
 						{#if p.unaccepted.length}
 							<p class="muted">If this is on purpose, name {p.unaccepted.join(', ')} in <code>closes</code> of the step, with a <code>reason</code>.</p>
 						{:else}
-							<p class="muted"><code>closes</code> of {p.accepted_by.join(', ')}: {p.reason ?? ''}</p>
+							{#each p.accepted_by as rule, k (rule)}
+								<p class="muted"><code>closes</code> of {rule}: {p.reasons[k] ?? ''}</p>
+							{/each}
 						{/if}
 						{@render path(p.path)}
 						<Button size="compact" variant="quiet" onclick={() => onreplay(p.path)}>Replay this path</Button>

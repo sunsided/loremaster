@@ -38,9 +38,10 @@ impl Project {
     /// which is how a compile error names its place.
     pub fn locate(&self, mut diagnostic: Diagnostic) -> Diagnostic {
         if diagnostic.file.is_empty() {
-            // A whole key first: the rule of a machine step is `rule:lock#1`.
+            // A whole rule key first: the rule of a machine step is
+            // `rule:lock#1`. Other keys keep `#` for a fragment: `room:vault#2`.
             let whole = diagnostic.at.split('/').next().unwrap_or_default();
-            let key = if self.origins.contains_key(whole) {
+            let key = if whole.starts_with("rule:") && self.origins.contains_key(whole) {
                 whole
             } else {
                 diagnostic.at.split(['/', '#']).next().unwrap_or_default()
