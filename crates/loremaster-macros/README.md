@@ -35,7 +35,7 @@ let world = Loremaster::new().pack(pack()).yaml("endings/").build()?;
 - A block makes the function `pack()`. It calls the builder API of `loremaster-dsl`, so the pack has the same model values as the builder and the YAML loader make.
 - Each entity gets an `Origin::Rust` with the file, line and column of its id in the block.
 - At compile time, the macro runs the schema checks (`check_packs`) on the pack: unknown ids, reserved names, conditions and markup. An error is a compile error at the tokens it names. Ids of other packs go into `extern { .. }`.
-- The grammar has the story header, vars, rooms, things, rules, machines, timers, endings, verbs and walkthrough tests. Dialogues, text pools, `one_of`, agendas and speech segments come later; the macro names the step or issue that brings each one.
+- The grammar has the story header, vars, rooms, things, rules, machines, timers, endings, verbs and walkthrough tests. A `line` takes speech segments: `line "He shrugs." keeper says "Prove it," narrate "he says.";` and `line when in(chamber) then "Water drips.";`. Dialogues, text pools, `one_of` and agendas come later; the macro names the step or issue that brings each one.
 - The tests in `tests/ui/` (trybuild) hold the compile errors, and `tests/grammar.rs` the model values and origins.
 
 ## License

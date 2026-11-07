@@ -71,6 +71,14 @@ mod lock {
             end drowned;
         }
 
+        rule talk on verb(examine, chest) {
+            line "He shrugs." keeper says "Prove it," narrate "he says.";
+            line says "Who is there?" player says "Me." when lock_open then "Water drips."
+                when coins > 1 then keeper says "Pay up.";
+        }
+
+        thing keeper "keeper" in chamber {}
+
         rule splash on event(splashed) within chamber {
             goto kitchen;
             cancel drain;
@@ -85,7 +93,9 @@ mod lock {
                 line "Then it is quiet.";
                 start drain;
             }
-            [empty, full] -> full on timer(drain);
+            [empty, full] -> full on timer(drain) {
+                line when in chamber then "Back to full.";
+            }
         }
 
         timer drain turns 3 {
@@ -207,9 +217,49 @@ fn rules_and_effects() {
     assert!(matches!(&jump.then[4], Effect::Start(_)));
     assert!(matches!(&jump.then[5], Effect::Emit(e) if e.as_str() == "splashed"));
     assert!(matches!(&jump.then[6], Effect::End(e) if e.as_str() == "drowned"));
-    let splash = &p.rules[1];
+    let splash = &p.rules[2];
     assert_eq!(splash.within.as_ref().unwrap().as_str(), "chamber");
     assert_eq!(splash.then.len(), 3);
+}
+
+#[test]
+fn speech_segments() {
+    use loremaster::dsl::model::{Line, LineSegment};
+    let p = lock::pack();
+    let talk = &p.rules[1];
+    let lines: Vec<&Line> = talk
+        .then
+        .iter()
+        .map(|e| match e {
+            Effect::Say(l) => l,
+            other => panic!("{other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        lines[0],
+        &Line::new(vec![
+            LineSegment::plain("He shrugs."),
+            LineSegment::says("Prove it,").by("keeper"),
+            LineSegment::narrate("he says."),
+        ])
+    );
+    assert_eq!(
+        lines[1],
+        &Line::new(vec![
+            LineSegment::says("Who is there?"),
+            LineSegment::says("Me.").by("player"),
+            LineSegment::narrate("Water drips.").when("lock_open"),
+            LineSegment::says("Pay up.").by("keeper").when("coins > 1"),
+        ])
+    );
+    // A machine step's conditional line is its `say`.
+    let m = &p.machines[0];
+    assert_eq!(
+        m.steps[1].say,
+        Some(Line::new(vec![
+            LineSegment::narrate("Back to full.").when("in(chamber)")
+        ]))
+    );
 }
 
 #[test]

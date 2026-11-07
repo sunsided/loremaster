@@ -15,8 +15,8 @@ use loremaster_dsl::{
     variants,
 };
 use loremaster_model::{
-    EndingKind, EventPattern, Fragment, FragmentMode, Id, Layer, TimeOfDay, VarDef,
-    VarType as ModelVarType, VerbSlots,
+    EndingKind, EventPattern, Fragment, FragmentMode, Id, Layer, Line, LineSegment, TimeOfDay,
+    VarDef, VarType as ModelVarType, VerbSlots,
 };
 use loremaster_project::{Origin, Pack, Severity, assemble};
 use proc_macro2::{Span, TokenStream};
@@ -401,6 +401,54 @@ fn build(world: &World, spans: &mut Spans) -> Pack {
     p
 }
 
+/// The spans of the segments of a line at `at`: the checks name a segment
+/// `<at>.say[j]`, and its condition and speaker below it.
+fn segment_spans(spans: &mut Spans, key: &str, at: &str, segments: &[Segment]) {
+    for (j, s) in segments.iter().enumerate() {
+        spans.add(key, format!("{at}.say[{j}]"), s.tokens.clone());
+        if let Some(w) = &s.when {
+            spans.add(key, format!("{at}.say[{j}].when"), w.tokens.clone());
+        }
+        if let SegmentVoice::Says(Some(by)) = &s.voice {
+            spans.add(key, format!("{at}.say[{j}].by"), name_tokens(by));
+        }
+    }
+}
+
+/// A `Line`, as the expansion makes it (`crate::emit`).
+fn line(segments: &[Segment]) -> Line {
+    if let [
+        Segment {
+            voice: SegmentVoice::Plain,
+            text,
+            when: None,
+            ..
+        },
+    ] = segments
+    {
+        return Line::from(text.value.as_str());
+    }
+    Line::new(
+        segments
+            .iter()
+            .map(|s| {
+                let mut seg = match &s.voice {
+                    SegmentVoice::Plain => LineSegment::plain(s.text.value.as_str()),
+                    SegmentVoice::Narrate => LineSegment::narrate(s.text.value.as_str()),
+                    SegmentVoice::Says(None) => LineSegment::says(s.text.value.as_str()),
+                    SegmentVoice::Says(Some(by)) => {
+                        LineSegment::says(s.text.value.as_str()).by(Id::new(by.value.as_str()))
+                    }
+                };
+                if let Some(when) = &s.when {
+                    seg = seg.when(when.source.as_str());
+                }
+                seg
+            })
+            .collect(),
+    )
+}
+
 fn value(v: &Value) -> loremaster_model::Value {
     match v {
         Value::Bool(b) => loremaster_model::Value::Bool(*b),
@@ -616,7 +664,7 @@ struct Then<'a> {
 fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans) -> B {
     for e in list {
         b = match &e.kind {
-            EffectKind::Line(t) => b.effect(loremaster_model::Effect::Say(t.value.as_str().into())),
+            EffectKind::Line(segments) => b.effect(loremaster_model::Effect::Say(line(segments))),
             EffectKind::Set(pairs) => pairs
                 .iter()
                 .fold(b, |b, (n, v)| b.set(n.value.as_str(), value(v))),
@@ -639,6 +687,9 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans
         };
         let i = then.offset + b.effects_mut().len().saturating_sub(1);
         spans.add(then.key, format!("{}[{i}]", then.at), e.tokens.clone());
+        if let EffectKind::Line(segments) = &e.kind {
+            segment_spans(spans, then.key, &format!("{}[{i}]", then.at), segments);
+        }
     }
     b
 }
@@ -698,7 +749,7 @@ fn machine(p: &mut Pack, m: &Machine, spans: &mut Spans) {
             b = b.instead();
         }
         if let Some(say) = &step.say {
-            b = b.say(say.value.as_str());
+            b = b.say(line(say));
         }
         // The checks see each step as the rule that `assemble` makes of it
         // (`machine_rules`): its `then` is the new state, the `say`, then
@@ -710,7 +761,8 @@ fn machine(p: &mut Pack, m: &Machine, spans: &mut Spans) {
             spans.add(&rule, "when", w.tokens.clone());
         }
         if let Some(say) = &step.say {
-            spans.add(&rule, "then[1]", text_tokens(say));
+            spans.add(&rule, "then[1]", step.say_tokens.clone());
+            segment_spans(spans, &rule, "then[1]", say);
         }
         let then = Then {
             key: &rule,

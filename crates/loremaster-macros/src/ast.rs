@@ -214,8 +214,29 @@ pub struct Effect {
     pub tokens: TokenStream,
 }
 
+/// One segment of a line: narration, `narrate` or speech, maybe with a
+/// condition.
+#[derive(Clone)]
+pub struct Segment {
+    pub voice: SegmentVoice,
+    pub text: Text,
+    pub when: Option<Cond>,
+    pub tokens: TokenStream,
+}
+
+#[derive(Clone)]
+pub enum SegmentVoice {
+    /// A bare string.
+    Plain,
+    /// `narrate "…"`.
+    Narrate,
+    /// `says "…"`, or `<speaker> says "…"`.
+    Says(Option<Name>),
+}
+
 pub enum EffectKind {
-    Line(Text),
+    /// `line <segments>`.
+    Line(Vec<Segment>),
     Set(Vec<(Name, Value)>),
     Add(Vec<(Name, i64)>),
     /// The thing and the target word: a room, `in:box`, `on:table`,
@@ -246,7 +267,9 @@ pub struct Step {
     pub instead: bool,
     pub when: Option<Cond>,
     /// A first `line` is the step's `say`; the rest are its effects.
-    pub say: Option<Text>,
+    pub say: Option<Vec<Segment>>,
+    /// The tokens of the step's first `line`, for the spans of its `say`.
+    pub say_tokens: TokenStream,
     pub effects: Vec<Effect>,
     pub tokens: TokenStream,
 }

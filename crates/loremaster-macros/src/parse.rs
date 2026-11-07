@@ -546,8 +546,110 @@ fn peek_word_then(input: ParseStream, kw: &str) -> bool {
 
 fn speech(input: ParseStream) -> Error {
     input.error(
-        "speech segments (`says`, `narrate`) are not in `world!` yet (P3-15 #111); write the line as one string, for example a raw string r#\"…\"#",
+        "speech segments (`says`, `narrate`) belong in a `line` effect; a description or a presence is one text",
     )
+}
+
+/// The segments of a `line`, up to `;`:
+///
+/// - `"…"`: narration, a bare string;
+/// - `narrate "…"`: narration, written out;
+/// - `says "…"`: speech with the default speaker, `keeper says "…"` or
+///   `player says "…"` with one;
+/// - `when <cond> then <segment>`: the one segment after `then` shows only
+///   while the condition holds. A bare string with a condition is
+///   narration, as `{ narrate: …, when: … }` in YAML.
+///
+/// A bare string right after speech reads like more speech, so it is an
+/// error that suggests `narrate` (the lint of #111; YAML loads it with a
+/// warning).
+fn line(input: ParseStream) -> Result<Vec<Segment>> {
+    let mut segments: Vec<Segment> = Vec::new();
+    while !input.peek(Token![;]) && !input.is_empty() {
+        if segments.is_empty()
+            && input.peek(Ident::peek_any)
+            && !peek_kw(input, "when")
+            && !peek_kw(input, "narrate")
+            && !peek_kw(input, "says")
+            && !peek_word_then(input, "says")
+        {
+            return Err(input.error(
+                "a line from a text pool is not in `world!` yet: it waits for the text core (R9, P4-01 #78)",
+            ));
+        }
+        let at = input.span();
+        let s = segment(input)?;
+        if matches!(s.voice, SegmentVoice::Plain)
+            && s.when.is_none()
+            && segments
+                .last()
+                .is_some_and(|p| matches!(p.voice, SegmentVoice::Says(_)))
+        {
+            return Err(Error::new(
+                at,
+                "a bare string after `says` reads like more speech; write `narrate \"…\"` for narration",
+            ));
+        }
+        segments.push(s);
+    }
+    if segments.is_empty() {
+        return Err(input.error("the line needs a text or at least one segment"));
+    }
+    Ok(segments)
+}
+
+fn segment(input: ParseStream) -> Result<Segment> {
+    let start = input.cursor();
+    let mut s = segment_body(input)?;
+    s.tokens = since(start, input);
+    Ok(s)
+}
+
+fn segment_body(input: ParseStream) -> Result<Segment> {
+    let plain = |voice, text| Segment {
+        voice,
+        text,
+        when: None,
+        tokens: TokenStream::new(),
+    };
+    if peek_kw(input, "when") {
+        keyword(input, "when")?;
+        let cond = parse_until(input, |i| peek_kw(i, "then") || i.peek(Token![;]))?;
+        keyword(input, "then").map_err(|e| {
+            Error::new(
+                e.span(),
+                "expected `then` and the segment after the condition",
+            )
+        })?;
+        if peek_kw(input, "when") {
+            return Err(input.error("a segment has one condition"));
+        }
+        let mut s = segment_body(input)?;
+        if matches!(s.voice, SegmentVoice::Plain) {
+            s.voice = SegmentVoice::Narrate;
+        }
+        s.when = Some(cond);
+        return Ok(s);
+    }
+    if input.peek(LitStr) {
+        return Ok(plain(SegmentVoice::Plain, text(input)?));
+    }
+    if peek_kw(input, "narrate") {
+        name(input)?;
+        return Ok(plain(SegmentVoice::Narrate, text(input)?));
+    }
+    if peek_kw(input, "says") {
+        name(input)?;
+        return Ok(plain(SegmentVoice::Says(None), text(input)?));
+    }
+    if peek_word_then(input, "says") {
+        let speaker = name(input)?;
+        name(input)?;
+        return Ok(plain(SegmentVoice::Says(Some(speaker)), text(input)?));
+    }
+    Err(input.error(
+        "expected a segment: a string, `narrate \"…\"`, `says \"…\"`, `<speaker> says \"…\"` or `when <cond> then <segment>`, or `;`",
+    ))
 }
 
 fn note(input: ParseStream, todo: bool) -> Result<Note> {
@@ -893,18 +995,7 @@ fn effect(input: ParseStream) -> Result<Effect> {
     let start = input.cursor();
     let word = name(input)?;
     let kind = match word.value.as_str() {
-        "line" => {
-            if !input.peek(LitStr) && input.peek(Ident::peek_any) {
-                return Err(input.error(
-                    "a line from a text pool is not in `world!` yet: it waits for the text core (R9, P4-01 #78)",
-                ));
-            }
-            let t = text(input)?;
-            if !input.peek(Token![;]) {
-                return Err(speech(input));
-            }
-            EffectKind::Line(t)
-        }
+        "line" => EffectKind::Line(line(input)?),
         "set" => {
             let mut list = Vec::new();
             loop {
@@ -1074,16 +1165,16 @@ fn step(input: ParseStream) -> Result<Step> {
     } else {
         effects(input)?
     };
-    let say = match effects_list.first() {
+    let (say, say_tokens) = match effects_list.first() {
         Some(Effect {
-            kind: EffectKind::Line(t),
-            ..
+            kind: EffectKind::Line(segments),
+            tokens,
         }) => {
-            let t = t.clone();
+            let say = (segments.clone(), tokens.clone());
             effects_list.remove(0);
-            Some(t)
+            (Some(say.0), say.1)
         }
-        _ => None,
+        _ => (None, TokenStream::new()),
     };
     Ok(Step {
         from,
@@ -1093,6 +1184,7 @@ fn step(input: ParseStream) -> Result<Step> {
         instead,
         when,
         say,
+        say_tokens,
         effects: effects_list,
         tokens: since(start, input),
     })
