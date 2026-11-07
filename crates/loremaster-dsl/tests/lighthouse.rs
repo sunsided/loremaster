@@ -295,22 +295,19 @@ fn the_builder_walkthrough_equals_the_yaml_walkthrough() {
 
 #[test]
 fn each_entity_has_its_rust_origin() {
-    let project = from_builder();
-    let origin = &project.origins["room:cottage"];
-    let Origin::Rust {
-        file,
-        line,
-        column,
-        pack,
-    } = origin
-    else {
-        panic!("not a Rust origin: {origin}");
-    };
-    assert!(file.ends_with("tests/lighthouse.rs"), "{file}");
-    assert_eq!(pack, "lighthouse");
-    assert!(*line > 0 && *column > 0);
+    let (built, yaml) = (from_builder(), from_yaml());
+    // The same entities as in YAML, each with a Rust origin in this file
+    // and pack.
+    assert!(built.origins.keys().eq(yaml.origins.keys()));
+    for (key, origin) in &built.origins {
+        let Origin::Rust { file, pack, .. } = origin else {
+            panic!("{key}: not a Rust origin: {origin}");
+        };
+        assert!(file.ends_with("tests/lighthouse.rs"), "{key}: {file}");
+        assert_eq!(pack, "lighthouse", "{key}");
+    }
     // Each entity has its own line: the call that made it.
-    let lines: std::collections::BTreeSet<u32> = project
+    let lines: std::collections::BTreeSet<u32> = built
         .origins
         .values()
         .filter_map(|o| match o {
@@ -318,10 +315,29 @@ fn each_entity_has_its_rust_origin() {
             _ => None,
         })
         .collect();
-    // The story header, 1 ending, 4 rooms, 6 rules and 7 things.
-    assert_eq!(lines.len(), 19);
-    // The walkthrough is keyed by its Rust file and line.
-    assert!(project.walkthroughs[0].0.contains("tests/lighthouse.rs:"));
+    assert_eq!(lines.len(), built.origins.len());
+    // The walkthrough is keyed by its Rust file, line and column.
+    assert!(built.walkthroughs[0].0.contains("tests/lighthouse.rs:"));
+}
+
+#[test]
+fn an_origin_is_the_line_and_column_of_the_call() {
+    let mut p = Pack::new("lines");
+    let line = line!();
+    p.room("cellar", "Cellar").text("Damp.").exit("up", "hall");
+    let at = |line: u32, column: u32| Origin::Rust {
+        file: file!().to_string(),
+        line,
+        column,
+        pack: "lines".into(),
+    };
+    // The column is the one of the method name: `room` after `    p.`.
+    assert_eq!(p.origins["room:cellar"], at(line + 1, 7));
+    let line = line!();
+    p.thing("lamp", "lamp").in_room("cellar");
+    p.rule("r", on::turn()).say("Tick.");
+    assert_eq!(p.origins["thing:lamp"], at(line + 1, 7));
+    assert_eq!(p.origins["rule:r"], at(line + 2, 7));
 }
 
 #[test]
