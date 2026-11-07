@@ -55,7 +55,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - `Game::save` and `Game::load_save` read and write save games. The web engine's `save()` and `restore()` and the AI tools `save` and `session_start` use the envelope; `restore()` returns the dropped ids.
 - **Breaking:** the `end` effect names an ending from `endings/` (`end: beacon_lit`) instead of a text. Move the text into `endings/<id>.yaml` with a `kind` and a `title`. The lighthouse and the tower examples show it.
 - **Breaking (library):** the authoring views moved out of `Game` into `loremaster-workbench`. `Game::atlas`, `map`, `rules`, `machines`, `symbols`, `try_markup`, `try_condition`, `try_markup_situation` (now `Workbench::try_markup_in`), `preview_situation`, `describe_preview` (now `Workbench::describe`), `assembly`, `room_parts`, `last_frame`, `talk_view`, `inspect_thing`, `inspect_exit`, `vars`, `phases`, `author` and `carry_over` (now `Workbench::reload`) are gone from the public API, and so are the free functions `explore`, `room_matrix` and `text_matrix` and their types at the root of `loremaster-runtime`: use `loremaster_workbench`. `Game` is `#[doc(hidden)]`; hosts use `Session`. `Session::game()` is gone.
-- The terminal player plays through `Session`.
+- The terminal player plays through `Session`. A death ending shows the death prompt: type `undo` or `restart`.
 - `carried(x)` is also true for a thing in a carried container.
 - The ZIL importer writes containers, surfaces and local-global scenery, and reads `machines/` and `timers/` for the flags that they use.
 
