@@ -1,31 +1,31 @@
 // Part "Dialogue": the keeper's dialogue. Its first node says the text pool
-// keeper_remark. Waits for one dialogue format (phase 3, D3), the text pool
-// (phase 4, R9) and dialogue in world! (DSL step L4).
+// keeper_remark, so the file waits for the text pool (phase 4, R9). The rest
+// is in world! since DSL step L4 (P4-08 #85): crates/loremaster-cli/tests/
+// slice_dsl.rs compiles this dialogue with an inline line in place of the
+// pool and compares it with dialogues/keeper.yaml.
 //
-// Draft syntax. It does not compile. Read ../PENDING.md.
+// Read ../PENDING.md.
 
 use loremaster::prelude::*;
 
 world! {
-    // draft: `extern` with the kinds var and texts. The DSL doc shows only
-    // thing and room.
+    // draft: `extern` with the kind texts (R9).
     extern {
         thing keeper;
         var ash_is_fresh;
         texts keeper_remark;
     }
 
-    // draft: `says "<text>"` is a speech segment (#111). The renderer adds
-    // the quotes, so the line has no escapes. A plain string is narration.
-    // Segments in a row join with a space, in any order:
-    // `"He turns the poker." says "Nobody."` or
-    // `says "Nobody." narrate "He turns the poker."`. An option's speaker is
-    // the player; a node's speaker is the thing of the dialogue.
+    // A dialogue is dramaturge's token form with the lines of world!. Without
+    // an id, it has the id of its thing (`keeper`, as dialogues/keeper.yaml).
+    // A node is `<key>: <line> { <options> }`; an option is
+    // `<line> [when <cond>] => <target>;`. `says "<text>"` is a speech
+    // segment (#111): the renderer adds the quotes. A node's speech is the
+    // thing's, an option's speech is the player's.
     dialogue with keeper start [stove] {
-        // draft: a node with an id in place of a string says a text pool,
-        // as `line keeper_remark;` does in a rule (D2 side note).
+        // draft: a node with an id in place of a line says a text pool, as
+        // `line keeper_remark;` does in a rule (D2 side note, R9).
         stove: keeper_remark {
-            // draft: `when` after the option text, before `=>`.
             says "Who fed it?" when ash_is_fresh => who_fed_it;
             says "What do you burn at night?" => what_burns;
             says "Good night." => end;
