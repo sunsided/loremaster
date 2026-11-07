@@ -88,7 +88,7 @@ impl NarrativeState for Game {
             .relations
             .iter()
             .any(|a| a.as_str() == &*axis.0);
-        (declared && self.world.story.thing(thing).is_some()).then_some(0)
+        (declared && self.world.thing(thing).is_some()).then_some(0)
     }
 
     fn add_relationship(
