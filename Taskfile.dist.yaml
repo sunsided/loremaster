@@ -57,6 +57,11 @@ tasks:
     cmds:
       - "{{.CARGO}} run -q -p loremaster --no-default-features -- check examples/lighthouse"
 
+  lock:check:
+    desc: Check that Cargo.lock takes dramaturge from crates.io, not from a local patch
+    cmds:
+      - scripts/check-lock.sh
+
   test:pending:
     desc: Run the pending tests; fails when a pending test passes (see CONTRIBUTING.md)
     cmds:
@@ -204,8 +209,9 @@ tasks:
       - target/release/loremaster serve examples/lighthouse {{.CLI_ARGS}}
 
   verify:
-    desc: Formatting, clippy and tests
+    desc: Formatting, clippy and tests, and a lockfile without local path sources
     deps:
       - fmt:check
       - lint
       - test
+      - lock:check

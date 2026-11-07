@@ -42,6 +42,23 @@ Run these commands before you open a pull request:
 | `task test:pending` | Runs the pending tests. A pending test that passes is an error. Read "Pending tests" below. |
 | `task lint:workflows` | Examines the GitHub workflows with actionlint and zizmor. Run it when you change `.github/`. It needs Docker and uv. |
 
+### dramaturge
+
+loremaster takes the dramaturge crates from crates.io, with an exact version (`=0.3.0-alpha.N` in `Cargo.toml`). CI builds with `--locked`, so it tests exactly the version in `Cargo.lock`.
+
+- When loremaster needs a change in dramaturge, make the change in dramaturge first and release a dramaturge alpha. Then change the version in `Cargo.toml` and run `cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring` in the same pull request.
+- The CI job "dramaturge feature/0.3 (not required)" tests loremaster against the newest dramaturge on `feature/0.3`. When it is red, the next bump needs changes in loremaster.
+- To work on both repositories at once, put a patch into `.cargo/config.toml` (git does not track it):
+
+  ```toml
+  [patch.crates-io]
+  dramaturge-model = { path = "../dramaturge/crates/dramaturge-model" }
+  dramaturge-runtime = { path = "../dramaturge/crates/dramaturge-runtime" }
+  dramaturge-authoring = { path = "../dramaturge/crates/dramaturge-authoring" }
+  ```
+
+  Then each cargo command rewrites `Cargo.lock` with path sources. Do not commit that file: `task lock:check` (part of `task verify`, and the first step in CI) fails on a staged `Cargo.lock` without the crates.io source.
+
 ### Pending tests
 
 Some tests describe a feature before the engine has it, for example the golden slice of the roadmap (phase 0). They are pending:

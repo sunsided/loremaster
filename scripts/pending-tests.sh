@@ -23,7 +23,7 @@ fi
 log=$(mktemp "${TMPDIR:-/tmp}/pending-tests.XXXXXX")
 trap 'rm -f "$log"' EXIT
 # The exit code is not used: the pending tests are expected to fail.
-cargo test --workspace --no-default-features --no-fail-fast -- --ignored 2>&1 | tee "$log" || true
+cargo test --workspace --no-default-features --no-fail-fast --locked -- --ignored 2>&1 | tee "$log" || true
 
 if grep -q 'error: could not compile' "$log" || ! grep -q '^test result:' "$log"; then
     echo "error: the tests did not build or run"

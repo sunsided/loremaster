@@ -161,14 +161,14 @@ fn outcomes(
         fact_name(name, scope)?;
         out.push(Outcome::SetFact {
             scope: FactScope::World,
-            fact: Fact {
-                id: FactId::new(name.as_str()),
-                value: match value {
+            fact: Fact::new(
+                FactId::new(name.as_str()),
+                match value {
                     Value::Bool(b) => FactValue::Bool(*b),
                     Value::Int(i) => FactValue::Int(*i),
                     Value::Text(t) => FactValue::Text(t.clone()),
                 },
-            },
+            ),
         });
     }
     for (name, n) in &o.add {
