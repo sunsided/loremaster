@@ -31,10 +31,6 @@ impl Session {
         &self.game
     }
 
-    pub(crate) fn engine_mut(&mut self) -> &mut Game {
-        &mut self.game
-    }
-
     /// The opening as a whole turn, with the rule log. A second call starts
     /// nothing again.
     pub(crate) fn start_turn(&mut self) -> Turn {
@@ -43,6 +39,15 @@ impl Session {
         }
         self.started = true;
         self.game.start()
+    }
+
+    /// An author command as a whole turn. `undo` can go back to the state
+    /// before it, as after an input.
+    pub(crate) fn author_turn(&mut self, command: crate::authoring::AuthorCommand) -> Turn {
+        let before = self.before();
+        let turn = self.game.author(command);
+        self.remember(before);
+        turn
     }
 
     /// One input as a whole turn, with the rule log. `undo` can go back to

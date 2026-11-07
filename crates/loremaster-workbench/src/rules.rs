@@ -292,7 +292,7 @@ fn relevance(ins: Inspector<'_>, rule: &loremaster_model::Rule) -> Option<String
         }
         EventPattern::Verb(parts) | EventPattern::Check(parts) => {
             let scope = ins.in_scope();
-            let things = &parts[1..];
+            let things = parts.get(1..).unwrap_or_default();
             if things.is_empty() {
                 Some("works with any thing".into())
             } else if things.iter().all(|t| scope.contains(t)) {

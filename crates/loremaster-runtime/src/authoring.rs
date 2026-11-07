@@ -206,9 +206,10 @@ pub fn play(session: &mut Session, input: Input) -> Turn {
     session.turn(input)
 }
 
-/// Run an author command: it changes the state directly.
+/// Run an author command: it changes the state directly. `undo` can go back
+/// to the state before it.
 pub fn author(session: &mut Session, command: AuthorCommand) -> Turn {
-    session.engine_mut().author(command)
+    session.author_turn(command)
 }
 
 /// The session in a changed world (SE-14). The state carries over; a value

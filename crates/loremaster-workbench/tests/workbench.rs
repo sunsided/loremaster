@@ -8,6 +8,7 @@ mod workbench {
     mod machines;
     mod reload;
     mod threads;
+    mod views;
     mod zork;
 }
 
