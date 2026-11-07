@@ -1,9 +1,15 @@
 //! Behaviors: game logic in Rust, for what rules, timers and machines cannot say.
 //!
 //! A behavior listens to the same events as rules and runs after the rules
-//! of each event. It changes the world only through [`Cx`], so every change is
-//! in [`State`](crate::State): save games, the state explorer and walkthroughs
-//! keep working. A behavior has no fields that change during play.
+//! of each event. It reads and changes the world only through [`Cx`], so every
+//! change is in [`State`](crate::State): save games, the state explorer and
+//! walkthroughs keep working. A behavior has no fields that change during play.
+//!
+//! [`Cx`] is a narrow, stable view (XP-1): facts, locations, the player's
+//! room, neighbours, carried things, tags, the turn count, and the effect
+//! calls. Random numbers come only from [`Cx::roll`] (XP-7), never from a
+//! clock or the host. [`Cx::unstable`] is the escape hatch to the whole state
+//! and world for Rust code; it can change between versions.
 
 use crate::{BlockKind, Event, Game, State, Turn, World};
 use loremaster_model::{Id, Location, Value};
@@ -41,13 +47,52 @@ pub struct Cx<'a> {
     pub(crate) depth: u8,
 }
 
-impl Cx<'_> {
-    pub fn state(&self) -> &State {
+/// The whole state and world, read-only. Not part of the stable behavior
+/// API: what it gives can change in any version. A script host must not
+/// hand it to scripts.
+pub struct Unstable<'a> {
+    game: &'a Game,
+}
+
+impl<'a> Unstable<'a> {
+    pub fn state(&self) -> &'a State {
         self.game.state()
     }
 
-    pub fn world(&self) -> &World {
+    pub fn world(&self) -> &'a World {
         self.game.world()
+    }
+}
+
+impl Cx<'_> {
+    /// The escape hatch for Rust code: the whole state and world, read-only.
+    /// It is not stable; prefer the other methods of `Cx`.
+    pub fn unstable(&self) -> Unstable<'_> {
+        Unstable { game: self.game }
+    }
+
+    /// The turns played so far.
+    pub fn turns(&self) -> u32 {
+        self.game.state().turns
+    }
+
+    /// The minutes on the story clock since midnight of the first day.
+    pub fn minutes(&self) -> u32 {
+        self.game.state().minutes
+    }
+
+    /// The player has been in the room.
+    pub fn visited(&self, room: &str) -> bool {
+        self.game.state().visits_to(room) > 0
+    }
+
+    /// The room has the tag, for example `dark`.
+    pub fn room_has_tag(&self, room: &str, tag: &str) -> bool {
+        self.game
+            .world()
+            .story
+            .room(room)
+            .is_some_and(|r| r.has_tag(tag))
     }
 
     /// The room of the player.
@@ -107,7 +152,8 @@ impl Cx<'_> {
 
     /// The rooms that the exits of a room lead to, without their conditions.
     pub fn neighbours(&self, room: &str) -> Vec<Id> {
-        self.world()
+        self.game
+            .world()
             .story
             .room(room)
             .map(|r| r.exits.iter().filter_map(|e| e.to.clone()).collect())

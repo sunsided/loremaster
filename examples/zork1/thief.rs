@@ -55,12 +55,7 @@ impl Thief {
         let dark: Vec<Id> = cx
             .neighbours(from)
             .into_iter()
-            .filter(|r| {
-                cx.world()
-                    .story
-                    .room(r.as_str())
-                    .is_some_and(|room| room.has_tag("dark"))
-            })
+            .filter(|r| cx.room_has_tag(r.as_str(), "dark"))
             .collect();
         if dark.is_empty() {
             return None;
