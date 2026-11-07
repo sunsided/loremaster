@@ -238,7 +238,8 @@ pub(crate) fn keep_known_steps(
             dropped.push(format!("agenda:{actor}"));
             return false;
         };
-        let keys: Vec<String> = agenda.keyed_steps().map(|(k, _)| k).collect();
+        let keys: std::collections::BTreeSet<String> =
+            agenda.keyed_steps().map(|(k, _)| k).collect();
         progress.steps.retain(|key, _| {
             let keep = keys.contains(key);
             if !keep {

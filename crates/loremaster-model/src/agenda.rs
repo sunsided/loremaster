@@ -47,7 +47,7 @@ pub struct AgendaStep {
     /// Its `check` and `verb` rules fire with the actor in the Command
     /// record; the default actions of the standard verbs are the player's
     /// and do not run. A `check` rule with `stop` refuses it, and then the
-    /// step's `then` does not run.
+    /// step's `then` does not run; the refused try takes the actor's turn.
     #[serde(default, rename = "do", skip_serializing_if = "Option::is_none")]
     pub action: Option<CommandPattern>,
     /// What the step does, as the effects of a rule.

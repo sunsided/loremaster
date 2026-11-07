@@ -267,6 +267,8 @@ steps:
     do: [open, stove]
     then:
       - say: "Done."
+  - then:
+      - say: "Next."
 "#,
     );
     files
@@ -283,6 +285,10 @@ steps:
         game.state().step_outcome("keeper", "1"),
         Some(StepOutcome::Skipped)
     );
+    // The refused try took the keeper's turn: the next step runs a turn later.
+    assert!(!turn.contains("Next."), "{turn}");
+    let next = input(&mut game, "wait").plain_text();
+    assert!(next.contains("Next."), "{next}");
 }
 
 #[test]
