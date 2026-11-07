@@ -313,8 +313,8 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
 
 /// `remembers(thing, memory)`: the thing keeps a memory that a dialogue gave it.
 ///
-/// dramaturge finds memories by query, not by id, so the memory key is also
-/// the memory's tag, and the query asks for the tag.
+/// The memory key resolves to its dramaturge `MemoryId` through the symbol
+/// table, and the condition queries that id (`MemoryQuery::by_id`).
 fn remembers(args: &[Expr], span: &Span, scope: &Scope) -> Result<Condition, LangError> {
     let [thing, memory] = args else {
         return Err(LangError::new(
