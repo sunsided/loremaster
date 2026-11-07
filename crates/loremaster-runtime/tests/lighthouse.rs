@@ -784,3 +784,32 @@ fn back_goes_the_way_the_player_came() {
     game.input("return");
     assert_eq!(game.scene().room, "shore");
 }
+
+#[test]
+fn the_text_matrix_tries_relations_on_both_sides_of_a_limit() {
+    use loremaster_runtime::text_matrix;
+    let mut game = example("cantina");
+    game.start();
+    // A condition and an insert on the player's relation to Blackbeard.
+    let matrix = text_matrix(
+        &game,
+        "{blackbeard.trust >= 2 ? He nods. | He looks away.} Trust {blackbeard.trust}.",
+        None,
+    )
+    .unwrap();
+    let dim = matrix
+        .dimensions
+        .iter()
+        .find(|d| d.name == "blackbeard.trust")
+        .unwrap_or_else(|| panic!("{:?}", matrix.dimensions));
+    assert_eq!(dim.values, ["0", "1", "2", "3"]);
+    let texts: Vec<&str> = matrix.cells.iter().map(|c| c.text.as_str()).collect();
+    assert!(
+        texts.iter().any(|t| t.contains("He looks away. Trust 1.")),
+        "{texts:?}"
+    );
+    assert!(
+        texts.iter().any(|t| t.contains("He nods. Trust 2.")),
+        "{texts:?}"
+    );
+}
