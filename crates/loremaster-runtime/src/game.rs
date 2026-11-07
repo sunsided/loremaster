@@ -436,7 +436,7 @@ impl Game {
                 (k.clone(), value)
             })
             .collect();
-        let has_room = |id: &Id| world.story.room(id.as_str()).is_some();
+        let has_room = |id: &Id| world.room(id.as_str()).is_some();
         state.locations = new_start
             .locations
             .iter()
@@ -1082,7 +1082,7 @@ impl Game {
     // ---- scope and light ------------------------------------------------
 
     fn room_def(&self) -> Option<&loremaster_model::Room> {
-        self.world.story.room(self.state.room.as_str())
+        self.world.room(self.state.room.as_str())
     }
 
     fn doors_here(&self) -> Vec<Id> {
@@ -1109,6 +1109,7 @@ impl Game {
     pub(crate) fn in_scope(&self) -> Vec<Id> {
         let dark = self.is_dark();
         let room = self.state.room.as_str();
+        let ev = self.eval();
         let mut ids: Vec<Id> = self
             .world
             .story
@@ -1116,8 +1117,14 @@ impl Game {
             .iter()
             .filter(|t| {
                 let id = t.id.as_str();
-                (self.state.is_carried(id) || (!dark && self.eval().is_here(id, room)))
-                    && self.state.closed_around(id, true).is_none()
+                // One walk up the containers answers both "carried" and "in the room".
+                let visible = match self.state.outer_location(id) {
+                    Some(Location::Carried) => true,
+                    _ if dark => false,
+                    Some(Location::Room(r)) if r.as_str() == room => true,
+                    _ => ev.is_backdrop_of(t, room, self.state.location_of(id)),
+                };
+                visible && self.state.closed_around(id, true).is_none()
             })
             .map(|t| t.id.clone())
             .collect();
@@ -1151,7 +1158,7 @@ impl Game {
             things: self
                 .in_scope()
                 .iter()
-                .filter_map(|id| self.world.story.thing(id.as_str()))
+                .filter_map(|id| self.world.thing(id.as_str()))
                 .map(|t| (t.id.clone(), self.nouns_of(t)))
                 .collect(),
             exits: self
@@ -1160,7 +1167,7 @@ impl Game {
                 .map(|(_, e)| {
                     let name =
                         e.to.as_ref()
-                            .and_then(|to| self.world.story.room(to.as_str()))
+                            .and_then(|to| self.world.room(to.as_str()))
                             .map(|r| r.name.clone())
                             .unwrap_or_default();
                     (e.direction.name().to_string(), name)
@@ -1170,7 +1177,7 @@ impl Game {
                 .visible_exits()
                 .iter()
                 .filter_map(|(_, e)| {
-                    let door = self.world.story.thing(e.door.as_ref()?.as_str())?;
+                    let door = self.world.thing(e.door.as_ref()?.as_str())?;
                     Some((e.direction.name().to_string(), self.nouns_of(door)))
                 })
                 .collect(),
@@ -1219,7 +1226,6 @@ impl Game {
                         to: to.to_string(),
                         to_name: self
                             .world
-                            .story
                             .room(to.as_str())
                             .map(|r| r.name.clone())
                             .unwrap_or_default(),
@@ -1495,7 +1501,7 @@ impl Game {
         };
         match cmd {
             AuthorCommand::Goto { room } => {
-                let Some(r) = self.world.story.room(&room) else {
+                let Some(r) = self.world.room(&room) else {
                     turn.say(BlockKind::Response, format!("There is no room `{room}`."));
                     return turn;
                 };
@@ -1540,7 +1546,7 @@ impl Game {
                 Err(e) => turn.say(BlockKind::Response, e),
             },
             AuthorCommand::Give { thing } => {
-                let Some(t) = self.world.story.thing(&thing) else {
+                let Some(t) = self.world.thing(&thing) else {
                     turn.say(BlockKind::Response, format!("There is no thing `{thing}`."));
                     return turn;
                 };
@@ -1563,7 +1569,7 @@ impl Game {
 
     /// Facts about a thing, for an author tooltip. Does not change any state.
     pub fn inspect_thing(&self, id: &str) -> Option<Inspect> {
-        let t = self.world.story.thing(id)?;
+        let t = self.world.thing(id)?;
         let mut facts: Vec<(String, String)> = vec![("id".into(), t.id.to_string())];
         let ev = self.eval();
         match ev.name_stage(id) {
@@ -1593,7 +1599,6 @@ impl Game {
         let location = match self.state.location_of(id) {
             Some(Location::Room(r)) => self
                 .world
-                .story
                 .room(r.as_str())
                 .map_or(r.to_string(), |room| format!("{} ({r})", room.name)),
             Some(Location::Carried) => "carried by the player".into(),
@@ -1671,7 +1676,6 @@ impl Game {
         let to = match &exit.to {
             Some(to) => self
                 .world
-                .story
                 .room(to.as_str())
                 .map_or(to.to_string(), |r| format!("{} ({})", r.name, r.id)),
             None => "nowhere: a message exit".to_string(),
@@ -1706,7 +1710,6 @@ impl Game {
         if let Some(to) = &exit.to {
             let back = self
                 .world
-                .story
                 .room(to.as_str())
                 .is_some_and(|t| t.exits.iter().any(|e| e.to.as_ref() == Some(&room.id)));
             facts.push((
@@ -2300,7 +2303,7 @@ impl Game {
             say(turn, "Put it where?".into());
             return;
         };
-        let Some(holder) = self.world.story.thing(into.as_str()).cloned() else {
+        let Some(holder) = self.world.thing(into.as_str()).cloned() else {
             say(turn, "You can't see anything like that here.".into());
             return;
         };
@@ -2504,7 +2507,7 @@ impl Game {
         let mut needles: Vec<(String, String)> = self
             .in_scope()
             .iter()
-            .filter_map(|id| self.world.story.thing(id.as_str()))
+            .filter_map(|id| self.world.thing(id.as_str()))
             .flat_map(|t| {
                 self.nouns_of(t)
                     .into_iter()
@@ -2590,9 +2593,7 @@ impl Game {
         let first = objects.first();
         let the = first.map(|o| self.the(o, false)).unwrap_or_default();
         let the_cap = first.map(|o| self.the(o, true)).unwrap_or_default();
-        let thing = first
-            .and_then(|o| self.world.story.thing(o.as_str()))
-            .cloned();
+        let thing = first.and_then(|o| self.world.thing(o.as_str())).cloned();
         let prop = |p: &str| first.map(|o| format!("{o}.{p}")).unwrap_or_default();
         let has = |g: &Game, p: &str| g.state.facts.contains_key(&prop(p));
         match verb {
@@ -2801,7 +2802,6 @@ impl Game {
                 [k, target]
                     if self
                         .world
-                        .story
                         .thing(target.as_str())
                         .and_then(|t| t.key.as_ref())
                         == Some(k) =>

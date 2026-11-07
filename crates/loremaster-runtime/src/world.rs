@@ -523,6 +523,16 @@ impl World {
         self.thing_index.get(id).copied()
     }
 
+    /// The story's thing with this id, by index instead of a linear search.
+    pub(crate) fn thing(&self, id: &str) -> Option<&loremaster_model::Thing> {
+        self.thing_index.get(id).map(|&i| &self.story.things[i])
+    }
+
+    /// The story's room with this id, by index instead of a linear search.
+    pub(crate) fn room(&self, id: &str) -> Option<&loremaster_model::Room> {
+        self.room_index.get(id).map(|&i| &self.story.rooms[i])
+    }
+
     /// The dialogue of a thing.
     pub(crate) fn dialogue_with(&self, thing: &str) -> Option<&std::sync::Arc<CDialogue>> {
         self.dialogues.iter().find(|d| d.with.as_str() == thing)

@@ -53,14 +53,24 @@ impl Eval<'_> {
 
     /// The thing is scenery of the room through `also_in`, by room or region.
     pub fn is_backdrop_here(&self, thing: &str, room: &str) -> bool {
-        let Some(t) = self.world.story.thing(thing) else {
+        let Some(t) = self.world.thing(thing) else {
             return false;
         };
-        if t.also_in.is_empty() || matches!(self.state.location_of(thing), Some(Location::Nowhere))
-        {
+        self.is_backdrop_of(t, room, self.state.location_of(thing))
+    }
+
+    /// [`Self::is_backdrop_here`] for a thing already at hand, with its own
+    /// location (not the outer one).
+    pub fn is_backdrop_of(
+        &self,
+        t: &loremaster_model::Thing,
+        room: &str,
+        location: Option<&Location>,
+    ) -> bool {
+        if t.also_in.is_empty() || matches!(location, Some(Location::Nowhere)) {
             return false;
         }
-        let region = self.world.story.room(room).and_then(|r| r.region.as_ref());
+        let region = self.world.room(room).and_then(|r| r.region.as_ref());
         t.also_in
             .iter()
             .any(|w| w.as_str() == room || Some(w) == region)
@@ -156,7 +166,7 @@ impl Eval<'_> {
     }
 
     pub fn is_proper(&self, id: &str) -> bool {
-        let Some(t) = self.world.story.thing(id) else {
+        let Some(t) = self.world.thing(id) else {
             return false;
         };
         match self.name_stage(id) {
@@ -167,7 +177,7 @@ impl Eval<'_> {
 
     /// The current name of a thing in a form, with the right article.
     pub fn thing_name(&self, id: &str, form: NameForm) -> String {
-        let Some(t) = self.world.story.thing(id) else {
+        let Some(t) = self.world.thing(id) else {
             return id.to_string();
         };
         let name = match self.name_stage(id) {
