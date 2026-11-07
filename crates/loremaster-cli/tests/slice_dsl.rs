@@ -163,7 +163,7 @@ fn the_dsl_tests_equal_the_yaml_tests() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, P4-08 #85 (world! L4: dialogue), R9 P4-01 #78 (texts, one_of), D6 P4-02 #79 (agenda, command slots), P3-15 #111"]
+#[ignore = "pending: phase 4, P4-08 #85 (world! L4: dialogue), R9 P4-01 #78 (texts, one_of), D6 P4-02 #79 (agenda, command slots)"]
 fn slice_equivalence_all_parts() {
     // The whole slice, with the parts in new syntax: the YAML form loads only
     // when the model knows that syntax, and the world! forms compile only

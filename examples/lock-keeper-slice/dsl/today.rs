@@ -109,7 +109,9 @@ world! {
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
-            line "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
+            // A segment with a condition shows only while it holds; there is
+            // no `else` (Markus's TODO, #111).
+            line when in(lock_chamber) then "The chamber is empty. Wet ladder rungs go down into the dark.";
         }
     }
 
@@ -126,12 +128,10 @@ world! {
     }
 
     rule accuse_without_pages on verb(accuse, keeper) when not pages.carried {
-        // `line` shows text, as `say:` does in YAML. A line will be made of
-        // segments: narration, `<speaker> says "…"` and `narrate "…"` (#111):
-        //     line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
+        // `line` shows text, as `say:` does in YAML. A line is made of
+        // segments: narration, `<speaker> says "…"` and `narrate "…"` (#111).
         // `line` instead of `say`, because "say … says" reads like a stutter.
-        // Until #111, the line is one raw string, as in rules/accuse.yaml.
-        line r#"The lock-keeper shrugs. "Prove it," he says."#;
+        line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
         end ashes;
     }
 

@@ -29,7 +29,9 @@ world! {
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
-            line "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
+            // A segment with a condition shows only while it holds; there is
+            // no `else` (Markus's TODO, #111).
+            line when in(lock_chamber) then "The chamber is empty. Wet ladder rungs go down into the dark.";
         }
     }
 }
