@@ -27,7 +27,9 @@ impl Session {
         self.game.talk()
     }
 
-    /// The answers the player can choose now. Empty outside a talk.
+    /// The answers the player can choose now: those of the talk in progress,
+    /// or of a rule that waits for a choice. Empty otherwise, also while the
+    /// death prompt waits: its answers are in the `Await` status of the step.
     pub fn choices(&self) -> Vec<Choice> {
         self.game.choices()
     }
