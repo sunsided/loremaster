@@ -73,30 +73,30 @@ fn a_pack_from_rust_gets_the_checks_without_files() {
     let checked = check_packs(vec![rust_pack()]);
     assert!(checked.project.is_some());
     assert!(checked.has_errors());
-    let found: Vec<(&str, &str, &str)> = checked
+    let found: Vec<(&str, &str, Option<u32>, &str)> = checked
         .diagnostics
         .iter()
         .filter(|d| d.severity == Severity::Error)
-        .map(|d| (d.file.as_str(), d.at.as_str(), d.message.as_str()))
+        .map(|d| (d.file.as_str(), d.at.as_str(), d.line, d.message.as_str()))
         .collect();
-    let has = |at: &str, text: &str| {
-        found
-            .iter()
-            .any(|(f, a, m)| *f == "src/world.rs" && *a == at && m.contains(text))
+    // Each diagnostic has the Rust file and line of its entity's origin.
+    let has = |at: &str, line: u32, text: &str| {
+        found.iter().any(|(f, a, l, m)| {
+            *f == "src/world.rs" && *a == at && *l == Some(line) && m.contains(text)
+        })
     };
     // A reference, a condition, and a reserved name; the variable is declared
     // in the header, which comes from Rust too.
-    assert!(has("exits[0].to", "unknown room `garden`"), "{found:#?}");
+    assert!(has("exits[0].to", 3, "unknown room `garden`"), "{found:#?}");
     assert!(
         has(
             "when",
+            14,
             "`lamp` has no property `lt`; did you mean `lamp.lit`?"
         ),
         "{found:#?}"
     );
-    assert!(has("vars.turns", "the variable `turns`"), "{found:#?}");
-    // Without the text of a file, there are no lines.
-    assert!(checked.diagnostics.iter().all(|d| d.line.is_none()));
+    assert!(has("vars.turns", 1, "the variable `turns`"), "{found:#?}");
 }
 
 #[test]

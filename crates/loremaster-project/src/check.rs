@@ -1,4 +1,4 @@
-use crate::{Diagnostic, Pack, Project, Severity, SourceFile, assemble};
+use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
     Effect, EventPattern, Fragment, Location, Story, ThreadStatus, standard_verbs,
@@ -30,7 +30,8 @@ impl Checked {
 /// YAML loader at load time ([`check_files`]), and the `world!` macro at
 /// compile time on its packs. It needs no files and no I/O. Diagnostics name
 /// the file of each entity's origin, YAML or Rust, and the place in the
-/// entity (`at`); a line comes only from the text of a YAML file.
+/// entity (`at`). The line comes from the text of a YAML file, or from the
+/// Rust origin of the entity.
 pub fn check_packs(packs: Vec<Pack>) -> Checked {
     match assemble(packs) {
         Ok(project) => Checked {
@@ -64,6 +65,7 @@ pub fn check(project: &Project) -> Vec<Diagnostic> {
         project,
         scope: Scope::from_story(&project.story),
         out: project.assembly.clone(),
+        place: None,
     };
     c.run();
     c.out
@@ -73,6 +75,10 @@ struct Checker<'a> {
     project: &'a Project,
     scope: Scope,
     out: Vec<Diagnostic>,
+    /// The Rust place (file, line, column) of the entity being checked, when
+    /// it comes from Rust. Its diagnostics get the line and column, which a
+    /// YAML entity gets from the text of its file.
+    place: Option<(String, u32, u32)>,
 }
 
 impl Checker<'_> {
@@ -80,20 +86,38 @@ impl Checker<'_> {
         &self.project.story
     }
 
-    fn file_of(&self, key: &str) -> String {
-        self.project
-            .origins
-            .get(key)
+    /// The file of an entity. The checks of the entity follow, so this also
+    /// sets the Rust place for their diagnostics.
+    fn file_of(&mut self, key: &str) -> String {
+        let origin = self.project.origins.get(key);
+        self.place = match origin {
+            Some(Origin::Rust {
+                file, line, column, ..
+            }) => Some((file.clone(), *line, *column)),
+            _ => None,
+        };
+        origin
             .map(|o| o.file().to_string())
             .unwrap_or_else(|| "story.yaml".into())
     }
 
+    fn push(&mut self, mut diagnostic: Diagnostic) {
+        if diagnostic.line.is_none()
+            && let Some((file, line, column)) = &self.place
+            && *file == diagnostic.file
+        {
+            diagnostic.line = Some(*line);
+            diagnostic.column = Some(*column);
+        }
+        self.out.push(diagnostic);
+    }
+
     fn error(&mut self, file: &str, at: &str, message: impl Into<String>) {
-        self.out.push(Diagnostic::error(file, at, message));
+        self.push(Diagnostic::error(file, at, message));
     }
 
     fn warning(&mut self, file: &str, at: &str, message: impl Into<String>) {
-        self.out.push(Diagnostic::warning(file, at, message));
+        self.push(Diagnostic::warning(file, at, message));
     }
 
     /// Report a language error, locating the source text inside the file.
@@ -107,7 +131,7 @@ impl Checker<'_> {
                     .map(|pos| line_col(&f.text, pos + err.span.start))
             })
             .map_or((None, None), |(l, c)| (Some(l), Some(c)));
-        self.out.push(Diagnostic {
+        self.push(Diagnostic {
             severity: Severity::Error,
             file: file.to_string(),
             at: at.to_string(),
@@ -385,12 +409,13 @@ impl Checker<'_> {
     /// built-in instead (P2-12).
     fn reserved_names(&mut self) {
         let story = self.story().clone();
-        let mut found: Vec<(String, String, &str, &str)> = Vec::new();
         for v in &story.vars {
-            let machine = format!("machine:{}", v.id);
+            if !loremaster_lang::is_reserved(v.id.as_str()) {
+                continue;
+            }
             let (file, at, kind) = if story.machines.iter().any(|m| m.id == v.id) {
                 (
-                    self.file_of(&machine),
+                    self.file_of(&format!("machine:{}", v.id)),
                     format!("machines.{}", v.id),
                     "machine",
                 )
@@ -399,35 +424,30 @@ impl Checker<'_> {
             } else {
                 (self.file_of("story"), format!("vars.{}", v.id), "variable")
             };
-            found.push((file, at, kind, v.id.as_str()));
+            self.reserved(&file, &at, kind, v.id.as_str());
         }
         for r in &story.rooms {
-            found.push((
-                self.file_of(&format!("room:{}", r.id)),
-                "id".into(),
-                "room",
-                r.id.as_str(),
-            ));
-        }
-        for t in &story.things {
-            found.push((
-                self.file_of(&format!("thing:{}", t.id)),
-                "id".into(),
-                "thing",
-                t.id.as_str(),
-            ));
-        }
-        for (file, at, kind, id) in found {
-            if loremaster_lang::is_reserved(id) {
-                self.error(
-                    &file,
-                    &at,
-                    format!(
-                        "the {kind} `{id}` has a name that conditions use for a built-in, so they would not read it; choose another id"
-                    ),
-                );
+            if loremaster_lang::is_reserved(r.id.as_str()) {
+                let file = self.file_of(&format!("room:{}", r.id));
+                self.reserved(&file, "id", "room", r.id.as_str());
             }
         }
+        for t in &story.things {
+            if loremaster_lang::is_reserved(t.id.as_str()) {
+                let file = self.file_of(&format!("thing:{}", t.id));
+                self.reserved(&file, "id", "thing", t.id.as_str());
+            }
+        }
+    }
+
+    fn reserved(&mut self, file: &str, at: &str, kind: &str, id: &str) {
+        self.error(
+            file,
+            at,
+            format!(
+                "the {kind} `{id}` has a name that conditions use for a built-in, so they would not read it; choose another id"
+            ),
+        );
     }
 
     /// Dialogues: references, conditions and markup, then the structure of
@@ -454,6 +474,7 @@ impl Checker<'_> {
                         .map(|(i, o)| (format!("nodes.{}.options[{i}]", n.key), &o.outcomes)),
                 ) {
                     self.effects(&file, &format!("{at}.then"), &o.then);
+                    self.no_await(&file, &format!("{at}.then"), &o.then);
                     for (name, value) in &o.set {
                         if !self.settable(name, value) {
                             self.error(&file, &at, format!("cannot set `{name}` to `{value}`"));
@@ -505,6 +526,7 @@ impl Checker<'_> {
             let at = format!("{at}[{i}]");
             match effect {
                 Effect::Say(text) => self.markup(file, &at, text),
+                Effect::Await(spec) => self.await_spec(file, &at, spec),
                 Effect::End(ending) => {
                     if self.story().ending(ending.as_str()).is_none() {
                         self.error(
@@ -797,6 +819,75 @@ impl Checker<'_> {
                     );
                 }
                 self.effects(&file, &format!("{at}.at.{n}"), effects);
+                self.no_await(&file, &format!("{at}.at.{n}"), effects);
+            }
+        }
+    }
+
+    /// An `await` asks exactly one thing, and its answer fits `into`.
+    fn await_spec(&mut self, file: &str, at: &str, spec: &loremaster_model::AwaitSpec) {
+        use loremaster_lang::Ty;
+        if spec.kinds() != 1 {
+            self.error(
+                file,
+                at,
+                "an `await` needs exactly one of `choice`, `action`, `roll` and `walk_to`",
+            );
+            return;
+        }
+        if let Some(room) = &spec.walk_to {
+            self.room_ref(file, at, room.as_str());
+        }
+        if let Some(dice) = &spec.roll
+            && loremaster_model::Dice::parse(dice).is_none()
+        {
+            self.error(
+                file,
+                at,
+                format!("`{dice}` is not dice such as `2d6` or `1d20+3`"),
+            );
+        }
+        if spec.action.is_none() && (!spec.args.is_empty() || !spec.results.is_empty()) {
+            self.error(file, at, "`args` and `results` belong to an `action`");
+        }
+        let Some(into) = &spec.into else {
+            return;
+        };
+        let answers: Vec<String> = if !spec.choice.is_empty() {
+            spec.choice.iter().map(|o| o.id().to_string()).collect()
+        } else if spec.walk_to.is_some() {
+            vec!["arrived".into(), "refused".into()]
+        } else {
+            spec.results.iter().map(|r| r.to_string()).collect()
+        };
+        match (self.ty_of(into), spec.roll.is_some()) {
+            (None, _) => self.error(file, at, format!("`into: {into}` names no variable")),
+            (Some(Ty::Int), true) | (Some(Ty::Text), false) => {}
+            // An action without results: the host answers with any value.
+            (Some(_), false) if spec.action.is_some() && spec.results.is_empty() => {}
+            (Some(Ty::Enum(values)), false) => {
+                for a in answers.iter().filter(|a| !values.contains(a)) {
+                    self.error(file, at, format!("`{into}` cannot hold the answer `{a}`"));
+                }
+            }
+            (Some(_), true) => self.error(
+                file,
+                at,
+                format!("a roll needs a number variable, `{into}` is not one"),
+            ),
+            (Some(_), false) => self.error(
+                file,
+                at,
+                format!("`{into}` cannot hold the answer of this `await`"),
+            ),
+        }
+    }
+
+    /// Only a rule can wait for the host: a timer or a dialogue has no place to go on from.
+    fn no_await(&mut self, file: &str, at: &str, effects: &[Effect]) {
+        for (i, e) in effects.iter().enumerate() {
+            if matches!(e, Effect::Await(_)) {
+                self.error(file, &format!("{at}[{i}]"), "`await` works only in rules");
             }
         }
     }

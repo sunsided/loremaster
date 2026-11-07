@@ -1,4 +1,4 @@
-use crate::{Id, Note, StartTimers, TimeOfDay, Value};
+use crate::{AwaitSpec, Id, Note, StartTimers, TimeOfDay, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -83,6 +83,8 @@ pub enum Effect {
     Stop,
     /// Send a custom event. Rules `on: { event: name }` fire at once.
     Emit(Id),
+    /// Stop the rule, ask the host, and go on with the answer (SE-5, SE-6).
+    Await(Box<AwaitSpec>),
     /// Start timers, or start them again from the beginning.
     Start(StartTimers),
     /// Stop a timer. Its rules do not fire.

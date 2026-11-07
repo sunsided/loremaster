@@ -6,6 +6,7 @@
 //! evaluates the parsed form. Keeping source text in the model means the
 //! bundle stays readable and survives changes to the expression language.
 
+mod awaits;
 mod clock;
 mod de;
 mod diagnostic;
@@ -25,6 +26,7 @@ mod value;
 mod verb;
 mod walkthrough;
 
+pub use awaits::{AwaitOption, AwaitSpec, Dice};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
 pub use diagnostic::{Diagnostic, Severity};
 pub use dialogue::{Dialogue, DialogueNode, DialogueOption, Outcomes};

@@ -103,6 +103,7 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         &s.talk,
         &s.relations,
         &s.memories,
+        &s.awaiting,
     ))
     .unwrap_or_default()
 }
@@ -122,6 +123,19 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     let story = &world.story;
     let scope = game.in_scope();
     let mut out: Vec<(String, Command)> = Vec::new();
+    // A rule waits: only its answers run.
+    if game.awaiting().is_some() {
+        return game
+            .choices()
+            .into_iter()
+            .map(|c| {
+                (
+                    format!("answer {}", c.text),
+                    Command::Choose { index: c.index },
+                )
+            })
+            .collect();
+    }
     // In a talk, only the answers and leaving run.
     if game.talk().is_some() {
         out.extend(game.choices().into_iter().map(|c| {
@@ -247,6 +261,9 @@ fn sources(turn: &Turn, into: &mut BTreeSet<(String, usize)>) {
 /// Walk the story from its start.
 pub fn explore(start: &Game, budget: Budget) -> Exploration {
     let mut game = start.clone();
+    // The explorer rolls itself: a roll for the host would leave it without
+    // a move. An action without results stays a dead end; its host decides.
+    game.host_rolls = false;
     let opening = game.start();
     let counters = reads_counters(&game);
 

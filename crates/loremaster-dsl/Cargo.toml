@@ -1,0 +1,23 @@
+[package]
+name = "loremaster-dsl"
+description = "Builder API in plain Rust for loremaster stories: rooms, things and rules as a pack, joined with YAML packs."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["text-adventure", "interactive-fiction", "builder", "dsl", "game"]
+categories = ["game-development"]
+# The tests read the stories in ../../examples. They are not in the package.
+exclude = ["tests/"]
+
+[dependencies]
+loremaster-model.workspace = true
+loremaster-project.workspace = true
+loremaster-runtime.workspace = true
+
+[lints]
+workspace = true
