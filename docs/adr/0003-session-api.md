@@ -3,7 +3,7 @@
 - Status: accepted
 - Date: 2026-11-07
 - Issue: P1-09 (#50)
-- Requirements: NF-3, SE-1 to SE-15, XP-1 to XP-4
+- Requirements: NF-3, SE-1 to SE-15, XP-1 to XP-4, XP-7
 - Builds on: decision D1 (Session API with the golden slice), ADR 0002
 - Open: D4 (#102), which crate exports the API
 
@@ -28,10 +28,11 @@ for the hosts of the roadmap:
 **One `Session` per running game. A host sends input down and gets effects
 and awaits back. Everything is data.**
 
-1. **Input.** `submit(input)` takes one of: a text command, a `Command` record
-   (actor, verb, direct, indirect, preposition, topic), a choice id, or a tick
-   (SE-2). `choose(id)` and `resume(await_id, value)` answer a choice and an
-   await.
+1. **Input.** `submit(input)` is the one entry point for input. The input is
+   one of: a text command, a `Command` record (actor, verb, direct, indirect,
+   preposition, topic), a choice id, or a tick (SE-2). `choose(id)` is a short
+   form of `submit` with a choice id. `resume(await_id, value)` is separate: it
+   answers an await request, not an input.
 2. **Step result.** Each call returns a list of effects and one status: ready
    for input, an await request, or the ending (SE-3).
 3. **Effects as data.** Kinds: text block (kind, runs, sources, links), state
