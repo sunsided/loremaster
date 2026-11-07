@@ -33,7 +33,7 @@ mod threads;
 mod walkthrough;
 mod world;
 
-pub use behavior::{Behavior, Cx, Flow};
+pub use behavior::{Behavior, Cx, Flow, Unstable};
 pub use events::{Event, Phase};
 pub use game::{ARRIVED, REFUSED};
 pub use game::{ExitInfo, Game, Scene, ThingInfo, VerbInfo};
