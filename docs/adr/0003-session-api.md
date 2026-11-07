@@ -5,7 +5,7 @@
 - Issue: P1-09 (#50)
 - Requirements: NF-3, SE-1 to SE-15, XP-1 to XP-4, XP-7
 - Builds on: decision D1 (Session API with the golden slice), ADR 0002
-- Open: D4 (#102), which crate exports the API
+- Decision D4 (#102, 2026-11-07): `loremaster-runtime` exports `Session`; a new crate `loremaster-workbench` holds the authoring views
 
 ## Context
 
@@ -77,6 +77,8 @@ and awaits back. Everything is data.**
   `slice_undo_after_death`, `slice_talk_pauses_agenda`).
 - Effects need stable data types with a version, because hosts outside the
   repository read them (JSON-RPC protocol mode, SE-15).
-- D4 decides where the types live: the recommendation is that
-  `loremaster-runtime` exports `Session` and a new `loremaster-workbench`
-  crate holds the authoring views.
+- D4 (#102) decided where the types live: `loremaster-runtime` exports
+  `Session`, so that `Game` can become `pub(crate)` step by step and the
+  compiler keeps hosts on the Session API; a new `loremaster-workbench` crate
+  holds the authoring views. A separate session crate would need `Game` and
+  `State` to stay public to reach them, which makes the boundary weaker.
