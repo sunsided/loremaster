@@ -151,7 +151,7 @@ fn steps_and_inputs_are_plain_data() {
     let mut s = Session::new(world("lighthouse"));
     let step = s.start();
     let json = serde_json::to_value(&step).unwrap();
-    assert_eq!(json["status"]["status"], "ready");
+    assert_eq!(json["status"]["type"], "ready");
     assert_eq!(json["effects"][0]["type"], "text");
     let back: Step = serde_json::from_value(json).unwrap();
     assert_eq!(back, step);
