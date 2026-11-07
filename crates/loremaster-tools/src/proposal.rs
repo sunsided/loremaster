@@ -417,7 +417,7 @@ fn file_of<'a>(project: &'a Project, entity: &str) -> &'a str {
     project
         .origins
         .get(entity)
-        .map(String::as_str)
+        .map(|o| o.file())
         .unwrap_or_default()
 }
 

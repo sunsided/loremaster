@@ -32,7 +32,7 @@ fn an_ending_loads_with_its_kind_and_rank() {
     assert_eq!(ending.rank, Some(1));
     assert_eq!(ending.title, "The beacon is lit");
     assert_eq!(
-        project.origins.get("ending:beacon_lit").map(String::as_str),
+        project.origins.get("ending:beacon_lit").map(|o| o.file()),
         Some("endings/beacon_lit.yaml")
     );
 }

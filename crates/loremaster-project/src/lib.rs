@@ -19,12 +19,14 @@ mod check;
 mod diagnostic;
 mod load;
 mod notes;
+mod origin;
 mod scaffold;
 
 pub use check::check;
 pub use diagnostic::{Diagnostic, Severity};
-pub use load::{Project, SourceFile, load};
+pub use load::{Pack, Project, SourceFile, StoryHeader, assemble, load};
 pub use notes::{NoteRef, ThreadView, notes, open_todos, threads};
+pub use origin::Origin;
 pub use scaffold::{START_TEXT, scaffold};
 
 #[cfg(not(target_family = "wasm"))]

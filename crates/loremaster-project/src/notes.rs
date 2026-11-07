@@ -99,7 +99,7 @@ pub fn threads(project: &Project) -> Vec<ThreadView> {
                 file: project
                     .origins
                     .get(&own)
-                    .cloned()
+                    .map(|o| o.file().to_string())
                     .unwrap_or_else(|| format!("threads/{}.yaml", t.id)),
                 setups: count(NoteRole::Setup),
                 payoffs: count(NoteRole::Payoff),
@@ -185,7 +185,7 @@ impl Collector<'_> {
         self.project
             .origins
             .get(entity)
-            .cloned()
+            .map(|o| o.file().to_string())
             .unwrap_or_else(|| "story.yaml".into())
     }
 

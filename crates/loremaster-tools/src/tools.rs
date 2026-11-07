@@ -543,6 +543,7 @@ fn get_entity(ws: &Workspace, kind: &str, id: &str) -> ToolResult {
     let path = project
         .origins
         .get(&format!("{kind}:{id}"))
+        .map(|o| o.file())
         .ok_or_else(|| {
             err(format!(
                 "There is no {kind} `{id}`. Call `overview` for the ids."
