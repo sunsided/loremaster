@@ -1,6 +1,6 @@
 use crate::{
-    ClockConfig, Dialogue, Ending, Fragment, Frames, Id, Machine, Note, Room, Rule, Thing, Thread,
-    Timer, Value, VerbDef,
+    ClockConfig, Dialogue, DialogueId, Ending, Fragment, Frames, Id, Machine, Note, Room, Rule,
+    Thing, Thread, Timer, Value, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -149,7 +149,7 @@ impl Story {
 
     /// The dialogue with the given id.
     pub fn dialogue(&self, id: &str) -> Option<&Dialogue> {
-        self.dialogues.iter().find(|d| d.id.as_deref() == Some(id))
+        self.dialogues.iter().find(|d| d.id_str() == id)
     }
 
     /// The dialogue of a thing, if it has one.

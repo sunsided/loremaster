@@ -29,7 +29,8 @@ use std::collections::BTreeMap;
 
 pub use syntax::Target as DialogueTarget;
 
-/// A conversation with a thing. The loader sets its `id` to the file stem.
+/// A conversation with a thing. The loader sets its `id` to the file stem,
+/// unless the file has an `id`. Without an id, it is `""` ([`DialogueId`]).
 pub type Dialogue = syntax::Dialogue<String, Line, Effect, Note>;
 /// One line of the other character, and the answers the player can give.
 pub type DialogueNode = syntax::Node<String, Line, Effect, Note>;
@@ -256,11 +257,25 @@ mod tests {
 
     #[test]
     fn the_story_form_writes_go_after_the_outcomes() {
-        let d: Dialogue = serde_json::from_value(blackbeard()).unwrap();
+        let mut d: Dialogue = serde_json::from_value(blackbeard()).unwrap();
+        d.nodes[1].options.push(DialogueOption::new(
+            Line::from("Back."),
+            DialogueTarget::Back,
+        ));
         let mut out = Vec::new();
         story_form(&[d], &mut serde_json::Serializer::new(&mut out)).unwrap();
+        // The whole dialogue, byte for byte, as before D3: the model hash
+        // and the save stamp of a story read it.
         let text = String::from_utf8(out).unwrap();
-        check!(text.contains(r#"{"say":"Who are you?","remember":["asked"],"go":"names"}"#));
-        check!(text.contains(r#"{"say":"Bye.","go":"end"}"#));
+        check!(
+            text == concat!(
+                r#"[{"id":"bb","with":"blackbeard","start":["meet"],"nodes":{"#,
+                r#""meet":{"say":"Sit.","relation":{"trust":1},"options":["#,
+                r#"{"say":"Who are you?","remember":["asked"],"go":"names"},"#,
+                r#"{"say":"Bye.","go":"end"}]},"#,
+                r#""names":{"say":"Blackbeard.","set":{"known":true},"#,
+                r#""options":[{"say":"Back.","go":"back"}]}}}]"#
+            )
+        );
     }
 }
