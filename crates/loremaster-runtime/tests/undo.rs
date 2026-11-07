@@ -119,7 +119,7 @@ fn a_snapshot_restores_and_the_restore_can_be_undone() {
     s.submit(text("open drawer"));
     s.submit(text("take key"));
     let later = s.state().clone();
-    let step = s.restore(&snap);
+    let step = s.restore(&snap).unwrap();
     assert_eq!(s.state(), snap.state());
     assert!(step.plain_text().contains("Restored."));
     s.undo();
@@ -212,4 +212,50 @@ proptest! {
             prop_assert_eq!(s.state(), states.last().unwrap());
         }
     }
+}
+
+#[test]
+fn a_snapshot_of_another_story_is_refused_and_a_restore_counts_as_started() {
+    let mut s = Session::new(lighthouse());
+    s.start();
+    s.submit(text("n"));
+    let snap = s.snapshot();
+    let mut other = Session::new(pier(""));
+    other.start();
+    assert!(other.restore(&snap).is_err());
+
+    let mut fresh = Session::new(lighthouse());
+    fresh.restore(&snap).unwrap();
+    let again = fresh.start();
+    assert!(again.effects.is_empty(), "{again:?}");
+    assert_eq!(fresh.state(), snap.state());
+}
+
+#[test]
+fn undo_during_a_talk_is_text_for_the_talk() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/cantina");
+    let world = Arc::new(World::compile(load(read_dir(&dir).unwrap()).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    s.submit(text("in"));
+    s.submit(text("talk to figure"));
+    let talking = s.state().clone();
+    s.submit(text("undo"));
+    assert!(s.state().talk.is_some(), "the talk is still open");
+    assert_ne!(s.undo_steps(), 0);
+    assert!(s.state().turns >= talking.turns);
+}
+
+#[test]
+fn the_text_restore_at_the_death_prompt_says_what_to_do() {
+    let mut s = Session::new(pier(""));
+    s.start();
+    s.submit(text("jump"));
+    let step = s.submit(text("restore"));
+    assert!(
+        step.plain_text().contains("restore a save"),
+        "{}",
+        step.plain_text()
+    );
+    assert!(s.state().ended);
 }

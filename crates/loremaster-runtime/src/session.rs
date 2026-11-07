@@ -118,6 +118,8 @@ pub struct Loaded {
 /// [`Session::restore`]. For a save file, use [`Session::save`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Snapshot {
+    /// The id of the story, so a snapshot of another story is refused.
+    story: String,
     state: State,
 }
 
@@ -212,14 +214,19 @@ impl Session {
     pub fn submit(&mut self, input: Input) -> Step {
         if let Input::Text(text) = &input {
             let word = text.trim().to_lowercase();
-            if self.death_prompt().is_some() && (word == UNDO || word == RESTART) {
+            if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
                 return self.answer_death(&word).unwrap_or_else(|e| self.message(e));
             }
-            if word == UNDO && !self.story_has_word(UNDO) {
+            // While a rule waits or a talk is open, the text is an answer.
+            if word == UNDO
+                && self.game.awaiting().is_none()
+                && self.game.talk().is_none()
+                && !self.parser_knows(UNDO)
+            {
                 return self.undo();
             }
         }
-        let before = self.game.state().clone();
+        let before = self.before();
         let turn = match input {
             Input::Text(text) => self.game.input(&text),
             Input::Command(cmd) => self.game.act(cmd),
@@ -245,7 +252,7 @@ impl Session {
                 _ => Err("the death prompt takes a text answer".into()),
             };
         }
-        let before = self.game.state().clone();
+        let before = self.before();
         let turn = self.game.resume(await_id, value)?;
         self.remember(before);
         Ok(self.step(turn))
@@ -278,27 +285,38 @@ impl Session {
     /// The state now, to put back later with [`Session::restore`].
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
+            story: crate::save::story_id(&self.game.world().story.title),
             state: self.game.state().clone(),
         }
     }
 
-    /// Put a snapshot back. `undo` can go back to the state before it.
-    pub fn restore(&mut self, snapshot: &Snapshot) -> Step {
-        let before = self.game.state().clone();
+    /// Put a snapshot back. `undo` can go back to the state before it. A
+    /// snapshot of another story is refused.
+    pub fn restore(&mut self, snapshot: &Snapshot) -> Result<Step, SaveError> {
+        let story = crate::save::story_id(&self.game.world().story.title);
+        if snapshot.story != story {
+            return Err(SaveError::OtherStory {
+                save: snapshot.story.clone(),
+                story,
+            });
+        }
+        let before = self.before();
         self.game.set_state(snapshot.state.clone());
+        self.started = true;
         self.remember(before);
-        self.shown_here("Restored.")
+        Ok(self.shown_here("Restored."))
     }
 
     /// Start the story again with the seed of this session. `undo` can go
     /// back to the state before it.
     pub fn restart(&mut self) -> Step {
-        let before = self.game.state().clone();
+        let before = self.before();
         let host_rolls = self.game.host_rolls;
         let mut game = Game::new(self.game.world_arc());
         game.state_mut().rng = self.seed;
         game.host_rolls = host_rolls;
         self.game = game;
+        self.started = true;
         let turn = self.game.start();
         self.remember(before);
         self.step(turn)
@@ -336,9 +354,17 @@ impl Session {
         &self.game
     }
 
+    /// The state before an input, if undo is on.
+    fn before(&self) -> Option<State> {
+        (self.undo_depth > 0).then(|| self.game.state().clone())
+    }
+
     /// Keep the state before an input for `undo`, if the input changed it.
-    fn remember(&mut self, before: State) {
-        if self.undo_depth == 0 || &before == self.game.state() {
+    fn remember(&mut self, before: Option<State>) {
+        let Some(before) = before else {
+            return;
+        };
+        if &before == self.game.state() {
             return;
         }
         self.history.push_back(before);
@@ -347,10 +373,11 @@ impl Session {
         }
     }
 
-    fn story_has_word(&self, word: &str) -> bool {
+    /// Does the parser know the word as a verb (the standard verbs and the
+    /// story's)? Then it is a command, not a session word.
+    fn parser_knows(&self, word: &str) -> bool {
         self.game
             .world()
-            .story
             .verbs
             .iter()
             .any(|v| v.words.iter().any(|w| w.eq_ignore_ascii_case(word)))
