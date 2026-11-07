@@ -9,6 +9,7 @@ mod workbench {
     mod play;
     mod reload;
     mod threads;
+    mod views;
     mod zork;
 }
 

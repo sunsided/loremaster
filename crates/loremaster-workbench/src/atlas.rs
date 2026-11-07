@@ -148,11 +148,14 @@ pub(crate) fn map(ins: Inspector<'_>) -> MapView {
             let back = story
                 .room(to.as_str())
                 .is_some_and(|t| t.exits.iter().any(|e| e.to.as_ref() == Some(&room.id)));
-            if back
-                && links
-                    .iter()
-                    .any(|l| l.from == to.as_str() && l.to == room.id.as_str())
-            {
+            // The rooms of a pair with a way back share one link. It shows when
+            // either exit shows.
+            let pair = |l: &MapLink| {
+                (l.from == room.id.as_str() && l.to == to.as_str())
+                    || (l.from == to.as_str() && l.to == room.id.as_str())
+            };
+            if back && let Some(link) = links.iter_mut().find(|l| !l.one_way && pair(l)) {
+                link.visible |= visible;
                 continue;
             }
             links.push(MapLink {

@@ -2,7 +2,9 @@
 //! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
 use loremaster_project::{Diagnostic, Project, check_files, open_todos, read_dir};
-use loremaster_runtime::{BlockKind, Effect, Input, Session, Status, Step, Verdict, World};
+use loremaster_runtime::{
+    AwaitRequest, BlockKind, Effect, Input, RESTORE, Session, Status, Step, Verdict, World,
+};
 use loremaster_workbench::Budget;
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
@@ -220,7 +222,9 @@ fn play(project: Project) -> ExitCode {
     let style = std::io::stdout().is_terminal();
     let mut session = Session::new(world.clone());
     println!("{}\n", bold(&world.story.title, style));
-    print_step(&session.start(), style);
+    if show_status(&session.start(), style) {
+        return ExitCode::SUCCESS;
+    }
     let stdin = std::io::stdin();
     loop {
         print!("\n> ");
@@ -241,13 +245,45 @@ fn play(project: Project) -> ExitCode {
         }
         let step = session.submit(Input::Text(line.to_string()));
         println!();
-        print_step(&step, style);
-        if matches!(step.status, Status::Ended { .. }) {
-            println!("\n*** The End ***");
+        if show_status(&step, style) {
             break;
         }
     }
     ExitCode::SUCCESS
+}
+
+/// Print a step and what the session waits for. True when the game is over.
+///
+/// A death ending does not end the session: it waits on the death prompt,
+/// whose answers `undo` and `restart` the session takes as text. A restore
+/// needs a save, which the terminal player does not keep.
+fn show_status(step: &Step, style: bool) -> bool {
+    print_step(step, style);
+    if step
+        .effects
+        .iter()
+        .any(|e| matches!(e, Effect::Ending { .. }))
+    {
+        println!("\n*** The End ***");
+    }
+    match &step.status {
+        Status::Ended { .. } => true,
+        Status::Await { awaiting } => {
+            match &awaiting.request {
+                AwaitRequest::DeathPrompt { options, .. } => {
+                    let answers: Vec<&str> = options
+                        .iter()
+                        .map(|o| o.as_str())
+                        .filter(|o| *o != RESTORE)
+                        .collect();
+                    println!("\n(Type {}, or \"quit\".)", answers.join(" or "));
+                }
+                request => println!("\n(The story waits: {}.)", request.describe()),
+            }
+            false
+        }
+        _ => false,
+    }
 }
 
 /// The story names behaviors in Rust that this program does not have. Say so once.

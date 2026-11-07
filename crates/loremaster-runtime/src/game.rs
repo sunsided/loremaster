@@ -235,7 +235,9 @@ impl Game {
     /// The state carries over. A value that is still at its start value in the old world takes
     /// the start value of the new world, so an edit of a start value shows at once. Values and
     /// things that the new world does not have are dropped; new ones start at their start value.
-    /// A current room that is gone becomes the start room.
+    /// A current room that is gone becomes the start room. Rules, endings, relations and
+    /// memories that the new world does not have are dropped too, and a rule that waits for the
+    /// host keeps waiting only when the new world has the same rule.
     pub(crate) fn carry_over(&self, world: Arc<World>) -> Self {
         let old_start = Game::new(self.world.clone()).state;
         let new_start = Game::new(world.clone()).state;
@@ -288,6 +290,33 @@ impl Game {
         if !talk_ok {
             state.talk = None;
         }
+        // A paused rule goes on only when the rule is the same in the new
+        // world: its effects may have moved, as in `save::reconcile`.
+        let rule_of = |w: &World, id: &Id| w.story.rules.iter().find(|r| r.id == *id).cloned();
+        if let Some(open) = &state.awaiting
+            && (rule_of(&world, &open.rule).is_none()
+                || rule_of(&world, &open.rule) != rule_of(&self.world, &open.rule))
+        {
+            state.awaiting = None;
+        }
+        state
+            .fired
+            .retain(|id| world.story.rules.iter().any(|r| r.id == *id));
+        if state.previous.as_ref().is_some_and(|r| !has_room(r)) {
+            state.previous = None;
+        }
+        if state
+            .ending
+            .as_ref()
+            .is_some_and(|e| world.story.ending(e.as_str()).is_none())
+        {
+            state.ending = None;
+        }
+        let has_thing = |id: &str| world.story.thing(id).is_some();
+        state
+            .relations
+            .retain(|key, _| key.split_once('.').is_some_and(|(t, _)| has_thing(t)));
+        state.memories.retain(|thing, _| has_thing(thing.as_str()));
         Self::restore(world, state)
     }
 
