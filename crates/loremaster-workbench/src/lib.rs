@@ -114,7 +114,8 @@ impl Workbench {
     /// edit of the story (SE-14). The room, the values and the things carry
     /// over. A value still at its start value takes the new start value, so an
     /// edit of a start value shows at once. What the new world does not have
-    /// is dropped; a room that is gone becomes the start room.
+    /// is dropped; a room that is gone becomes the start room. The undo
+    /// history of the session does not carry over.
     pub fn reload(&mut self, world: Arc<World>) {
         self.session = authoring::carry_over(&self.session, world);
     }

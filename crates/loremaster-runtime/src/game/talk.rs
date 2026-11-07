@@ -271,8 +271,12 @@ impl Game {
         runtime.available_options(node, self).cloned().collect()
     }
 
-    /// The answers the player can choose now, numbered from 0.
+    /// The answers the player can choose now, numbered from 0: the answers
+    /// of a rule that waits, or else the answers of the talk.
     pub fn choices(&self) -> Vec<Choice> {
+        if self.state.awaiting.is_some() {
+            return self.await_choices();
+        }
         let Some(d) = self
             .state
             .talk

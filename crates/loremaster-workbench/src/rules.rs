@@ -163,6 +163,12 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                             .join(", ")
                     ),
                     loremaster_model::Effect::Cancel(t) => format!("cancel {t}"),
+                    loremaster_model::Effect::Await(spec) => {
+                        match loremaster_runtime::authoring::describe_await(spec) {
+                            Some(r) => format!("wait for the host: {r}"),
+                            None => "wait for the host".to_string(),
+                        }
+                    }
                 })
                 .collect();
             let trigger = match &r.on {

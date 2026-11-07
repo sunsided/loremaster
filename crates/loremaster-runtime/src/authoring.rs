@@ -166,13 +166,13 @@ impl<'a> Inspector<'a> {
     /// with each named value set. `None` for an unknown room.
     pub fn situation(&self, room: &str, values: &[(String, String)]) -> Option<Session> {
         let mut copy = self.game.clone();
-        crate::matrix::apply_cell(&mut copy, room, values).then(|| Session::from_engine(copy, true))
+        crate::matrix::apply_cell(&mut copy, room, values).then(|| Session::detached(copy))
     }
 
     /// Walk the reachable states from the start of the story of this game.
     /// It does not change the game.
     pub fn explore(&self, budget: Budget) -> Exploration {
-        explore(self.game.world_arc().clone(), budget)
+        explore(self.game.world_arc(), budget)
     }
 
     /// The text of a room in every combination of the values it depends on.
@@ -205,7 +205,13 @@ pub fn author(session: &mut Session, command: AuthorCommand) -> Turn {
 /// still at its start value takes the new start value, and what the new world
 /// does not have is dropped.
 pub fn carry_over(session: &Session, world: Arc<World>) -> Session {
-    Session::from_engine(session.engine().carry_over(world), session.started())
+    session.carried_over(world)
+}
+
+/// What an `await` effect waits for, in words, for the rules view. `None`
+/// for a spec that the checks reject.
+pub fn describe_await(spec: &loremaster_model::AwaitSpec) -> Option<String> {
+    crate::state::AwaitRequest::of(spec).map(|r| r.describe())
 }
 
 /// Walk the reachable states from the start of the story.

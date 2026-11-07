@@ -84,6 +84,8 @@ and awaits back. Everything is data.**
   `State` to stay public to reach them, which makes the boundary weaker.
 - P2-08 (#59) made the workbench crate. A `Workbench` owns a `Session`;
   `reload(world)` carries the running game over to a changed world (SE-14).
+  The seed, the undo depth and the host's rolls setting stay; the undo
+  history does not, because its states belong to the old world.
   The split between the two crates:
   - In `loremaster-workbench`, written against public reads of `World` and
     `State`: the Atlas, the map, the rules view with its relevance, the
@@ -110,7 +112,7 @@ and awaits back. Everything is data.**
   `choices`) are methods of `Session`. The web engine, the AI tools and the
   terminal player use `Session` and `Workbench`; none of them names `Game`.
 - `Game` is not `pub(crate)` yet: it is `#[doc(hidden)]` and has only the play
-  methods left. The integration tests of `loremaster-runtime` play through it
-  (and `Game::restore` with a bare `State`), as does `run_walkthrough` inside
-  the crate. Moving those tests to `Session` is what remains, next to P2-09,
-  which makes the web player use only `Session` and `Workbench`.
+  methods left. Eight integration test files of `loremaster-runtime` play
+  through it, and some build a game from a bare `State` with
+  `Game::restore`. Moving those tests to `Session` is what remains, next to
+  P2-09, which makes the web player use only `Session` and `Workbench`.
