@@ -1,0 +1,5 @@
+error: agendas are not in `world!` yet: they wait for actors and agendas (D6, P4-02 #79)
+ --> tests/ui/fail/agenda.rs:5:5
+  |
+5 |     agenda for keeper {}
+  |     ^^^^^^

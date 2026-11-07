@@ -1,11 +1,12 @@
-// The whole slice in world!, one pack per part (the files in dsl/). This file joins the packs in
-// a fixed order, as the DSL doc proposes (Pack and assemble, DS-1, DSL step
-// L1; the builder API, DS-3, step L2). A test can load today's pack plus only
-// the parts that it needs, as crates/loremaster-runtime/tests/slice.rs does
-// with the YAML folders.
+// The whole slice in world!, one pack per part (the files in dsl/). This file
+// joins the packs in a fixed order, as the DSL doc proposes (Pack and
+// assemble, DS-1, DSL step L1). A test can load today's pack plus only the
+// parts that it needs, as crates/loremaster-runtime/tests/slice.rs does with
+// the YAML folders.
 //
-// Behind the cargo feature `dsl`. It does not compile until DSL step L2
-// (phase 1 and 2), and the world! grammar of the parts until steps L3 and L4.
+// Behind the cargo feature `dsl`. Today, the endings and the tests compile
+// with the world! core (DSL step L3, P3-03 #66). The other parts use syntax
+// that world! does not have yet; they stay out of the build until it does.
 
 #![cfg(feature = "dsl")]
 
@@ -14,22 +15,33 @@
 
 use loremaster::prelude::*;
 
-#[path = "dsl/agenda.rs"]
-pub mod agenda;
-#[path = "dsl/dialogue.rs"]
-pub mod dialogue;
 #[path = "dsl/endings.rs"]
 pub mod endings;
-#[path = "dsl/keeper_rule.rs"]
-pub mod keeper_rule;
-#[path = "dsl/stove.rs"]
-pub mod stove;
 #[path = "dsl/tests.rs"]
 pub mod tests;
-#[path = "dsl/texts.rs"]
-pub mod texts;
 #[path = "dsl/today.rs"]
 pub mod today;
+
+// Pending parts. `cfg(any())` is never true, so the compiler does not read
+// these files. Each one names what it waits for in its first lines, and the
+// world! macro names it too: text pools and `one_of` (R9, P4-01 #78),
+// dialogues (dramaturge R12's `dialogue!`, DSL step L4, P4-08 #85), named
+// slots of the command record and agendas (D6, P4-02 #79).
+#[cfg(any())]
+#[path = "dsl/agenda.rs"]
+pub mod agenda;
+#[cfg(any())]
+#[path = "dsl/dialogue.rs"]
+pub mod dialogue;
+#[cfg(any())]
+#[path = "dsl/keeper_rule.rs"]
+pub mod keeper_rule;
+#[cfg(any())]
+#[path = "dsl/stove.rs"]
+pub mod stove;
+#[cfg(any())]
+#[path = "dsl/texts.rs"]
+pub mod texts;
 
 /// The parts of the slice with new syntax. The names match the parts table
 /// in ../PENDING.md.
@@ -53,15 +65,12 @@ impl Part {
         Part::Agenda,
     ];
 
-    /// Each world! block makes `pack()` (DSL doc, "Joining the files").
-    fn pack(self) -> Pack {
+    /// Each world! block makes `pack()` (DSL doc, "Joining the files"). None
+    /// for a part whose world! file does not compile yet.
+    pub fn pack(self) -> Option<Pack> {
         match self {
-            Part::Endings => endings::pack(),
-            Part::Texts => texts::pack(),
-            Part::Dialogue => dialogue::pack(),
-            Part::Stove => stove::pack(),
-            Part::KeeperRule => keeper_rule::pack(),
-            Part::Agenda => agenda::pack(),
+            Part::Endings => Some(endings::pack()),
+            Part::Texts | Part::Dialogue | Part::Stove | Part::KeeperRule | Part::Agenda => None,
         }
     }
 }
@@ -69,16 +78,21 @@ impl Part {
 /// Today's pack plus the given parts, in the order of `Part::ALL`. The order
 /// is explicit, so the result does not depend on the order of `parts`. No
 /// pack uses `extend` or `replace`, so a duplicate id is an error.
+///
+/// Panics on a part that does not compile yet ([`Part::pack`]).
 pub fn with(parts: &[Part]) -> Loremaster {
     let mut lm = Loremaster::new().pack(today::pack());
     for part in Part::ALL.iter().filter(|p| parts.contains(p)) {
-        lm = lm.pack(part.pack());
+        let pack = part
+            .pack()
+            .unwrap_or_else(|| panic!("the part {part:?} is not in world! yet"));
+        lm = lm.pack(pack);
     }
     lm
 }
 
 /// The whole slice. `slice_equivalence` compares its model hash with the
-/// hashes of ../yaml and ../mixed.
+/// hashes of ../yaml and ../mixed. Panics until all parts compile.
 pub fn world() -> Loremaster {
     with(Part::ALL).pack(tests::pack())
 }

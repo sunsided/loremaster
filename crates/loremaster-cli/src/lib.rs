@@ -1,16 +1,22 @@
 //! loremaster as a library. The terminal player is the binary of this crate.
 //!
-//! With the cargo feature `builder`, the crate gives the builder API of
-//! [`loremaster-dsl`](https://docs.rs/loremaster-dsl) in [`prelude`]: write a
-//! story in plain Rust, join it with YAML folders, and build the world.
+//! With the cargo feature `dsl`, the crate gives the stories in Rust (D7):
+//! the builder API of [`loremaster-dsl`](https://docs.rs/loremaster-dsl) and
+//! the [`world!`] macro of [`loremaster-macros`](https://docs.rs/loremaster-macros),
+//! both in [`prelude`]. Write a story in Rust, join it with YAML folders, and
+//! build the world. The feature `builder` is the old name of `dsl`.
 //!
 //! ```toml
-//! loremaster = { version = "0.1", default-features = false, features = ["builder"] }
+//! loremaster = { version = "0.1", default-features = false, features = ["dsl"] }
 //! ```
 
-/// The builder API: [`loremaster_dsl`].
-#[cfg(feature = "builder")]
+/// The builder API: [`loremaster_dsl`]. The [`world!`] macro expands to
+/// calls of it.
+#[cfg(feature = "dsl")]
 pub use loremaster_dsl as dsl;
+
+#[cfg(feature = "dsl")]
+pub use loremaster_macros::world;
 
 /// Everything a story module needs: `use loremaster::prelude::*;`.
 ///
@@ -22,7 +28,24 @@ pub use loremaster_dsl as dsl;
 /// p.room("shore", "The Shore").text("Shingle crunches underfoot.");
 /// let world = Loremaster::new().pack(p).yaml("story/").build();
 /// ```
-#[cfg(feature = "builder")]
+///
+/// The same with the macro. `world!` makes the function `pack()`:
+///
+/// ```
+/// use loremaster::prelude::*;
+///
+/// world! {
+///     story "The Lighthouse" { start: shore }
+///     room shore "The Shore" {
+///         "Shingle crunches underfoot.";
+///     }
+/// }
+///
+/// let world = Loremaster::new().pack(pack()).build().unwrap();
+/// assert_eq!(world.story.title, "The Lighthouse");
+/// ```
+#[cfg(feature = "dsl")]
 pub mod prelude {
     pub use loremaster_dsl::prelude::*;
+    pub use loremaster_macros::world;
 }

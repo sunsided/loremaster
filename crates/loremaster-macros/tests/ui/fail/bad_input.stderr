@@ -1,0 +1,47 @@
+error: `<command> * <n>` repeats a step at most 1000 times
+ --> tests/ui/fail/bad_input.rs:7:29
+  |
+7 |         test t "T" { wait * 4294967295; }
+  |                             ^^^^^^^^^^
+
+error: the amount is out of range
+  --> tests/ui/fail/bad_input.rs:14:39
+   |
+14 |         rule r on turn { add score -= -9223372036854775808; }
+   |                                       ^
+
+error: a position has two numbers: `at [x, y]`
+  --> tests/ui/fail/bad_input.rs:21:36
+   |
+21 |         room hall "Hall" { at [1, 2, 3]; }
+   |                                    ^
+
+error: expected `)`: `time("HH:MM")` takes one time
+  --> tests/ui/fail/bad_input.rs:28:32
+   |
+28 |         rule r on time("07:00" "08:00") { stop; }
+   |                                ^^^^^^^
+
+error: the number is too large for a position
+  --> tests/ui/fail/bad_input.rs:35:32
+   |
+35 |         room hall "Hall" { at [1e40, 0]; }
+   |                                ^^^^
+
+error: `phases { .. }` needs at least one phase: `night "00:00"`
+  --> tests/ui/fail/bad_input.rs:42:45
+   |
+42 |         story "Tiny" { start: hall, clock { phases {} } }
+   |                                             ^^^^^^
+
+error: an extern machine needs its states, so that conditions on it check: `machine door [a, b];`
+  --> tests/ui/fail/bad_input.rs:49:26
+   |
+49 |         extern { machine door; }
+   |                          ^^^^
+
+error: the variables live in the story header, and this block has it, so no other pack can define `visits`; write `var visits: <type> = <value>;`
+  --> tests/ui/fail/bad_input.rs:56:22
+   |
+56 |         extern { var visits: int; }
+   |                      ^^^^^^

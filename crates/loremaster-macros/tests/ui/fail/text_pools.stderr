@@ -1,0 +1,5 @@
+error: `one_of` text groups are not in `world!` yet: they wait for the text core (R9, P4-01 #78)
+ --> tests/ui/fail/text_pools.rs:6:17
+  |
+6 |         examine one_of stove_state best {
+  |                 ^^^^^^

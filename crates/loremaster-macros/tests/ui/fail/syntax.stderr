@@ -1,0 +1,23 @@
+error: expected `extern`, `story`, `var`, `room`, `thing`, `rule`, `machine`, `timer`, `ending`, `verb` or `test`
+ --> tests/ui/fail/syntax.rs:5:9
+  |
+5 |         chamber hall "Hall" {}
+  |         ^^^^^^^
+
+error: expected `;`
+  --> tests/ui/fail/syntax.rs:14:13
+   |
+14 |             exit north -> garden;
+   |             ^^^^
+
+error: the effect that shows a text is `line "<text>"`
+  --> tests/ui/fail/syntax.rs:22:26
+   |
+22 |         rule r on turn { say "Hello."; }
+   |                          ^^^
+
+error: `end` names an ending entity: `end <id>;` with `ending <id> "<title>" { .. }`
+  --> tests/ui/fail/syntax.rs:29:30
+   |
+29 |         rule r on turn { end "You win."; }
+   |                              ^^^^^^^^^^

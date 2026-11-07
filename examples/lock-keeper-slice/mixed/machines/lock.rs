@@ -1,10 +1,9 @@
 // The lock machine in world!, in place of ../../yaml/machines/lock.yaml. The
 // chamber empties when the player opens the lower paddles with the windlass.
-// The pages are in the gear housing at the bottom. Part "Today": the YAML
-// form loads now. This form waits for Pack and assemble (DSL step L1) and
-// for machines in world! (step L4).
+// The pages are in the gear housing at the bottom. Part "Today". It compiles
+// since the world! core (DSL step L3, P3-03 #66).
 //
-// Draft syntax. It does not compile. Read ../README.md.
+// Read ../README.md.
 
 use loremaster::prelude::*;
 
@@ -30,7 +29,6 @@ world! {
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
-            // TODO: line when in(lock_chamber) then The chamber is empty. Wet ladder rungs go down into the dark. (no empty else, empty else, or done)
             line "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
         }
     }

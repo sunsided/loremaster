@@ -1,0 +1,17 @@
+error: the variable `turns` has a name that conditions use for a built-in, so they would not read it; choose another id
+  --> tests/ui/fail/reserved_names.rs:10:9
+   |
+10 |     var turns: int = 0;
+   |         ^^^^^
+
+error: the variable `night` has the name of a phase of the clock, so conditions would read it instead of the phase; choose another id
+  --> tests/ui/fail/reserved_names.rs:11:9
+   |
+11 |     var night: bool = false;
+   |         ^^^^^
+
+error: the room `here` has a name that conditions use for a built-in, so they would not read it; choose another id
+  --> tests/ui/fail/reserved_names.rs:14:10
+   |
+14 |     room here "Here" {}
+   |          ^^^^
