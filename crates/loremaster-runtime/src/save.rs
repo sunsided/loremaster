@@ -208,6 +208,11 @@ fn reconcile(
     let start = Game::new(world.clone()).state().clone();
     let mut dropped = Vec::new();
 
+    // A paused rule of a changed story may point at other effects now.
+    if let Some(open) = state.awaiting.take() {
+        dropped.push(format!("await:{}", open.id));
+    }
+
     let old_facts = std::mem::take(&mut state.facts);
     for (key, value) in &old_facts {
         if start.facts.contains_key(key) {

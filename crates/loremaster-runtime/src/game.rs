@@ -8,6 +8,8 @@ use loremaster_model::{EventPattern, Id, Location, TimeOfDay, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod awaits;
+pub use awaits::{ARRIVED, REFUSED};
 mod narrative;
 mod talk;
 pub use talk::{TalkOptionView, TalkView};
@@ -26,6 +28,8 @@ pub struct Game {
     last_frame: Option<FrameUse>,
     /// A `stop` effect ran in the rules that fire now.
     stopped: bool,
+    /// The host answers rolls itself (SE-7). Without it, the session rolls.
+    pub(crate) host_rolls: bool,
 }
 
 /// What a run of rules did.
@@ -385,6 +389,7 @@ impl Game {
             rng: story.seed,
             ended: false,
             ending: None,
+            awaiting: None,
             action: None,
             last_command: None,
             repeat: 0,
@@ -485,6 +490,7 @@ impl Game {
             last_fired: Vec::new(),
             last_frame: None,
             stopped: false,
+            host_rolls: false,
         }
     }
 
@@ -796,6 +802,12 @@ impl Game {
     pub fn input(&mut self, text: &str) -> Turn {
         self.last_frame = None;
         let mut turn = Turn::default();
+        // A rule waits for an answer: the input is the answer.
+        if self.state.awaiting.is_some() && !self.state.ended {
+            turn.say(BlockKind::Command, text.trim());
+            self.await_input(&mut turn, text);
+            return self.finish(turn);
+        }
         // In a talk, the chosen answer shows instead of the typed text.
         if self.state.talk.is_some() && !self.state.ended {
             self.talk_input(&mut turn, text);
@@ -813,6 +825,24 @@ impl Game {
         self.finish(turn)
     }
 
+    /// Let one turn of time pass without an action of the player: no command
+    /// echo, no action counts, and also during a talk (SE-2).
+    pub fn tick(&mut self) -> Turn {
+        self.last_frame = None;
+        let mut turn = Turn::default();
+        if self.state.ended {
+            turn.say(BlockKind::Response, "The story has ended.");
+            return turn;
+        }
+        // While a rule waits for the host, time does not pass.
+        if let Some(open) = self.state.awaiting.as_ref().map(|a| a.request.describe()) {
+            turn.say(BlockKind::Response, format!("The story waits: {open}."));
+            return self.finish(turn);
+        }
+        self.advance(&mut turn);
+        self.finish(turn)
+    }
+
     /// Handle a command picked on the verb bar.
     pub fn act(&mut self, cmd: Command) -> Turn {
         self.last_frame = None;
@@ -823,6 +853,19 @@ impl Game {
         if self.state.ended {
             turn.say(BlockKind::Response, "The story has ended.");
             return turn;
+        }
+        if self.state.awaiting.is_some() {
+            match cmd {
+                Command::Choose { index } => self.await_input(&mut turn, &(index + 1).to_string()),
+                _ => {
+                    let open = self.state.awaiting.as_ref().map(|a| a.request.describe());
+                    turn.say(
+                        BlockKind::Response,
+                        format!("The story waits: {}.", open.unwrap_or_default()),
+                    );
+                }
+            }
+            return self.finish(turn);
         }
         self.perform(&mut turn, cmd);
         self.finish(turn)
@@ -1831,6 +1874,12 @@ impl Game {
                     .then
                     .iter()
                     .map(|e| match e {
+                        loremaster_model::Effect::Await(spec) => {
+                            match crate::state::AwaitRequest::of(spec) {
+                                Some(r) => format!("wait for the host: {}", r.describe()),
+                                None => "wait for the host".to_string(),
+                            }
+                        }
                         loremaster_model::Effect::Set(m) => format!(
                             "set {}",
                             m.iter()
@@ -2216,7 +2265,15 @@ impl Game {
             self.state.fired.insert(rule.id.clone());
             out.instead |= rule.instead;
             stepped.extend(rule.machine.as_ref());
-            for effect in &world.rules[i].then {
+            for (k, effect) in world.rules[i].then.iter().enumerate() {
+                if let CEffect::Await(spec) = effect {
+                    // The rule pauses; the other rules of the event still run.
+                    if self.begin_await(turn, &rule.id, k + 1, spec) != awaits::AwaitStep::Answered
+                    {
+                        break;
+                    }
+                    continue;
+                }
                 self.apply(turn, &rule.id, effect, depth + 1);
                 if self.stopped || self.state.ended {
                     break;
@@ -2404,8 +2461,16 @@ impl Game {
                 }
                 self.state.ended = true;
                 self.state.ending = Some(ending.clone());
+                // An ended story answers no await.
+                self.state.awaiting = None;
             }
             CEffect::Stop => self.stopped = true,
+            // Only a rule can pause (the fire loop handles it there); the checks
+            // reject `await` in timers and dialogues.
+            CEffect::Await(_) => turn.log.push(LogEntry {
+                kind: "await".into(),
+                text: format!("{rule}: `await` works only in rules"),
+            }),
             CEffect::Emit(name) => {
                 turn.log.push(LogEntry {
                     kind: "event".into(),
