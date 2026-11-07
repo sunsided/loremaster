@@ -22,7 +22,6 @@ use dramaturge_model::{
     FactValue, Memory, MemoryId, MemoryQuery, RelationshipAxisId,
 };
 use dramaturge_runtime::NarrativeState;
-use loremaster_lang::memory_tag;
 use loremaster_model::{Id, Value};
 use std::borrow::Cow;
 
@@ -137,6 +136,11 @@ impl NarrativeState for Game {
         removed
     }
 
+    /// The save keeps memories by key only, so the memory rebuilt here has an
+    /// id and the player as subject, nothing more. That answers the queries
+    /// that loremaster lowers (`MemoryQuery::by_id`); a query on tags,
+    /// confidence or facts would never match. Keep more in the save first if
+    /// a condition needs them.
     fn matches_memory_query(&self, owner: EntityId, query: &MemoryQuery) -> bool {
         let symbols = &self.world.symbols;
         let Some(keys) = symbols
@@ -148,9 +152,7 @@ impl NarrativeState for Game {
         let player = self.world.scope.player();
         keys.iter().any(|key| {
             symbols.memory(key).is_some_and(|id| {
-                let memory = Memory::new(id)
-                    .with_subject(player)
-                    .with_tag(memory_tag(key));
+                let memory = Memory::new(id).with_subject(player);
                 query.matches(&memory)
             })
         })
@@ -223,14 +225,9 @@ mod tests {
         let player = game.world.scope.player();
         let blackbeard = game.world.scope.entity("blackbeard").unwrap();
         let id = game.world.symbols.memory("asked_marigold").unwrap();
-        let query = MemoryQuery::by_tag(memory_tag("asked_marigold"));
+        let query = MemoryQuery::by_id(id);
         check!(!game.matches_memory_query(blackbeard, &query));
-        game.add_memory(
-            blackbeard,
-            Memory::new(id)
-                .with_subject(player)
-                .with_tag(memory_tag("asked_marigold")),
-        );
+        game.add_memory(blackbeard, Memory::new(id).with_subject(player));
         check!(game.matches_memory_query(blackbeard, &query));
         check!(game.state.memories["blackbeard"].contains("asked_marigold"));
         check!(game.remove_memory(blackbeard, id));

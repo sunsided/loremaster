@@ -21,7 +21,7 @@ use dramaturge_runtime::{
     ConditionEvaluator, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
     DefaultRuntime, DialogueRuntime, NarrativeState, OutcomeApplier,
 };
-use loremaster_lang::{ADD_KEY, THEN_KEY};
+use loremaster_lang::THEN_KEY;
 use loremaster_model::{Id, Layer, Value};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -172,8 +172,7 @@ impl NarrativeState for Turned<'_> {
     }
 }
 
-/// Applies the outcomes that dramaturge can not: `add`, and the world effects
-/// of `then`. They write into the turn of the [`Turned`] state.
+/// Applies the world effects of `then`, which dramaturge can not. They write into the turn of the [`Turned`] state.
 struct WorldEffects {
     dialogue: Arc<CDialogue>,
 }
@@ -181,32 +180,26 @@ struct WorldEffects {
 impl CustomHandler<Turned<'_>> for WorldEffects {
     fn outcome(&mut self, key: &str, args: &[FactValue], state: &mut Turned<'_>) {
         let Turned { game, turn } = state;
-        match (key, args) {
-            (ADD_KEY, [FactValue::Text(name), FactValue::Int(n)]) => {
-                let now = game.state.facts.get(name).and_then(Value::as_int);
-                game.set_fact(turn, name, Value::Int(now.unwrap_or(0) + n));
+        let (THEN_KEY, [FactValue::Int(i)]) = (key, args) else {
+            return;
+        };
+        let owner = Id::new(format!("dialogue:{}", self.dialogue.id));
+        let Some(effects) = usize::try_from(*i)
+            .ok()
+            .and_then(|i| self.dialogue.effects.get(i))
+        else {
+            return;
+        };
+        // A `stop` (or `Flow::Stop` of a called behavior) ends the
+        // node's effects, as it ends a rule.
+        let outer = std::mem::replace(&mut game.stopped, false);
+        for effect in effects {
+            game.apply(turn, &owner, effect, 1);
+            if game.stopped || game.state.ended {
+                break;
             }
-            (THEN_KEY, [FactValue::Int(i)]) => {
-                let owner = Id::new(format!("dialogue:{}", self.dialogue.id));
-                let Some(effects) = usize::try_from(*i)
-                    .ok()
-                    .and_then(|i| self.dialogue.effects.get(i))
-                else {
-                    return;
-                };
-                // A `stop` (or `Flow::Stop` of a called behavior) ends the
-                // node's effects, as it ends a rule.
-                let outer = std::mem::replace(&mut game.stopped, false);
-                for effect in effects {
-                    game.apply(turn, &owner, effect, 1);
-                    if game.stopped || game.state.ended {
-                        break;
-                    }
-                }
-                game.stopped = outer;
-            }
-            _ => {}
         }
+        game.stopped = outer;
     }
 }
 

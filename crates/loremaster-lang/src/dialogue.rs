@@ -1,4 +1,4 @@
-use crate::lower::{memory_tag, resolve};
+use crate::lower::resolve;
 use crate::{LangError, Operand, Scope, Segment, compile_condition, compile_markup, parse_expr};
 use dramaturge_model::{
     CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
@@ -8,8 +8,6 @@ use dramaturge_model::{
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
 use std::collections::BTreeMap;
 
-/// The custom-outcome key for `add`: dramaturge can only set a fact, not add to one.
-pub const ADD_KEY: &str = "loremaster.add";
 /// The custom-outcome key for `then`: world effects that the runtime applies.
 pub const THEN_KEY: &str = "loremaster.then";
 
@@ -173,9 +171,10 @@ fn outcomes(
     }
     for (name, n) in &o.add {
         fact_name(name, scope)?;
-        out.push(Outcome::Custom {
-            key: ADD_KEY.into(),
-            args: vec![FactValue::Text(name.clone()), FactValue::Int(*n)],
+        out.push(Outcome::AddFact {
+            scope: FactScope::World,
+            fact_id: FactId::new(name.as_str()),
+            delta: *n,
         });
     }
     for (axis, delta) in &o.relation {
@@ -204,9 +203,7 @@ fn outcomes(
         })?;
         out.push(Outcome::AddMemory {
             owner: with,
-            memory: Memory::new(id)
-                .with_subject(player)
-                .with_tag(memory_tag(key)),
+            memory: Memory::new(id).with_subject(player),
         });
     }
     if !o.then.is_empty() {
@@ -247,7 +244,7 @@ mod tests {
             "title": "t",
             "start": "bar",
             "relations": ["trust"],
-            "vars": [{"id": "known", "type": "bool", "initial": false}],
+            "vars": [{"id": "known", "type": "bool", "initial": false}, {"id": "visits_bb", "type": "int", "initial": 0}],
             "rooms": [{"id": "bar", "name": "Bar"}],
             "things": [{"id": "bb", "name": "man", "location": {"room": "bar"}}],
             "dialogues": [{
@@ -261,7 +258,7 @@ mod tests {
                             {"say": "Bye."}
                         ]
                     },
-                    "names": {"say": "Blackbeard.", "set": {"known": true}, "then": [{"goto": "bar"}]},
+                    "names": {"say": "Blackbeard.", "set": {"known": true}, "add": {"visits_bb": 2}, "then": [{"goto": "bar"}]},
                     "again": {"say": "Again.", "when": "remembers(bb, asked)"}
                 }
             }]
@@ -293,8 +290,12 @@ mod tests {
             names.outcomes_on_enter[0],
             Outcome::SetFact { .. }
         ));
+        check!(matches!(
+            &names.outcomes_on_enter[1],
+            Outcome::AddFact { scope: FactScope::World, fact_id, delta: 2 } if fact_id.0.as_ref() == "visits_bb"
+        ));
         check!(
-            matches!(&names.outcomes_on_enter[1], Outcome::Custom { key, .. } if key == THEN_KEY)
+            matches!(&names.outcomes_on_enter[2], Outcome::Custom { key, .. } if key == THEN_KEY)
         );
         check!(c.effects.len() == 1);
         check!(matches!(
