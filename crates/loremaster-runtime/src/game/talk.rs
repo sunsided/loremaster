@@ -18,8 +18,8 @@ use dramaturge_model::{
     Outcome, RelationshipAxisId,
 };
 use dramaturge_runtime::{
-    ConditionEvaluator, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
-    DefaultRuntime, DialogueRuntime, NarrativeState, OutcomeApplier,
+    CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
+    DefaultRuntime, DialogueRuntime, NarrativeState, OutcomeApplier, select_entry,
 };
 use loremaster_lang::THEN_KEY;
 use loremaster_model::{Id, Layer, Value};
@@ -317,12 +317,7 @@ impl Game {
         let Some(d) = self.world.dialogue_with(thing.as_str()).cloned() else {
             return false;
         };
-        let ev = evaluator();
-        let start = d.graph.starts.iter().copied().find(|id| {
-            d.node(*id)
-                .is_some_and(|n| n.conditions.iter().all(|c| ev.evaluate(c, &*self)))
-        });
-        let Some(start) = start else {
+        let Some(start) = select_entry(&d.graph.graph, &evaluator(), &*self) else {
             return false;
         };
         self.state.talk = Some(Talk {

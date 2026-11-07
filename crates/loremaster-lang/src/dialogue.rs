@@ -19,9 +19,8 @@ pub const THEN_KEY: &str = "loremaster.then";
 /// markup that the runtime renders.
 #[derive(Debug, Clone)]
 pub struct CompiledDialogue {
+    /// The start nodes are its entry nodes, in order.
     pub graph: DialogueGraph,
-    /// The start nodes, in order.
-    pub starts: Vec<DialogueNodeId>,
     /// The `then` lists, by the index that their `THEN_KEY` outcome carries.
     pub effects: Vec<Vec<Effect>>,
     pub node_say: BTreeMap<DialogueNodeId, Vec<Segment>>,
@@ -74,7 +73,6 @@ pub fn compile_dialogue(
     let speaker = CharacterId::new(with);
     let mut out = CompiledDialogue {
         graph: DialogueGraph::new(),
-        starts: Vec::new(),
         effects: Vec::new(),
         node_say: BTreeMap::new(),
         option_say: BTreeMap::new(),
@@ -95,6 +93,8 @@ pub fn compile_dialogue(
             conditions: Vec::new(),
             outcomes_on_enter: Vec::new(),
             options: Vec::new(),
+            lines: Vec::new(),
+            next: None,
         };
         if let Some(when) = &n.when {
             node.conditions.push(
@@ -129,7 +129,7 @@ pub fn compile_dialogue(
     }
     for (i, key) in d.start.iter().enumerate() {
         match d.nodes.iter().position(|n| &n.key == key) {
-            Some(index) => out.starts.push(ids[index]),
+            Some(index) => out.graph.entry_nodes.push(ids[index]),
             None => {
                 return Err(fail(
                     format!("start[{i}]"),
@@ -139,9 +139,6 @@ pub fn compile_dialogue(
             }
         }
     }
-    // dramaturge has one entry node; loremaster has a list of start nodes. The
-    // first one is the entry, so the validator walks the graph from it.
-    out.graph.entry_node = out.starts.first().copied();
     Ok(out)
 }
 
@@ -273,8 +270,8 @@ mod tests {
         let mut symbols = scope.symbols.clone();
         let c = compile_dialogue(&story.dialogues[0], &scope, &mut symbols).unwrap();
         check!(c.graph.nodes.len() == 3);
-        check!(c.starts.len() == 2);
-        check!(c.graph.entry_node == Some(c.starts[0]));
+        // The start nodes, in order: again, meet.
+        check!(c.graph.entry_nodes == [c.graph.nodes[0].id, c.graph.nodes[1].id]);
         // serde_json sorts map keys: again, meet, names.
         let meet = &c.graph.nodes[1];
         check!(meet.options[0].target == DialogTarget::Node(c.graph.nodes[2].id));
