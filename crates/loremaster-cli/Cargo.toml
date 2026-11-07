@@ -17,6 +17,7 @@ name = "loremaster"
 path = "src/main.rs"
 
 [dependencies]
+loremaster-dsl = { workspace = true, optional = true }
 loremaster-mcp.workspace = true
 loremaster-project.workspace = true
 loremaster-runtime.workspace = true
@@ -27,9 +28,12 @@ loremaster-runtime.workspace = true
 default = ["embed-ui"]
 embed-ui = ["loremaster-mcp/embed-ui"]
 # The draft world! forms of the golden slice (examples/lock-keeper-slice/dsl
-# and mixed). They do not compile until DSL step L2. Only the test target
-# tests/slice_dsl.rs uses this feature.
+# and mixed). They do not compile until the world! macro exists (DSL steps
+# L3 and L4). Only the test target tests/slice_dsl.rs uses this feature.
 dsl = []
+# The builder API in plain Rust (crate loremaster-dsl, DSL step L2): `loremaster::dsl` and
+# `loremaster::prelude`. A separate feature, so that it does not turn on the draft forms above.
+builder = ["dep:loremaster-dsl"]
 
 [lints]
 workspace = true
