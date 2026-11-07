@@ -1,0 +1,159 @@
+//! Dialogues with a thing.
+
+use crate::convert::{IntoValue, id, strings};
+use crate::pack::{register, replaceable, with_notes};
+use loremaster_model::{Dialogue, DialogueNode, DialogueOption, Effect, Id, Outcomes};
+use loremaster_project::Pack;
+
+/// A dialogue of a pack, from [`BuildPack::dialogue`](crate::BuildPack::dialogue).
+///
+/// [`node`](Self::node) adds a node and [`option`](Self::option) an answer
+/// to the node added last. [`when`](Self::when) and the outcomes
+/// ([`set`](Self::set), [`add`](Self::add), [`relation`](Self::relation),
+/// [`remember`](Self::remember), [`then`](Self::then)) change the node or
+/// option added last.
+///
+/// ```
+/// use loremaster_dsl::prelude::*;
+///
+/// let mut p = Pack::new("cantina");
+/// p.dialogue("blackbeard_talk", "blackbeard")
+///     .start(["meet"])
+///     .node("meet", "The figure looks up. \"Sit, if you like.\"")
+///     .option("\"Who are you?\"", "names")
+///     .option("\"Not tonight.\"", "end")
+///     .node("names", "\"They call me Blackbeard,\" he says.")
+///     .set("knows_blackbeard_name", true)
+///     .relation("trust", 1);
+/// assert_eq!(p.dialogues[0].nodes.len(), 2);
+/// ```
+pub struct DialogueBuilder<'a> {
+    pub(crate) pack: &'a mut Pack,
+    pub(crate) i: usize,
+}
+
+impl<'a> DialogueBuilder<'a> {
+    #[track_caller]
+    pub(crate) fn new(pack: &'a mut Pack, id: Id, with: Id) -> Self {
+        register(pack, format!("dialogue:{id}"));
+        pack.dialogues.push(Dialogue {
+            id,
+            with,
+            start: Vec::new(),
+            nodes: Vec::new(),
+            notes: Vec::new(),
+        });
+        let i = pack.dialogues.len() - 1;
+        DialogueBuilder { pack, i }
+    }
+
+    fn dialogue(&mut self) -> &mut Dialogue {
+        &mut self.pack.dialogues[self.i]
+    }
+
+    #[track_caller]
+    fn last_node(&mut self) -> &mut DialogueNode {
+        match self.dialogue().nodes.last_mut() {
+            Some(node) => node,
+            None => panic!("the dialogue has no node yet: call `node` first"),
+        }
+    }
+
+    /// The outcomes of the option added last, or of the node when it has no
+    /// option yet.
+    #[track_caller]
+    fn outcomes(&mut self) -> &mut Outcomes {
+        let node = self.last_node();
+        match node.options.last_mut() {
+            Some(option) => &mut option.outcomes,
+            None => &mut node.outcomes,
+        }
+    }
+
+    /// `start:`, the node keys that can start the talk, in order.
+    pub fn start(mut self, keys: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
+        self.dialogue().start.extend(strings(keys));
+        self
+    }
+
+    /// A node: the other character's line.
+    pub fn node(mut self, key: impl Into<String>, say: impl Into<String>) -> Self {
+        self.dialogue().nodes.push(DialogueNode {
+            key: key.into(),
+            when: None,
+            say: say.into(),
+            outcomes: Outcomes::default(),
+            options: Vec::new(),
+        });
+        self
+    }
+
+    /// An answer of the last node: the player's line and where it goes (a
+    /// node key, `end` or `back`).
+    #[track_caller]
+    pub fn option(mut self, say: impl Into<String>, go: impl Into<String>) -> Self {
+        self.last_node().options.push(DialogueOption {
+            say: say.into(),
+            when: None,
+            outcomes: Outcomes::default(),
+            go: go.into(),
+        });
+        self
+    }
+
+    /// `when:` of the option added last, or of the node when it has no option yet.
+    #[track_caller]
+    pub fn when(mut self, condition: impl Into<String>) -> Self {
+        let condition = Some(condition.into());
+        let node = self.last_node();
+        match node.options.last_mut() {
+            Some(option) => option.when = condition,
+            None => node.when = condition,
+        }
+        self
+    }
+
+    /// `set:` a variable or property.
+    #[track_caller]
+    pub fn set(mut self, name: impl Into<String>, value: impl IntoValue) -> Self {
+        self.outcomes().set.insert(name.into(), value.into_value());
+        self
+    }
+
+    /// `add:` to an integer variable.
+    #[track_caller]
+    pub fn add(mut self, name: impl Into<String>, amount: i64) -> Self {
+        self.outcomes().add.insert(name.into(), amount);
+        self
+    }
+
+    /// `relation:`: add to the player's relation to the dialogue's thing.
+    #[track_caller]
+    pub fn relation(mut self, axis: impl Into<String>, amount: i32) -> Self {
+        self.outcomes().relation.insert(axis.into(), amount);
+        self
+    }
+
+    /// `remember:`: a memory that the dialogue's thing keeps.
+    #[track_caller]
+    pub fn remember(mut self, memory: impl Into<String>) -> Self {
+        self.outcomes().remember.push(memory.into());
+        self
+    }
+
+    /// One world effect of `then:` (`move`, `goto`, `end`).
+    #[track_caller]
+    pub fn then(mut self, effect: Effect) -> Self {
+        self.outcomes().then.push(effect);
+        self
+    }
+
+    /// `end:` the game with an ending, as a world effect.
+    #[track_caller]
+    pub fn end(self, ending: impl AsRef<str>) -> Self {
+        self.then(Effect::End(id(ending)))
+    }
+}
+
+replaceable!(DialogueBuilder, dialogues, "dialogue");
+with_notes!(DialogueBuilder, dialogues);

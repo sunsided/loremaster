@@ -444,6 +444,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "loremaster-dsl"
+version = "0.1.0"
+dependencies = [
+ "loremaster-model",
+ "loremaster-project",
+ "loremaster-runtime",
+]
+
+[[package]]
 name = "loremaster-lang"
 version = "0.1.0"
 dependencies = [
