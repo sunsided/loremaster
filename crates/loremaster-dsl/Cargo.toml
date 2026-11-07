@@ -11,6 +11,8 @@ rust-version.workspace = true
 readme = "README.md"
 keywords = ["text-adventure", "interactive-fiction", "builder", "dsl", "game"]
 categories = ["game-development"]
+# The tests read the stories in ../../examples. They are not in the package.
+exclude = ["tests/"]
 
 [dependencies]
 loremaster-model.workspace = true
