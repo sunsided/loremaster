@@ -15,6 +15,6 @@ The `.rs` files are draft syntax, behind the cargo feature `dsl`. The `world!` m
 | `rules/keeper.yaml` | YAML | Keeper rule |
 | `agendas/keeper.rs` | `world!` | Agenda, in place of `agendas/keeper.yaml` |
 | `tests/` | YAML | The walkthroughs |
-| `mod.rs` | Rust | Joins the YAML folder and the two packs; `today()` and `world()` |
+| `../mixed.rs` | Rust | Joins the YAML folder and the two packs; `today()` and `world()` |
 
 The two Rust files name YAML ids in an `extern { ... }` block (open mode). The macro cannot see the YAML, so the check finds these ids at load time.

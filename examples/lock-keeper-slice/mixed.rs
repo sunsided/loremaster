@@ -10,9 +10,9 @@
 
 use loremaster::prelude::*;
 
-#[path = "agendas/keeper.rs"]
+#[path = "mixed/agendas/keeper.rs"]
 pub mod agenda;
-#[path = "machines/lock.rs"]
+#[path = "mixed/machines/lock.rs"]
 pub mod lock;
 
 /// The YAML files of this folder. The YAML loader reads only `*.yaml`, so
