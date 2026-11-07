@@ -9,7 +9,7 @@ The golden slice of the roadmap (phase 0). It is a small part of the demo "The L
 | `yaml/` | The whole slice in YAML | This folder |
 | `dsl/` | The same slice in `world!`, one pack per part, behind the cargo feature `dsl` of the crate `loremaster` | Draft syntax; compiles after DSL step L2 |
 | `mixed/` | The YAML folder, with the lock machine and the agenda in `world!` instead | Draft syntax; compiles after DSL step L2 |
-| `expected/` | `model.hash` and `slice_best.transcript` | When `slice_equivalence` (P1-06) and `slice_best` (P4-07) pass |
+| `expected/` | `model.hash`: the canonical model hash of the YAML form in today's syntax (P1-06). `slice_best.transcript` follows with P4-07 | `model.hash` now |
 
 The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine with its timer, the stove with the text of the D2 side note, the keeper with one dialogue and one agenda step (he burns the pages at midnight), and three endings: a win, a loss, and a death. The roadmap names two endings; the death ending is for `slice_undo_after_death`.
 
@@ -36,7 +36,8 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`. Each one loads
 | `slice_baseline` | Rooms, things and the lock machine load and play in today's syntax; every walkthrough without a pending mark passes (`slice_baseline`, `slice_drowning`) | Today | Phase 0 (passes now) | #37 |
 | `slice_endings` | Endings are entities with id, kind and rank | Today | Passes (P1-03) | #44 |
 | `slice_save_envelope` | A save from the middle of `slice_best` has an envelope and restores | Today | Passes (P1-04) | #45 |
-| `slice_equivalence` | YAML, DSL and mixed give one model | Today, per form | Phase 1 and DSL step L2 | P1-06 #47 |
+| `slice_model_hash` | The YAML form gives the model hash in `expected/model.hash` | Today | Passes (P1-06) | #47 |
+| `slice_equivalence` | YAML, DSL and mixed give one model hash | Today, per form | DSL steps L3 and L4 (the `world!` macro reads dsl/ and mixed/) | P3-03 #66, P4-08 #85 |
 | `slice_undo_after_death` | The death prompt, and undo after it | Today | Phase 2 | P2-03 #54 |
 | `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Phase 3 (and R9, see the log) | P3-01 #64, #111 |
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |

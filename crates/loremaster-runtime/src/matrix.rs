@@ -4,7 +4,7 @@
 
 use crate::world::CFragment;
 use crate::{BlockKind, Game, Turn};
-use dramaturge_model::{Condition, FactValue};
+use dramaturge_model::{Condition, FactValue, SymbolTable};
 use loremaster_lang::{Derived, Operand, Segment};
 use loremaster_model::{Id, Location, TimeOfDay, Value, VarType};
 use serde::{Deserialize, Serialize};
@@ -52,6 +52,8 @@ enum Key {
     Present(Id),
     Talked(Id),
     Interactions(Id),
+    /// The player's relation to a thing, as `thing.axis`.
+    Relation(String),
 }
 
 impl Key {
@@ -66,18 +68,28 @@ impl Key {
             Key::Present(t) => format!("{t}.present"),
             Key::Talked(t) => format!("{t}.talked"),
             Key::Interactions(t) => format!("{t}.interactions"),
+            Key::Relation(key) => key.clone(),
         }
     }
 }
 
 /// Numbers that a condition compares with, so the matrix tries both sides of each limit.
 #[derive(Default)]
-struct Found {
+struct Found<'w> {
     keys: BTreeMap<Key, BTreeSet<i64>>,
     texts: BTreeMap<Key, BTreeSet<String>>,
+    /// To name the thing of a relation condition.
+    symbols: Option<&'w SymbolTable>,
 }
 
-impl Found {
+impl<'w> Found<'w> {
+    fn new(symbols: &'w SymbolTable) -> Self {
+        Self {
+            symbols: Some(symbols),
+            ..Self::default()
+        }
+    }
+
     fn number(&mut self, key: Key, n: i64) {
         let e = self.keys.entry(key).or_default();
         e.extend([n - 1, n, n + 1].into_iter().filter(|v| *v >= 0));
@@ -110,6 +122,23 @@ impl Found {
                 self.number(Key::Fact(fact_id.0.to_string()), *value)
             }
             Condition::FactExists { fact_id, .. } => self.flag(Key::Fact(fact_id.0.to_string())),
+            Condition::RelationshipAtLeast {
+                target,
+                axis,
+                value,
+                ..
+            }
+            | Condition::RelationshipAtMost {
+                target,
+                axis,
+                value,
+                ..
+            } => {
+                if let Some(thing) = self.symbols.and_then(|s| s.entity_key(*target)) {
+                    let key = Key::Relation(format!("{thing}.{}", axis.0));
+                    self.number(key, i64::from(*value));
+                }
+            }
             Condition::Custom { key, args } => {
                 if let Some((d, _, value)) = Derived::from_condition(key, args) {
                     self.derived(&d, &value);
@@ -145,7 +174,10 @@ impl Found {
                 Segment::Insert { operand, .. } => match operand {
                     Operand::Fact(name) => self.flag(Key::Fact(name.clone())),
                     Operand::Derived(d) => self.derived(d, &FactValue::Int(0)),
-                    Operand::ThingName(..) | Operand::Relation(..) => {}
+                    Operand::Relation(thing, axis) => {
+                        self.number(Key::Relation(format!("{thing}.{axis}")), 0)
+                    }
+                    Operand::ThingName(..) => {}
                 },
                 Segment::Choice {
                     condition,
@@ -203,7 +235,9 @@ fn values_for(game: &Game, key: &Key, found: &Found) -> Vec<String> {
             .into_iter()
             .map(String::from)
             .collect(),
-        Key::Hour | Key::Visits(_) | Key::Talked(_) | Key::Interactions(_) => numbers(&[0]),
+        Key::Hour | Key::Visits(_) | Key::Talked(_) | Key::Interactions(_) | Key::Relation(_) => {
+            numbers(&[0])
+        }
         Key::FirstVisit | Key::Carried(_) | Key::Present(_) => vec!["true".into(), "false".into()],
     }
 }
@@ -234,6 +268,20 @@ fn apply(game: &mut Game, room: &Id, key: &Key, value: &str) {
             }
         }
         Key::Hour => game.state_mut().minutes = day + value.parse::<u32>().unwrap_or(0) * 60,
+        Key::Relation(key) => {
+            // A relation that no dialogue changed is not stored and reads as 0.
+            // The values next to a limit can leave the i32 range; clamp them.
+            let n = value
+                .parse::<i64>()
+                .map(|n| n.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32)
+                .unwrap_or(0);
+            let relations = &mut game.state_mut().relations;
+            if n == 0 {
+                relations.remove(key);
+            } else {
+                relations.insert(key.clone(), n);
+            }
+        }
         Key::FirstVisit => {
             let n = if value == "true" { 1 } else { 2 };
             game.state_mut().visits.insert(room.clone(), n);
@@ -328,7 +376,7 @@ pub fn room_matrix(game: &Game, room: &str) -> Option<RoomMatrix> {
     let world = game.world();
     let ri = world.room_idx(room)?;
     let room_id = world.story.rooms[ri].id.clone();
-    let mut found = Found::default();
+    let mut found = Found::new(&world.symbols);
     found.fragments(&world.rooms[ri].description);
     for (ti, t) in world.story.things.iter().enumerate() {
         let here = matches!(&t.location, Location::Room(r) if *r == room_id)
@@ -459,7 +507,7 @@ pub fn text_matrix(game: &Game, src: &str, when: Option<&str>) -> Option<RoomMat
         Some(w) => Some(loremaster_lang::compile_condition(w, &world.scope).ok()?),
         None => None,
     };
-    let mut found = Found::default();
+    let mut found = Found::new(&world.symbols);
     found.segments(&segments);
     if let Some(c) = &condition {
         found.condition(c);

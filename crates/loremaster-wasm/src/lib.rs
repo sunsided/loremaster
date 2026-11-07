@@ -97,16 +97,8 @@ impl Engine {
         if diags.iter().any(|d| d.severity == Severity::Error) {
             return Err(to_js(&diags)?);
         }
-        let world = World::compile(project.story).map_err(|e| {
-            to_js(&vec![Diagnostic {
-                severity: Severity::Error,
-                file: String::new(),
-                at: e.at.clone(),
-                message: e.error.message.clone(),
-                line: None,
-                column: None,
-            }])
-            .unwrap_or(JsValue::NULL)
+        let world = World::compile(project.story.clone()).map_err(|e| {
+            to_js(&vec![project.locate(Diagnostic::from(&e))]).unwrap_or(JsValue::NULL)
         })?;
         let world = Arc::new(world);
         Ok(Engine {
