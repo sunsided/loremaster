@@ -3,7 +3,8 @@
 //! shaped like the runtime's serde types.
 
 use loremaster_project::{Diagnostic, SourceFile, check_files, load};
-use loremaster_runtime::{AuthorCommand, Budget, Command, Game, World};
+use loremaster_runtime::{Command, Input, Session, World};
+use loremaster_workbench::{AuthorCommand, Budget, MarkupCheck, Workbench};
 use serde::Serialize;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -20,10 +21,7 @@ fn utf16(text: &str, byte: usize) -> usize {
         .map_or(0, |s| s.encode_utf16().count())
 }
 
-fn utf16_error(
-    text: &str,
-    mut check: loremaster_runtime::MarkupCheck,
-) -> loremaster_runtime::MarkupCheck {
+fn utf16_error(text: &str, mut check: MarkupCheck) -> MarkupCheck {
     if let Some(e) = &mut check.error {
         e.start = utf16(text, e.start);
         e.end = utf16(text, e.end);
@@ -73,11 +71,11 @@ pub fn project_threads(files: JsValue) -> Result<JsValue, JsValue> {
     }
 }
 
-/// A running game.
+/// A running game with the authoring views of the editor.
 #[wasm_bindgen]
 pub struct Engine {
     world: Arc<World>,
-    game: Game,
+    bench: Workbench,
     origins: std::collections::BTreeMap<String, String>,
 }
 
@@ -98,7 +96,7 @@ impl Engine {
         })?;
         let world = Arc::new(world);
         Ok(Engine {
-            game: Game::new(world.clone()),
+            bench: Workbench::new(world.clone()),
             world,
             // The editor opens files by path. Origins in Rust (DSL step L6) get
             // their own field when the editor shows them as read-only.
@@ -121,45 +119,45 @@ impl Engine {
 
     /// Opening text. Call once.
     pub fn start(&mut self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.start())
+        to_js(&self.bench.start())
     }
 
     /// What a partial command refers to: `{ verb, objects, candidates, direction, complete }`.
     pub fn preview(&self, text: &str) -> Result<JsValue, JsValue> {
-        to_js(&self.game.preview(text))
+        to_js(&self.bench.session().preview(text))
     }
 
     /// A typed command.
     pub fn input(&mut self, text: &str) -> Result<JsValue, JsValue> {
-        to_js(&self.game.input(text))
+        to_js(&self.bench.play(Input::Text(text.to_string())))
     }
 
     /// A command from the verb bar: `{ type: "verb", verb, objects }` or
     /// `{ type: "go", direction }`.
     pub fn act(&mut self, command: JsValue) -> Result<JsValue, JsValue> {
         let command: Command = from_js(command)?;
-        to_js(&self.game.act(command))
+        to_js(&self.bench.play(Input::Command(command)))
     }
 
     /// Choose an answer in the talk in progress, by its index in `choices`.
     pub fn choose(&mut self, index: usize) -> Result<JsValue, JsValue> {
-        to_js(&self.game.act(Command::Choose { index }))
+        to_js(&self.bench.play(Input::Choice(index)))
     }
 
     /// Leave the talk in progress.
     pub fn leave(&mut self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.act(Command::Leave))
+        to_js(&self.bench.play(Input::Command(Command::Leave)))
     }
 
     /// The answers the player can choose now: `[{ index, text }]`. Empty outside a talk.
     pub fn choices(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.choices())
+        to_js(&self.bench.session().choices())
     }
 
     /// The talk in progress for the inspector, with hidden options, or null.
     #[wasm_bindgen(js_name = talkView)]
     pub fn talk_view(&self) -> Result<JsValue, JsValue> {
-        match self.game.talk_view() {
+        match self.bench.talk_view() {
             Some(v) => to_js(&v),
             None => Ok(JsValue::NULL),
         }
@@ -171,33 +169,33 @@ impl Engine {
     }
 
     pub fn scene(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.scene())
+        to_js(&self.bench.session().scene())
     }
 
     /// How the current room's description is assembled, for the assembly panel.
     pub fn assembly(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.assembly())
+        to_js(&self.bench.assembly())
     }
 
     /// The things and exits of the current room, for the assembly panel.
     #[wasm_bindgen(js_name = roomParts)]
     pub fn room_parts(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.room_parts())
+        to_js(&self.bench.room_parts())
     }
 
     /// An author command: `{ type: "goto", room }`, `{ type: "set", name, value }`,
     /// `{ type: "time", time }` or `{ type: "give", thing }`.
     pub fn author(&mut self, command: JsValue) -> Result<JsValue, JsValue> {
         let command: AuthorCommand = from_js(command)?;
-        to_js(&self.game.author(command))
+        to_js(&self.bench.author(command))
     }
 
     /// Facts about a thing (`kind` "thing", `id` its id) or an exit of the current room
     /// (`kind` "exit", `id` its direction), for an author tooltip. Null when there is none.
     pub fn inspect(&self, kind: &str, id: &str) -> Result<JsValue, JsValue> {
         let found = match kind {
-            "thing" => self.game.inspect_thing(id),
-            "exit" => self.game.inspect_exit(id),
+            "thing" => self.bench.inspect_thing(id),
+            "exit" => self.bench.inspect_exit(id),
             _ => None,
         };
         match found {
@@ -208,18 +206,18 @@ impl Engine {
 
     /// All variables and thing properties with their values.
     pub fn vars(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.vars())
+        to_js(&self.bench.vars())
     }
 
     /// The phases of the day with their start times.
     pub fn phases(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.phases())
+        to_js(&self.bench.phases())
     }
 
     /// The action frame used for the last action, or null.
     #[wasm_bindgen(js_name = lastFrame)]
     pub fn last_frame(&self) -> Result<JsValue, JsValue> {
-        match self.game.last_frame() {
+        match self.bench.last_frame() {
             Some(f) => to_js(f),
             None => Ok(JsValue::NULL),
         }
@@ -227,9 +225,8 @@ impl Engine {
 
     /// Walk all reachable states from the start of the story and report coverage.
     pub fn explore(&self, max_states: usize, max_depth: usize) -> Result<JsValue, JsValue> {
-        let fresh = Game::new(self.world.clone());
-        to_js(&loremaster_runtime::explore(
-            &fresh,
+        to_js(&loremaster_workbench::explore(
+            self.world.clone(),
             Budget {
                 max_states,
                 max_depth,
@@ -240,7 +237,7 @@ impl Engine {
     /// The text of a room in every combination of the values that the text depends on.
     #[wasm_bindgen(js_name = roomMatrix)]
     pub fn room_matrix(&self, room: &str) -> Result<JsValue, JsValue> {
-        match loremaster_runtime::room_matrix(&self.game, room) {
+        match self.bench.room_matrix(room) {
             Some(m) => to_js(&m),
             None => Ok(JsValue::NULL),
         }
@@ -248,32 +245,32 @@ impl Engine {
 
     /// All rooms with what is in them now, for the Atlas.
     pub fn atlas(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.atlas())
+        to_js(&self.bench.atlas())
     }
 
     /// All rules with their state now, for the rules view.
     pub fn rules(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.rules())
+        to_js(&self.bench.rules())
     }
 
     /// The puzzle machines with their states and steps, for the Atlas.
     pub fn machines(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.machines())
+        to_js(&self.bench.machines())
     }
 
     /// All rooms and exits, for the map panel.
     pub fn map(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.map())
+        to_js(&self.bench.map())
     }
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.verbs())
+        to_js(&self.bench.session().verbs())
     }
 
     /// Continue the game of an engine with an earlier version of the story, after an edit.
     #[wasm_bindgen(js_name = carryOver)]
     pub fn carry_over(&mut self, from: &Engine) {
-        self.game = from.game.carry_over(self.world.clone());
+        self.bench = from.bench.carried_to(self.world.clone());
     }
 
     /// Highlighted spans of fragment text (or of a condition), in UTF-16 offsets.
@@ -299,7 +296,7 @@ impl Engine {
     /// Check fragment text and render it in the current state. Error offsets are UTF-16.
     #[wasm_bindgen(js_name = tryMarkup)]
     pub fn try_markup(&self, text: &str) -> Result<JsValue, JsValue> {
-        to_js(&utf16_error(text, self.game.try_markup(text)))
+        to_js(&utf16_error(text, self.bench.try_markup(text)))
     }
 
     /// Check fragment text and render it as it would read in other values. Error offsets are UTF-16.
@@ -312,7 +309,7 @@ impl Engine {
         text: &str,
     ) -> Result<JsValue, JsValue> {
         let values: Vec<(String, String)> = from_js(values)?;
-        match self.game.try_markup_situation(room, &values, text) {
+        match self.bench.try_markup_in(room, &values, text) {
             Some(check) => to_js(&utf16_error(text, check)),
             None => Ok(JsValue::NULL),
         }
@@ -321,18 +318,18 @@ impl Engine {
     /// Check a condition and tell whether it holds now. Error offsets are UTF-16.
     #[wasm_bindgen(js_name = tryCondition)]
     pub fn try_condition(&self, text: &str) -> Result<JsValue, JsValue> {
-        to_js(&utf16_error(text, self.game.try_condition(text)))
+        to_js(&utf16_error(text, self.bench.try_condition(text)))
     }
 
     /// Every name that conditions and markup can use, with its value now.
     pub fn symbols(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.symbols())
+        to_js(&self.bench.symbols())
     }
 
     /// One fragment text in all combinations of the values that it depends on.
     #[wasm_bindgen(js_name = textMatrix)]
     pub fn text_matrix(&self, text: &str, when: Option<String>) -> Result<JsValue, JsValue> {
-        match loremaster_runtime::text_matrix(&self.game, text, when.as_deref()) {
+        match self.bench.text_matrix(text, when.as_deref()) {
             Some(m) => to_js(&m),
             None => Ok(JsValue::NULL),
         }
@@ -342,7 +339,7 @@ impl Engine {
     #[wasm_bindgen(js_name = previewSituation)]
     pub fn preview_situation(&self, room: &str, values: JsValue) -> Result<JsValue, JsValue> {
         let values: Vec<(String, String)> = from_js(values)?;
-        match self.game.preview_situation(room, &values) {
+        match self.bench.preview_situation(room, &values) {
             Some(turn) => to_js(&turn),
             None => Ok(JsValue::NULL),
         }
@@ -350,29 +347,29 @@ impl Engine {
 
     /// The room description as it would show now, without changing the game.
     pub fn describe(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.describe_preview())
+        to_js(&self.bench.describe())
     }
 
     /// The game as a save: an envelope with the format version, the story and the state.
     pub fn save(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.game.save())
+        to_js(&self.bench.session().save())
     }
 
     /// Restore a save, also an older version or one of an earlier version of the
     /// story. Returns `{ storyChanged, dropped }`: the ids that the story no longer has.
     pub fn restore(&mut self, save: JsValue) -> Result<JsValue, JsValue> {
         let save: serde_json::Value = from_js(save)?;
-        let restored = Game::load_save(self.world.clone(), save)
+        let (session, loaded) = Session::load(self.world.clone(), save)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        self.game = restored.game;
+        self.bench = Workbench::from_session(session);
         to_js(&serde_json::json!({
-            "storyChanged": restored.story_changed,
-            "dropped": restored.dropped,
+            "storyChanged": loaded.story_changed,
+            "dropped": loaded.dropped,
         }))
     }
 
     /// Start over from the beginning.
     pub fn reset(&mut self) {
-        self.game = Game::new(self.world.clone());
+        self.bench = Workbench::new(self.world.clone());
     }
 }

@@ -21,7 +21,8 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 | `crates/loremaster-model` | World types: rooms, exits, things, fragments, rules, clock and verbs. |
 | `crates/loremaster-lang` | The condition language and the inline markup. They compile to dramaturge conditions. |
 | `crates/loremaster-project` | The project folder format (one YAML file for each entity) and the checker. |
-| `crates/loremaster-runtime` | The runtime: state, text assembly, rules and parser. It has no input or output of its own. |
+| `crates/loremaster-runtime` | The runtime: state, text assembly, rules and parser. It has no input or output of its own. Hosts play through its `Session`. |
+| `crates/loremaster-workbench` | The authoring views over a running session: Atlas, map, rules, machines, symbols, markup and condition checks, previews, room matrix and explorer. `reload` carries the game over to a changed world. |
 | `crates/loremaster-dsl` | The builder API in plain Rust: write a story as a pack, and join it with YAML folders (`Loremaster::new().pack(..).yaml(..).build()`). The crate `loremaster` gives it with the cargo feature `builder`. |
 | `crates/loremaster-wasm` | The WebAssembly bindings for the web app. Trunk builds them. |
 | `crates/loremaster-cli` | The crate `loremaster`, with the terminal player: `loremaster play` and `loremaster check`. Also `loremaster new`, `loremaster mcp` and `loremaster serve`. |
@@ -98,7 +99,7 @@ Write all documentation in ASD-STE100 Simplified Technical English. The "Foundat
 
 ## Crates
 
-These crates are on crates.io: `loremaster`, `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-tools`, `loremaster-dsl` and `loremaster-mcp`. All have the same version. `loremaster-wasm` and `loremaster-zil` are not on crates.io. The changes are in [CHANGELOG.md](CHANGELOG.md).
+These crates are on crates.io: `loremaster`, `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-workbench`, `loremaster-tools`, `loremaster-dsl` and `loremaster-mcp`. All have the same version. `loremaster-wasm` and `loremaster-zil` are not on crates.io. The changes are in [CHANGELOG.md](CHANGELOG.md).
 
 The crate `loremaster` builds with the web editor by default. In a git checkout, the editor must be in `crates/loremaster-mcp/ui` first: run `task release:ui`. To build without the editor, use `--no-default-features`.
 

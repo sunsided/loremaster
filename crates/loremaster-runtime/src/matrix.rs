@@ -545,7 +545,7 @@ pub fn text_matrix(game: &Game, src: &str, when: Option<&str>) -> Option<RoomMat
         }
         let shows = condition.as_ref().is_none_or(|c| g.eval().holds(c));
         let text = if shows {
-            g.try_markup(src).text
+            crate::text::render(&g.eval(), &segments)
         } else {
             String::new()
         };

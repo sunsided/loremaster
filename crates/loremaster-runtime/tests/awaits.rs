@@ -3,9 +3,8 @@
 
 use loremaster_model::Value;
 use loremaster_project::{Severity, SourceFile, check, load};
-use loremaster_runtime::{
-    AwaitRequest, Budget, Command, Game, Input, Session, Status, Step, World, explore,
-};
+use loremaster_runtime::authoring::{Budget, explore};
+use loremaster_runtime::{AwaitRequest, Command, Input, Session, Status, Step, World};
 use std::sync::Arc;
 
 fn file(path: &str, text: &str) -> SourceFile {
@@ -184,7 +183,9 @@ fn the_session_answers_a_roll_unless_the_host_asks_to() {
 #[test]
 fn the_explorer_tries_each_answer() {
     let world = Arc::new(World::compile(load(files(CHOICE)).unwrap().story).unwrap());
-    let found = explore(&Game::new(world), Budget::default());
+    // The authoring views are in loremaster-workbench; this test reaches the
+    // explorer through the primitive behind `Workbench::explore`.
+    let found = explore(world, Budget::default());
     assert!(found.never_fired.is_empty(), "{:?}", found.never_fired);
     assert!(found.states >= 3, "{}", found.states);
 }

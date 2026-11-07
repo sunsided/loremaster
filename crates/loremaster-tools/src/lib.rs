@@ -24,7 +24,8 @@ pub use proposal::{Change, FileChange, PreviewText, Proposal, ProposalView, Room
 pub use tools::{ToolDef, tools};
 
 use loremaster_project::{Diagnostic, Project, SourceFile, check_files};
-use loremaster_runtime::{Game, World};
+use loremaster_runtime::World;
+use loremaster_workbench::Workbench;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -60,7 +61,7 @@ pub struct Workspace {
     project: Option<Project>,
     diagnostics: Vec<Diagnostic>,
     world: Option<Arc<World>>,
-    sessions: BTreeMap<String, Game>,
+    sessions: BTreeMap<String, Workbench>,
     proposals: BTreeMap<String, Proposal>,
     next_proposal: u64,
 }
@@ -118,8 +119,8 @@ impl Workspace {
     /// no new world: the sessions wait with their state and move on the next good reload.
     fn carry_sessions(&mut self) {
         if let Some(world) = &self.world {
-            for game in self.sessions.values_mut() {
-                *game = game.carry_over(world.clone());
+            for bench in self.sessions.values_mut() {
+                bench.reload(world.clone());
             }
         }
     }
@@ -157,7 +158,7 @@ impl Workspace {
     }
 
     /// The named session. The default session starts on first use.
-    fn session(&mut self, name: &str) -> Result<&mut Game, ToolError> {
+    fn session(&mut self, name: &str) -> Result<&mut Workbench, ToolError> {
         let world = self.world()?.clone();
         if !self.sessions.contains_key(name) {
             if name != DEFAULT_SESSION {
@@ -165,9 +166,9 @@ impl Workspace {
                     "There is no session `{name}`. Call `session_start` to make one."
                 )));
             }
-            let mut game = Game::new(world);
-            game.start();
-            self.sessions.insert(name.to_string(), game);
+            let mut bench = Workbench::new(world);
+            bench.start();
+            self.sessions.insert(name.to_string(), bench);
         }
         Ok(self.sessions.get_mut(name).expect("inserted above"))
     }

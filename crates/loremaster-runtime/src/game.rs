@@ -1,10 +1,10 @@
 use crate::eval::Eval;
 use crate::parser::{ParseScope, parse};
-use crate::text::{self, SourcePiece, article};
+use crate::text::{self, article};
 use crate::world::{CEffect, CFragment, Within};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
 use crate::{Event, Phase};
-use loremaster_model::{EventPattern, Id, Location, TimeOfDay, Value, VerbSlots};
+use loremaster_model::{Id, Location, TimeOfDay, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -14,7 +14,12 @@ mod narrative;
 mod talk;
 pub use talk::{TalkOptionView, TalkView};
 
-/// A game in progress.
+/// A game in progress: the engine behind [`Session`](crate::Session).
+///
+/// Hosts use the Session API, and authoring tools the crate
+/// `loremaster-workbench` (ADR 0003). `Game` is public only for the tests of
+/// this crate and goes `pub(crate)` once they play through `Session` (P2-09).
+#[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct Game {
     world: Arc<World>,
@@ -99,52 +104,6 @@ pub struct FragmentView {
     pub why: Option<String>,
 }
 
-/// A room on the map.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MapRoom {
-    pub id: String,
-    pub name: String,
-    /// Grid position from the story, or a generated one when the story has none.
-    pub x: f32,
-    pub y: f32,
-    /// The level, for towers and dungeons. Up exits go one level higher.
-    pub level: i32,
-    pub visited: bool,
-    pub current: bool,
-}
-
-/// A connection between two rooms on the map. Paired exits show as one link.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MapLink {
-    pub from: String,
-    pub to: String,
-    /// Direction from `from`, for example `north` or `up`.
-    pub direction: String,
-    /// False while the exit is hidden from the player.
-    pub visible: bool,
-    /// True when there is no exit back.
-    pub one_way: bool,
-}
-
-/// An exit that leads nowhere and only prints a message, for its own mark on the map.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MapEnd {
-    pub room: String,
-    pub direction: String,
-    /// False while the exit is hidden from the player.
-    pub visible: bool,
-}
-
-/// The whole map, for the map panel.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MapView {
-    pub rooms: Vec<MapRoom>,
-    pub links: Vec<MapLink>,
-    /// The message exits.
-    #[serde(default)]
-    pub ends: Vec<MapEnd>,
-}
-
 /// One line of the generated objects or exits layer, for the assembly panel.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartView {
@@ -167,29 +126,6 @@ pub struct RoomParts {
     pub exits: Vec<PartView>,
 }
 
-/// A rule as When / If / Then, with its state now, for the rules view.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuleView {
-    pub id: String,
-    /// The event, in words, for example "the player enters lantern_room".
-    pub when: String,
-    /// The condition as written.
-    pub condition: Option<String>,
-    /// True when the condition holds now (or there is none).
-    pub condition_holds: bool,
-    /// Each effect, in words.
-    pub then: Vec<String>,
-    pub once: bool,
-    pub instead: bool,
-    /// True when the rule fired at least one time in this game.
-    pub fired: bool,
-    /// The kind of event: start, turn, enter, leave, time or verb.
-    pub trigger: String,
-    /// Why the rule matters here and now, or None. For example "fires when the
-    /// player enters this room" or "fired in the last turn".
-    pub relevant: Option<String>,
-}
-
 /// A command for the author, not the player: it changes the game state
 /// directly. The command palette and a cheat console use it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -204,135 +140,11 @@ pub enum AuthorCommand {
     /// Put a thing in the player's hands.
     Give { thing: String },
     /// Put the game into one combination of the room matrix: go to the room and set each named value.
-    /// The names and values are the ones of [`crate::RoomMatrix`].
+    /// The names and values are the ones of [`RoomMatrix`](crate::authoring::RoomMatrix).
     Situation {
         room: String,
         values: Vec<(String, String)>,
     },
-}
-
-/// A puzzle machine for the Atlas: its states, where it is now and its steps.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MachineView {
-    pub id: String,
-    pub state: String,
-    /// The state at the start of the game.
-    pub start: String,
-    pub states: Vec<String>,
-    /// Author text about states, by state name. States without a description are not in it.
-    pub descriptions: std::collections::BTreeMap<String, String>,
-    pub steps: Vec<MachineStepView>,
-}
-
-/// One step of a machine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MachineStepView {
-    /// The id of the rule that the step became.
-    pub rule: String,
-    pub from: Vec<String>,
-    pub to: String,
-    /// The event, in words.
-    pub when: String,
-    /// The step's own condition, as written.
-    pub condition: Option<String>,
-    /// The step ran at least once in this game.
-    pub fired: bool,
-    /// The machine is in a `from` state and the condition holds: the event takes the step now.
-    pub ready: bool,
-}
-
-/// One room for the Atlas: where it is, what is in it now, and its exits.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AtlasRoom {
-    pub id: String,
-    pub name: String,
-    pub level: i32,
-    pub visited: bool,
-    pub current: bool,
-    /// The things in the room now. Things that the room text names are here too.
-    pub things: Vec<ThingInfo>,
-    /// Each exit as its direction and the room it leads to (empty for an exit that only prints a message).
-    pub exits: Vec<(String, String)>,
-    /// The number of room fragments.
-    pub fragments: usize,
-}
-
-/// A name that conditions and markup can use.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Symbol {
-    /// For example `oil_lamp.lit`, `time.phase`, `oil_lamp.the`.
-    pub name: String,
-    /// `variable`, `property`, `name`, `derived`, `phase` or `markup`.
-    pub kind: String,
-    /// What it is, in a few words.
-    pub detail: String,
-    /// The value now, as text, when it has one.
-    pub value: Option<String>,
-    /// The values to compare with, for example the values of an enum.
-    pub values: Vec<String>,
-}
-
-/// The result of a check of text that the author is typing.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MarkupCheck {
-    /// The first error, with its byte range in the text.
-    pub error: Option<TextError>,
-    /// The rendered text in the current state. Empty for a condition.
-    pub text: String,
-    /// The source in pieces, with branches that do not hold now marked as not active.
-    pub pieces: Vec<SourcePiece>,
-    /// For a condition: whether it holds now.
-    pub holds: Option<bool>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TextError {
-    pub start: usize,
-    pub end: usize,
-    pub message: String,
-}
-
-impl MarkupCheck {
-    fn failed(e: loremaster_lang::LangError) -> Self {
-        Self {
-            error: Some(TextError {
-                start: e.span.start,
-                end: e.span.end,
-                message: e.message,
-            }),
-            ..Self::default()
-        }
-    }
-}
-
-/// A variable or thing property with its value now, for the command palette.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VarView {
-    pub name: String,
-    pub value: Value,
-    /// For an enum variable: all values. Empty for other types.
-    pub options: Vec<String>,
-}
-
-/// The phases of the day with their start times, for the command palette.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PhaseView {
-    pub name: String,
-    pub from: String,
-}
-
-/// What the author sees about a thing or an exit in a tooltip.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Inspect {
-    /// `thing` or `exit`.
-    pub kind: String,
-    /// The thing id, or the exit direction.
-    pub id: String,
-    pub title: String,
-    /// Label and value pairs, in display order.
-    pub facts: Vec<(String, String)>,
-    /// Ids of rules that name this thing or the room of this exit.
-    pub rules: Vec<String>,
 }
 
 /// The action frame used for the last action, as it was evaluated then.
@@ -425,8 +237,10 @@ impl Game {
     /// The state carries over. A value that is still at its start value in the old world takes
     /// the start value of the new world, so an edit of a start value shows at once. Values and
     /// things that the new world does not have are dropped; new ones start at their start value.
-    /// A current room that is gone becomes the start room.
-    pub fn carry_over(&self, world: Arc<World>) -> Self {
+    /// A current room that is gone becomes the start room. Rules, endings, relations and
+    /// memories that the new world does not have are dropped too, and a rule that waits for the
+    /// host keeps waiting only when the new world has the same rule.
+    pub(crate) fn carry_over(&self, world: Arc<World>) -> Self {
         let old_start = Game::new(self.world.clone()).state;
         let new_start = Game::new(world.clone()).state;
         let mut state = self.state.clone();
@@ -478,6 +292,33 @@ impl Game {
         if !talk_ok {
             state.talk = None;
         }
+        // A paused rule goes on only when the rule is the same in the new
+        // world: its effects may have moved, as in `save::reconcile`.
+        let rule_of = |w: &World, id: &Id| w.story.rules.iter().find(|r| r.id == *id).cloned();
+        if let Some(open) = &state.awaiting
+            && (rule_of(&world, &open.rule).is_none()
+                || rule_of(&world, &open.rule) != rule_of(&self.world, &open.rule))
+        {
+            state.awaiting = None;
+        }
+        state
+            .fired
+            .retain(|id| world.story.rules.iter().any(|r| r.id == *id));
+        if state.previous.as_ref().is_some_and(|r| !has_room(r)) {
+            state.previous = None;
+        }
+        if state
+            .ending
+            .as_ref()
+            .is_some_and(|e| world.story.ending(e.as_str()).is_none())
+        {
+            state.ending = None;
+        }
+        let has_thing = |id: &str| world.story.thing(id).is_some();
+        state
+            .relations
+            .retain(|key, _| key.split_once('.').is_some_and(|(t, _)| has_thing(t)));
+        state.memories.retain(|thing, _| has_thing(thing.as_str()));
         Self::restore(world, state)
     }
 
@@ -544,7 +385,7 @@ impl Game {
     }
 
     /// What a command that is still being typed refers to, for the verb bar.
-    pub fn preview(&self, text: &str) -> crate::Preview {
+    pub(crate) fn preview(&self, text: &str) -> crate::Preview {
         crate::parser::preview(&self.world.verbs, &self.parse_scope(), text)
     }
 
@@ -559,261 +400,8 @@ impl Game {
         &mut self.state
     }
 
-    /// Check fragment text that the author is typing, and render it in the current state.
-    pub fn try_markup(&self, src: &str) -> MarkupCheck {
-        match loremaster_lang::compile_markup(src, &self.world.scope) {
-            Ok(segments) => {
-                let ev = self.eval();
-                let mut pieces = Vec::new();
-                text::outline(&ev, &segments, true, &mut pieces);
-                MarkupCheck {
-                    error: None,
-                    text: text::render(&ev, &segments),
-                    pieces,
-                    holds: None,
-                }
-            }
-            Err(e) => MarkupCheck::failed(e),
-        }
-    }
-
-    /// All rooms with what is in them now, for the Atlas.
-    pub fn atlas(&self) -> Vec<AtlasRoom> {
-        let story = &self.world.story;
-        let ev = self.eval();
-        story
-            .rooms
-            .iter()
-            .map(|r| AtlasRoom {
-                id: r.id.to_string(),
-                name: r.name.clone(),
-                level: self.world.level_of(r.id.as_str()),
-                visited: self.state.visits_to(r.id.as_str()) > 0,
-                current: r.id == self.state.room,
-                things: story
-                    .things
-                    .iter()
-                    .filter(|t| self.state.is_in_room(t.id.as_str(), r.id.as_str()))
-                    .map(|t| ThingInfo {
-                        id: t.id.to_string(),
-                        name: ev.thing_name(t.id.as_str(), loremaster_lang::NameForm::Bare),
-                    })
-                    .collect(),
-                exits: r
-                    .exits
-                    .iter()
-                    .map(|e| {
-                        let to = e.to.as_ref().map(|t| t.to_string()).unwrap_or_default();
-                        (e.direction.name().to_string(), to)
-                    })
-                    .collect(),
-                fragments: r.description.len(),
-            })
-            .collect()
-    }
-
-    /// Every name that conditions and markup can use, for completion and hover in the editor.
-    pub fn symbols(&self) -> Vec<Symbol> {
-        let scope = &self.world.scope;
-        let story = &self.world.story;
-        let mut out = Vec::new();
-        let mut add = |name: String, kind: &str, detail: String, values: Vec<String>| {
-            out.push(Symbol {
-                name,
-                kind: kind.to_string(),
-                detail,
-                value: None,
-                values,
-            });
-        };
-        let rooms: Vec<String> = scope.rooms.iter().cloned().collect();
-        for (name, ty) in &scope.vars {
-            let values = match ty {
-                loremaster_lang::Ty::Enum(v) => v.clone(),
-                loremaster_lang::Ty::Bool => vec!["true".into(), "false".into()],
-                _ => Vec::new(),
-            };
-            add(
-                name.clone(),
-                "variable",
-                format!("variable, {}", ty.describe()),
-                values,
-            );
-        }
-        for (thing, props) in &scope.things {
-            for (prop, ty) in props {
-                add(
-                    format!("{thing}.{prop}"),
-                    "property",
-                    format!("property of {thing}, {}", ty.describe()),
-                    Vec::new(),
-                );
-            }
-            for (form, what) in [
-                ("name", "the current name"),
-                ("the", "the name with \"the\""),
-                ("The", "the name with \"The\""),
-                ("a", "the name with \"a\" or \"an\""),
-                ("A", "the name with \"A\" or \"An\""),
-            ] {
-                add(
-                    format!("{thing}.{form}"),
-                    "name",
-                    format!("{what} of {thing}, for text"),
-                    Vec::new(),
-                );
-            }
-            for (derived, what) in [
-                ("carried", "true when the player carries it"),
-                ("present", "true when it is carried or in the current room"),
-                ("interactions", "how many commands named it"),
-                ("talked", "how many times the player talked to it"),
-            ] {
-                add(
-                    format!("{thing}.{derived}"),
-                    "derived",
-                    what.to_string(),
-                    Vec::new(),
-                );
-            }
-            let mut places = rooms.clone();
-            places.extend(["carried".to_string(), "nowhere".to_string()]);
-            add(
-                format!("{thing}.location"),
-                "derived",
-                "a room id, carried or nowhere".into(),
-                places,
-            );
-        }
-        for room in &rooms {
-            add(
-                format!("{room}.visits"),
-                "derived",
-                "how many times the player entered it".into(),
-                Vec::new(),
-            );
-            add(
-                format!("{room}.visited"),
-                "derived",
-                "true after the first visit".into(),
-                Vec::new(),
-            );
-        }
-        add(
-            "time.phase".into(),
-            "derived",
-            "the phase of the day".into(),
-            scope.phases.clone(),
-        );
-        add(
-            "time.hour".into(),
-            "derived",
-            "the hour, 0 to 23".into(),
-            Vec::new(),
-        );
-        add(
-            "time.day".into(),
-            "derived",
-            "the day, from 1".into(),
-            Vec::new(),
-        );
-        add(
-            "turns".into(),
-            "derived",
-            "the number of turns".into(),
-            Vec::new(),
-        );
-        add(
-            "here".into(),
-            "derived",
-            "the id of the current room".into(),
-            rooms.clone(),
-        );
-        add(
-            "first_visit".into(),
-            "derived",
-            "true on the first visit to the current room".into(),
-            Vec::new(),
-        );
-        for (name, what) in [
-            (
-                "action.repeat",
-                "times in a row the player gave this command",
-            ),
-            (
-                "action.count",
-                "times the player used this verb in this room",
-            ),
-            (
-                "action.total",
-                "times the player used this verb in the game",
-            ),
-            ("action.verb", "the id of the current verb"),
-        ] {
-            add(name.into(), "derived", what.into(), Vec::new());
-        }
-        for phase in &scope.phases {
-            add(
-                phase.clone(),
-                "phase",
-                format!("true when time.phase is {phase}"),
-                Vec::new(),
-            );
-        }
-        add(
-            "first".into(),
-            "markup",
-            "in markup: {first: …} shows only on the first visit".into(),
-            Vec::new(),
-        );
-        let _ = story;
-        // The value now: render the name as an insert, or test it as a condition.
-        for sym in &mut out {
-            let insert = self.try_markup(&format!("{{{}}}", sym.name));
-            sym.value = if insert.error.is_none() {
-                Some(insert.text)
-            } else {
-                self.try_condition(&sym.name).holds.map(|b| b.to_string())
-            };
-        }
-        out
-    }
-
-    /// Check a condition that the author is typing, and tell whether it holds now.
-    pub fn try_condition(&self, src: &str) -> MarkupCheck {
-        if src.trim().is_empty() {
-            return MarkupCheck::default();
-        }
-        match loremaster_lang::compile_condition(src, &self.world.scope) {
-            Ok(c) => MarkupCheck {
-                holds: Some(self.eval().holds(&c)),
-                ..MarkupCheck::default()
-            },
-            Err(e) => MarkupCheck::failed(e),
-        }
-    }
-
-    /// The room description in another combination of values, without changing the game.
-    /// The names and values are the ones of [`crate::RoomMatrix`]. None for an unknown room.
-    pub fn preview_situation(&self, room: &str, values: &[(String, String)]) -> Option<Turn> {
-        let mut copy = self.clone();
-        crate::matrix::apply_cell(&mut copy, room, values).then(|| copy.describe_preview())
-    }
-
-    /// Check fragment text and render it as it would read in other values, without changing the game.
-    /// None for an unknown room, as in [`Game::preview_situation`].
-    pub fn try_markup_situation(
-        &self,
-        room: &str,
-        values: &[(String, String)],
-        src: &str,
-    ) -> Option<MarkupCheck> {
-        let mut copy = self.clone();
-        crate::matrix::apply_cell(&mut copy, room, values).then(|| copy.try_markup(src))
-    }
-
     /// The room description as it would show now, without changing the game.
-    pub fn describe_preview(&self) -> Turn {
+    pub(crate) fn describe_preview(&self) -> Turn {
         let mut copy = self.clone();
         let mut turn = Turn::default();
         copy.describe_room(&mut turn);
@@ -934,7 +522,7 @@ impl Game {
 
     /// The nouns that name a thing now: those of its current name stage and of
     /// the stages before it, lowercased. A later name is not known yet.
-    fn nouns_of(&self, t: &loremaster_model::Thing) -> Vec<String> {
+    pub(crate) fn nouns_of(&self, t: &loremaster_model::Thing) -> Vec<String> {
         let ev = self.eval();
         match ev.name_stage(t.id.as_str()) {
             Some(current) => t.names[..=current]
@@ -1122,8 +710,13 @@ impl Game {
         }
     }
 
+    /// The rules that fired in the last turn.
+    pub(crate) fn last_fired(&self) -> &[Id] {
+        &self.last_fired
+    }
+
     /// The frame used for the last action, if there was one.
-    pub fn last_frame(&self) -> Option<&FrameUse> {
+    pub(crate) fn last_frame(&self) -> Option<&FrameUse> {
         self.last_frame.as_ref()
     }
 
@@ -1306,7 +899,7 @@ impl Game {
 
     /// How the current room's description is assembled right now: every
     /// fragment, whether it shows, and why not. Does not change any state.
-    pub fn assembly(&self) -> Vec<FragmentView> {
+    pub(crate) fn assembly(&self) -> Vec<FragmentView> {
         let Some(ri) = self.world.room_idx(self.state.room.as_str()) else {
             return Vec::new();
         };
@@ -1375,76 +968,9 @@ impl Game {
             .collect()
     }
 
-    /// All rooms and exits with the player's position and visits. Does not change any state.
-    pub fn map(&self) -> MapView {
-        let story = &self.world.story;
-        let ev = self.eval();
-        let mut next_free = 0.0_f32;
-        // Rooms without a position go on a row under the placed rooms; with no placed room, on row 0.
-        let free_row = story
-            .rooms
-            .iter()
-            .filter_map(|r| r.position.map(|[_, y]| y))
-            .reduce(f32::max)
-            .map_or(0.0, |y| y + 1.0);
-        let rooms = story
-            .rooms
-            .iter()
-            .map(|r| {
-                let [x, y] = r.position.unwrap_or_else(|| {
-                    next_free += 1.0;
-                    [next_free - 1.0, free_row]
-                });
-                MapRoom {
-                    id: r.id.to_string(),
-                    name: r.name.clone(),
-                    x,
-                    y,
-                    level: self.world.level_of(r.id.as_str()),
-                    visited: self.state.visits_to(r.id.as_str()) > 0,
-                    current: r.id == self.state.room,
-                }
-            })
-            .collect();
-        let mut links: Vec<MapLink> = Vec::new();
-        let mut ends: Vec<MapEnd> = Vec::new();
-        for (ri, room) in story.rooms.iter().enumerate() {
-            for (ei, exit) in room.exits.iter().enumerate() {
-                let visible = ev.holds_opt(&self.world.rooms[ri].exits[ei].visible);
-                // A message exit is no edge of the map: it gets its own mark.
-                let Some(to) = &exit.to else {
-                    ends.push(MapEnd {
-                        room: room.id.to_string(),
-                        direction: exit.direction.name().to_string(),
-                        visible,
-                    });
-                    continue;
-                };
-                let back = story
-                    .room(to.as_str())
-                    .is_some_and(|t| t.exits.iter().any(|e| e.to.as_ref() == Some(&room.id)));
-                if back
-                    && links
-                        .iter()
-                        .any(|l| l.from == to.as_str() && l.to == room.id.as_str())
-                {
-                    continue;
-                }
-                links.push(MapLink {
-                    from: room.id.to_string(),
-                    to: to.to_string(),
-                    direction: exit.direction.name().to_string(),
-                    visible,
-                    one_way: !back,
-                });
-            }
-        }
-        MapView { rooms, links, ends }
-    }
-
     /// The things and exits that make the objects and exits layers of the
     /// current room, with what shows and why. Does not change any state.
-    pub fn room_parts(&self) -> RoomParts {
+    pub(crate) fn room_parts(&self) -> RoomParts {
         let Some(ri) = self.world.room_idx(self.state.room.as_str()) else {
             return RoomParts {
                 objects: Vec::new(),
@@ -1558,7 +1084,7 @@ impl Game {
 
     /// Run an author command. Its result shows in the transcript like a turn,
     /// marked as an author action, and the turn log records it.
-    pub fn author(&mut self, cmd: AuthorCommand) -> Turn {
+    pub(crate) fn author(&mut self, cmd: AuthorCommand) -> Turn {
         let mut turn = Turn::default();
         let note = |turn: &mut Turn, text: String| {
             turn.log.push(LogEntry {
@@ -1635,480 +1161,7 @@ impl Game {
         self.finish(turn)
     }
 
-    /// Facts about a thing, for an author tooltip. Does not change any state.
-    pub fn inspect_thing(&self, id: &str) -> Option<Inspect> {
-        let t = self.world.thing(id)?;
-        let mut facts: Vec<(String, String)> = vec![("id".into(), t.id.to_string())];
-        let ev = self.eval();
-        match ev.name_stage(id) {
-            Some(current) => {
-                let stages: Vec<String> = t
-                    .names
-                    .iter()
-                    .enumerate()
-                    .map(|(i, n)| {
-                        let when = n
-                            .when
-                            .as_deref()
-                            .map(|w| format!(" when {w}"))
-                            .unwrap_or_default();
-                        let now = if i == current { " (now)" } else { "" };
-                        format!("{}{when}{now}", n.text)
-                    })
-                    .collect();
-                facts.push(("names".into(), stages.join(" → ")));
-                facts.push(("player calls it".into(), self.nouns_of(t).join(", ")));
-            }
-            None if !t.aliases.is_empty() => {
-                facts.push(("also called".into(), t.aliases.join(", ")))
-            }
-            None => {}
-        }
-        let location = match self.state.location_of(id) {
-            Some(Location::Room(r)) => self
-                .world
-                .room(r.as_str())
-                .map_or(r.to_string(), |room| format!("{} ({r})", room.name)),
-            Some(Location::Carried) => "carried by the player".into(),
-            Some(Location::In(h)) => format!("in {} ({h})", self.name_of(h)),
-            Some(Location::On(h)) => format!("on {} ({h})", self.name_of(h)),
-            _ => "nowhere".into(),
-        };
-        facts.push(("location".into(), location));
-        if !t.also_in.is_empty() {
-            let rooms: Vec<String> = t.also_in.iter().map(Id::to_string).collect();
-            facts.push(("also in".into(), rooms.join(", ")));
-        }
-        let mut kind = vec![if t.portable { "portable" } else { "fixed" }];
-        if !t.listed {
-            kind.push("not listed");
-        }
-        facts.push(("kind".into(), kind.join(", ")));
-        if let Some(key) = &t.key {
-            facts.push(("key".into(), key.to_string()));
-        }
-        for prop in t.props.keys() {
-            let name = format!("{id}.{prop}");
-            if let Some(v) = self.state.facts.get(&name) {
-                facts.push((prop.clone(), v.to_string()));
-            }
-        }
-        let doors: Vec<String> = self
-            .world
-            .story
-            .rooms
-            .iter()
-            .flat_map(|r| {
-                r.exits
-                    .iter()
-                    .filter(|e| e.door.as_ref().is_some_and(|d| d.as_str() == id))
-                    .map(move |e| format!("{} {}", r.id, e.direction.name()))
-            })
-            .collect();
-        if !doors.is_empty() {
-            facts.push(("door of".into(), doors.join(", ")));
-        }
-        let mentions = |text: &str| text.contains(id);
-        let rules = self
-            .world
-            .story
-            .rules
-            .iter()
-            .filter(|r| {
-                matches!(&r.on, EventPattern::Verb(p) if p.iter().any(|x| x.as_str() == id))
-                    || r.when.as_deref().is_some_and(mentions)
-                    || r.then.iter().any(|e| mentions(&format!("{e:?}")))
-            })
-            .map(|r| r.id.to_string())
-            .collect();
-        Some(Inspect {
-            kind: "thing".into(),
-            id: id.to_string(),
-            title: self.name_of(&t.id),
-            facts,
-            rules,
-        })
-    }
-
-    /// Facts about an exit of the current room, for an author tooltip.
-    pub fn inspect_exit(&self, direction: &str) -> Option<Inspect> {
-        let ri = self.world.room_idx(self.state.room.as_str())?;
-        let room = &self.world.story.rooms[ri];
-        let (ei, exit) = room
-            .exits
-            .iter()
-            .enumerate()
-            .find(|(_, e)| e.direction.name() == direction)?;
-        let ev = self.eval();
-        let compiled = &self.world.rooms[ri].exits[ei];
-        let to = match &exit.to {
-            Some(to) => self
-                .world
-                .room(to.as_str())
-                .map_or(to.to_string(), |r| format!("{} ({})", r.name, r.id)),
-            None => "nowhere: a message exit".to_string(),
-        };
-        let mut facts = vec![("leads to".to_string(), to)];
-        if let Some(door) = &exit.door {
-            let state = if self.state.flag(&format!("{door}.locked")) {
-                "locked"
-            } else if self.state.flag(&format!("{door}.open")) {
-                "open"
-            } else {
-                "closed"
-            };
-            facts.push(("door".into(), format!("{door}, {state}")));
-        }
-        if let Some(src) = &exit.visible {
-            let now = if ev.holds_opt(&compiled.visible) {
-                "true now"
-            } else {
-                "false now"
-            };
-            facts.push(("visible when".into(), format!("{src} ({now})")));
-        }
-        if let Some(src) = &exit.passable {
-            let now = if ev.holds_opt(&compiled.passable) {
-                "true now"
-            } else {
-                "false now"
-            };
-            facts.push(("passable when".into(), format!("{src} ({now})")));
-        }
-        if let Some(to) = &exit.to {
-            let back = self
-                .world
-                .room(to.as_str())
-                .is_some_and(|t| t.exits.iter().any(|e| e.to.as_ref() == Some(&room.id)));
-            facts.push((
-                "way back".into(),
-                if back { "yes" } else { "no, one way" }.into(),
-            ));
-        }
-        let target = exit.to.clone();
-        let rules = self
-            .world
-            .story
-            .rules
-            .iter()
-            .filter(|r| matches!(&r.on, EventPattern::Enter(x) | EventPattern::Leave(x) if Some(x) == target.as_ref()))
-            .map(|r| r.id.to_string())
-            .collect();
-        Some(Inspect {
-            kind: "exit".into(),
-            id: direction.to_string(),
-            title: format!("Exit {direction}"),
-            facts,
-            rules,
-        })
-    }
-
-    /// All story variables and thing properties with their values now.
-    pub fn vars(&self) -> Vec<VarView> {
-        self.state
-            .facts
-            .iter()
-            .map(|(name, value)| VarView {
-                name: name.clone(),
-                value: value.clone(),
-                options: match self.world.story.var(name).map(|v| &v.ty) {
-                    Some(loremaster_model::VarType::Enum(values)) => values.clone(),
-                    _ => Vec::new(),
-                },
-            })
-            .chain(self.world.story.timers.iter().map(|t| VarView {
-                name: format!("timer.{}", t.id),
-                value: Value::Int(i64::from(
-                    self.state.timers.get(&t.id).copied().unwrap_or(0),
-                )),
-                options: Vec::new(),
-            }))
-            .collect()
-    }
-
-    /// The phases of the day, in order of their start time.
-    pub fn phases(&self) -> Vec<PhaseView> {
-        let mut phases: Vec<&loremaster_model::Phase> =
-            self.world.story.clock.phases.iter().collect();
-        phases.sort_by_key(|p| p.from);
-        phases
-            .into_iter()
-            .map(|p| PhaseView {
-                name: p.name.clone(),
-                from: p.from.to_string(),
-            })
-            .collect()
-    }
-
-    /// All rules with their state now. Does not change any state.
-    pub fn rules(&self) -> Vec<RuleView> {
-        let ev = self.eval();
-        let story = &self.world.story;
-        let thing_or_room = |id: &Id| {
-            story
-                .thing(id.as_str())
-                .map(|t| t.name.clone())
-                .or_else(|| story.room(id.as_str()).map(|r| r.name.clone()))
-                .unwrap_or_else(|| id.to_string())
-        };
-        let verb_text = |parts: &[Id]| {
-            let verb = parts
-                .first()
-                .and_then(|v| self.world.verb(v.as_str()))
-                .map_or_else(
-                    || parts.first().map(Id::to_string).unwrap_or_default(),
-                    |v| v.label.to_lowercase(),
-                );
-            let objects: Vec<String> = parts.iter().skip(1).map(thing_or_room).collect();
-            if objects.is_empty() {
-                verb
-            } else {
-                format!("{verb} {}", objects.join(" with "))
-            }
-        };
-        story
-            .rules
-            .iter()
-            .enumerate()
-            .map(|(i, r)| {
-                let when = match &r.on {
-                    EventPattern::Start => "the game starts".to_string(),
-                    EventPattern::Turn => "a turn passes".to_string(),
-                    EventPattern::Enter(room) => {
-                        format!("the player enters {}", thing_or_room(room))
-                    }
-                    EventPattern::Leave(room) => {
-                        format!("the player leaves {}", thing_or_room(room))
-                    }
-                    EventPattern::Time(t) => format!("the clock reaches {t}"),
-                    EventPattern::Verb(parts) => {
-                        format!("the player uses \"{}\"", verb_text(parts))
-                    }
-                    EventPattern::Check(parts) => {
-                        format!("the player tries \"{}\"", verb_text(parts))
-                    }
-                    EventPattern::Timer(t) => format!("the timer {t} runs out"),
-                    EventPattern::Event(e) => format!("the event {e} happens"),
-                    EventPattern::Talk(parts) => match parts.as_slice() {
-                        [d, node, ..] => format!("the dialogue {d} reaches {node}"),
-                        [d] => format!("the dialogue {d} goes on"),
-                        [] => "a dialogue goes on".to_string(),
-                    },
-                };
-                let then = r
-                    .then
-                    .iter()
-                    .map(|e| match e {
-                        loremaster_model::Effect::Await(spec) => {
-                            match crate::state::AwaitRequest::of(spec) {
-                                Some(r) => format!("wait for the host: {}", r.describe()),
-                                None => "wait for the host".to_string(),
-                            }
-                        }
-                        loremaster_model::Effect::Set(m) => format!(
-                            "set {}",
-                            m.iter()
-                                .map(|(k, v)| format!("{k} = {v}"))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                        loremaster_model::Effect::Add(m) => format!(
-                            "add {}",
-                            m.iter()
-                                .map(|(k, v)| format!("{v} to {k}"))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                        loremaster_model::Effect::Say(t) => format!("say \"{t}\""),
-                        loremaster_model::Effect::Move(m) => format!(
-                            "move {}",
-                            m.iter()
-                                .map(|(t, to)| format!("{} to {to}", thing_or_room(t)))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                        loremaster_model::Effect::Goto(room) => {
-                            format!("move the player to {}", thing_or_room(room))
-                        }
-                        loremaster_model::Effect::End(id) => {
-                            match self.world.story.ending(id.as_str()) {
-                                Some(e) => {
-                                    format!("end the game: {} ({})", e.title, e.kind.as_str())
-                                }
-                                None => format!("end the game: {id}"),
-                            }
-                        }
-                        loremaster_model::Effect::Stop => "stop the action".to_string(),
-                        loremaster_model::Effect::Emit(e) => format!("send the event {e}"),
-                        loremaster_model::Effect::Call(b) => format!("run the behavior {b}"),
-                        loremaster_model::Effect::Start(t) => format!(
-                            "start {}",
-                            t.entries()
-                                .iter()
-                                .map(|(id, n)| match n {
-                                    Some(n) => format!("{id} at {n}"),
-                                    None => id.to_string(),
-                                })
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                        loremaster_model::Effect::Cancel(t) => format!("cancel {t}"),
-                    })
-                    .collect();
-                let trigger = match &r.on {
-                    EventPattern::Start => "start",
-                    EventPattern::Turn => "turn",
-                    EventPattern::Enter(_) => "enter",
-                    EventPattern::Leave(_) => "leave",
-                    EventPattern::Time(_) => "time",
-                    EventPattern::Verb(_) => "verb",
-                    EventPattern::Check(_) => "check",
-                    EventPattern::Timer(_) => "timer",
-                    EventPattern::Event(_) => "event",
-                    EventPattern::Talk(_) => "talk",
-                };
-                let relevant = self.relevance(r);
-                let when = match &r.within {
-                    Some(w) => format!("{when}, in {}", thing_or_room(w)),
-                    None => when,
-                };
-                RuleView {
-                    id: r.id.to_string(),
-                    trigger: trigger.to_string(),
-                    relevant,
-                    when,
-                    condition: r.when.clone(),
-                    condition_holds: ev.holds_opt(&self.world.rules[i].when),
-                    then,
-                    once: r.once,
-                    instead: r.instead,
-                    fired: self.state.fired.contains(&r.id),
-                }
-            })
-            .chain(self.world.story.behaviors.iter().map(|id| {
-                let found = self.world.behavior(id.as_str());
-                let mut when = match found.map(|b| b.description()) {
-                    Some("") | None if found.is_some() => "code in this game".to_string(),
-                    Some(d) => format!("code in this game: {d}"),
-                    None => "code in the game, which this build does not have".to_string(),
-                };
-                if let Some(m) = self.world.manifest(id.as_str()) {
-                    when.push_str(&format!(" ({})", m.describe()));
-                }
-                RuleView {
-                    id: format!("behavior:{id}"),
-                    trigger: "event".into(),
-                    relevant: None,
-                    when,
-                    condition: None,
-                    condition_holds: found.is_some(),
-                    then: Vec::new(),
-                    once: false,
-                    instead: false,
-                    fired: false,
-                }
-            }))
-            .collect()
-    }
-
-    /// The puzzle machines with their states and steps.
-    pub fn machines(&self) -> Vec<MachineView> {
-        let rules = self.rules();
-        self.world
-            .story
-            .machines
-            .iter()
-            .map(|m| MachineView {
-                id: m.id.to_string(),
-                state: self
-                    .state
-                    .facts
-                    .get(m.id.as_str())
-                    .map(Value::to_string)
-                    .unwrap_or_else(|| m.start.clone()),
-                start: m.start.clone(),
-                states: m.all_states(),
-                descriptions: m
-                    .all_states()
-                    .iter()
-                    .filter_map(|s| Some((s.clone(), m.description(s)?.to_string())))
-                    .collect(),
-                steps: m
-                    .steps
-                    .iter()
-                    .enumerate()
-                    .map(|(i, step)| {
-                        let id = m.step_rule(i);
-                        let view = rules.iter().find(|r| r.id == id.as_str());
-                        MachineStepView {
-                            rule: id.to_string(),
-                            from: step.from.list().iter().map(|s| s.to_string()).collect(),
-                            to: step.to.clone(),
-                            when: view.map(|r| r.when.clone()).unwrap_or_default(),
-                            condition: step.when.clone(),
-                            fired: view.is_some_and(|r| r.fired),
-                            ready: view.is_some_and(|r| r.condition_holds),
-                        }
-                    })
-                    .collect(),
-            })
-            .collect()
-    }
-
-    /// Why a rule matters at the player's position and time now, if it does.
-    fn relevance(&self, rule: &loremaster_model::Rule) -> Option<String> {
-        if self.last_fired.contains(&rule.id) {
-            return Some("fired in the last turn".into());
-        }
-        if rule.once && self.state.fired.contains(&rule.id) {
-            return None;
-        }
-        let here = &self.state.room;
-        match &rule.on {
-            EventPattern::Enter(r) | EventPattern::Leave(r) if r == here => {
-                Some("about this room".into())
-            }
-            EventPattern::Enter(r) => {
-                let next_door = self
-                    .room_def()
-                    .is_some_and(|room| room.exits.iter().any(|e| e.to.as_ref() == Some(r)));
-                next_door.then(|| "fires in a room next to this one".into())
-            }
-            EventPattern::Verb(parts) | EventPattern::Check(parts) => {
-                let scope = self.in_scope();
-                let things = &parts[1..];
-                if things.is_empty() {
-                    Some("works with any thing".into())
-                } else if things.iter().all(|t| scope.contains(t)) {
-                    Some("uses things in reach".into())
-                } else {
-                    None
-                }
-            }
-            EventPattern::Time(t) => {
-                let now = self.state.minutes % TimeOfDay::MINUTES_PER_DAY;
-                let at = u32::from(t.0);
-                let ahead = (at + TimeOfDay::MINUTES_PER_DAY - now) % TimeOfDay::MINUTES_PER_DAY;
-                (ahead <= 60).then(|| format!("fires in {ahead} minutes"))
-            }
-            EventPattern::Turn => Some("checks every turn".into()),
-            EventPattern::Timer(t) => self
-                .state
-                .timers
-                .get(t)
-                .filter(|left| **left <= 5)
-                .map(|left| format!("the timer runs out in {left} turns")),
-            EventPattern::Talk(parts) => self
-                .state
-                .talk
-                .as_ref()
-                .filter(|t| parts.first() == Some(&t.dialogue))
-                .map(|_| "about the talk now".into()),
-            EventPattern::Leave(_) | EventPattern::Start | EventPattern::Event(_) => None,
-        }
-    }
-
-    pub fn verbs(&self) -> Vec<VerbInfo> {
+    pub(crate) fn verbs(&self) -> Vec<VerbInfo> {
         self.world
             .verbs
             .iter()

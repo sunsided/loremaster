@@ -2,7 +2,10 @@
 //! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
 use loremaster_project::{Diagnostic, Project, check_files, open_todos, read_dir};
-use loremaster_runtime::{BlockKind, Budget, Game, Turn, Verdict, World};
+use loremaster_runtime::{
+    AwaitRequest, BlockKind, Effect, Input, RESTORE, Session, Status, Step, Verdict, World,
+};
+use loremaster_workbench::Budget;
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -217,9 +220,11 @@ fn play(project: Project) -> ExitCode {
         }
     };
     let style = std::io::stdout().is_terminal();
-    let mut game = Game::new(world.clone());
+    let mut session = Session::new(world.clone());
     println!("{}\n", bold(&world.story.title, style));
-    print_turn(&game.start(), style);
+    if show_status(&session.start(), style) {
+        return ExitCode::SUCCESS;
+    }
     let stdin = std::io::stdin();
     loop {
         print!("\n> ");
@@ -234,19 +239,51 @@ fn play(project: Project) -> ExitCode {
             break;
         }
         if line == "time" {
-            let s = game.scene();
+            let s = session.scene();
             println!("Day {}, {} ({}), turn {}.", s.day, s.time, s.phase, s.turns);
             continue;
         }
-        let turn = game.input(line);
+        let step = session.submit(Input::Text(line.to_string()));
         println!();
-        print_turn(&turn, style);
-        if turn.ended {
-            println!("\n*** The End ***");
+        if show_status(&step, style) {
             break;
         }
     }
     ExitCode::SUCCESS
+}
+
+/// Print a step and what the session waits for. True when the game is over.
+///
+/// A death ending does not end the session: it waits on the death prompt,
+/// whose answers `undo` and `restart` the session takes as text. A restore
+/// needs a save, which the terminal player does not keep.
+fn show_status(step: &Step, style: bool) -> bool {
+    print_step(step, style);
+    if step
+        .effects
+        .iter()
+        .any(|e| matches!(e, Effect::Ending { .. }))
+    {
+        println!("\n*** The End ***");
+    }
+    match &step.status {
+        Status::Ended { .. } => true,
+        Status::Await { awaiting } => {
+            match &awaiting.request {
+                AwaitRequest::DeathPrompt { options, .. } => {
+                    let answers: Vec<&str> = options
+                        .iter()
+                        .map(|o| o.as_str())
+                        .filter(|o| *o != RESTORE)
+                        .collect();
+                    println!("\n(Type {}, or \"quit\".)", answers.join(" or "));
+                }
+                request => println!("\n(The story waits: {}.)", request.describe()),
+            }
+            false
+        }
+        _ => false,
+    }
 }
 
 /// The story names behaviors in Rust that this program does not have. Say so once.
@@ -332,7 +369,7 @@ fn explore(project: Project) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let result = loremaster_runtime::explore(&Game::new(world), Budget::default());
+    let result = loremaster_workbench::explore(world, Budget::default());
     let more = if result.truncated {
         " (budget reached; results are incomplete)"
     } else {
@@ -390,9 +427,13 @@ fn explore(project: Project) -> ExitCode {
     }
 }
 
-fn print_turn(turn: &Turn, style: bool) {
+fn print_step(step: &Step, style: bool) {
     let mut first = true;
-    for block in &turn.blocks {
+    let blocks = step.effects.iter().filter_map(|e| match e {
+        Effect::Text { block } => Some(block),
+        _ => None,
+    });
+    for block in blocks {
         if block.kind == BlockKind::Command {
             continue;
         }
@@ -407,9 +448,13 @@ fn print_turn(turn: &Turn, style: bool) {
             _ => println!("{}", wrap(&text, 78)),
         }
     }
-    if !turn.choices.is_empty() {
+    let choices = step.effects.iter().find_map(|e| match e {
+        Effect::Choices { choices, .. } => Some(choices),
+        _ => None,
+    });
+    if let Some(choices) = choices.filter(|c| !c.is_empty()) {
         println!();
-        for c in &turn.choices {
+        for c in choices {
             println!(
                 "{}",
                 wrap(

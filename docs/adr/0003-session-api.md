@@ -82,3 +82,37 @@ and awaits back. Everything is data.**
   compiler keeps hosts on the Session API; a new `loremaster-workbench` crate
   holds the authoring views. A separate session crate would need `Game` and
   `State` to stay public to reach them, which makes the boundary weaker.
+- P2-08 (#59) made the workbench crate. A `Workbench` owns a `Session`;
+  `reload(world)` carries the running game over to a changed world (SE-14).
+  The seed, the undo depth and the host's rolls setting stay; the undo
+  history does not, because its states belong to the old world.
+  The split between the two crates:
+  - In `loremaster-workbench`, written against public reads of `World` and
+    `State`: the Atlas, the map, the rules view with its relevance, the
+    machines, the symbols, the markup and condition checks, the tooltips of
+    things and exits, the variables and the phases. They change nothing.
+  - In `loremaster-runtime`, in the module `authoring` (`#[doc(hidden)]`, not
+    under semver): the primitives that need the engine. `Inspector` reads a
+    session: a condition, markup rendered or outlined, a name stage, the
+    nouns of a thing, the scope, whether an exit shows or a rule's condition
+    holds, the rules that fired last, and a copy of the game in one
+    combination of the room matrix. The free functions `start`, `play` (whole
+    turns with the rule log, for an editor transcript), `author`,
+    `carry_over` and `explore` change or make a session.
+  - Views that are mostly engine work stay whole in the runtime and the
+    workbench passes them through: the assembly of a room and its generated
+    layers (they read the compiled fragments and what was on screen), the
+    talk inspector (dramaturge's option filter), the last action frame, the
+    room and text matrix and the explorer (they copy the game and play it).
+    Moving them would make most of the engine public.
+  - The thread list and the proposals read and write files, so they stay in
+    `loremaster-project` and `loremaster-tools`. The workbench gives the
+    reach of threads through `explore`.
+- The read-only queries of point 8 (`scene`, `verbs`, `preview`, `talk`,
+  `choices`) are methods of `Session`. The web engine, the AI tools and the
+  terminal player use `Session` and `Workbench`; none of them names `Game`.
+- `Game` is not `pub(crate)` yet: it is `#[doc(hidden)]` and has only the play
+  methods left. Eight integration test files of `loremaster-runtime` play
+  through it, and some build a game from a bare `State` with
+  `Game::restore`. Moving those tests to `Session` is what remains, next to
+  P2-09, which makes the web player use only `Session` and `Workbench`.

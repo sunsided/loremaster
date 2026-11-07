@@ -199,16 +199,12 @@ fn a_behavior_gets_only_the_events_of_its_manifest() {
 fn the_rules_view_and_the_explorer_use_the_manifest() {
     let world = counter_world();
     assert!(!world.behaviors_watch_time());
-    let game = Game::new(world);
-    let view = game
-        .rules()
-        .into_iter()
-        .find(|r| r.id == "behavior:counter")
-        .unwrap();
+    // The rules view shows the manifest: loremaster-workbench tests it
+    // (tests/workbench/behaviors.rs).
     assert!(
-        view.when.contains("on custom; reads seen; writes seen"),
-        "{}",
-        view.when
+        world
+            .manifest("counter")
+            .is_some_and(|m| m.describe().contains("on custom"))
     );
     // The thief declares start and turn events: waiting matters.
     let thief = world_thief();

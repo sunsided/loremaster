@@ -540,7 +540,7 @@ impl Game {
 
     /// The talk in progress, for the inspector: the node, its outcomes, and
     /// every option with the reason it is hidden.
-    pub fn talk_view(&self) -> Option<TalkView> {
+    pub(crate) fn talk_view(&self) -> Option<TalkView> {
         let talk = self.state.talk.as_ref()?;
         let d = self.world.dialogue(talk.dialogue.as_str())?;
         let src = self

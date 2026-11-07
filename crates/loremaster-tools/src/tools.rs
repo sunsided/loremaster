@@ -3,7 +3,8 @@
 use crate::{Args, ToolResult, Workspace, err, json};
 use loremaster_model::{Effect, Layer, Location};
 use loremaster_project::SourceFile;
-use loremaster_runtime::{AuthorCommand, Budget, Command, Game, Turn};
+use loremaster_runtime::{Command, Input, Session, Turn};
+use loremaster_workbench::{AuthorCommand, Budget, Workbench};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, VecDeque};
 
@@ -337,13 +338,12 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
                     .max(1),
                 max_depth: a.usize_or("max_depth", Budget::default().max_depth).max(1),
             };
-            let fresh = Game::new(ws.world()?.clone());
-            json(&loremaster_runtime::explore(&fresh, budget))
+            json(&loremaster_workbench::explore(ws.world()?.clone(), budget))
         }
         "room_matrix" => {
             let room = a.str("room")?;
             let game = ws.session(a.session())?;
-            match loremaster_runtime::room_matrix(game, room) {
+            match game.room_matrix(room) {
                 Some(m) => json(&m),
                 None => Err(err(format!("There is no room `{room}`."))),
             }
@@ -352,7 +352,7 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
             let text = a.str("text")?;
             let when = a.opt_str("when");
             let game = ws.session(a.session())?;
-            match loremaster_runtime::text_matrix(game, text, when) {
+            match game.text_matrix(text, when) {
                 Some(m) => json(&m),
                 None => Err(err(
                     "The text or the condition does not parse. Call `try_markup` or `try_condition` to see why.",
@@ -378,16 +378,17 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
             let mut dropped = Vec::new();
             let (game, opening) = match save {
                 Some(save) => {
-                    let restored = Game::load_save(world, save)
-                        .map_err(|e| crate::ToolError(e.to_string()))?;
-                    dropped = restored.dropped;
-                    let text = restored.game.describe_preview().plain_text();
-                    (restored.game, text)
+                    let (session, loaded) =
+                        Session::load(world, save).map_err(|e| crate::ToolError(e.to_string()))?;
+                    dropped = loaded.dropped;
+                    let bench = Workbench::from_session(session);
+                    let text = bench.describe().plain_text();
+                    (bench, text)
                 }
                 None => {
-                    let mut game = Game::new(world);
-                    let text = game.start().plain_text();
-                    (game, text)
+                    let mut bench = Workbench::new(world);
+                    let text = bench.start().plain_text();
+                    (bench, text)
                 }
             };
             ws.sessions.insert(name.clone(), game);
@@ -399,13 +400,13 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
         "input" => {
             let text = a.str("text")?;
             let game = ws.session(a.session())?;
-            let turn = game.input(text);
+            let turn = game.play(Input::Text(text.to_string()));
             Ok(turn_json(&turn, game))
         }
         "act" => {
             let cmd: Command = a.value("command")?;
             let game = ws.session(a.session())?;
-            let turn = game.act(cmd);
+            let turn = game.play(Input::Command(cmd));
             Ok(turn_json(&turn, game))
         }
         "author" => {
@@ -439,7 +440,7 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
             ws.remove_proposal(id);
             Ok(json!({ "withdrawn": id }))
         }
-        "scene" => json(&ws.session(a.session())?.scene()),
+        "scene" => json(&ws.session(a.session())?.session().scene()),
         "assembly" => json(&ws.session(a.session())?.assembly()),
         "room_parts" => json(&ws.session(a.session())?.room_parts()),
         "inspect" => {
@@ -456,16 +457,16 @@ pub(crate) fn dispatch(ws: &mut Workspace, name: &str, a: &Args) -> ToolResult {
         }
         "vars" => json(&ws.session(a.session())?.vars()),
         "rules" => json(&ws.session(a.session())?.rules()),
-        "verbs" => json(&ws.session(a.session())?.verbs()),
+        "verbs" => json(&ws.session(a.session())?.session().verbs()),
         "map" => json(&ws.session(a.session())?.map()),
-        "save" => json(&ws.session(a.session())?.save()),
+        "save" => json(&ws.session(a.session())?.session().save()),
         _ => Err(err(format!("There is no tool `{name}`."))),
     }
 }
 
 /// The result of one turn: its text, whether the game ended, the log of what
 /// changed, and where the player is now.
-fn turn_json(turn: &Turn, game: &Game) -> Value {
+fn turn_json(turn: &Turn, game: &Workbench) -> Value {
     json!({
         "text": turn.plain_text(),
         "ended": turn.ended,
@@ -474,8 +475,8 @@ fn turn_json(turn: &Turn, game: &Game) -> Value {
     })
 }
 
-fn brief(game: &Game) -> Value {
-    let s = game.scene();
+fn brief(game: &Workbench) -> Value {
+    let s = game.session().scene();
     json!({ "room": s.room, "room_name": s.room_name, "time": s.time, "phase": s.phase, "day": s.day, "turns": s.turns })
 }
 

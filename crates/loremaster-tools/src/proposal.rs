@@ -11,7 +11,8 @@
 
 use crate::{ToolError, Workspace, err};
 use loremaster_project::{Diagnostic, Project, SourceFile, check_files};
-use loremaster_runtime::{Game, World};
+use loremaster_runtime::World;
+use loremaster_workbench::Workbench;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -628,11 +629,11 @@ fn previews(world: &Arc<World>, changes: &[Change]) -> Vec<RoomPreview> {
         .collect();
     rooms.sort_unstable();
     rooms.dedup();
-    let game = Game::new(world.clone());
+    let bench = Workbench::new(world.clone());
     rooms
         .into_iter()
         .filter_map(|room| {
-            let m = loremaster_runtime::room_matrix(&game, room)?;
+            let m = bench.room_matrix(room)?;
             let mut texts: Vec<PreviewText> = Vec::new();
             for cell in m.cells {
                 match texts.iter_mut().find(|t| t.text == cell.text) {
