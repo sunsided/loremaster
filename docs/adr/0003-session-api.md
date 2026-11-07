@@ -111,8 +111,13 @@ and awaits back. Everything is data.**
 - The read-only queries of point 8 (`scene`, `verbs`, `preview`, `talk`,
   `choices`) are methods of `Session`. The web engine, the AI tools and the
   terminal player use `Session` and `Workbench`; none of them names `Game`.
-- `Game` is not `pub(crate)` yet: it is `#[doc(hidden)]` and has only the play
-  methods left. Eight integration test files of `loremaster-runtime` play
-  through it, and some build a game from a bare `State` with
-  `Game::restore`. Moving those tests to `Session` is what remains, next to
-  P2-09, which makes the web player use only `Session` and `Workbench`.
+- P2-09 (#60) made `Game` `pub(crate)`. The integration tests of
+  `loremaster-runtime` play through `Session`; where they need whole turns
+  with the rule log, or a session on a bare `State`, they use the hidden
+  primitives `authoring::start`, `authoring::play` and
+  `authoring::session_of`. The wasm bindings mirror the split with two JS
+  classes: `Session` (steps of effects, for players) and `Workbench` (it owns
+  a session; whole turns for the editor's transcript, and the views). The
+  workbench's `resume`, `undo` and `restart` also give whole turns, through
+  the primitives `authoring::resume`, `undo` and `restart`.
+  `Session::status` tells a host what the session waits for between calls.

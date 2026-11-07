@@ -1,6 +1,10 @@
 import {
-	Game,
+	Workbench,
 	type AuthorCommand,
+	type Awaiting,
+	type Input,
+	type Status,
+	type Value,
 	type Choice,
 	type DialogueOutline,
 	type TalkInfo,
@@ -28,9 +32,13 @@ export interface Entry {
 	rewritten?: boolean;
 }
 
-/** One play session: the transcript, the scene, and the verb bar state. */
+/** One play session: the transcript, the scene, and the verb bar state. It plays through the engine's workbench. */
 export class Session {
-	game = $state.raw<Game>() as Game;
+	bench = $state.raw<Workbench>() as Workbench;
+	/** What the game waits for: the next command, an answer to a paused rule or the death prompt, or nothing (ended). */
+	status = $state<Status>({ type: 'ready' });
+	/** How many turns `undo` can go back. */
+	undoSteps = $state(0);
 	entries = $state<Entry[]>([]);
 	scene = $state<Scene>() as Scene;
 	assembly = $state<FragmentView[]>([]);
@@ -61,27 +69,27 @@ export class Session {
 	/** What the draft refers to so far. It changes with the draft and after each turn. */
 	preview = $derived.by<Preview>(() => {
 		this.entries.length;
-		return this.game.preview(this.draft);
+		return this.bench.preview(this.draft);
 	});
 	/** Fragment highlighted in both the transcript and the assembly panel. */
 	focus = $state<number | null>(null);
 	#next = 0;
 
 	/** `first` is the first turn to show; by default the game starts from its beginning. */
-	constructor(game: Game, first?: Turn) {
-		this.game = game;
-		this.verbs = game.verbs();
-		this.phases = game.phases();
-		this.#push(first ?? game.start());
+	constructor(bench: Workbench, first?: Turn) {
+		this.bench = bench;
+		this.verbs = bench.verbs();
+		this.phases = bench.phases();
+		this.#push(first ?? bench.start());
 	}
 
 	/**
 	 * A sandbox: this game state in another build of the story, for example the files of an AI proposal.
 	 * The new session starts with the room text; this session does not change.
 	 */
-	sandbox(game: Game): Session {
-		game.carryOver(this.game);
-		return new Session(game, game.describe());
+	sandbox(bench: Workbench): Session {
+		bench.carryOver(this.bench);
+		return new Session(bench, bench.describe());
 	}
 
 	/** The verb bar: Walk to and Look around first, then the verbs that take things. */
@@ -113,11 +121,11 @@ export class Session {
 	 * Continue in a new build of the story, after an edit. The state carries over, and the room text of the
 	 * last turn is written again with the new story. Older turns stay as they were played.
 	 */
-	carryOver(game: Game) {
-		game.carryOver(this.game);
-		this.game = game;
-		this.verbs = game.verbs();
-		this.phases = game.phases();
+	carryOver(bench: Workbench) {
+		bench.carryOver(this.bench);
+		this.bench = bench;
+		this.verbs = bench.verbs();
+		this.phases = bench.phases();
 		this.#refresh();
 		// The last turn that showed a room text, when that room is still the current room.
 		const at = this.entries.findLastIndex((e) => e.turn.blocks.some((b) => b.kind === 'title'));
@@ -128,7 +136,7 @@ export class Session {
 		if (blocks[start].runs.map((r) => r.text).join('') !== this.scene.room_name) return;
 		let end = start + 1;
 		while (end < blocks.length && ['prose', 'objects', 'exits'].includes(blocks[end].kind)) end++;
-		const fresh = game.describe().blocks;
+		const fresh = bench.describe().blocks;
 		this.entries[at] = {
 			...last,
 			turn: { ...last.turn, blocks: [...blocks.slice(0, start), ...fresh, ...blocks.slice(end)] },
@@ -137,48 +145,75 @@ export class Session {
 	}
 
 	#refresh() {
-		this.scene = this.game.scene();
-		this.assembly = this.game.assembly();
-		this.map = this.game.map();
-		this.parts = this.game.roomParts();
-		this.rules = this.game.rules();
-		this.machines = this.game.machines();
-		this.vars = this.game.vars();
-		this.frame = this.game.lastFrame();
-		this.choices = this.game.choices();
-		this.talkView = this.game.talkView();
+		this.scene = this.bench.scene();
+		this.status = this.bench.status();
+		this.undoSteps = this.bench.undoSteps();
+		this.assembly = this.bench.assembly();
+		this.map = this.bench.map();
+		this.parts = this.bench.roomParts();
+		this.rules = this.bench.rules();
+		this.machines = this.bench.machines();
+		this.vars = this.bench.vars();
+		this.frame = this.bench.lastFrame();
+		this.choices = this.bench.choices();
+		this.talkView = this.bench.talkView();
 		this.talk = this.talkView
 			? { dialogue: this.talkView.dialogue, with: this.talkView.with, name: this.talkView.name, node: this.talkView.node }
 			: null;
-		this.dialogues = this.game.dialogues();
+		this.dialogues = this.bench.dialogues();
+	}
+
+	/** Play one input. */
+	#play(input: Input) {
+		this.draft = '';
+		this.#push(this.bench.play(input));
 	}
 
 	input(text: string) {
 		if (!text.trim()) return;
-		this.draft = '';
-		this.#push(this.game.input(text));
+		this.#play({ type: 'text', value: text });
 	}
 
 	/** Run an author command, for example from the command palette. */
 	author(command: AuthorCommand) {
-		this.#push(this.game.author(command));
+		this.#push(this.bench.author(command));
 	}
 
 	act(command: Command) {
-		this.draft = '';
-		this.#push(this.game.act(command));
+		this.#play({ type: 'command', value: command });
 	}
 
 	/** Choose an answer in the talk in progress. */
 	choose(index: number) {
-		this.draft = '';
-		this.#push(this.game.choose(index));
+		this.#play({ type: 'choice', value: index });
 	}
 
 	/** Leave the talk in progress. */
 	leave() {
+		this.#play({ type: 'command', value: { type: 'leave' } });
+	}
+
+	/** The paused rule or the death prompt that waits for an answer, or null. */
+	get awaiting(): Awaiting | null {
+		return this.status.type === 'await' ? this.status.awaiting : null;
+	}
+
+	/** Answer what the game waits for. An answer that does not fit shows as a note. */
+	resume(value: Value) {
+		const awaiting = this.awaiting;
+		if (!awaiting) return;
 		this.draft = '';
-		this.#push(this.game.leave());
+		try {
+			this.#push(this.bench.resume(awaiting.id, value));
+		} catch (e) {
+			this.#push({ blocks: [{ kind: 'note', runs: [{ text: String(e) }] }], ended: false, log: [] });
+		}
+	}
+
+	/** Go back to the state before the last turn. The transcript keeps the turns; the undo shows as a new turn. */
+	undo() {
+		this.draft = '';
+		this.#push(this.bench.undo());
 	}
 
 	/** The verb that the draft names, if any. */
@@ -282,11 +317,11 @@ export class Session {
 		return parts.join(' ');
 	}
 
+	/** Start the story again with an empty transcript. `undo` can go back to the state before it. */
 	restart() {
-		this.game.reset();
 		this.entries = [];
 		this.history = [];
 		this.draft = '';
-		this.#push(this.game.start());
+		this.#push(this.bench.restart());
 	}
 }

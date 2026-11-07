@@ -1,7 +1,24 @@
-import init, { Engine as WasmEngine, newStory as wasmNewStory, projectNotes, projectThreads } from './pkg/loremaster-wasm.js';
+// The two classes of the engine mirror ADR 0003: `Session` plays a story and returns steps of effects;
+// `Workbench` owns a session and adds the authoring views of the editor. Nothing here calls the engine
+// in another way.
+import init, {
+	Session as WasmSession,
+	Workbench as WasmWorkbench,
+	markupTokens as wasmMarkupTokens,
+	newStory as wasmNewStory,
+	projectNotes,
+	projectThreads
+} from './pkg/loremaster-wasm.js';
 import type {
 	AuthorCommand,
 	Choice,
+	Input,
+	Loaded,
+	Snapshot,
+	Status,
+	Step,
+	Talk,
+	Value,
 	DialogueOutline,
 	TalkView,
 	AtlasRoom,
@@ -14,7 +31,6 @@ import type {
 	ThreadView,
 	PhaseView,
 	VarView,
-	Command,
 	Diagnostic,
 	FragmentView,
 	MapView,
@@ -63,199 +79,337 @@ export class ProjectError extends Error {
 	}
 }
 
-/** A typed wrapper around the WASM engine. */
-export class Game {
-	#engine: WasmEngine;
+/** Highlighted spans of fragment text, or of a condition. Offsets are UTF-16, as in JavaScript strings. */
+export function markupTokens(text: string, condition: boolean): { from: number; to: number; kind: string }[] {
+	return wasmMarkupTokens(text, condition);
+}
 
-	private constructor(engine: WasmEngine) {
-		this.#engine = engine;
+/** Build an engine object from project files; turn the thrown diagnostics into a `ProjectError`. */
+async function build<T>(make: () => T): Promise<T> {
+	await loadEngine();
+	try {
+		return make();
+	} catch (e) {
+		if (Array.isArray(e)) throw new ProjectError(e as Diagnostic[]);
+		throw e;
+	}
+}
+
+/** A running game for a player (the Session API). Each call that plays returns a step: effects and a status. */
+export class Session {
+	#session: WasmSession;
+
+	private constructor(session: WasmSession) {
+		this.#session = session;
 	}
 
-	/** Give the memory of the engine back. Do not use the game after this. */
+	/** A new game of the files. Throws a `ProjectError` when the files have errors. */
+	static async open(files: SourceFile[]): Promise<Session> {
+		return new Session(await build(() => new WasmSession(files)));
+	}
+
+	/** Give the memory of the engine back. Do not use the session after this. */
 	free(): void {
-		this.#engine.free();
-	}
-
-	static async open(files: SourceFile[]): Promise<Game> {
-		await loadEngine();
-		try {
-			return new Game(new WasmEngine(files));
-		} catch (e) {
-			if (Array.isArray(e)) throw new ProjectError(e as Diagnostic[]);
-			throw e;
-		}
+		this.#session.free();
 	}
 
 	get title(): string {
-		return this.#engine.title();
+		return this.#session.title;
 	}
 
-	start(): Turn {
-		return this.#engine.start();
+	/** The opening. A second call starts nothing again. */
+	start(): Step {
+		return this.#session.start();
 	}
 
-	author(command: AuthorCommand): Turn {
-		return this.#engine.author(command);
+	submit(input: Input): Step {
+		return this.#session.submit(input);
 	}
 
-	inspect(kind: 'thing' | 'exit', id: string): Inspect | null {
-		return this.#engine.inspect(kind, id);
+	/** Choose an answer of the talk in progress, by its index in `choices`. */
+	choose(index: number): Step {
+		return this.#session.choose(index);
 	}
 
-	lastFrame(): FrameUse | null {
-		return this.#engine.lastFrame();
+	/** Answer the request of an `await` status, also the death prompt. Throws when the answer does not fit. */
+	resume(awaitId: string, value: Value): Step {
+		return this.#session.resume(awaitId, value);
 	}
 
-	/** Walk all reachable states from the start of the story. This can take a moment. */
-	explore(maxStates = 2000, maxDepth = 40): Exploration {
-		return this.#engine.explore(maxStates, maxDepth);
+	/** Go back to the state before the last input. */
+	undo(): Step {
+		return this.#session.undo();
 	}
 
-	/** The text of a room in every combination of the values that the text depends on. */
-	roomMatrix(room: string): RoomMatrix | null {
-		return this.#engine.roomMatrix(room);
+	/** How many inputs `undo` can go back now. */
+	undoSteps(): number {
+		return this.#session.undoSteps();
 	}
 
-	vars(): VarView[] {
-		return this.#engine.vars();
+	/** How many inputs `undo` can go back. 0 turns undo off. */
+	setUndoDepth(depth: number): void {
+		this.#session.setUndoDepth(depth);
 	}
 
-	phases(): PhaseView[] {
-		return this.#engine.phases();
+	/** Answer rolls with `resume` instead of letting the session roll. */
+	setHostRolls(hostRolls: boolean): void {
+		this.#session.setHostRolls(hostRolls);
 	}
 
+	/** Start the story again. `undo` can go back to the state before it. */
+	restart(): Step {
+		return this.#session.restart();
+	}
+
+	/** The state now, to put back later with `restore`. */
+	snapshot(): Snapshot {
+		return this.#session.snapshot();
+	}
+
+	/** Put a snapshot back. Throws for a snapshot of another story. */
+	restore(snapshot: Snapshot): Step {
+		return this.#session.restore(snapshot);
+	}
+
+	/** The save state, as JSON-compatible data. */
+	save(): unknown {
+		return this.#session.save();
+	}
+
+	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
+	load(save: unknown): Loaded {
+		return this.#session.load(save);
+	}
+
+	/** What the session waits for now. */
+	status(): Status {
+		return this.#session.status();
+	}
+
+	scene(): Scene {
+		return this.#session.scene();
+	}
+
+	verbs(): VerbInfo[] {
+		return this.#session.verbs();
+	}
+
+	/** What a command that is still being typed refers to. */
 	preview(text: string): Preview {
-		return this.#engine.preview(text);
+		return this.#session.preview(text);
 	}
 
-	input(text: string): Turn {
-		return this.#engine.input(text);
-	}
-
-	act(command: Command): Turn {
-		return this.#engine.act(command);
-	}
-
-	/** Choose an answer in the talk in progress, by its index in `choices`. */
-	choose(index: number): Turn {
-		return this.#engine.choose(index);
-	}
-
-	/** Leave the talk in progress. */
-	leave(): Turn {
-		return this.#engine.leave();
+	/** The talk in progress, or null. */
+	talk(): Talk | null {
+		return this.#session.talk();
 	}
 
 	/** The answers the player can choose now. Empty outside a talk. */
 	choices(): Choice[] {
-		return this.#engine.choices();
+		return this.#session.choices();
+	}
+}
+
+/**
+ * A running game with the authoring views of the editor (the Workbench API). It owns a session; its play
+ * methods return whole turns with the rule log, for the transcript.
+ */
+export class Workbench {
+	#bench: WasmWorkbench;
+
+	private constructor(bench: WasmWorkbench) {
+		this.#bench = bench;
 	}
 
-	/** The talk in progress for the inspector, with the hidden options, or null. */
-	talkView(): TalkView | null {
-		return this.#engine.talkView();
+	/** A new game of the files. Throws a `ProjectError` when the files have errors. */
+	static async open(files: SourceFile[]): Promise<Workbench> {
+		return new Workbench(await build(() => new WasmWorkbench(files)));
 	}
 
-	/** Every dialogue as an outline of nodes, options and their targets. */
-	dialogues(): DialogueOutline[] {
-		return this.#engine.dialogues();
+	/** Give the memory of the engine back. Do not use the workbench after this. */
+	free(): void {
+		this.#bench.free();
 	}
 
-	scene(): Scene {
-		return this.#engine.scene();
-	}
-
-	assembly(): FragmentView[] {
-		return this.#engine.assembly();
-	}
-
-	roomParts(): RoomParts {
-		return this.#engine.roomParts();
-	}
-
-	rules(): RuleView[] {
-		return this.#engine.rules();
-	}
-
-	machines(): MachineView[] {
-		return this.#engine.machines();
-	}
-
-	map(): MapView {
-		return this.#engine.map();
-	}
-
-	verbs(): VerbInfo[] {
-		return this.#engine.verbs();
-	}
-
-	reset(): void {
-		this.#engine.reset();
+	get title(): string {
+		return this.#bench.title;
 	}
 
 	/** The file of each entity, for example `room:shore` to `rooms/shore.yaml`. */
 	origins(): Record<string, string> {
-		return this.#engine.origins();
+		return this.#bench.origins();
 	}
 
-	/** The room description as it would show now. It does not change the game. */
-	describe(): Turn {
-		return this.#engine.describe();
+	// ---- play, as whole turns ----
+
+	/** The opening. A second call starts nothing again. */
+	start(): Turn {
+		return this.#bench.start();
+	}
+
+	play(input: Input): Turn {
+		return this.#bench.play(input);
+	}
+
+	/** Answer the request of an `await` status, also the death prompt. Throws when the answer does not fit. */
+	resume(awaitId: string, value: Value): Turn {
+		return this.#bench.resume(awaitId, value);
+	}
+
+	/** Go back to the state before the last input. */
+	undo(): Turn {
+		return this.#bench.undo();
+	}
+
+	/** How many inputs `undo` can go back now. */
+	undoSteps(): number {
+		return this.#bench.undoSteps();
+	}
+
+	/** Start the story again. `undo` can go back to the state before it. */
+	restart(): Turn {
+		return this.#bench.restart();
+	}
+
+	author(command: AuthorCommand): Turn {
+		return this.#bench.author(command);
+	}
+
+	// ---- the queries of the session ----
+
+	/** What the session waits for now. */
+	status(): Status {
+		return this.#bench.status();
+	}
+
+	scene(): Scene {
+		return this.#bench.scene();
+	}
+
+	verbs(): VerbInfo[] {
+		return this.#bench.verbs();
+	}
+
+	preview(text: string): Preview {
+		return this.#bench.preview(text);
+	}
+
+	/** The answers the player can choose now. Empty outside a talk. */
+	choices(): Choice[] {
+		return this.#bench.choices();
+	}
+
+	/** The save state, as JSON-compatible data. */
+	save(): unknown {
+		return this.#bench.save();
+	}
+
+	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
+	load(save: unknown): Loaded {
+		return this.#bench.load(save);
 	}
 
 	/** Continue the game of an earlier version of the story in this one. Values still at their start value take the new start value. */
-	carryOver(from: Game): void {
-		this.#engine.carryOver(from.#engine);
+	carryOver(from: Workbench): void {
+		this.#bench.carryOver(from.#bench);
 	}
 
-	/** Highlighted spans of fragment text, or of a condition. Offsets are UTF-16, as in JavaScript strings. */
-	tokens(text: string, condition: boolean): { from: number; to: number; kind: string }[] {
-		return this.#engine.tokens(text, condition);
+	// ---- views ----
+
+	/** The talk in progress for the inspector, with the hidden options, or null. */
+	talkView(): TalkView | null {
+		return this.#bench.talkView();
+	}
+
+	/** Every dialogue as an outline of nodes, options and their targets. */
+	dialogues(): DialogueOutline[] {
+		return this.#bench.dialogues();
+	}
+
+	assembly(): FragmentView[] {
+		return this.#bench.assembly();
+	}
+
+	roomParts(): RoomParts {
+		return this.#bench.roomParts();
+	}
+
+	inspect(kind: 'thing' | 'exit', id: string): Inspect | null {
+		return this.#bench.inspect(kind, id);
+	}
+
+	vars(): VarView[] {
+		return this.#bench.vars();
+	}
+
+	phases(): PhaseView[] {
+		return this.#bench.phases();
+	}
+
+	lastFrame(): FrameUse | null {
+		return this.#bench.lastFrame();
+	}
+
+	/** Walk all reachable states from the start of the story. This can take a moment. */
+	explore(maxStates = 2000, maxDepth = 40): Exploration {
+		return this.#bench.explore(maxStates, maxDepth);
+	}
+
+	/** The text of a room in every combination of the values that the text depends on. */
+	roomMatrix(room: string): RoomMatrix | null {
+		return this.#bench.roomMatrix(room);
+	}
+
+	/** All rooms with what is in them now, for the Atlas. */
+	atlas(): AtlasRoom[] {
+		return this.#bench.atlas();
+	}
+
+	rules(): RuleView[] {
+		return this.#bench.rules();
+	}
+
+	machines(): MachineView[] {
+		return this.#bench.machines();
+	}
+
+	map(): MapView {
+		return this.#bench.map();
 	}
 
 	/** Check fragment text and render it in the current state. */
 	tryMarkup(text: string): MarkupCheck {
-		return this.#engine.tryMarkup(text);
+		return this.#bench.tryMarkup(text);
 	}
 
 	/** Check fragment text and render it as it would read in other values. It does not change the game. */
 	tryMarkupIn(room: string, values: [string, string][], text: string): MarkupCheck {
-		const check = this.#engine.tryMarkupIn(room, values, text) as MarkupCheck | null;
+		const check = this.#bench.tryMarkupIn(room, values, text) as MarkupCheck | null;
 		return check ?? { error: { start: 0, end: 0, message: `The room ${room} does not exist.` }, text: '', pieces: [], holds: null };
 	}
 
 	/** Check a condition and tell whether it holds now. */
 	tryCondition(text: string): MarkupCheck {
-		return this.#engine.tryCondition(text);
+		return this.#bench.tryCondition(text);
 	}
 
 	/** Every name that conditions and markup can use, with its value now. */
 	symbols(): { name: string; kind: string; detail: string; value: string | null; values: string[] }[] {
-		return this.#engine.symbols();
+		return this.#bench.symbols();
 	}
 
 	/** One fragment text in all combinations of the values that it depends on. Null when it has a problem. */
 	textMatrix(text: string, when: string | null): RoomMatrix | null {
-		return this.#engine.textMatrix(text, when ?? undefined);
+		return this.#bench.textMatrix(text, when ?? undefined);
 	}
 
 	/** The room description in other values. It does not change the game. Null for an unknown room. */
 	previewSituation(room: string, values: [string, string][]): Turn | null {
-		return this.#engine.previewSituation(room, values);
+		return this.#bench.previewSituation(room, values);
 	}
 
-	/** All rooms with what is in them now, for the Atlas. */
-	atlas(): AtlasRoom[] {
-		return this.#engine.atlas();
-	}
-
-	/** The save state, as JSON-compatible data. */
-	save(): unknown {
-		return this.#engine.save();
-	}
-
-	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
-	restore(save: unknown): { storyChanged: boolean; dropped: string[] } {
-		return this.#engine.restore(save);
+	/** The room description as it would show now. It does not change the game. */
+	describe(): Turn {
+		return this.#bench.describe();
 	}
 }
