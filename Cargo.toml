@@ -28,9 +28,9 @@ loremaster-project = { version = "0.1.0", path = "crates/loremaster-project" }
 loremaster-runtime = { version = "0.1.0", path = "crates/loremaster-runtime" }
 loremaster-tools = { version = "0.1.0", path = "crates/loremaster-tools" }
 loremaster-mcp = { version = "0.1.0", path = "crates/loremaster-mcp" }
-dramaturge-model = "0.2.0"
-dramaturge-runtime = "0.2.0"
-dramaturge-authoring = "0.2.0"
+dramaturge-model = { git = "https://github.com/sunsided/dramaturge", branch = "feature/0.3", version = "0.3.0-alpha.1" }
+dramaturge-runtime = { git = "https://github.com/sunsided/dramaturge", branch = "feature/0.3", version = "0.3.0-alpha.1" }
+dramaturge-authoring = { git = "https://github.com/sunsided/dramaturge", branch = "feature/0.3", version = "0.3.0-alpha.1" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 serde-saphyr = "2"
