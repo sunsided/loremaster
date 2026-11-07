@@ -1,0 +1,17 @@
+error: `lever` has no property `lt`; did you mean `lever.lit`?
+  --> tests/ui/fail/machine_steps.rs:13:50
+   |
+13 |         closed -> open on verb(pull, lever) when lever.lt {
+   |                                                  ^^^^^^^^
+
+error: unknown timer `missing_timer`; for an id of another pack, write `extern { timer missing_timer; }`
+  --> tests/ui/fail/machine_steps.rs:15:13
+   |
+15 |             start missing_timer;
+   |             ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown thing `crank`; for an id of another pack, write `extern { thing crank; }`
+  --> tests/ui/fail/machine_steps.rs:17:27
+   |
+17 |         open -> closed on verb(push, crank);
+   |                           ^^^^^^^^^^^^^^^^^

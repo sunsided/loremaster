@@ -191,11 +191,15 @@ fn float(input: ParseStream) -> Result<f32> {
     if negative {
         input.parse::<Token![-]>()?;
     }
+    let span = input.span();
     let value: f32 = if input.peek(LitFloat) {
         input.parse::<LitFloat>()?.base10_parse()?
     } else {
         input.parse::<LitInt>()?.base10_parse()?
     };
+    if !value.is_finite() {
+        return Err(Error::new(span, "the number is too large for a position"));
+    }
     Ok(if negative { -value } else { value })
 }
 
@@ -275,11 +279,25 @@ fn externs(input: ParseStream) -> Result<Vec<Extern>> {
                 };
                 ExternKind::Var(ty)
             }
-            "machine" => ExternKind::Machine(if input.peek(syn::token::Bracket) {
-                names(input)?
-            } else {
-                Vec::new()
-            }),
+            "machine" => {
+                if !input.peek(syn::token::Bracket) {
+                    return Err(Error::new(
+                        id.span,
+                        format!(
+                            "an extern machine needs its states, so that conditions on it check: `machine {} [a, b];`",
+                            id.value
+                        ),
+                    ));
+                }
+                let states = names(input)?;
+                if states.is_empty() {
+                    return Err(Error::new(
+                        id.span,
+                        "an extern machine needs at least one state",
+                    ));
+                }
+                ExternKind::Machine(states)
+            }
             "timer" => ExternKind::Timer,
             "ending" => ExternKind::Ending,
             "verb" => ExternKind::Verb,
@@ -378,6 +396,12 @@ fn clock(input: ParseStream, story: &mut Story) -> Result<()> {
                     if !list.is_empty() {
                         list.parse::<Token![,]>()?;
                     }
+                }
+                if phases.is_empty() {
+                    return Err(Error::new(
+                        field.span,
+                        "`phases { .. }` needs at least one phase: `night \"00:00\"`",
+                    ));
                 }
                 story.phases = Some(phases);
             }
@@ -546,6 +570,9 @@ fn room(input: ParseStream) -> Result<Room> {
                 let x = float(&content)?;
                 content.parse::<Token![,]>()?;
                 let y = float(&content)?;
+                if !content.is_empty() {
+                    return Err(content.error("a position has two numbers: `at [x, y]`"));
+                }
                 RoomPart::At(x, y)
             }
             Some("exit") => RoomPart::Exit(exit(input)?),
@@ -610,9 +637,7 @@ fn exit(input: ParseStream) -> Result<Exit> {
         traversal: None,
         tokens: TokenStream::new(),
     };
-    let stop = |i: ParseStream| {
-        i.peek(Token![;]) || peek_word(i).is_some_and(|w| EXIT_FIELDS.contains(&w.as_str()))
-    };
+    let stop = |i: ParseStream| i.peek(Token![;]) || starts_exit_field(i);
     while !input.peek(Token![;]) {
         let field = name(input)?;
         match field.value.as_str() {
@@ -637,6 +662,20 @@ fn exit(input: ParseStream) -> Result<Exit> {
     }
     exit.tokens = since(start, input);
     Ok(exit)
+}
+
+/// An exit field starts here: a field word followed by its value (an id,
+/// a condition word or a string), not by `.`, `(` or an operator. So
+/// `visible door.locked` reads `door.locked` as the condition.
+fn starts_exit_field(input: ParseStream) -> bool {
+    if !peek_word(input).is_some_and(|w| EXIT_FIELDS.contains(&w.as_str())) {
+        return false;
+    }
+    let fork = input.fork();
+    if fork.call(Ident::parse_any).is_err() {
+        return false;
+    }
+    fork.peek(Ident::peek_any) || fork.peek(LitStr)
 }
 
 fn thing(input: ParseStream) -> Result<Thing> {
@@ -772,7 +811,11 @@ fn event(input: ParseStream) -> Result<Event> {
         "time" => {
             let content;
             parenthesized!(content in input);
-            EventKind::Time(text(&content)?)
+            let time = text(&content)?;
+            if !content.is_empty() {
+                return Err(content.error("expected `)`: `time(\"HH:MM\")` takes one time"));
+            }
+            EventKind::Time(time)
         }
         "verb" => EventKind::Verb(args(input)?),
         "check" => EventKind::Check(args(input)?),
@@ -888,7 +931,11 @@ fn effect(input: ParseStream) -> Result<Effect> {
                         .map_err(|e| Error::new(e.span(), "expected `+=` or `-=`"))?;
                     1
                 };
-                list.push((target, sign * int::<i64>(input)?));
+                let at = input.span();
+                let amount = int::<i64>(input)?
+                    .checked_mul(sign)
+                    .ok_or_else(|| Error::new(at, "the amount is out of range"))?;
+                list.push((target, amount));
                 if !input.peek(Token![,]) {
                     break;
                 }
@@ -1207,6 +1254,9 @@ fn verb(input: ParseStream) -> Result<Verb> {
     Ok(verb)
 }
 
+/// The most repeats of one step: each repeat is a step in the expansion.
+const MAX_REPEAT: u32 = 1000;
+
 fn test(input: ParseStream) -> Result<Test> {
     keyword(input, "test")?;
     let id = name(input)?;
@@ -1242,7 +1292,15 @@ fn test(input: ParseStream) -> Result<Test> {
             .map_err(|e| Error::new(e.span(), "expected a command, `expect` or `pending`"))?;
         let times = if content.peek(Token![*]) {
             content.parse::<Token![*]>()?;
-            int(&content)?
+            let at = content.span();
+            let n: u32 = int(&content)?;
+            if n > MAX_REPEAT {
+                return Err(Error::new(
+                    at,
+                    format!("`<command> * <n>` repeats a step at most {MAX_REPEAT} times"),
+                ));
+            }
+            n
         } else {
             1
         };

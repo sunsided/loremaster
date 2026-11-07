@@ -18,7 +18,7 @@ world! {
     extern {
         room kitchen;
         room lock_chamber;
-        machine lock;
+        machine lock [full, emptying, empty];
         var ash_is_fresh;
         var pages_burned;
         thing stove;

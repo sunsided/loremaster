@@ -1,6 +1,6 @@
 //! The checks at compile time. The macro builds the pack of the block with
-//! the builder, as the expansion will at run time, and runs
-//! [`check_packs`] on it, together with a pack of stubs for the `extern`
+//! the builder, as the expansion will at run time, and runs the checks of
+//! `loremaster_project::check_packs` on it, together with a pack of stubs for the `extern`
 //! ids. Each error becomes a `compile_error!` at the tokens of the entity
 //! and the field that it names.
 //!
@@ -18,7 +18,7 @@ use loremaster_model::{
     EndingKind, EventPattern, Fragment, FragmentMode, Id, Layer, TimeOfDay, VarDef,
     VarType as ModelVarType, VerbSlots,
 };
-use loremaster_project::{Origin, Pack, Severity, check_packs};
+use loremaster_project::{Origin, Pack, Severity, assemble};
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
 use std::collections::BTreeSet;
@@ -94,6 +94,15 @@ pub fn validate(world: &World) -> Result<(), Error> {
             Item::Extern(list) => {
                 for e in list {
                     let kind = extern_kind(&e.kind);
+                    if story_seen && matches!(e.kind, ExternKind::Var(_)) {
+                        errors.push(Error::new(
+                            e.id.span,
+                            format!(
+                                "the variables live in the story header, and this block has it, so no other pack can define `{}`; write `var {}: <type> = <value>;`",
+                                e.id.value, e.id.value
+                            ),
+                        ));
+                    }
                     if defined.contains(&(kind.to_string(), e.id.value.clone())) {
                         errors.push(Error::new(
                             e.id.span,
@@ -168,10 +177,32 @@ pub fn check(world: &World) -> Result<(), Error> {
         };
     }
     let stubs = stubs(world, &mut pack, &mut spans);
-    let checked = check_packs(vec![stubs, pack]);
+    // check_packs, with one change: the rule of each machine step gets its
+    // own file, so that its diagnostics point at the step and not at the
+    // machine.
+    let diagnostics = match assemble(vec![stubs, pack]) {
+        Ok(mut project) => {
+            for item in &world.items {
+                let Item::Machine(m) = item else { continue };
+                for i in 0..m.steps.len() {
+                    let rule = format!("rule:{}#{}", m.id.value, i + 1);
+                    if let Some(origin) = project.origins.get_mut(&rule) {
+                        *origin = Origin::Rust {
+                            file: step_key(&m.id.value, i),
+                            line: 0,
+                            column: 0,
+                            pack: "world".into(),
+                        };
+                    }
+                }
+            }
+            loremaster_project::check(&project)
+        }
+        Err(diagnostics) => diagnostics,
+    };
     let mut errors = Vec::new();
     let mut seen = BTreeSet::new();
-    for d in &checked.diagnostics {
+    for d in &diagnostics {
         if d.severity != Severity::Error || d.file == EXTERN {
             continue;
         }
@@ -571,10 +602,18 @@ fn event(e: &Event) -> EventPattern {
     }
 }
 
-/// Apply the effects in order. `then` is the `at` of the list, for the
-/// spans of the effects: the builder joins a `set` into the one before, so
-/// the index of an effect is the length of the list after it.
-fn effects<B: Effects>(mut b: B, list: &[Effect], key: &str, then: &str, spans: &mut Spans) -> B {
+/// Where the spans of a list of effects go: the entity key, the `at` of
+/// the list, and the index of its first effect there.
+struct Then<'a> {
+    key: &'a str,
+    at: &'a str,
+    offset: usize,
+}
+
+/// Apply the effects in order, and record their spans: the builder joins a
+/// `set` into the one before, so the index of an effect is the length of
+/// the list after it.
+fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans) -> B {
     for e in list {
         b = match &e.kind {
             EffectKind::Line(t) => b.effect(loremaster_model::Effect::Say(t.value.as_str().into())),
@@ -598,8 +637,8 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], key: &str, then: &str, spans: 
                 b.effect(loremaster_model::Effect::Call(Id::new(c.value.as_str())))
             }
         };
-        let i = b.effects_mut().len().saturating_sub(1);
-        spans.add(key, format!("{then}[{i}]"), e.tokens.clone());
+        let i = then.offset + b.effects_mut().len().saturating_sub(1);
+        spans.add(then.key, format!("{}[{i}]", then.at), e.tokens.clone());
     }
     b
 }
@@ -625,7 +664,12 @@ fn rule(p: &mut Pack, r: &Rule, spans: &mut Spans) {
     if let Some(n) = r.priority {
         b = b.priority(n);
     }
-    effects(b, &r.effects, &key, "then", spans);
+    let then = Then {
+        key: &key,
+        at: "then",
+        offset: 0,
+    };
+    effects(b, &r.effects, &then, spans);
     spans.add(&key, "", name_tokens(&r.id));
 }
 
@@ -656,19 +700,35 @@ fn machine(p: &mut Pack, m: &Machine, spans: &mut Spans) {
         if let Some(say) = &step.say {
             b = b.say(say.value.as_str());
         }
-        b = effects(
-            b,
-            &step.effects,
-            &key,
-            &format!("{at}.steps[{i}].then"),
-            spans,
-        );
+        // The checks see each step as the rule that `assemble` makes of it
+        // (`machine_rules`): its `then` is the new state, the `say`, then
+        // the step's effects. `check` gives that rule its own file.
+        let rule = step_key(&m.id.value, i);
+        spans.add(&rule, "", step.tokens.clone());
+        spans.add(&rule, "on", step.on.tokens.clone());
+        if let Some(w) = &step.when {
+            spans.add(&rule, "when", w.tokens.clone());
+        }
+        if let Some(say) = &step.say {
+            spans.add(&rule, "then[1]", text_tokens(say));
+        }
+        let then = Then {
+            key: &rule,
+            at: "then",
+            offset: 1 + usize::from(step.say.is_some()),
+        };
+        b = effects(b, &step.effects, &then, spans);
     }
     if let Some((first, _)) = m.states.first() {
         spans.add(&key, format!("{at}.states"), name_tokens(first));
     }
     spans.add(&key, format!("{at}.start"), name_tokens(&m.start));
     spans.add(&key, "", name_tokens(&m.id));
+}
+
+/// The file of the rule that `assemble` makes of step `i` of a machine.
+fn step_key(machine: &str, i: usize) -> String {
+    format!("machine:{machine}#{}", i + 1)
 }
 
 fn timer(p: &mut Pack, t: &Timer, spans: &mut Spans) {
@@ -687,7 +747,13 @@ fn timer(p: &mut Pack, t: &Timer, spans: &mut Spans) {
     }
     for (n, list) in &t.at {
         b = b.at(*n);
-        b = effects(b, list, &key, &format!("{at}.at.{n}"), spans);
+        let list_at = format!("{at}.at.{n}");
+        let then = Then {
+            key: &key,
+            at: &list_at,
+            offset: 0,
+        };
+        b = effects(b, list, &then, spans);
     }
     spans.add(&key, "", name_tokens(&t.id));
 }
