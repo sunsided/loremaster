@@ -109,5 +109,13 @@ fn check(game: &Game, expect: &Expect, text: &str, at: &str) -> Vec<String> {
         let word = if ended { "has not ended" } else { "has ended" };
         out.push(format!("{at}: the game {word}"));
     }
+    if let Some(want) = &expect.ending
+        && state.ending.as_ref() != Some(want)
+    {
+        match &state.ending {
+            Some(got) => out.push(format!("{at}: the ending is `{got}`, not `{want}`")),
+            None => out.push(format!("{at}: the game has no ending, not `{want}`")),
+        }
+    }
     out
 }

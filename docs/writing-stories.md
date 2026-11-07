@@ -13,6 +13,7 @@ A story is a folder of YAML files. Each entity has its own file.
 | `things/*.yaml` | One thing or character in each file. A thing file can also have rules. |
 | `rules/*.yaml` | One rule, or a list of rules, in each file. Read [Rules](#rules). |
 | `timers/*.yaml` | One timer in each file. Read [Timers](#timers). |
+| `endings/*.yaml` | One ending in each file. Read [Endings](#endings). |
 | `machines/*.yaml` | One puzzle machine in each file. Read [Puzzle machines](#puzzle-machines). |
 | `verbs/*.yaml` | One custom verb in each file, as an item of `verbs:` in story.yaml. |
 | `behaviors/*.yaml` | One file for each behavior in Rust, with notes about it. Read [Behaviors in Rust](#behaviors-in-rust). |
@@ -263,7 +264,7 @@ The effects:
 | `say: "text"` | Shows the text. Inline markup is permitted. |
 | `move: { thing: place }` | Moves things. The place is a room, `carried`, `nowhere`, `in:box` or `on:table`. |
 | `goto: room` | Moves the player. Leave and enter rules fire. |
-| `end: "text"` | Ends the game with the text. |
+| `end: beacon_lit` | Ends the game with an ending from `endings/`. Read [Endings](#endings). |
 | `stop` | Stops the action. Read [Action phases](#action-phases). |
 | `emit: name` | Sends a custom event. Rules `on: { event: name }` fire immediately. |
 | `start: fuse` or `start: { fuse: 6 }` | Starts a timer, with its own turns or with a number of turns. |
@@ -310,6 +311,37 @@ rules:
     then:
       - say: "The rug is extremely heavy and cannot be carried."
 ```
+
+## Endings
+
+An ending is a way the story can end. Put each ending in `endings/<id>.yaml`. The `end` effect names it by its id.
+
+```yaml
+# endings/beacon_lit.yaml
+kind: win
+rank: 1
+title: The beacon is lit
+text: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, and comes home. | Hours early, the beam goes round and round.}"
+```
+
+```yaml
+# rules/beacon.yaml
+- id: light_the_beacon
+  on: { verb: [turn_on, lens] }
+  then:
+    - end: beacon_lit
+```
+
+| Field | Meaning |
+| --- | --- |
+| `kind` | `win`, `loss`, `death` or `neutral`. |
+| `rank` | The order of the endings: 1 is the best. Optional, for example for deaths. |
+| `title` | The name of the ending. The game shows it above the text. |
+| `text` | The text, with inline markup. Optional. |
+
+- When an `end` effect runs, the game shows the title and the text, and the game ends. The save game keeps the id of the ending.
+- `loremaster check` gives an error for an `end` that names no ending, and a warning for an ending that no `end` names.
+- A walkthrough checks the ending with `ending:`, for example `expect: { ending: beacon_lit }`.
 
 ## Timers
 
@@ -589,7 +621,7 @@ expect:
   ended: true
 ```
 
-- A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room` and `ended`.
+- A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room`, `ended` and `ending`.
 - `expect` says what must be true after the last step. `see` there looks at the whole transcript.
 
 Run `cargo run -p loremaster --no-default-features -- test <folder>`, or `task walkthroughs` for all examples. The command names each step that failed. The Rust tests run the walkthroughs of all examples, so CI runs them too.

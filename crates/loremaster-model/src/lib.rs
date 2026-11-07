@@ -8,6 +8,7 @@
 
 mod clock;
 mod dialogue;
+mod ending;
 mod fragment;
 mod frame;
 mod id;
@@ -24,6 +25,7 @@ mod walkthrough;
 
 pub use clock::{ClockConfig, Phase, TimeOfDay};
 pub use dialogue::{Dialogue, DialogueNode, DialogueOption, Outcomes};
+pub use ending::{Ending, EndingKind};
 pub use fragment::{Fragment, FragmentMode, Layer};
 pub use frame::{Frame, Frames};
 pub use id::Id;

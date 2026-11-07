@@ -2,4 +2,4 @@
   on: { verb: [ring, bell] }
   instead: true
   then:
-    - end: "The bell swings, and for the first time in forty years the whole town hears it."
+    - end: bell_rung

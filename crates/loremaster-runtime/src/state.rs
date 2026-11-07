@@ -27,6 +27,9 @@ pub struct State {
     pub fired: BTreeSet<Id>,
     pub rng: u64,
     pub ended: bool,
+    /// The ending that ended the game, from `endings/`. Old saves have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ending: Option<Id>,
     /// The verb of the action being handled now, for `action.*` in conditions.
     #[serde(default)]
     pub action: Option<Id>,

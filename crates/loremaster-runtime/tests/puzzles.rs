@@ -503,7 +503,11 @@ fn a_timer_that_ends_the_game_stops_there() {
     let mut g = world_of(&[
         (
             "story.yaml",
-            "title: End\nstart: hall\ntimers:\n  - id: doom\n    turns: 1\n    running: true\n    at:\n      0: [{ end: \"The roof falls in.\" }, { say: \"After the end.\" }]\n",
+            "title: End\nstart: hall\ntimers:\n  - id: doom\n    turns: 1\n    running: true\n    at:\n      0: [{ end: roof }, { say: \"After the end.\" }]\n",
+        ),
+        (
+            "endings/roof.yaml",
+            "kind: death\ntitle: The roof falls in.\n",
         ),
         (
             "rooms/hall.yaml",

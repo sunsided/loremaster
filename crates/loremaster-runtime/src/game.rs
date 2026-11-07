@@ -384,6 +384,7 @@ impl Game {
             fired: Default::default(),
             rng: story.seed,
             ended: false,
+            ending: None,
             action: None,
             last_command: None,
             repeat: 0,
@@ -1852,7 +1853,14 @@ impl Game {
                         loremaster_model::Effect::Goto(room) => {
                             format!("move the player to {}", thing_or_room(room))
                         }
-                        loremaster_model::Effect::End(t) => format!("end the game: \"{t}\""),
+                        loremaster_model::Effect::End(id) => {
+                            match self.world.story.ending(id.as_str()) {
+                                Some(e) => {
+                                    format!("end the game: {} ({})", e.title, e.kind.as_str())
+                                }
+                                None => format!("end the game: {id}"),
+                            }
+                        }
                         loremaster_model::Effect::Stop => "stop the action".to_string(),
                         loremaster_model::Effect::Emit(e) => format!("send the event {e}"),
                         loremaster_model::Effect::Start(t) => format!(
@@ -2379,10 +2387,20 @@ impl Game {
                 }
             }
             CEffect::Goto(room) => self.move_player(turn, room.clone(), depth),
-            CEffect::End(segments) => {
-                let text = self.render(segments);
-                turn.push(BlockKind::End, vec![rule_run(text, rule)]);
+            CEffect::End {
+                ending,
+                title,
+                text,
+            } => {
+                // Two blocks, so that each front end shows the title as its own line.
+                let title = self.render(title);
+                let text = self.render(text);
+                turn.push(BlockKind::End, vec![rule_run(title, rule)]);
+                if !text.is_empty() {
+                    turn.push(BlockKind::End, vec![rule_run(text, rule)]);
+                }
                 self.state.ended = true;
+                self.state.ending = Some(ending.clone());
             }
             CEffect::Stop => self.stopped = true,
             CEffect::Emit(name) => {

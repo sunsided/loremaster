@@ -25,5 +25,5 @@ steps:
   - { do: examine stove, see: "The ash on the grate is fresh.", facts: { ash_is_fresh: true } }
   - { do: accuse keeper, see: ["Released at dawn", "The ash in the stove was fresh."] }
 expect:
-  facts: { ending: ashes, ending.kind: loss, ending.rank: 3 }
+  ending: ashes
   ended: true

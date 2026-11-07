@@ -4,4 +4,4 @@ name: Jump into the full lock
 steps:
   - { do: jump, see: "Nothing happens.", ended: false }
   - e
-  - { do: jump, see: "The water closes over you", not_see: "Nothing happens.", ended: true }
+  - { do: jump, see: ["The water closes over you", "Drowned"], not_see: "Nothing happens.", ended: true, ending: drowned }

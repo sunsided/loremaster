@@ -13,13 +13,12 @@ use std::sync::Arc;
 /// The parts of the slice that use syntax the model does not know yet. Today's
 /// loader rejects them, or ignores their folder. Each test loads today's files
 /// plus only the parts it needs, so that each feature turns its own test green.
-const ENDINGS: &str = "endings/";
 const AGENDA: &str = "agendas/";
 const DIALOGUE: &str = "dialogues/";
 const TEXTS: &str = "texts/";
 const STOVE: &str = "things/stove.yaml";
 const KEEPER_RULE: &str = "rules/keeper.yaml";
-const NEW_SYNTAX: &[&str] = &[ENDINGS, AGENDA, DIALOGUE, TEXTS, STOVE, KEEPER_RULE];
+const NEW_SYNTAX: &[&str] = &[AGENDA, DIALOGUE, TEXTS, STOVE, KEEPER_RULE];
 
 fn form(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -100,21 +99,39 @@ fn slice_baseline() {
     ran.sort();
     assert_eq!(
         ran,
-        ["tests/slice_baseline.yaml", "tests/slice_drowning.yaml"]
+        [
+            "tests/slice_baseline.yaml",
+            "tests/slice_drowning.yaml",
+            "tests/slice_endings.yaml",
+        ]
     );
 }
 
 #[test]
-#[ignore = "pending: phase 1, WO, CK, P1-03 #44"]
 fn slice_endings() {
-    assert_passes("slice_endings", &[ENDINGS]);
+    // WO-1: endings are entities with an id, a kind, a rank and a text.
+    let story = project(with("yaml", &[])).story;
+    let kinds: Vec<_> = story
+        .endings
+        .iter()
+        .map(|e| (e.id.as_str(), e.kind.as_str(), e.rank))
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            ("ashes", "loss", Some(3)),
+            ("committed", "win", Some(1)),
+            ("drowned", "death", None),
+        ]
+    );
+    assert_passes("slice_endings", &[]);
 }
 
 #[test]
 #[ignore = "pending: phase 1, SE, D5, P1-04 #45"]
 fn slice_save_envelope() {
     // A save from the middle of slice_best: the pages are taken.
-    let project = project(with("yaml", &[ENDINGS]));
+    let project = project(with("yaml", &[]));
     let world = Arc::new(World::compile(project.story).unwrap());
     let mut game = Game::new(world.clone());
     game.start();
@@ -159,7 +176,7 @@ fn slice_equivalence() {
 #[test]
 #[ignore = "pending: phase 2, SE-8, SE-9, P2-03 #54"]
 fn slice_undo_after_death() {
-    assert_passes("slice_undo_after_death", &[ENDINGS]);
+    assert_passes("slice_undo_after_death", &[]);
 }
 
 #[test]

@@ -1,0 +1,4 @@
+kind: win
+rank: 1
+title: The beacon is lit
+text: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, and comes home. | Hours early, the beam goes round and round in the {time.phase} light. By dark, the *Marigold* will see it.}"

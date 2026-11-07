@@ -16,6 +16,7 @@ steps:
   - { do: examine stove, see: '"Do not touch the stove," the lock-keeper says.' }
   - { do: accuse keeper, see: "Committed for trial" }
 expect:
-  facts: { ending: committed, ending.kind: win, ending.rank: 1, pages_burned: false }
+  facts: { pages_burned: false }
+  ending: committed
   not_see: "You smell smoke"
   ended: true

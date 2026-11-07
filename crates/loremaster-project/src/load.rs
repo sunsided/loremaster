@@ -1,7 +1,7 @@
 use crate::{Diagnostic, Severity};
 use loremaster_model::{
-    ClockConfig, Dialogue, Effect, Fragment, Id, Machine, Note, Room, Rule, Story, Thing, Thread,
-    Timer, VarDef, VerbDef, Walkthrough,
+    ClockConfig, Dialogue, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule, Story, Thing,
+    Thread, Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -80,6 +80,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut behaviors: Vec<Id> = Vec::new();
     let mut verbs: Vec<VerbDef> = Vec::new();
     let mut timers: Vec<Timer> = Vec::new();
+    let mut endings: Vec<Ending> = Vec::new();
 
     let mut sorted: Vec<&SourceFile> = files.iter().collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -148,6 +149,15 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
             "behaviors" => {
                 origins.insert(format!("behavior:{stem}"), path.to_string());
                 behaviors.push(Id::new(stem));
+            }
+            "endings" => {
+                match serde_saphyr::from_str::<Ending>(&with_default_id(&file.text, stem)) {
+                    Ok(e) => {
+                        origins.insert(format!("ending:{}", e.id), path.to_string());
+                        endings.push(e);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                }
             }
             "timers" => match serde_saphyr::from_str::<Timer>(&with_default_id(&file.text, stem)) {
                 Ok(t) => {
@@ -257,6 +267,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         rooms,
         things,
         rules,
+        endings,
         timers: header.timers.into_iter().chain(timers).collect(),
         behaviors: header
             .behaviors
