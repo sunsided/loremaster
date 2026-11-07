@@ -1,8 +1,8 @@
 use crate::merge::{Extension, MergeMode, extend_entity, merge_mode};
 use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
-    ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule,
-    Story, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
+    Agenda, ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note, Room,
+    Rule, Story, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -121,6 +121,8 @@ pub struct Pack {
     pub verbs: Vec<VerbDef>,
     pub timers: Vec<Timer>,
     pub endings: Vec<Ending>,
+    /// What actors do on their own (D6).
+    pub agendas: Vec<Agenda>,
     /// The source files, for diagnostics with lines.
     pub files: Vec<SourceFile>,
     /// Entity key such as `room:cellar` to where it is defined. The key
@@ -162,6 +164,7 @@ impl Pack {
         let mut verbs: Vec<VerbDef> = Vec::new();
         let mut timers: Vec<Timer> = Vec::new();
         let mut endings: Vec<Ending> = Vec::new();
+        let mut agendas: Vec<Agenda> = Vec::new();
         let mut replaces = BTreeSet::new();
         let mut extensions = Vec::new();
 
@@ -206,7 +209,7 @@ impl Pack {
                 let Some(kind) = entity_kind(dir) else {
                     errors.push(parse_diagnostic(
                         path,
-                        "`extend` and `replace` work only in rooms/, things/, threads/, dialogues/, endings/, timers/, verbs/ and machines/",
+                        "`extend` and `replace` work only in rooms/, things/, threads/, dialogues/, endings/, timers/, verbs/, machines/ and agendas/",
                     ));
                     continue;
                 };
@@ -334,6 +337,15 @@ impl Pack {
                         Err(e) => errors.push(parse_err(e)),
                     }
                 }
+                "agendas" => {
+                    match serde_saphyr::from_str::<Agenda>(&with_default_id(&file_text, stem)) {
+                        Ok(a) => {
+                            origins.insert(format!("agenda:{}", a.id), Origin::yaml(path));
+                            agendas.push(a);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
                 "machines" => {
                     match serde_saphyr::from_str::<Machine>(&with_default_id(&file_text, stem)) {
                         Ok(m) => {
@@ -393,6 +405,7 @@ impl Pack {
             verbs,
             timers,
             endings,
+            agendas,
             files,
             origins,
             replaces,
@@ -416,6 +429,7 @@ pub const FOLDERS: &[&str] = &[
     "timers",
     "verbs",
     "machines",
+    "agendas",
     "behaviors",
     "tests",
 ];
@@ -423,10 +437,7 @@ pub const FOLDERS: &[&str] = &[
 /// Folders of planned features. The golden slice (`examples/lock-keeper-slice`)
 /// has drafts in them. The loader skips them with a warning instead of an
 /// error, so that their drafts can wait in a project.
-const PLANNED_FOLDERS: &[(&str, &str)] = &[
-    ("agendas", "agendas of characters are planned"),
-    ("texts", "named text pools are planned"),
-];
+const PLANNED_FOLDERS: &[(&str, &str)] = &[("texts", "named text pools are planned")];
 
 fn unknown_folder(path: &str, dir: &str) -> Diagnostic {
     let hint = match loremaster_lang::closest(dir, FOLDERS.iter().copied()) {
@@ -483,6 +494,7 @@ fn entity_kind(dir: &str) -> Option<&'static str> {
         "timers" => "timer",
         "verbs" => "verb",
         "machines" => "machine",
+        "agendas" => "agenda",
         _ => return None,
     })
 }
@@ -521,6 +533,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut verbs: Vec<VerbDef> = Vec::new();
     let mut timers: Vec<Timer> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
+    let mut agendas: Vec<Agenda> = Vec::new();
     for (i, mut pack) in packs.into_iter().enumerate() {
         assembly.append(&mut pack.warnings);
         // A replaced room or thing takes its nested rules with it: they come
@@ -569,6 +582,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
                     &mut timers,
                     &mut verbs,
                     &mut machines,
+                    &mut agendas,
                 );
                 owner.insert(key.clone(), i);
                 origins.insert(key, origin);
@@ -617,6 +631,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         verbs.extend(pack.verbs);
         timers.extend(pack.timers);
         endings.extend(pack.endings);
+        agendas.extend(pack.agendas);
         files.extend(pack.files);
         for ext in pack.extensions {
             let found = extend_with(
@@ -629,6 +644,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
                 &mut timers,
                 &mut verbs,
                 &mut machines,
+                &mut agendas,
             );
             let message = match found {
                 Ok(true) => continue,
@@ -698,6 +714,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         rules,
         endings,
         timers: header.timers.into_iter().chain(timers).collect(),
+        agendas,
         behaviors: header
             .behaviors
             .into_iter()
@@ -737,6 +754,7 @@ fn remove_entity(
     timers: &mut Vec<Timer>,
     verbs: &mut Vec<VerbDef>,
     machines: &mut Vec<Machine>,
+    agendas: &mut Vec<Agenda>,
 ) {
     let Some((kind, id)) = key.split_once(':') else {
         return;
@@ -750,6 +768,7 @@ fn remove_entity(
         "timer" => timers.retain(|e| e.id.as_str() != id),
         "verb" => verbs.retain(|e| e.id.as_str() != id),
         "machine" => machines.retain(|e| e.id.as_str() != id),
+        "agenda" => agendas.retain(|e| e.id.as_str() != id),
         _ => {}
     }
 }
@@ -767,6 +786,7 @@ fn extend_with(
     timers: &mut [Timer],
     verbs: &mut [VerbDef],
     machines: &mut [Machine],
+    agendas: &mut [Agenda],
 ) -> Result<bool, String> {
     fn one<T: serde::Serialize + serde::de::DeserializeOwned>(
         list: &mut [T],
@@ -795,6 +815,7 @@ fn extend_with(
         "timer" => one(timers, id, |e| e.id.as_str(), f),
         "verb" => one(verbs, id, |e| e.id.as_str(), f),
         "machine" => one(machines, id, |e| e.id.as_str(), f),
+        "agenda" => one(agendas, id, |e| e.id.as_str(), f),
         _ => Ok(false),
     }
 }

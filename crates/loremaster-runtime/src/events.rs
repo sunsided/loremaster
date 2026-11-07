@@ -1,5 +1,6 @@
 //! Events: what happens in play. Rules (and behaviors) react to them.
 
+use crate::CommandRecord;
 use loremaster_model::{EventPattern, Id, Rule};
 
 /// The phase of an action. A verb runs `check`, then `instead` or the
@@ -28,10 +29,16 @@ pub enum Event {
         after: u32,
     },
     /// A verb in one of its phases. For `go`, the object is the direction.
+    /// The other slots of the Command record (D6) are in `actor`,
+    /// `preposition` and `topic`; [`Event::command`] gives the whole record.
     Verb {
         phase: Phase,
         verb: Id,
         objects: Vec<Id>,
+        /// Who acts: `player`, or an actor thing that runs an agenda step.
+        actor: Id,
+        preposition: Option<String>,
+        topic: Option<String>,
     },
     /// A timer runs out.
     Timer(Id),
@@ -90,21 +97,14 @@ impl Event {
             (Event::Time { before, after }, EventPattern::Time(t)) => {
                 crate::game::crossed(*before, *after, *t)
             }
-            (
-                Event::Verb {
-                    phase,
-                    verb,
-                    objects,
-                },
-                pattern,
-            ) => {
-                let parts = match (phase, pattern) {
-                    (Phase::Check, EventPattern::Check(parts)) => parts,
-                    (Phase::Instead, EventPattern::Verb(parts)) if rule.instead => parts,
-                    (Phase::After, EventPattern::Verb(parts)) if !rule.instead => parts,
+            (Event::Verb { phase, .. }, pattern) => {
+                let wanted = match (phase, pattern) {
+                    (Phase::Check, EventPattern::Check(p)) => p,
+                    (Phase::Instead, EventPattern::Verb(p)) if rule.instead => p,
+                    (Phase::After, EventPattern::Verb(p)) if !rule.instead => p,
                     _ => return false,
                 };
-                verb_matches(parts, verb, objects)
+                self.command().is_some_and(|c| c.matches(wanted))
             }
             (Event::Timer(a), EventPattern::Timer(b))
             | (Event::Custom(a), EventPattern::Event(b)) => a == b,
@@ -122,11 +122,38 @@ impl Event {
             _ => None,
         }
     }
-}
 
-/// `[verb, thing, other]` matches a verb and its objects; fewer parts match more.
-fn verb_matches(parts: &[Id], verb: &Id, objects: &[Id]) -> bool {
-    parts.first() == Some(verb)
-        && parts.len() - 1 <= objects.len()
-        && parts[1..].iter().zip(objects.iter()).all(|(a, b)| a == b)
+    /// The Command record of a verb event.
+    pub fn command(&self) -> Option<CommandRecord> {
+        match self {
+            Event::Verb {
+                verb,
+                objects,
+                actor,
+                preposition,
+                topic,
+                ..
+            } => Some(CommandRecord {
+                actor: actor.clone(),
+                verb: verb.clone(),
+                direct: objects.first().cloned(),
+                indirect: objects.get(1).cloned(),
+                preposition: preposition.clone(),
+                topic: topic.clone(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// The verb event of a command in one phase.
+    pub(crate) fn of_command(phase: Phase, c: &CommandRecord) -> Self {
+        Event::Verb {
+            phase,
+            verb: c.verb.clone(),
+            objects: c.objects(),
+            actor: c.actor.clone(),
+            preposition: c.preposition.clone(),
+            topic: c.topic.clone(),
+        }
+    }
 }

@@ -50,10 +50,10 @@ fn a_session_plays_the_lighthouse_to_its_ending() {
         );
     }
     // A command record does the same as typed text.
-    let last = s.submit(Input::Command(Command::Verb {
-        verb: Id::new("turn_on"),
-        objects: vec![Id::new("lens")],
-    }));
+    let last = s.submit(Input::Command(Command::verb(
+        "turn_on",
+        vec![Id::new("lens")],
+    )));
     let Status::Ended {
         ending: Some(ending),
     } = &last.status

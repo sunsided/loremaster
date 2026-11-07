@@ -212,7 +212,7 @@ fn rooms_and_things() {
 fn rules_and_effects() {
     let p = lock::pack();
     let jump = &p.rules[0];
-    assert_eq!(jump.on, EventPattern::Verb(vec!["jump".into()]));
+    assert_eq!(jump.on, EventPattern::Verb("jump".into()));
     assert!(jump.instead && jump.once);
     assert_eq!(jump.priority, 2);
     assert_eq!(jump.when.as_deref(), Some("in(chamber) and not lock_open"));

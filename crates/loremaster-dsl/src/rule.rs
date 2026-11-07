@@ -90,7 +90,7 @@ with_notes!(RuleBuilder, rules);
 /// The events of a rule or a machine step, as in `on:` in YAML.
 pub mod on {
     use crate::convert::{IntoTime, id, ids};
-    use loremaster_model::EventPattern;
+    use loremaster_model::{CommandPattern, EventPattern};
 
     /// `start`: the game begins.
     pub fn start() -> EventPattern {
@@ -120,12 +120,19 @@ pub mod on {
 
     /// `verb: [verb, thing, other]`: after a verb, or instead of it.
     pub fn verb(pattern: impl IntoIterator<Item = impl AsRef<str>>) -> EventPattern {
-        EventPattern::Verb(ids(pattern))
+        EventPattern::Verb(CommandPattern::from_parts(ids(pattern)))
     }
 
     /// `check: [verb, thing, other]`: before a verb.
     pub fn check(pattern: impl IntoIterator<Item = impl AsRef<str>>) -> EventPattern {
-        EventPattern::Check(ids(pattern))
+        EventPattern::Check(CommandPattern::from_parts(ids(pattern)))
+    }
+
+    /// `{ verb: …, direct: …, actor: … }`: after a verb, with any slot of
+    /// the Command record (D6). Build the pattern with
+    /// `CommandPattern::new("examine").with_direct("stove")`.
+    pub fn command(pattern: CommandPattern) -> EventPattern {
+        EventPattern::Verb(pattern)
     }
 
     /// `timer: id`: a timer runs out.

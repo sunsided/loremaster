@@ -68,20 +68,27 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
             .or_else(|| story.room(id.as_str()).map(|r| r.name.clone()))
             .unwrap_or_else(|| id.to_string())
     };
-    let verb_text = |parts: &[Id]| {
-        let verb = parts
-            .first()
-            .and_then(|v| ins.world().verb(v.as_str()))
-            .map_or_else(
-                || parts.first().map(Id::to_string).unwrap_or_default(),
-                |v| v.label.to_lowercase(),
-            );
-        let objects: Vec<String> = parts.iter().skip(1).map(thing_or_room).collect();
-        if objects.is_empty() {
+    let verb_text = |p: &loremaster_model::CommandPattern| {
+        let verb = ins
+            .world()
+            .verb(p.verb.as_str())
+            .map_or_else(|| p.verb.to_string(), |v| v.label.to_lowercase());
+        let objects: Vec<String> = p.objects().map(thing_or_room).collect();
+        let prep = p.preposition.as_deref().unwrap_or("with");
+        let text = if objects.is_empty() {
             verb
         } else {
-            format!("{verb} {}", objects.join(" with "))
+            format!("{verb} {}", objects.join(&format!(" {prep} ")))
+        };
+        match &p.topic {
+            Some(topic) => format!("{text} about {topic}"),
+            None => text,
         }
+    };
+    // The player, or another actor of a Command record (D6).
+    let who = |p: &loremaster_model::CommandPattern| match &p.actor {
+        Some(a) if a.as_str() != loremaster_model::PLAYER_SPEAKER => thing_or_room(a),
+        _ => "the player".to_string(),
     };
     story
         .rules
@@ -98,11 +105,11 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                     format!("the player leaves {}", thing_or_room(room))
                 }
                 EventPattern::Time(t) => format!("the clock reaches {t}"),
-                EventPattern::Verb(parts) => {
-                    format!("the player uses \"{}\"", verb_text(parts))
+                EventPattern::Verb(p) => {
+                    format!("{} uses \"{}\"", who(p), verb_text(p))
                 }
-                EventPattern::Check(parts) => {
-                    format!("the player tries \"{}\"", verb_text(parts))
+                EventPattern::Check(p) => {
+                    format!("{} tries \"{}\"", who(p), verb_text(p))
                 }
                 EventPattern::Timer(t) => format!("the timer {t} runs out"),
                 EventPattern::Event(e) => format!("the event {e} happens"),
@@ -294,9 +301,9 @@ fn relevance(ins: Inspector<'_>, rule: &loremaster_model::Rule) -> Option<String
                 .is_some_and(|room| room.exits.iter().any(|e| e.to.as_ref() == Some(r)));
             next_door.then(|| "fires in a room next to this one".into())
         }
-        EventPattern::Verb(parts) | EventPattern::Check(parts) => {
+        EventPattern::Verb(p) | EventPattern::Check(p) => {
             let scope = ins.in_scope();
-            let things = parts.get(1..).unwrap_or_default();
+            let things: Vec<&Id> = p.objects().collect();
             if things.is_empty() {
                 Some("works with any thing".into())
             } else if things.iter().all(|t| scope.contains(t)) {

@@ -354,6 +354,7 @@ impl Checker<'_> {
         self.dialogues();
         self.player_thing();
         self.timers();
+        self.agendas();
         self.endings();
         self.machines();
         self.score();
@@ -370,29 +371,13 @@ impl Checker<'_> {
                 EventPattern::Enter(r) | EventPattern::Leave(r) => {
                     self.room_ref(&file, "on", r.as_str())
                 }
-                EventPattern::Verb(parts) | EventPattern::Check(parts) => {
+                EventPattern::Verb(pattern) | EventPattern::Check(pattern) => {
                     let at = if matches!(rule.on, EventPattern::Check(_)) {
                         "on.check"
                     } else {
                         "on.verb"
                     };
-                    match parts.split_first() {
-                        Some((verb, objects)) => {
-                            if !verbs.contains(verb.as_str()) {
-                                self.error(&file, at, format!("unknown verb `{verb}`"));
-                            }
-                            for o in objects {
-                                let direction = verb.as_str() == "go";
-                                if !direction
-                                    && self.story().thing(o.as_str()).is_none()
-                                    && self.story().room(o.as_str()).is_none()
-                                {
-                                    self.error(&file, at, format!("unknown thing `{o}`"));
-                                }
-                            }
-                        }
-                        None => self.error(&file, at, "name the verb"),
-                    }
+                    self.command(&file, at, pattern, &verbs);
                 }
                 EventPattern::Timer(t) => self.timer_ref(&file, "on.timer", t.as_str()),
                 EventPattern::Talk(parts) => match parts.split_first() {
@@ -976,6 +961,140 @@ impl Checker<'_> {
         }
     }
 
+    /// The slots of a Command record: a known verb, things (or rooms) as its
+    /// objects, and a known actor. For `go`, the direct object is a
+    /// direction.
+    fn command(
+        &mut self,
+        file: &str,
+        at: &str,
+        pattern: &loremaster_model::CommandPattern,
+        verbs: &BTreeSet<String>,
+    ) {
+        let verb = pattern.verb.as_str();
+        if verb.is_empty() {
+            self.error(file, at, "name the verb");
+        } else if !verbs.contains(verb) {
+            self.error(file, at, format!("unknown verb `{verb}`"));
+        }
+        for (i, o) in pattern.objects().enumerate() {
+            let direction = verb == "go" && i == 0;
+            if !direction
+                && self.story().thing(o.as_str()).is_none()
+                && self.story().room(o.as_str()).is_none()
+            {
+                self.error(file, at, format!("unknown thing `{o}`"));
+            }
+        }
+        if let Some(actor) = &pattern.actor
+            && actor.as_str() != PLAYER_SPEAKER
+            && self.story().agenda_of(actor.as_str()).is_none()
+        {
+            let message = if self.story().thing(actor.as_str()).is_some() {
+                format!("`{actor}` is a thing, but not an actor: give it an agenda in agendas/")
+            } else {
+                format!("unknown actor `{actor}`: an actor is `player` or a thing with an agenda")
+            };
+            self.error(file, &format!("{at}.actor"), message);
+        }
+    }
+
+    /// Agendas (D6): the actor is a thing with one agenda, each step's
+    /// place, condition, command and effects check, and `closes` names
+    /// endings, with a `reason`.
+    fn agendas(&mut self) {
+        let agendas = self.story().agendas.clone();
+        let verbs: BTreeSet<String> = standard_verbs()
+            .iter()
+            .chain(self.story().verbs.iter())
+            .map(|v| v.id.to_string())
+            .collect();
+        let mut seen = BTreeSet::new();
+        let mut actors = BTreeSet::new();
+        for a in &agendas {
+            let file = self.file_of(&format!("agenda:{}", a.id));
+            if !seen.insert(a.id.clone()) {
+                self.error(&file, "id", format!("agenda `{}` is defined twice", a.id));
+            }
+            if a.actor.as_str() == PLAYER_SPEAKER {
+                self.error(
+                    &file,
+                    "actor",
+                    "the player acts by commands, not by an agenda: name a thing",
+                );
+            } else if self.story().thing(a.actor.as_str()).is_none() {
+                self.error(
+                    &file,
+                    "actor",
+                    format!("unknown thing `{}`: an actor is a thing", a.actor),
+                );
+            }
+            if !actors.insert(a.actor.clone()) {
+                self.error(
+                    &file,
+                    "actor",
+                    format!("`{}` has two agendas; an actor has one", a.actor),
+                );
+            }
+            let mut keys = BTreeSet::new();
+            for (i, step) in a.steps.iter().enumerate() {
+                let at = format!("steps[{i}]");
+                let key = step.key(i);
+                if !keys.insert(key.clone()) {
+                    self.error(&file, &at, format!("two steps have the key `{key}`"));
+                }
+                if let Some(place) = &step.place {
+                    self.room_ref(&file, &format!("{at}.place"), place.as_str());
+                }
+                if let Some(when) = &step.when {
+                    self.condition(&file, &format!("{at}.when"), when);
+                }
+                if let Some(cmd) = &step.action {
+                    let at = format!("{at}.do");
+                    if cmd.actor.is_some() {
+                        self.error(
+                            &file,
+                            &format!("{at}.actor"),
+                            "the agenda's actor runs the command; leave `actor` out",
+                        );
+                    }
+                    self.command(&file, &at, cmd, &verbs);
+                }
+                self.effects(&file, &format!("{at}.then"), &step.then);
+                self.no_await(&file, &format!("{at}.then"), &step.then);
+                for (j, ending) in step.closes.iter().enumerate() {
+                    if self.story().ending(ending.as_str()).is_none() {
+                        self.error(
+                            &file,
+                            &format!("{at}.closes[{j}]"),
+                            format!("unknown ending `{ending}`"),
+                        );
+                    }
+                }
+                match (step.closes.is_empty(), &step.reason) {
+                    (false, None) => self.warning(
+                        &file,
+                        &format!("{at}.closes"),
+                        "say why the step closes these endings: add a `reason`",
+                    ),
+                    (true, Some(_)) => self.warning(
+                        &file,
+                        &format!("{at}.reason"),
+                        "`reason` explains `closes`, and the step closes no ending",
+                    ),
+                    _ => {}
+                }
+                if step.action.is_none() && step.then.is_empty() && step.place.is_none() {
+                    self.warning(
+                        &file,
+                        &at,
+                        "the step does nothing: give it `place`, `do` or `then`",
+                    );
+                }
+            }
+        }
+    }
+
     /// An `await` asks exactly one thing, and its answer fits `into`.
     fn await_spec(&mut self, file: &str, at: &str, spec: &loremaster_model::AwaitSpec) {
         use loremaster_lang::Ty;
@@ -1115,10 +1234,14 @@ fn uses_speech(story: &Story) -> bool {
         .any(|l| l.segments.iter().any(LineSegment::is_speech))
 }
 
-/// The effects of all rules (machine steps included), timers and dialogues.
+/// The effects of all rules (machine steps included), timers, agendas and dialogues.
 fn all_effects(story: &Story) -> impl Iterator<Item = &Effect> {
     let rule_effects = story.rules.iter().flat_map(|r| r.then.iter());
     let timer_effects = story.timers.iter().flat_map(|t| t.at.values().flatten());
+    let agenda_effects = story
+        .agendas
+        .iter()
+        .flat_map(|a| a.steps.iter().flat_map(|s| s.then.iter()));
     let dialogue_effects = story.dialogues.iter().flat_map(|d| {
         d.nodes.iter().flat_map(|n| {
             n.outcomes
@@ -1127,7 +1250,10 @@ fn all_effects(story: &Story) -> impl Iterator<Item = &Effect> {
                 .chain(n.options.iter().flat_map(|o| o.outcomes.then.iter()))
         })
     });
-    rule_effects.chain(timer_effects).chain(dialogue_effects)
+    rule_effects
+        .chain(timer_effects)
+        .chain(agenda_effects)
+        .chain(dialogue_effects)
 }
 
 fn line_col(text: &str, pos: usize) -> (u32, u32) {

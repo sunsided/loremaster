@@ -1,6 +1,6 @@
 use crate::{
-    ClockConfig, Dialogue, DialogueId, Ending, Fragment, Frames, Id, Machine, Note, Room, Rule,
-    Thing, Thread, Timer, Value, VerbDef,
+    Agenda, ClockConfig, Dialogue, DialogueId, Ending, Fragment, Frames, Id, Machine, Note, Room,
+    Rule, Thing, Thread, Timer, Value, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -102,6 +102,10 @@ pub struct Story {
     /// Counters that go down each turn.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,
+    /// What actors do on their own, from `agendas/` (D6). Each agenda's
+    /// actor is a thing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agendas: Vec<Agenda>,
     /// Relation axes between the player and the characters, such as `trust`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub relations: Vec<Id>,
@@ -163,6 +167,21 @@ impl Story {
 
     pub fn timer(&self, id: &str) -> Option<&Timer> {
         self.timers.iter().find(|t| t.id.as_str() == id)
+    }
+
+    pub fn agenda(&self, id: &str) -> Option<&Agenda> {
+        self.agendas.iter().find(|a| a.id.as_str() == id)
+    }
+
+    /// The agenda of an actor, if it has one.
+    pub fn agenda_of(&self, actor: &str) -> Option<&Agenda> {
+        self.agendas.iter().find(|a| a.actor.as_str() == actor)
+    }
+
+    /// Things that act: the actors of the agendas. The player acts too, but
+    /// is not a thing.
+    pub fn actors(&self) -> impl Iterator<Item = &Id> {
+        self.agendas.iter().map(|a| &a.actor)
     }
 
     pub fn var(&self, id: &str) -> Option<&VarDef> {

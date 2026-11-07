@@ -6,8 +6,10 @@
 //! evaluates the parsed form. Keeping source text in the model means the
 //! bundle stays readable and survives changes to the expression language.
 
+mod agenda;
 mod awaits;
 mod clock;
+mod command;
 mod de;
 mod diagnostic;
 mod dialogue;
@@ -27,8 +29,10 @@ mod value;
 mod verb;
 mod walkthrough;
 
+pub use agenda::{Agenda, AgendaStep};
 pub use awaits::{AwaitOption, AwaitSpec, Dice};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
+pub use command::CommandPattern;
 pub use diagnostic::{Diagnostic, Severity};
 pub use dialogue::{Dialogue, DialogueId, DialogueNode, DialogueOption, DialogueTarget, Outcomes};
 /// The dialogue AST of dramaturge (decision D3).

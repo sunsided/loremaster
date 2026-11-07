@@ -240,17 +240,17 @@ fn an_unknown_file_at_the_top_is_an_error() {
 
 #[test]
 fn the_folders_of_planned_parts_are_skipped_with_a_warning() {
-    // The golden slice keeps drafts in `agendas/` and `texts/`.
+    // The golden slice keeps drafts in `texts/`. `agendas/` loads since D6.
     let project = load(lighthouse_with(
-        "agendas/keeper.yaml",
-        "actor: keeper\nsteps: []\n",
+        "texts/keeper_remark.yaml",
+        "pick: best\none_of: []\n",
     ))
     .unwrap();
     let found = check(&project);
     assert!(
         found.iter().any(|d| d.severity == Severity::Warning
-            && d.file == "agendas/keeper.yaml"
-            && d.message.contains("`agendas/` is not read yet")),
+            && d.file == "texts/keeper_remark.yaml"
+            && d.message.contains("`texts/` is not read yet")),
         "{found:#?}"
     );
     assert!(!found.iter().any(|d| d.severity == Severity::Error));
@@ -273,7 +273,7 @@ fn other_files_than_yaml_are_not_read() {
 
 #[test]
 fn the_warnings_stay_when_the_project_has_errors() {
-    let mut files = lighthouse_with("agendas/keeper.yaml", "actor: keeper\nsteps: []\n");
+    let mut files = lighthouse_with("texts/keeper_remark.yaml", "pick: best\none_of: []\n");
     files.push(SourceFile {
         path: "ending/lost.yaml".into(),
         text: "kind: loss\ntitle: Lost\n".into(),
@@ -291,7 +291,7 @@ fn the_warnings_stay_when_the_project_has_errors() {
         "{checked:#?}"
     );
     assert!(
-        has(Severity::Warning, "`agendas/` is not read yet"),
+        has(Severity::Warning, "`texts/` is not read yet"),
         "{checked:#?}"
     );
 

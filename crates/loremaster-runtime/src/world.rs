@@ -23,6 +23,8 @@ pub struct World {
     /// higher priority, then file order.
     pub(crate) rule_order: Vec<usize>,
     pub(crate) timers: Vec<CTimer>,
+    /// The agendas, in the order of the story's agendas.
+    pub(crate) agendas: Vec<CAgenda>,
     /// Registered behaviors that the story names, in story order.
     pub(crate) behaviors: Vec<std::sync::Arc<dyn crate::Behavior>>,
     /// The manifests of `behaviors`, in the same order.
@@ -119,6 +121,31 @@ impl Within {
 pub(crate) struct CTimer {
     pub runs_while: Option<Condition>,
     pub at: BTreeMap<u32, Vec<CEffect>>,
+}
+
+/// A compiled agenda (D6).
+#[derive(Debug, Clone)]
+pub(crate) struct CAgenda {
+    pub id: Id,
+    pub actor: Id,
+    pub steps: Vec<CStep>,
+}
+
+/// A compiled agenda step.
+#[derive(Debug, Clone)]
+pub(crate) struct CStep {
+    /// The key in the save: the step's id, or its place from 1.
+    pub key: String,
+    /// The step has a time `at`; else it is due when the step before it is over.
+    pub timed: bool,
+    /// The minute (since midnight of day one) from which the step is due:
+    /// the first time the clock reaches `at` at or after the time the step
+    /// before it was due, or the story's start.
+    pub due: u32,
+    pub place: Option<Id>,
+    pub when: Option<Condition>,
+    pub action: Option<loremaster_model::CommandPattern>,
+    pub then: Vec<CEffect>,
 }
 
 /// A dialogue lowered to a dramaturge graph, with its world effects compiled.
@@ -468,6 +495,41 @@ impl World {
                 })
             })
             .collect::<Result<Vec<_>, CompileError>>()?;
+        let agendas = story
+            .agendas
+            .iter()
+            .map(|a| {
+                let at = format!("agenda:{}", a.id);
+                let mut due = u32::from(story.clock.start.0);
+                let steps = a
+                    .keyed_steps()
+                    .map(|(key, step)| {
+                        if let Some(t) = step.at {
+                            due = next_at(due, t);
+                        }
+                        let at = format!("{at}/steps/{key}");
+                        Ok(CStep {
+                            key,
+                            timed: step.at.is_some(),
+                            due,
+                            place: step.place.clone(),
+                            when: c.cond(&at, &step.when)?,
+                            action: step.action.clone(),
+                            then: step
+                                .then
+                                .iter()
+                                .map(|e| c.effect(&at, e))
+                                .collect::<Result<_, CompileError>>()?,
+                        })
+                    })
+                    .collect::<Result<_, CompileError>>()?;
+                Ok(CAgenda {
+                    id: a.id.clone(),
+                    actor: a.actor.clone(),
+                    steps,
+                })
+            })
+            .collect::<Result<Vec<_>, CompileError>>()?;
         let frames = c.frames("story", &story.frames)?;
         let mut symbols = c.scope.symbols.clone();
         let dialogues = story
@@ -540,6 +602,7 @@ impl World {
             rules,
             rule_order,
             timers,
+            agendas,
             behaviors: Vec::new(),
             manifests: Vec::new(),
             registered: Vec::new(),
@@ -638,6 +701,56 @@ impl World {
 
     pub fn verb(&self, id: &str) -> Option<&VerbDef> {
         self.verbs.iter().find(|v| v.id.as_str() == id)
+    }
+}
+
+/// The first minute at or after `from` whose time of day is `at`.
+fn next_at(from: u32, at: loremaster_model::TimeOfDay) -> u32 {
+    let day = loremaster_model::TimeOfDay::MINUTES_PER_DAY;
+    let today = from - from % day + u32::from(at.0);
+    if today >= from { today } else { today + day }
+}
+
+impl World {
+    /// The first move on the shortest way from one room to another, along
+    /// exits that lead somewhere: the direction and the next room. Doors and
+    /// conditions on exits do not stop an actor. None when there is no way,
+    /// or the rooms are the same.
+    pub(crate) fn route(&self, from: &str, to: &str) -> Option<(String, Id)> {
+        let start = self.room_idx(from)?;
+        let goal = self.room_idx(to)?;
+        if start == goal {
+            return None;
+        }
+        // For each room reached, the first move from `start` towards it.
+        let mut first: Vec<Option<(String, Id)>> = vec![None; self.story.rooms.len()];
+        let mut seen = vec![false; self.story.rooms.len()];
+        seen[start] = true;
+        let mut queue = std::collections::VecDeque::from([start]);
+        while let Some(i) = queue.pop_front() {
+            for exit in &self.story.rooms[i].exits {
+                let Some(j) = exit.to.as_ref().and_then(|t| self.room_idx(t.as_str())) else {
+                    continue;
+                };
+                if seen[j] {
+                    continue;
+                }
+                seen[j] = true;
+                first[j] = if i == start {
+                    Some((
+                        exit.direction.name().to_string(),
+                        self.story.rooms[j].id.clone(),
+                    ))
+                } else {
+                    first[i].clone()
+                };
+                if j == goal {
+                    return first[j].clone();
+                }
+                queue.push_back(j);
+            }
+        }
+        None
     }
 }
 

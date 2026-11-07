@@ -104,6 +104,7 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         &s.relations,
         &s.memories,
         &s.awaiting,
+        &s.actors,
     ))
     .unwrap_or_default()
 }
@@ -147,10 +148,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         out.push(("leave".into(), Command::Leave));
         return out;
     }
-    let verb = |v: &str, objects: Vec<Id>| Command::Verb {
-        verb: Id::new(v),
-        objects,
-    };
+    let verb = |v: &str, objects: Vec<Id>| Command::verb(v, objects);
     let label = |v: &str, objects: &[Id]| {
         std::iter::once(v.to_string())
             .chain(objects.iter().map(Id::to_string))
@@ -163,14 +161,26 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         out.push((format!("go {dir}"), Command::Go { direction: dir }));
     }
     // Verbs that rules listen to, with exactly the things the rules name.
+    // A rule for another actor's commands (`actor: keeper`) is not a command
+    // of the player, and an indirect object needs a direct one.
     for rule in &story.rules {
-        if let EventPattern::Verb(parts) = &rule.on
-            && let Some((v, objects)) = parts.split_first()
-            && objects.iter().all(|o| scope.contains(o))
+        if let EventPattern::Verb(p) = &rule.on
+            && p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
+            && (p.direct.is_some() || p.indirect.is_none())
         {
+            let objects: Vec<Id> = p.objects().cloned().collect();
+            if !objects.iter().all(|o| scope.contains(o)) {
+                continue;
+            }
             out.push((
-                label(v.as_str(), objects),
-                verb(v.as_str(), objects.to_vec()),
+                label(p.verb.as_str(), &objects),
+                Command::Verb {
+                    verb: p.verb.clone(),
+                    objects,
+                    actor: None,
+                    preposition: p.preposition.clone(),
+                    topic: p.topic.clone(),
+                },
             ));
         }
     }
@@ -210,7 +220,9 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     }
     // Waiting, when the story reacts to time.
     // Waiting matters when the story reacts to time: rules on time and turns, and timers.
+    // An agenda step is time-driven too: it is due at a time of day.
     if !story.timers.is_empty()
+        || !story.agendas.is_empty()
         || world.behaviors_watch_time()
         || story
             .rules
