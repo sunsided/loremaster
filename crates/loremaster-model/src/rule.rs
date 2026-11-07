@@ -75,8 +75,8 @@ pub enum Effect {
     Move(BTreeMap<Id, Id>),
     /// Move the player.
     Goto(Id),
-    /// End the game with a closing text.
-    End(String),
+    /// End the game with an ending from `endings/`, by its id.
+    End(Id),
     /// Stop the action: no more rules in this phase, and no later phases.
     /// In a `check` rule, this refuses the action.
     Stop,

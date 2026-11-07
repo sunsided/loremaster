@@ -1,6 +1,6 @@
 use crate::{
-    ClockConfig, Dialogue, Fragment, Frames, Id, Machine, Note, Room, Rule, Thing, Thread, Timer,
-    Value, VerbDef,
+    ClockConfig, Dialogue, Ending, Fragment, Frames, Id, Machine, Note, Room, Rule, Thing, Thread,
+    Timer, Value, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -89,6 +89,9 @@ pub struct Story {
     /// of them plays the story without its logic.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub behaviors: Vec<Id>,
+    /// The ways the story can end, from `endings/`. The `end` effect names one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub endings: Vec<Ending>,
     /// Counters that go down each turn.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,
@@ -128,6 +131,10 @@ impl Story {
     /// The dialogue of a thing, if it has one.
     pub fn dialogue_with(&self, thing: &str) -> Option<&Dialogue> {
         self.dialogues.iter().find(|d| d.with.as_str() == thing)
+    }
+
+    pub fn ending(&self, id: &str) -> Option<&Ending> {
+        self.endings.iter().find(|e| e.id.as_str() == id)
     }
 
     pub fn timer(&self, id: &str) -> Option<&Timer> {

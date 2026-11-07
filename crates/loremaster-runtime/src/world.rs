@@ -154,7 +154,12 @@ pub(crate) enum CEffect {
     Say(Vec<Segment>),
     Move(BTreeMap<Id, Id>),
     Goto(Id),
-    End(Vec<Segment>),
+    /// End the game with an ending: its id, title and text.
+    End {
+        ending: Id,
+        title: Vec<Segment>,
+        text: Vec<Segment>,
+    },
     Stop,
     Emit(Id),
     Start(Vec<(Id, Option<u32>)>),
@@ -178,6 +183,7 @@ impl std::error::Error for CompileError {}
 
 struct Compiler {
     scope: Scope,
+    endings: BTreeMap<Id, loremaster_model::Ending>,
 }
 
 impl Compiler {
@@ -232,7 +238,22 @@ impl Compiler {
             Effect::Say(s) => CEffect::Say(self.markup(at, s)?),
             Effect::Move(m) => CEffect::Move(m.clone()),
             Effect::Goto(r) => CEffect::Goto(r.clone()),
-            Effect::End(s) => CEffect::End(self.markup(at, s)?),
+            Effect::End(id) => {
+                let Some(ending) = self.endings.get(id) else {
+                    return Err(CompileError {
+                        at: at.to_string(),
+                        error: loremaster_lang::LangError::new(
+                            format!("unknown ending `{id}`"),
+                            0..id.as_str().len(),
+                        ),
+                    });
+                };
+                CEffect::End {
+                    ending: id.clone(),
+                    title: self.markup(&format!("ending:{id}/title"), &ending.title)?,
+                    text: self.markup(&format!("ending:{id}/text"), &ending.text)?,
+                }
+            }
             Effect::Stop => CEffect::Stop,
             Effect::Emit(e) => CEffect::Emit(e.clone()),
             Effect::Start(t) => CEffect::Start(t.entries()),
@@ -266,6 +287,11 @@ impl World {
     pub fn compile(story: Story) -> Result<Self, CompileError> {
         let c = Compiler {
             scope: Scope::from_story(&story),
+            endings: story
+                .endings
+                .iter()
+                .map(|e| (e.id.clone(), e.clone()))
+                .collect(),
         };
         let intro = c.fragments("story:intro", &story.intro)?;
         let rooms = story

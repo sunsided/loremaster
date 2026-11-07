@@ -2,7 +2,7 @@
 // the stove), the lock machine and its timer, the lock and accuse rules, and
 // the verbs. The YAML form of this part loads now. This form waits for the
 // world! core (DSL step L3) and for machines, timers and verbs (step L4).
-// `end committed` names an ending entity (phase 1, P1-03).
+// `end committed` names an ending entity (YAML since P1-03, #44).
 //
 // Draft syntax. It does not compile. Read ../PENDING.md.
 

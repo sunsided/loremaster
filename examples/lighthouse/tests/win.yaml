@@ -16,3 +16,4 @@ expect:
   facts: { beacon_lit: true }
   room: lantern_room
   ended: true
+  ending: beacon_lit

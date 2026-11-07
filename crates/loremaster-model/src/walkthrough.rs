@@ -91,6 +91,9 @@ pub struct Expect {
     /// The game has ended (or not).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ended: Option<bool>,
+    /// The game has ended with this ending, from `endings/`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ending: Option<Id>,
 }
 
 fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {

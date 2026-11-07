@@ -248,6 +248,7 @@ impl Checker<'_> {
         self.threads();
         self.dialogues();
         self.timers();
+        self.endings();
         self.machines();
         self.score();
 
@@ -412,7 +413,16 @@ impl Checker<'_> {
         for (i, effect) in effects.iter().enumerate() {
             let at = format!("{at}[{i}]");
             match effect {
-                Effect::Say(text) | Effect::End(text) => self.markup(file, &at, text),
+                Effect::Say(text) => self.markup(file, &at, text),
+                Effect::End(ending) => {
+                    if self.story().ending(ending.as_str()).is_none() {
+                        self.error(
+                            file,
+                            &at,
+                            format!("unknown ending `{ending}`: add it as endings/{ending}.yaml"),
+                        );
+                    }
+                }
                 Effect::Goto(room) => self.room_ref(file, &at, room.as_str()),
                 Effect::Move(moves) => {
                     for (thing, to) in moves {
@@ -642,6 +652,31 @@ impl Checker<'_> {
     }
 
     /// Timers: their conditions and effects.
+    fn endings(&mut self) {
+        let endings = self.story().endings.clone();
+        let named = ended_endings(self.story());
+        let mut seen = BTreeSet::new();
+        for e in &endings {
+            let file = self.file_of(&format!("ending:{}", e.id));
+            let at = format!("endings.{}", e.id);
+            if !seen.insert(e.id.clone()) {
+                self.error(&file, &at, format!("ending `{}` is defined twice", e.id));
+            }
+            if e.rank == Some(0) {
+                self.error(&file, &format!("{at}.rank"), "the best rank is 1");
+            }
+            self.markup(&file, &format!("{at}.title"), &e.title);
+            self.markup(&file, &format!("{at}.text"), &e.text);
+            if !named.contains(e.id.as_str()) {
+                self.warning(
+                    &file,
+                    &at,
+                    format!("no `end` effect names ending `{}`", e.id),
+                );
+            }
+        }
+    }
+
     fn timers(&mut self) {
         let timers = self.story().timers.clone();
         let mut seen = BTreeSet::new();
@@ -705,8 +740,28 @@ fn is_state_name(s: &str) -> bool {
         && !matches!(s, "and" | "or" | "not" | "true" | "false")
 }
 
+/// The ids of the endings that some `end` effect names.
+fn ended_endings(story: &Story) -> BTreeSet<String> {
+    all_effects(story)
+        .filter_map(|e| match e {
+            Effect::End(id) => Some(id.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The names of the custom events that some `emit` sends.
 fn emitted_events(story: &Story) -> BTreeSet<String> {
+    all_effects(story)
+        .filter_map(|e| match e {
+            Effect::Emit(name) => Some(name.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The effects of all rules (machine steps included), timers and dialogues.
+fn all_effects(story: &Story) -> impl Iterator<Item = &Effect> {
     let rule_effects = story.rules.iter().flat_map(|r| r.then.iter());
     let timer_effects = story.timers.iter().flat_map(|t| t.at.values().flatten());
     let dialogue_effects = story.dialogues.iter().flat_map(|d| {
@@ -717,14 +772,7 @@ fn emitted_events(story: &Story) -> BTreeSet<String> {
                 .chain(n.options.iter().flat_map(|o| o.outcomes.then.iter()))
         })
     });
-    rule_effects
-        .chain(timer_effects)
-        .chain(dialogue_effects)
-        .filter_map(|e| match e {
-            Effect::Emit(name) => Some(name.to_string()),
-            _ => None,
-        })
-        .collect()
+    rule_effects.chain(timer_effects).chain(dialogue_effects)
 }
 
 fn line_col(text: &str, pos: usize) -> (u32, u32) {

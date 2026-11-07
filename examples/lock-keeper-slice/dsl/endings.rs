@@ -1,5 +1,5 @@
 // Part "Endings": the three endings as entities with a kind, a rank and a
-// title. Waits for endings as entities (phase 1, P1-03) and the world! core
+// title. The YAML form loads since P1-03 (#44). This form waits for the world! core
 // (DSL step L3). `kind death` sends the death prompt in phase 2 (SE-9).
 //
 // Draft syntax. It does not compile. Read ../PENDING.md.

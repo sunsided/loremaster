@@ -43,7 +43,7 @@ world! {
         wait sees "He opens the stove and feeds it in." expect pages_burned == true;
         "examine stove" sees "The ash on the grate is fresh." expect ash_is_fresh == true;
         "accuse keeper" sees ["Released at dawn", "The ash in the stove was fresh."];
-        expect ending == ashes, ending.kind == loss, ending.rank == 3, ended;
+        expect ending ashes, ended;
     }
 
     // Passes today: rooms, things, the lock machine and its timer in today's
@@ -86,16 +86,14 @@ world! {
         "examine stove" sees r#""Do not touch the stove," the lock-keeper says."#;
         "accuse keeper" sees "Committed for trial";
         // draft: `not_sees` in `expect` is YAML `expect: { not_see: .. }`.
-        expect ending == committed, ending.kind == win, ending.rank == 1, pages_burned == false,
+        expect ending committed, pages_burned == false,
             not_sees "You smell smoke", ended;
     }
 
-    // Endings are entities: the game reports the id, kind and rank of the
-    // ending.
+    // Endings are entities: the game reports the ending by its id (P1-03).
     test slice_endings "Accuse without proof" {
-        pending phase 1, needs "WO, CK, P1-03 #44";
         "accuse keeper" sees "Released at dawn" not_sees "ashes";
-        expect ending == ashes, ending.kind == loss, ending.rank == 3, ended;
+        expect ending ashes, ended;
     }
 
     // The keeper's agenda: at midnight he feeds the stove with the pages.

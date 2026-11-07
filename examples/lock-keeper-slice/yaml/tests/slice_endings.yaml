@@ -1,8 +1,8 @@
-# Endings are entities: the game reports the id, kind and rank of the ending.
+# Endings are entities: the game reports the ending by its id. Its kind and
+# rank are in endings/ashes.yaml; tests/slice.rs checks them.
 name: Accuse without proof
-pending: { phase: 1, needs: "WO, CK, P1-03 #44" }
 steps:
   - { do: accuse keeper, see: "Released at dawn", not_see: "ashes" }
 expect:
-  facts: { ending: ashes, ending.kind: loss, ending.rank: 3 }
+  ending: ashes
   ended: true
