@@ -58,6 +58,9 @@ fn sorted(story: &loremaster::dsl::model::Story) -> loremaster::dsl::model::Stor
     s.timers.sort_by(|a, b| a.id.cmp(&b.id));
     s.machines.sort_by(|a, b| a.id.cmp(&b.id));
     s.vars.sort_by(|a, b| a.id.cmp(&b.id));
+    s.threads.sort_by(|a, b| a.id.cmp(&b.id));
+    s.dialogues.sort_by(|a, b| a.id.cmp(&b.id));
+    s.relations.sort();
     s
 }
 

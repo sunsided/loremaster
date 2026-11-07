@@ -118,9 +118,9 @@ mod lock {
         test drowning "Jump into the lock" {
             pending phase 4, needs "P4-07 #84";
             wait * 3;
-            "open hatch" sees "Water" not_sees ["Nothing", "Never"] expect lock == empty, coins == 3;
+            "open hatch" sees "Water" not_sees ["Nothing", "Never"] expect lock == empty, coins == 3, not ended;
             jump sees "closes over you" expect ended, ending drowned, room == chamber;
-            expect ending drowned, not ended, mood == angry, not_sees "Nothing";
+            expect ending drowned, ended, mood == angry, not_sees "Nothing";
         }
     }
 }
@@ -265,12 +265,13 @@ fn walkthrough_tests() {
     assert_eq!(expect.not_see, ["Nothing", "Never"]);
     assert_eq!(expect.facts["lock"], Value::Text("empty".into()));
     assert_eq!(expect.facts["coins"], Value::Int(3));
+    assert_eq!(expect.ended, Some(false));
     let WalkStep::Checked { expect, .. } = &w.steps[4] else {
         panic!("{:?}", w.steps[4]);
     };
     assert_eq!(expect.ended, Some(true));
     assert_eq!(expect.room.as_ref().unwrap().as_str(), "chamber");
-    assert_eq!(w.expect.ended, Some(false));
+    assert_eq!(w.expect.ended, Some(true));
     assert_eq!(w.expect.not_see, ["Nothing"]);
     assert_eq!(w.expect.facts["mood"], Value::Text("angry".into()));
 }
