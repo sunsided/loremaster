@@ -189,11 +189,7 @@ proptest! {
     /// Undo after any inputs walks back through the exact states before them.
     #[test]
     fn undo_restores_each_earlier_state(commands in prop::collection::vec(
-        prop::sample::select(vec![
-            "n", "s", "e", "w", "up", "down", "open drawer", "take key", "take lamp",
-            "take matches", "light lamp", "unlock iron door with key", "wait", "look",
-            "turn on lens", "drop lamp", "inventory",
-        ]),
+        prop::sample::select(COMMANDS.to_vec()),
         0..20,
     )) {
         let mut s = Session::new(lighthouse());
@@ -258,4 +254,62 @@ fn the_text_restore_at_the_death_prompt_says_what_to_do() {
         step.plain_text()
     );
     assert!(s.state().ended);
+}
+
+const COMMANDS: &[&str] = &[
+    "n",
+    "s",
+    "e",
+    "w",
+    "up",
+    "down",
+    "open drawer",
+    "take key",
+    "take lamp",
+    "take matches",
+    "light lamp",
+    "unlock iron door with key",
+    "wait",
+    "look",
+    "turn on lens",
+    "drop lamp",
+    "inventory",
+];
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    /// Random play, a snapshot, more play, a restore: the state is the one of
+    /// the snapshot, and the same inputs after it give the same effects as
+    /// the first time (also through a save game and a fresh session).
+    #[test]
+    fn a_snapshot_restores_the_state_and_the_play_after_it(
+        seed in any::<u64>(),
+        before in prop::collection::vec(prop::sample::select(COMMANDS.to_vec()), 0..=12),
+        after in prop::collection::vec(prop::sample::select(COMMANDS.to_vec()), 1..=12),
+    ) {
+        let world = lighthouse();
+        let mut s = Session::with_seed(world.clone(), seed);
+        s.start();
+        for c in &before {
+            s.submit(text(c));
+        }
+        let snap = s.snapshot();
+        let save = serde_json::to_value(s.save()).unwrap();
+        let first: Vec<Step> = after.iter().map(|c| s.submit(text(c))).collect();
+        let end = s.state().clone();
+
+        s.restore(&snap).unwrap();
+        prop_assert_eq!(s.state(), snap.state());
+        let again: Vec<Step> = after.iter().map(|c| s.submit(text(c))).collect();
+        prop_assert_eq!(&again, &first);
+        // The whole state, the random numbers too, not only what the steps show.
+        prop_assert_eq!(s.state(), &end);
+
+        let (mut loaded, _) = Session::load(world, save).unwrap();
+        prop_assert_eq!(loaded.state(), snap.state());
+        let from_save: Vec<Step> = after.iter().map(|c| loaded.submit(text(c))).collect();
+        prop_assert_eq!(&from_save, &first);
+        prop_assert_eq!(loaded.state(), &end);
+    }
 }
