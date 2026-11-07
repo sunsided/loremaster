@@ -46,9 +46,14 @@ impl Session {
         self.game.start()
     }
 
-    /// One input as a whole turn, with the rule log. `undo` can go back to
-    /// the state before it.
+    /// One input as a whole turn, with the rule log. Typed text that is a
+    /// session word (`undo`, or an answer of the death prompt) runs in the
+    /// session, as in [`Session::submit`]. `undo` can go back to the state
+    /// before the input.
     pub(crate) fn turn(&mut self, input: Input) -> Turn {
+        if let Some(turn) = self.session_word(&input) {
+            return turn;
+        }
         let before = self.before();
         let turn = match input {
             Input::Text(text) => self.game.input(&text),

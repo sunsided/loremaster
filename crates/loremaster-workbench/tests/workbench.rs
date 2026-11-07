@@ -6,6 +6,7 @@ mod workbench {
     mod behaviors;
     mod lighthouse;
     mod machines;
+    mod play;
     mod reload;
     mod threads;
     mod zork;

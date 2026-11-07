@@ -211,22 +211,28 @@ impl Session {
     /// the story has a verb with that word. While the death prompt waits, the
     /// text `undo` or `restart` answers it.
     pub fn submit(&mut self, input: Input) -> Step {
-        if let Input::Text(text) = &input {
-            let word = text.trim().to_lowercase();
-            if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
-                return self.answer_death(&word).unwrap_or_else(|e| self.message(e));
-            }
-            // While a rule waits or a talk is open, the text is an answer.
-            if word == UNDO
-                && self.game.awaiting().is_none()
-                && self.game.talk().is_none()
-                && !self.parser_knows(UNDO)
-            {
-                return self.undo();
-            }
-        }
         let turn = self.turn(input);
         self.step(turn)
+    }
+
+    /// The turn of a session word in typed text, or `None` when the text is
+    /// a command for the story. While the death prompt waits, `undo`,
+    /// `restart` and `restore` answer it. Otherwise `undo` undoes, unless a
+    /// rule waits or a talk is open (then the text is an answer) or the
+    /// story has a verb with that word.
+    fn session_word(&mut self, input: &Input) -> Option<Turn> {
+        let Input::Text(text) = input else {
+            return None;
+        };
+        let word = text.trim().to_lowercase();
+        if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
+            return Some(self.death_turn(&word).unwrap_or_else(Self::note_turn));
+        }
+        (word == UNDO
+            && self.game.awaiting().is_none()
+            && self.game.talk().is_none()
+            && !self.parser_knows(UNDO))
+        .then(|| self.undo_turn())
     }
 
     /// Answer the request of a rule that waits, and run the rest of the rule
@@ -367,11 +373,6 @@ impl Session {
             .any(|v| v.words.iter().any(|w| w.eq_ignore_ascii_case(word)))
     }
 
-    fn answer_death(&mut self, answer: &str) -> Result<Step, String> {
-        let turn = self.death_turn(answer)?;
-        Ok(self.step(turn))
-    }
-
     fn death_turn(&mut self, answer: &str) -> Result<Turn, String> {
         match answer {
             UNDO => Ok(self.undo_turn()),
@@ -433,10 +434,6 @@ impl Session {
             }],
             ..Turn::default()
         }
-    }
-
-    fn message(&self, text: String) -> Step {
-        self.step(Self::note_turn(text))
     }
 
     fn step(&self, turn: Turn) -> Step {

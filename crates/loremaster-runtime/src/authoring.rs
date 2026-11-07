@@ -202,6 +202,7 @@ pub fn start(session: &mut Session) -> Turn {
 }
 
 /// One input as a whole turn, with the rule log, for an editor transcript.
+/// Typed session words (`undo`, the death prompt) run as in [`Session::submit`].
 pub fn play(session: &mut Session, input: Input) -> Turn {
     session.turn(input)
 }
