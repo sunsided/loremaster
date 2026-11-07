@@ -1,10 +1,18 @@
 //! [`Loremaster`]: the sources of a story, in order, joined into one world.
 
-use loremaster_project::{Diagnostic, Pack, Project, Severity, SourceFile, assemble, check};
+use loremaster_project::{
+    Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble, check,
+};
 use loremaster_runtime::World;
 
 /// The sources of a story, in a fixed order: packs from Rust and YAML
 /// folders. A later pack can extend or replace an entity of an earlier one.
+///
+/// With one YAML source, its paths stay relative to its folder
+/// (`rooms/shore.yaml`), as in a YAML project. With more than one, each
+/// path starts with its source, so that two folders with the same file do
+/// not mix: the folder as given (`story/rooms/shore.yaml`), or `yaml<n>`
+/// for the `n`-th YAML source from [`yaml_files`](Self::yaml_files).
 ///
 /// ```no_run
 /// use loremaster_dsl::prelude::*;
@@ -46,7 +54,9 @@ impl Loremaster {
         self
     }
 
-    /// A YAML folder on disk. It is read when the packs are joined.
+    /// A YAML folder on disk. It is read when the packs are joined. Not on
+    /// `wasm32`: there, read the files and give them to
+    /// [`yaml_files`](Self::yaml_files).
     #[cfg(not(target_family = "wasm"))]
     pub fn yaml(mut self, dir: impl Into<std::path::PathBuf>) -> Self {
         self.sources.push(Source::Dir(dir.into()));
@@ -63,32 +73,55 @@ impl Loremaster {
     /// Read the sources and join the packs in their order
     /// ([`assemble`]). The project is not checked yet.
     pub fn assemble(self) -> Result<Project, Vec<Diagnostic>> {
+        let yaml_sources = self
+            .sources
+            .iter()
+            .filter(|s| !matches!(s, Source::Pack(_)))
+            .count();
         let mut packs = Vec::new();
         let mut errors = Vec::new();
+        let mut n = 0;
         for source in self.sources {
-            let files = match source {
+            if !matches!(source, Source::Pack(_)) {
+                n += 1;
+            }
+            let (files, root) = match source {
                 Source::Pack(pack) => {
                     packs.push(*pack);
                     continue;
                 }
-                Source::Files(files) => files,
+                Source::Files(files) => (files, format!("yaml{n}")),
                 #[cfg(not(target_family = "wasm"))]
-                Source::Dir(dir) => match loremaster_project::read_dir(&dir) {
-                    Ok(files) => files,
-                    Err(e) => {
-                        let file = dir.display().to_string();
-                        errors.push(Diagnostic::error(
-                            file,
-                            "",
-                            format!("cannot read the YAML folder: {e}"),
-                        ));
-                        continue;
+                Source::Dir(dir) => {
+                    let root = dir.display().to_string().replace('\\', "/");
+                    let root = root.trim_end_matches('/').to_string();
+                    match loremaster_project::read_dir(&dir) {
+                        Ok(files) => (files, root),
+                        Err(e) => {
+                            errors.push(Diagnostic::error(
+                                root,
+                                "",
+                                format!("cannot read the YAML folder: {e}"),
+                            ));
+                            continue;
+                        }
                     }
-                },
+                }
             };
+            let prefix = (yaml_sources > 1).then_some(root);
             match Pack::from_files(files) {
-                Ok(pack) => packs.push(pack),
-                Err(found) => errors.extend(found),
+                Ok(mut pack) => {
+                    if let Some(prefix) = &prefix {
+                        prefix_paths(&mut pack, prefix);
+                    }
+                    packs.push(pack);
+                }
+                Err(found) => errors.extend(found.into_iter().map(|mut d| {
+                    if let Some(prefix) = &prefix {
+                        d.file = format!("{prefix}/{}", d.file);
+                    }
+                    d
+                })),
             }
         }
         if !errors.is_empty() {
@@ -101,7 +134,10 @@ impl Loremaster {
     /// warnings, or all diagnostics when one of them is an error.
     pub fn check(self) -> Result<(Project, Vec<Diagnostic>), Vec<Diagnostic>> {
         let project = self.assemble()?;
-        let diagnostics = check(&project);
+        let diagnostics: Vec<Diagnostic> = check(&project)
+            .into_iter()
+            .map(|d| rust_place(&project, d))
+            .collect();
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
             return Err(diagnostics);
         }
@@ -113,6 +149,62 @@ impl Loremaster {
     pub fn build(self) -> Result<World, Vec<Diagnostic>> {
         let (project, _warnings) = self.check()?;
         World::compile(project.story.clone())
-            .map_err(|e| vec![project.locate(Diagnostic::from(&e))])
+            .map_err(|e| vec![rust_place(&project, Diagnostic::from(&e))])
     }
+}
+
+/// Start each path of a YAML pack with `prefix`.
+fn prefix_paths(pack: &mut Pack, prefix: &str) {
+    let prefixed = |path: &mut String| *path = format!("{prefix}/{path}");
+    for file in &mut pack.files {
+        prefixed(&mut file.path);
+    }
+    for (key, _) in &mut pack.walkthroughs {
+        prefixed(key);
+    }
+    let origins = pack
+        .origins
+        .values_mut()
+        .chain(pack.extensions.iter_mut().map(|e| &mut e.origin));
+    for origin in origins {
+        if let Origin::Yaml { path } = origin {
+            prefixed(path);
+        }
+    }
+}
+
+/// Give a diagnostic the file of its entity and, for an entity from Rust,
+/// the line and column of the call that made it. `check` does this for the
+/// entities; this adds compile errors (their `at` starts with the entity
+/// key) and the story header, which the checks name `story.yaml`.
+fn rust_place(project: &Project, diagnostic: Diagnostic) -> Diagnostic {
+    let mut d = project.locate(diagnostic);
+    if d.line.is_some() {
+        return d;
+    }
+    // The entity key, as `Project::locate` finds it: `room:shore/exits[0]`
+    // is `room:shore`, `story:intro` is `story`.
+    let key = d.at.split(['/', '#']).next().unwrap_or_default();
+    let key = if key.starts_with("story:") {
+        "story"
+    } else {
+        key
+    };
+    let origin = match project.origins.get(key) {
+        Some(origin) => Some(origin),
+        None if d.file == "story.yaml" && project.file("story.yaml").is_none() => {
+            project.origins.get("story")
+        }
+        None => None,
+    };
+    if let Some(Origin::Rust {
+        file, line, column, ..
+    }) = origin
+        && (*file == d.file || d.file == "story.yaml")
+    {
+        d.file = file.clone();
+        d.line = Some(*line);
+        d.column = Some(*column);
+    }
+    d
 }
