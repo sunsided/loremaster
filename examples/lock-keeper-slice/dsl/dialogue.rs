@@ -23,7 +23,7 @@ world! {
     // the player; a node's speaker is the thing of the dialogue.
     dialogue with keeper start [stove] {
         // draft: a node with an id in place of a string says a text pool,
-        // as `say keeper_remark;` does in a rule (D2 side note).
+        // as `line keeper_remark;` does in a rule (D2 side note).
         stove: keeper_remark {
             // draft: `when` after the option text, before `=>`.
             says "Who fed it?" when ash_is_fresh => who_fed_it;

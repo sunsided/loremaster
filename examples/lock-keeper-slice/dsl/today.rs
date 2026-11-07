@@ -106,11 +106,11 @@ world! {
         state empty "The chamber is empty. The player can open the gear housing.";
 
         full -> emptying on verb(open, lower_paddles) instead when windlass.carried {
-            say "You fit the windlass and turn. Water roars out under the lower gate.";
+            line "You fit the windlass and turn. Water roars out under the lower gate.";
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
-            say "{here == lock_chamber ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
+            line "{here == lock_chamber ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
         }
     }
 
@@ -122,32 +122,34 @@ world! {
     // draft: `on check(verb, thing)` is YAML `on: { check: [verb, thing] }`,
     // and `stop` is the stop effect.
     rule paddles_need_windlass on check(open, lower_paddles) when not windlass.carried {
-        say "The paddles turn only with a windlass.";
+        line "The paddles turn only with a windlass.";
         stop;
     }
 
     rule housing_under_water on check(open, gear_housing) when lock != empty {
-        say "The gear housing is under black water.";
+        line "The gear housing is under black water.";
         stop;
     }
 
     // draft: `end <ident>` names an ending entity (P1-03). `end "<text>"` in
     // the DSL doc is today's form, with a text.
     rule jump_into_the_lock on verb(jump) when here == lock_chamber and lock == full {
-        say "The water closes over you, colder than anything.";
+        line "The water closes over you, colder than anything.";
         end drowned;
     }
 
     // Accuse rules
 
     rule accuse_with_pages on verb(accuse, keeper) when pages.carried {
-        say "You lay the pages on the table. The lock-keeper looks at them for a long time.";
+        line "You lay the pages on the table. The lock-keeper looks at them for a long time.";
         end committed;
     }
 
     rule accuse_without_pages on verb(accuse, keeper) when not pages.carried {
-        // draft: a speech segment with its speaker (#111).
-        say "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
+        // draft: `line` shows text, as `say:` does in YAML. A line is made of
+        // segments: narration, `<speaker> says "…"` and `narrate "…"` (#111).
+        // `line` instead of `say`, because "say … says" reads like a stutter.
+        line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
         end ashes;
     }
 
