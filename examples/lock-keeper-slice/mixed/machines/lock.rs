@@ -30,6 +30,7 @@ world! {
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
+            // TODO: line when in(lock_chamber) then The chamber is empty. Wet ladder rungs go down into the dark. (no empty else, empty else, or done)
             line "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
         }
     }
