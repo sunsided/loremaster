@@ -119,12 +119,12 @@ Each point of the report, and what happened to it:
 | Point | Status | Where |
 | --- | --- | --- |
 | 1. Two text systems | Solved. A dialogue line is host text in the graph (`DialogText::Host`, dramaturge R8); the side tables `node_say` and `option_say` are gone. | dramaturge #91; loremaster #150 (P3-08) |
-| 2. Facts are stored twice | Solved. loremaster implements dramaturge's `NarrativeState` on its own state (ADR 0002); `DialogWorldState`, `Game::mirror` and the restore rebuild are gone. | phase 1 (P1-01) |
-| 3. The explorer and the room matrix do not see relations and memories | Solved. Both read relations and memories from the one store. | phase 1 (P1-02) |
+| 2. Facts are stored twice | Solved. loremaster implements dramaturge's `NarrativeState` on its own state (ADR 0002); `DialogWorldState`, `Game::mirror` and the restore rebuild are gone. | loremaster #39 (P1-01, phase 1) |
+| 3. The explorer and the room matrix do not see relations and memories | Solved. Both read relations and memories from the one store. | loremaster #43 (P1-02, phase 1) |
 | 4. One entry node, but a list of start nodes | Solved. `start` is the graph's entry node list, `select_entry` picks the first that holds, and the unreachable-start filter is gone. | dramaturge #87 (R1); loremaster #150 (P3-09) |
 | 5. `Outcome::Custom` is untyped | Solved. `then` is a typed host outcome (`Outcome::Host(Vec<Effect>)`, R3), and `add` is `Outcome::AddFact`. `THEN_KEY`, `ADD_KEY` and the effects index are gone. | dramaturge #86 (R3), alpha.2 (R0e); loremaster #147 (P3-06), #150 (P3-07) |
 | 6. The player needs a reserved entity | Solved. loremaster uses `SymbolTable::PLAYER_KEY` and `SymbolTable::player()`; the key `@player` is the same, so saves stay compatible. | alpha.2 (R0c); loremaster #147 (P3-13) |
-| 7.1 A relation that was never set is "missing" | Solved. Unset relations read as 0; no start-of-game zero fill. | alpha.2 (R4); phase 1 |
+| 7.1 A relation that was never set is "missing" | Solved. Unset relations read as 0; no start-of-game zero fill. | alpha.2 (R4); loremaster #39 |
 | 7.2 Memories are found by query, not by id | Solved. `remembers()` queries `MemoryQuery::by_id`; memories carry no key tag. | alpha.2 (R5); loremaster #147 (P3-11) |
 | 7.3 No "enter node" in the runtime | Solved. Nodes are entered with `enter_node`, which checks the node's conditions and applies its enter outcomes. A `go` to a node whose `when` does not hold now ends the talk. | dramaturge #88 (R7); loremaster #150 (P3-12) |
 | 7.4 No "back" | Solved. `go` and `go: back` move a `DialogCursor` with a return stack. The save keeps the node keys (`Talk::back`), so old saves load. | dramaturge #88 (R7); loremaster #150 (P3-12) |
