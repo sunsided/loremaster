@@ -112,7 +112,13 @@ impl Engine {
         Ok(Engine {
             game: Game::new(world.clone()),
             world,
-            origins: project.origins,
+            // The editor opens files by path. Origins in Rust (DSL step L6) get
+            // their own field when the editor shows them as read-only.
+            origins: project
+                .origins
+                .into_iter()
+                .map(|(key, origin)| (key, origin.file().to_string()))
+                .collect(),
         })
     }
 

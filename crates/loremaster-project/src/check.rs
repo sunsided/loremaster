@@ -32,7 +32,7 @@ impl Checker<'_> {
         self.project
             .origins
             .get(key)
-            .cloned()
+            .map(|o| o.file().to_string())
             .unwrap_or_else(|| "story.yaml".into())
     }
 

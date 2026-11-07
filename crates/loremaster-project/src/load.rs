@@ -1,4 +1,4 @@
-use crate::{Diagnostic, Severity};
+use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
     ClockConfig, Dialogue, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule, Story, Thing,
     Thread, Timer, VarDef, VerbDef, Walkthrough,
@@ -18,8 +18,8 @@ pub struct SourceFile {
 pub struct Project {
     pub story: Story,
     pub files: Vec<SourceFile>,
-    /// Entity key such as `room:cellar` to the file that defines it.
-    pub origins: BTreeMap<String, String>,
+    /// Entity key such as `room:cellar` to where it is defined.
+    pub origins: BTreeMap<String, Origin>,
     /// Walkthrough tests from `tests/`, with their file paths.
     pub walkthroughs: Vec<(String, Walkthrough)>,
 }
@@ -30,46 +30,288 @@ impl Project {
     }
 }
 
-/// `story.yaml`: everything that is not a room, thing or rule.
-#[derive(Deserialize)]
+/// The story header (`story.yaml` in a YAML folder): everything that is not a
+/// room, thing or rule. Exactly one pack of a project gives it.
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct StoryFile {
-    title: String,
+pub struct StoryHeader {
+    pub title: String,
     #[serde(default)]
-    author: Option<String>,
-    start: Id,
+    pub author: Option<String>,
+    pub start: Id,
     #[serde(default)]
-    intro: Vec<Fragment>,
+    pub intro: Vec<Fragment>,
     #[serde(default)]
-    clock: ClockConfig,
+    pub clock: ClockConfig,
     #[serde(default)]
-    vars: Vec<VarDef>,
+    pub vars: Vec<VarDef>,
     #[serde(default)]
-    verbs: Vec<VerbDef>,
+    pub verbs: Vec<VerbDef>,
     #[serde(default)]
-    relations: Vec<Id>,
+    pub relations: Vec<Id>,
     #[serde(default)]
-    frames: loremaster_model::Frames,
+    pub frames: loremaster_model::Frames,
     #[serde(default)]
-    seed: u64,
+    pub seed: u64,
     #[serde(default)]
-    notes: Vec<Note>,
+    pub notes: Vec<Note>,
     #[serde(default)]
-    timers: Vec<Timer>,
+    pub timers: Vec<Timer>,
     #[serde(default)]
-    machines: Vec<Machine>,
+    pub machines: Vec<Machine>,
     #[serde(default)]
-    behaviors: Vec<Id>,
+    pub behaviors: Vec<Id>,
     #[serde(default)]
-    score: Option<loremaster_model::Score>,
+    pub score: Option<loremaster_model::Score>,
+}
+/// Load a project from its files: one YAML pack, assembled. Paths use `/` and
+/// are relative to the project folder.
+pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
+    assemble(vec![Pack::from_files(files)?])
 }
 
-/// Load a project from its files. Paths use `/` and are relative to the
-/// project folder.
-pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
+/// The parts of a project that one source gives (DS-1): a YAML folder, and
+/// later a `world!` block or a builder function. [`assemble`] joins packs.
+#[derive(Debug, Clone, Default)]
+pub struct Pack {
+    /// The name in diagnostics, for example `yaml` or a Rust module.
+    pub name: String,
+    /// The story header. Exactly one pack of a project gives it.
+    pub header: Option<StoryHeader>,
+    pub rooms: Vec<Room>,
+    pub things: Vec<Thing>,
+    /// Rules, also the ones of rooms and things (with their scope set).
+    pub rules: Vec<Rule>,
+    pub threads: Vec<Thread>,
+    pub dialogues: Vec<Dialogue>,
+    pub machines: Vec<Machine>,
+    pub walkthroughs: Vec<(String, Walkthrough)>,
+    pub behaviors: Vec<Id>,
+    pub verbs: Vec<VerbDef>,
+    pub timers: Vec<Timer>,
+    pub endings: Vec<Ending>,
+    /// The source files, for diagnostics with lines.
+    pub files: Vec<SourceFile>,
+    /// Entity key such as `room:cellar` to where it is defined. The key
+    /// `story` is the origin of the header.
+    pub origins: BTreeMap<String, Origin>,
+}
+
+impl Pack {
+    pub fn new(name: impl Into<String>) -> Self {
+        Pack {
+            name: name.into(),
+            ..Pack::default()
+        }
+    }
+
+    /// A pack from the files of a YAML folder. Paths use `/` and are relative
+    /// to the folder.
+    pub fn from_files(files: Vec<SourceFile>) -> Result<Pack, Vec<Diagnostic>> {
+        let mut errors = Vec::new();
+        let mut origins = BTreeMap::new();
+        let mut header: Option<StoryHeader> = None;
+        // `story.yaml` or `story.yml`: the origin names the file that gave the header.
+        let mut header_path = String::new();
+        let mut rooms = Vec::new();
+        let mut things = Vec::new();
+        let mut rules = Vec::new();
+        let mut threads = Vec::new();
+        let mut dialogues = Vec::new();
+        let mut machines = Vec::new();
+        let mut walkthroughs = Vec::new();
+        let mut behaviors: Vec<Id> = Vec::new();
+        let mut verbs: Vec<VerbDef> = Vec::new();
+        let mut timers: Vec<Timer> = Vec::new();
+        let mut endings: Vec<Ending> = Vec::new();
+
+        let mut sorted: Vec<&SourceFile> = files.iter().collect();
+        sorted.sort_by(|a, b| a.path.cmp(&b.path));
+
+        for file in sorted {
+            let path = file.path.as_str();
+            let Some(stem) = yaml_stem(path) else {
+                continue;
+            };
+            let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+            let parse_err = |e: serde_saphyr::Error| parse_diagnostic(path, &e.to_string());
+            match dir {
+                "" if stem == "story" => match serde_saphyr::from_str::<StoryHeader>(&file.text) {
+                    Ok(s) => {
+                        header = Some(s);
+                        header_path = path.to_string();
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                },
+                "rooms" => match serde_saphyr::from_str::<Room>(&with_default_id(&file.text, stem))
+                {
+                    Ok(mut r) => {
+                        origins.insert(format!("room:{}", r.id), Origin::yaml(path));
+                        for rule in nested_rules(&mut r.rules, &r.id) {
+                            origins.insert(format!("rule:{}", rule.id), Origin::yaml(path));
+                            rules.push(rule);
+                        }
+                        rooms.push(r);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                },
+                "things" => {
+                    match serde_saphyr::from_str::<Thing>(&with_default_id(&file.text, stem)) {
+                        Ok(mut t) => {
+                            origins.insert(format!("thing:{}", t.id), Origin::yaml(path));
+                            for rule in nested_rules(&mut t.rules, &t.id) {
+                                origins.insert(format!("rule:{}", rule.id), Origin::yaml(path));
+                                rules.push(rule);
+                            }
+                            things.push(t);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                "threads" => {
+                    match serde_saphyr::from_str::<Thread>(&with_default_id(&file.text, stem)) {
+                        Ok(t) => {
+                            origins.insert(format!("thread:{}", t.id), Origin::yaml(path));
+                            threads.push(t);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                "dialogues" => {
+                    match serde_saphyr::from_str::<Dialogue>(&with_default_id(&file.text, stem)) {
+                        Ok(d) => {
+                            origins.insert(format!("dialogue:{}", d.id), Origin::yaml(path));
+                            dialogues.push(d);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                // Commands such as `n` and `y` are words here, not YAML 1.1 booleans.
+                "tests" => match serde_saphyr::from_str_with_options::<Walkthrough>(
+                    &file.text,
+                    serde_saphyr::options! { strict_booleans: true },
+                ) {
+                    Ok(w) => walkthroughs.push((path.to_string(), w)),
+                    Err(e) => errors.push(parse_err(e)),
+                },
+                // A file that names a behavior in Rust; the text holds author notes about it.
+                "behaviors" => {
+                    origins.insert(format!("behavior:{stem}"), Origin::yaml(path));
+                    behaviors.push(Id::new(stem));
+                }
+                "endings" => {
+                    match serde_saphyr::from_str::<Ending>(&with_default_id(&file.text, stem)) {
+                        Ok(e) => {
+                            origins.insert(format!("ending:{}", e.id), Origin::yaml(path));
+                            endings.push(e);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                "timers" => {
+                    match serde_saphyr::from_str::<Timer>(&with_default_id(&file.text, stem)) {
+                        Ok(t) => {
+                            origins.insert(format!("timer:{}", t.id), Origin::yaml(path));
+                            timers.push(t);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                "verbs" => {
+                    match serde_saphyr::from_str::<VerbDef>(&with_default_id(&file.text, stem)) {
+                        Ok(v) => {
+                            origins.insert(format!("verb:{}", v.id), Origin::yaml(path));
+                            verbs.push(v);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                "machines" => {
+                    match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
+                        Ok(m) => {
+                            origins.insert(format!("machine:{}", m.id), Origin::yaml(path));
+                            machines.push(m);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                "rules" => {
+                    let list = file
+                        .text
+                        .lines()
+                        .map(str::trim_start)
+                        .find(|l| !l.is_empty() && !l.starts_with('#'))
+                        .is_some_and(|l| l.starts_with('-'));
+                    let parsed = if list {
+                        serde_saphyr::from_str::<Vec<Rule>>(&file.text)
+                    } else {
+                        serde_saphyr::from_str::<Rule>(&with_default_id(&file.text, stem))
+                            .map(|r| vec![r])
+                    };
+                    match parsed {
+                        Ok(list) => {
+                            for r in list {
+                                origins.insert(format!("rule:{}", r.id), Origin::yaml(path));
+                                rules.push(r);
+                            }
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if !errors.is_empty() {
+            if header.is_none() {
+                errors.push(no_story());
+            }
+            return Err(errors);
+        }
+        if header.is_some() {
+            origins.insert("story".into(), Origin::yaml(header_path));
+        }
+        Ok(Pack {
+            name: "yaml".into(),
+            header,
+            rooms,
+            things,
+            rules,
+            threads,
+            dialogues,
+            machines,
+            walkthroughs,
+            behaviors,
+            verbs,
+            timers,
+            endings,
+            files,
+            origins,
+        })
+    }
+}
+
+fn no_story() -> Diagnostic {
+    Diagnostic {
+        severity: Severity::Error,
+        file: "story.yaml".into(),
+        at: String::new(),
+        message: "the project has no story.yaml".into(),
+        line: None,
+        column: None,
+    }
+}
+
+/// Join packs in their order into one project (DS-1). An id that two packs
+/// define is an error that names both origins, and exactly one pack gives the
+/// story header. Machine rules and machine variables are made here, after the
+/// merge, so they are the same for each source.
+pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut errors = Vec::new();
-    let mut origins = BTreeMap::new();
-    let mut header: Option<StoryFile> = None;
+    let mut origins: BTreeMap<String, Origin> = BTreeMap::new();
+    let mut owner: BTreeMap<String, usize> = BTreeMap::new();
+    let mut header: Option<StoryHeader> = None;
+    let mut files = Vec::new();
     let mut rooms = Vec::new();
     let mut things = Vec::new();
     let mut rules = Vec::new();
@@ -81,152 +323,60 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     let mut verbs: Vec<VerbDef> = Vec::new();
     let mut timers: Vec<Timer> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
-
-    let mut sorted: Vec<&SourceFile> = files.iter().collect();
-    sorted.sort_by(|a, b| a.path.cmp(&b.path));
-
-    for file in sorted {
-        let path = file.path.as_str();
-        let Some(stem) = yaml_stem(path) else {
-            continue;
-        };
-        let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
-        let parse_err = |e: serde_saphyr::Error| parse_diagnostic(path, &e.to_string());
-        match dir {
-            "" if stem == "story" => match serde_saphyr::from_str::<StoryFile>(&file.text) {
-                Ok(s) => header = Some(s),
-                Err(e) => errors.push(parse_err(e)),
-            },
-            "rooms" => match serde_saphyr::from_str::<Room>(&with_default_id(&file.text, stem)) {
-                Ok(mut r) => {
-                    origins.insert(format!("room:{}", r.id), path.to_string());
-                    for rule in nested_rules(&mut r.rules, &r.id) {
-                        origins.insert(format!("rule:{}", rule.id), path.to_string());
-                        rules.push(rule);
-                    }
-                    rooms.push(r);
-                }
-                Err(e) => errors.push(parse_err(e)),
-            },
-            "things" => match serde_saphyr::from_str::<Thing>(&with_default_id(&file.text, stem)) {
-                Ok(mut t) => {
-                    origins.insert(format!("thing:{}", t.id), path.to_string());
-                    for rule in nested_rules(&mut t.rules, &t.id) {
-                        origins.insert(format!("rule:{}", rule.id), path.to_string());
-                        rules.push(rule);
-                    }
-                    things.push(t);
-                }
-                Err(e) => errors.push(parse_err(e)),
-            },
-            "threads" => {
-                match serde_saphyr::from_str::<Thread>(&with_default_id(&file.text, stem)) {
-                    Ok(t) => {
-                        origins.insert(format!("thread:{}", t.id), path.to_string());
-                        threads.push(t);
-                    }
-                    Err(e) => errors.push(parse_err(e)),
-                }
-            }
-            "dialogues" => {
-                match serde_saphyr::from_str::<Dialogue>(&with_default_id(&file.text, stem)) {
-                    Ok(d) => {
-                        origins.insert(format!("dialogue:{}", d.id), path.to_string());
-                        dialogues.push(d);
-                    }
-                    Err(e) => errors.push(parse_err(e)),
-                }
-            }
-            // Commands such as `n` and `y` are words here, not YAML 1.1 booleans.
-            "tests" => match serde_saphyr::from_str_with_options::<Walkthrough>(
-                &file.text,
-                serde_saphyr::options! { strict_booleans: true },
-            ) {
-                Ok(w) => walkthroughs.push((path.to_string(), w)),
-                Err(e) => errors.push(parse_err(e)),
-            },
-            // A file that names a behavior in Rust; the text holds author notes about it.
-            "behaviors" => {
-                origins.insert(format!("behavior:{stem}"), path.to_string());
-                behaviors.push(Id::new(stem));
-            }
-            "endings" => {
-                match serde_saphyr::from_str::<Ending>(&with_default_id(&file.text, stem)) {
-                    Ok(e) => {
-                        origins.insert(format!("ending:{}", e.id), path.to_string());
-                        endings.push(e);
-                    }
-                    Err(e) => errors.push(parse_err(e)),
-                }
-            }
-            "timers" => match serde_saphyr::from_str::<Timer>(&with_default_id(&file.text, stem)) {
-                Ok(t) => {
-                    origins.insert(format!("timer:{}", t.id), path.to_string());
-                    timers.push(t);
-                }
-                Err(e) => errors.push(parse_err(e)),
-            },
-            "verbs" => {
-                match serde_saphyr::from_str::<VerbDef>(&with_default_id(&file.text, stem)) {
-                    Ok(v) => {
-                        origins.insert(format!("verb:{}", v.id), path.to_string());
-                        verbs.push(v);
-                    }
-                    Err(e) => errors.push(parse_err(e)),
-                }
-            }
-            "machines" => {
-                match serde_saphyr::from_str::<Machine>(&with_default_id(&file.text, stem)) {
-                    Ok(m) => {
-                        origins.insert(format!("machine:{}", m.id), path.to_string());
-                        machines.push(m);
-                    }
-                    Err(e) => errors.push(parse_err(e)),
-                }
-            }
-            "rules" => {
-                let list = file
-                    .text
-                    .lines()
-                    .map(str::trim_start)
-                    .find(|l| !l.is_empty() && !l.starts_with('#'))
-                    .is_some_and(|l| l.starts_with('-'));
-                let parsed = if list {
-                    serde_saphyr::from_str::<Vec<Rule>>(&file.text)
+    for (i, pack) in packs.into_iter().enumerate() {
+        for (key, origin) in pack.origins {
+            // Within one pack, the checks report a duplicate, as before.
+            if let Some(&j) = owner.get(&key)
+                && j != i
+            {
+                let first = &origins[&key];
+                let message = if key == "story" {
+                    format!("two packs give the story header: {first} and {origin}")
                 } else {
-                    serde_saphyr::from_str::<Rule>(&with_default_id(&file.text, stem))
-                        .map(|r| vec![r])
+                    format!("`{key}` is defined twice: in {first} and in {origin}")
                 };
-                match parsed {
-                    Ok(list) => {
-                        for r in list {
-                            origins.insert(format!("rule:{}", r.id), path.to_string());
-                            rules.push(r);
-                        }
-                    }
-                    Err(e) => errors.push(parse_err(e)),
-                }
+                errors.push(Diagnostic {
+                    severity: Severity::Error,
+                    file: origin.file().to_string(),
+                    at: String::new(),
+                    message,
+                    line: None,
+                    column: None,
+                });
+                continue;
             }
-            _ => {}
+            owner.insert(key.clone(), i);
+            origins.insert(key, origin);
         }
+        if header.is_none() {
+            header = pack.header;
+        }
+        rooms.extend(pack.rooms);
+        things.extend(pack.things);
+        rules.extend(pack.rules);
+        threads.extend(pack.threads);
+        dialogues.extend(pack.dialogues);
+        machines.extend(pack.machines);
+        walkthroughs.extend(pack.walkthroughs);
+        behaviors.extend(pack.behaviors);
+        verbs.extend(pack.verbs);
+        timers.extend(pack.timers);
+        endings.extend(pack.endings);
+        files.extend(pack.files);
     }
-
+    let header_origin = origins
+        .get("story")
+        .cloned()
+        .unwrap_or_else(|| Origin::yaml("story.yaml"));
     let Some(header) = header else {
-        errors.push(Diagnostic {
-            severity: Severity::Error,
-            file: "story.yaml".into(),
-            at: String::new(),
-            message: "the project has no story.yaml".into(),
-            line: None,
-            column: None,
-        });
+        errors.push(no_story());
         return Err(errors);
     };
     if !errors.is_empty() {
         return Err(errors);
     }
     for m in &header.machines {
-        origins.insert(format!("machine:{}", m.id), "story.yaml".to_string());
+        origins.insert(format!("machine:{}", m.id), header_origin.clone());
     }
     machines.splice(0..0, header.machines);
     let mut vars = header.vars;
@@ -248,7 +398,7 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
         let file = origins
             .get(&format!("machine:{}", m.id))
             .cloned()
-            .unwrap_or_default();
+            .unwrap_or_else(|| header_origin.clone());
         for rule in machine_rules(m) {
             origins.insert(format!("rule:{}", rule.id), file.clone());
             rules.push(rule);
