@@ -270,8 +270,34 @@ The effects:
 | `start: fuse` or `start: { fuse: 6 }` | Starts a timer, with its own turns or with a number of turns. |
 | `cancel: fuse` | Stops a timer. Its rules do not fire. |
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
+| `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
 More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response.
+
+### Wait for the host
+
+`await` stops a rule. The host, for example the web player or a game engine, gives the answer, and the rest of the rule runs with it. One `await` asks for one of these:
+
+| Request | The answer |
+| --- | --- |
+| `choice: [left, { id: right, text: "the right door" }]` | One of the options. A player types its number, its id or its text. |
+| `roll: 2d6` | A number from the dice. The game rolls itself, unless the host rolls (`set_host_rolls`). |
+| `walk_to: dock` | `arrived` or `refused`. With `arrived`, the player is in the room. |
+| `action: open_sluice`, with `args` and `results` | One of the `results`. The host does the action, for example an animation. |
+
+`into: path` keeps the answer in a variable: an enum variable that has all answers, or a number variable for a roll.
+
+```yaml
+- id: pull_lever
+  on: { verb: [pull, lever] }
+  instead: true
+  then:
+    - say: "A voice asks: left or right?"
+    - await: { choice: [left, right], into: path }
+    - say: "You go {path}."
+```
+
+While a rule waits, the player can only answer. The answer is not a new turn: the clock and the timers do not move. A save game keeps the waiting rule. `await` works only in rules, not in dialogues or timers.
 
 ### Action phases
 

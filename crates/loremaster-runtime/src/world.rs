@@ -163,6 +163,8 @@ pub(crate) enum CEffect {
         text: Vec<Segment>,
     },
     Stop,
+    /// A pause for the host; the fire loop handles it, not `apply`.
+    Await(Box<loremaster_model::AwaitSpec>),
     Emit(Id),
     Call(Id),
     Start(Vec<(Id, Option<u32>)>),
@@ -244,6 +246,36 @@ impl Compiler {
 impl Compiler {
     fn effect(&self, at: &str, e: &Effect) -> Result<CEffect, CompileError> {
         Ok(match e {
+            Effect::Await(spec) => {
+                let shape = if spec.kinds() != 1 {
+                    Some(
+                        "an `await` asks for exactly one of `choice`, `roll`, `walk_to` or `action`",
+                    )
+                } else if spec.action.is_none()
+                    && (!spec.args.is_empty() || !spec.results.is_empty())
+                {
+                    Some("`args` and `results` belong to an `action`")
+                } else {
+                    None
+                };
+                if let Some(message) = shape {
+                    return Err(CompileError {
+                        at: at.to_string(),
+                        error: loremaster_lang::LangError::new(message, 0..0),
+                    });
+                }
+                if spec
+                    .roll
+                    .as_deref()
+                    .is_some_and(|d| loremaster_model::Dice::parse(d).is_none())
+                {
+                    return Err(CompileError {
+                        at: at.to_string(),
+                        error: loremaster_lang::LangError::new("dice such as `2d6` expected", 0..0),
+                    });
+                }
+                CEffect::Await(spec.clone())
+            }
             Effect::Set(m) => CEffect::Set(m.clone()),
             Effect::Add(m) => CEffect::Add(m.clone()),
             Effect::Say(s) => CEffect::Say(self.markup(at, s)?),

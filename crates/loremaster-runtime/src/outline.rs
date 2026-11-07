@@ -116,6 +116,7 @@ pub(crate) fn describe(o: &Outcomes) -> Vec<String> {
     out.extend(o.relation.iter().map(|(k, n)| format!("{k} {n:+}")));
     out.extend(o.remember.iter().map(|k| format!("remember {k}")));
     out.extend(o.then.iter().map(|e| match e {
+        Effect::Await(_) => "wait for the host".into(),
         Effect::Move(m) => format!(
             "move {}",
             m.iter()
