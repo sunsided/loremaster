@@ -361,14 +361,7 @@ fn build(files: Vec<SourceFile>) -> Built {
     if !check.iter().any(|d| d.severity == Severity::Error) {
         match World::compile(project.story.clone()) {
             Ok(w) => world = Some(Arc::new(w)),
-            Err(e) => check.push(Diagnostic {
-                severity: Severity::Error,
-                file: String::new(),
-                at: e.at.clone(),
-                message: e.error.message,
-                line: None,
-                column: None,
-            }),
+            Err(e) => check.push(project.locate(Diagnostic::from(&e))),
         }
     }
     Built {

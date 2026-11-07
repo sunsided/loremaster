@@ -181,6 +181,14 @@ impl fmt::Display for CompileError {
 
 impl std::error::Error for CompileError {}
 
+/// A compile error as a diagnostic, without a file yet: `Project::locate`
+/// finds the file of the entity that `at` names.
+impl From<&CompileError> for loremaster_model::Diagnostic {
+    fn from(e: &CompileError) -> Self {
+        loremaster_model::Diagnostic::error("", e.at.clone(), e.error.message.clone())
+    }
+}
+
 struct Compiler {
     scope: Scope,
     endings: BTreeMap<Id, loremaster_model::Ending>,
