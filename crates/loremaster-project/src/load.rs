@@ -174,20 +174,30 @@ impl Pack {
                     ));
                     continue;
                 };
-                let key = format!("{kind}:{}", file_id(&file_text, stem));
+                // The id from the parsed file (`id:` in any YAML style), else
+                // the file name.
+                let fields = match serde_saphyr::from_str::<serde_json::Value>(&file_text) {
+                    Ok(fields) => fields,
+                    Err(e) => {
+                        errors.push(parse_err(e));
+                        continue;
+                    }
+                };
+                let id = fields
+                    .get("id")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or(stem);
+                let key = format!("{kind}:{id}");
                 match mode {
                     MergeMode::Replace => {
                         replaces.insert(key);
                     }
                     MergeMode::Extend => {
-                        match serde_saphyr::from_str::<serde_json::Value>(&file_text) {
-                            Ok(fields) => extensions.push(Extension {
-                                key,
-                                fields,
-                                origin: Origin::yaml(path),
-                            }),
-                            Err(e) => errors.push(parse_err(e)),
-                        }
+                        extensions.push(Extension {
+                            key,
+                            fields,
+                            origin: Origin::yaml(path),
+                        });
                         continue;
                     }
                 }
@@ -362,14 +372,6 @@ fn entity_kind(dir: &str) -> Option<&'static str> {
         "machines" => "machine",
         _ => return None,
     })
-}
-
-/// The id of an entity file: its `id:` line, or the file name.
-fn file_id(text: &str, stem: &str) -> String {
-    text.lines()
-        .find_map(|l| l.strip_prefix("id:"))
-        .map(|id| id.trim().trim_matches(['"', '\'']).to_string())
-        .unwrap_or_else(|| stem.to_string())
 }
 
 fn no_story() -> Diagnostic {

@@ -218,3 +218,13 @@ fn extend_and_replace_report_conflicts_and_missing_entities() {
         ["`room:attic` replaces an entity that no earlier pack defines"]
     );
 }
+
+#[test]
+fn the_id_of_an_extension_comes_from_the_parsed_file() {
+    // Flow style: the id is not on a line of its own.
+    let extra = second(
+        "rooms/other_name.yaml",
+        "extend: true\n{ id: cottage, description: [\"A gull sits on the sill.\"] }\n",
+    );
+    assert_eq!(extra.extensions[0].key, "room:cottage");
+}

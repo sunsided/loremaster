@@ -107,6 +107,11 @@ mod tests {
         let (mode, text) = merge_mode("name: Cellar\n");
         assert_eq!(mode, None);
         assert_eq!(text, "name: Cellar\n");
+        // Only a whole top-level line counts, not a nested value.
+        let nested = "name: Cellar\nnotes:\n  - extend: true\n  - { replace: true }\n";
+        let (mode, text) = merge_mode(nested);
+        assert_eq!(mode, None);
+        assert_eq!(text, nested);
     }
 
     #[test]
