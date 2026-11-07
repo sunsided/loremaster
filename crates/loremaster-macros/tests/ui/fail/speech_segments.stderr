@@ -21,3 +21,15 @@ error: a line from a text pool is not in `world!` yet: it waits for the text cor
    |
 30 |         rule r on turn { line keeper_remark; }
    |                               ^^^^^^^^^^^^^
+
+error: unknown name `bogus`
+  --> tests/ui/fail/speech_segments.rs:47:31
+   |
+47 |         rule r on turn { line "Tick. {bogus ? Yes. | No.}"; }
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unknown name `bogus`
+  --> tests/ui/fail/speech_segments.rs:44:22
+   |
+44 |                 line "It opens. {bogus ? Yes. | No.}";
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

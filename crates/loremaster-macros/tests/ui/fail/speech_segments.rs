@@ -31,4 +31,21 @@ mod text_pool {
     }
 }
 
+mod plain_line_markup {
+    use loremaster::prelude::*;
+    world! {
+        story "Tiny" { start: hall }
+        room hall "Hall" {}
+        thing lever "lever" in hall {}
+        machine gate starts closed {
+            state closed;
+            state open;
+            closed -> open on verb(pull, lever) {
+                line "It opens. {bogus ? Yes. | No.}";
+            }
+        }
+        rule r on turn { line "Tick. {bogus ? Yes. | No.}"; }
+    }
+}
+
 fn main() {}

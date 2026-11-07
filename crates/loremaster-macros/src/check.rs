@@ -401,6 +401,23 @@ fn build(world: &World, spans: &mut Spans) -> Pack {
     p
 }
 
+/// The tokens for the errors of a whole line: the string, when the line is
+/// one bare string (the checks report its markup at the line, not at a
+/// segment), else the whole `line ..;` effect.
+fn line_tokens(segments: &[Segment], effect: &TokenStream) -> TokenStream {
+    match segments {
+        [
+            Segment {
+                voice: SegmentVoice::Plain,
+                when: None,
+                text,
+                ..
+            },
+        ] => text_tokens(text),
+        _ => effect.clone(),
+    }
+}
+
 /// The spans of the segments of a line at `at`: the checks name a segment
 /// `<at>.say[j]`, and its condition and speaker below it.
 fn segment_spans(spans: &mut Spans, key: &str, at: &str, segments: &[Segment]) {
@@ -686,7 +703,11 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans
             }
         };
         let i = then.offset + b.effects_mut().len().saturating_sub(1);
-        spans.add(then.key, format!("{}[{i}]", then.at), e.tokens.clone());
+        let tokens = match &e.kind {
+            EffectKind::Line(segments) => line_tokens(segments, &e.tokens),
+            _ => e.tokens.clone(),
+        };
+        spans.add(then.key, format!("{}[{i}]", then.at), tokens);
         if let EffectKind::Line(segments) = &e.kind {
             segment_spans(spans, then.key, &format!("{}[{i}]", then.at), segments);
         }
@@ -761,7 +782,7 @@ fn machine(p: &mut Pack, m: &Machine, spans: &mut Spans) {
             spans.add(&rule, "when", w.tokens.clone());
         }
         if let Some(say) = &step.say {
-            spans.add(&rule, "then[1]", step.say_tokens.clone());
+            spans.add(&rule, "then[1]", line_tokens(say, &step.say_tokens));
             segment_spans(spans, &rule, "then[1]", say);
         }
         let then = Then {
