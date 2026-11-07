@@ -1,10 +1,12 @@
 # New syntax (phase 4, D6 actors and agendas). One step: at midnight the
-# keeper feeds the stove with the pages, if the player has not taken them.
+# keeper feeds the stove with the pages, if they are still in the gear housing.
 actor: keeper
 steps:
+  # `place` is where the step ends. The step stands for a walk to the lock and
+  # back in one turn; D6 decides if a step can take several turns.
   - at: "00:00"
     place: kitchen
-    when: not pages.carried
+    when: in(pages, gear_housing)
     then:
       - move: { pages: nowhere }
       - set: { stove.hot: true, pages_burned: true }

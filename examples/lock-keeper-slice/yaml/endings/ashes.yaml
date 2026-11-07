@@ -1,3 +1,4 @@
+# Rank 2 is kept for the weak case of the full demo ("Charged, case weak").
 kind: loss
 rank: 3
 title: Released at dawn

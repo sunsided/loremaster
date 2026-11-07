@@ -11,7 +11,7 @@ The golden slice of the roadmap (phase 0). It is a small part of the demo "The L
 | `mixed/` | Rooms and texts in YAML, the agenda and the lock machine in `world!` | P0-03 (#35) |
 | `expected/` | `model.hash` and `slice_best.transcript` | When `slice_equivalence` (P1-06) and `slice_best` (P4-07) pass |
 
-The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine with its timer, the stove with the text of the D2 side note, the keeper with one dialogue and one agenda step (he burns the pages at midnight), and three endings (a win, a loss and a death).
+The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine with its timer, the stove with the text of the D2 side note, the keeper with one dialogue and one agenda step (he burns the pages at midnight), and three endings: a win, a loss, and a death. The roadmap names two endings; the death ending is for `slice_undo_after_death`.
 
 ## Which file needs which phase
 
@@ -41,7 +41,7 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`. Each one loads
 | `slice_keeper_dialogue` | One dialogue format with a text pool | + Dialogue, Texts | Phase 3 (and R9, see the log) | P3-01 #64 |
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
 | `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Phase 4 | P4-02 #79 |
-| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 4 | P4-02 #79 |
+| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 2 (talk as an await), then phase 4 | P4-02 #79 |
 | `slice_winnable` | The agenda step is an unwinnable edge, and `allow_unwinnable` accepts it | All | Phase 4 | P4-04 #81 |
 | `slice_best`, `slice_ashes` | The two full walkthroughs | All | Phase 4 | P4-07 #84 |
 
@@ -61,4 +61,6 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | YAML | `expect:` ignores unknown keys, so `expect: { ending: … }` would pass silently. The walkthroughs use `facts: { ending: …, ending.kind: …, ending.rank: … }` instead. | Reject unknown keys in `expect:`; P1-03 decides how a walkthrough names the ending. |
 | 2026-11-07 | YAML | `seen_by(inspector)` in D2 needs a name for the player. The slice uses `seen_by(player)`. | Decide the perceiver id with D6. |
 | 2026-11-07 | YAML | `slice_keeper_dialogue` is phase 3 in the spec, but its dialogue says a text pool, which is R9 (phase 4). | Either an inline `say` in phase 3, or the test moves to phase 4. |
+| 2026-11-07 | YAML | Two candidates of the D2 sketch can never show to the player: "too hot to touch" (when the player examines, `seen_by(player)` is true, so the fresh-ash text scores higher) and "Mind your step." (the keeper never leaves the kitchen). | Keep them as D2 wrote them. `seen_by` matters only with several perceivers (D6); the winnable and quality checks of phase 4 should report a candidate that no state can show. |
+| 2026-11-07 | YAML | The agenda step "comes in from the lock" in one turn, but `place:` names only where it ends. | D6: a step with a route, or a step that takes several turns. |
 | 2026-11-07 | YAML | The roadmap wants Markus to write one part in each form and note how it felt. | Open: Markus. |

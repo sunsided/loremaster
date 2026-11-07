@@ -3,7 +3,7 @@
 start: full
 states:
   - { name: full, description: The chamber is full. The gear housing is under water. }
-  - { name: emptying, description: The lower paddles are open. The chamber is empty in 3 turns (timer lock_drain). }
+  - { name: emptying, description: "The lower paddles are open. The chamber is empty 3 turns after they open, the opening turn included (timer lock_drain)." }
   - { name: empty, description: The chamber is empty. The player can open the gear housing. }
 steps:
   - from: full
