@@ -66,6 +66,157 @@ pub struct State {
     /// Running timers and the turns they have left.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub timers: BTreeMap<Id, u32>,
+    /// A rule that waits for the host (SE-6): where it goes on, and what it asked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub awaiting: Option<Awaiting>,
+}
+
+/// A paused rule, as data (XP-3): the rule, the next effect, the request.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Awaiting {
+    /// The id to pass to `resume`.
+    pub id: String,
+    pub rule: Id,
+    /// The effect of the rule that runs after the answer.
+    pub next: usize,
+    pub request: AwaitRequest,
+    /// The variable that takes the answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub into: Option<String>,
+    /// Local values of the rule. Empty until rules get locals.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub locals: BTreeMap<String, Value>,
+}
+
+/// What a paused rule asks the host (SE-5).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum AwaitRequest {
+    /// Choose one option.
+    Choice { options: Vec<AwaitOptionInfo> },
+    /// Do a custom action and report one of its results.
+    Action {
+        name: Id,
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        args: BTreeMap<String, Value>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        results: Vec<Id>,
+    },
+    /// Roll dice and report the total.
+    Roll { dice: String, min: i64, max: i64 },
+    /// Walk the player to a room; answer `arrived` or `refused`.
+    WalkTo { room: Id },
+}
+
+/// An option of a choice: its id and the text to show.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AwaitOptionInfo {
+    pub id: Id,
+    pub text: String,
+}
+
+impl AwaitRequest {
+    pub(crate) fn of(spec: &loremaster_model::AwaitSpec) -> Option<Self> {
+        if !spec.choice.is_empty() {
+            let options = spec
+                .choice
+                .iter()
+                .map(|o| AwaitOptionInfo {
+                    id: o.id().clone(),
+                    text: o.text().to_string(),
+                })
+                .collect();
+            return Some(AwaitRequest::Choice { options });
+        }
+        if let Some(name) = &spec.action {
+            return Some(AwaitRequest::Action {
+                name: name.clone(),
+                args: spec.args.clone(),
+                results: spec.results.clone(),
+            });
+        }
+        if let Some(text) = &spec.roll {
+            let dice = loremaster_model::Dice::parse(text)?;
+            return Some(AwaitRequest::Roll {
+                dice: text.clone(),
+                min: dice.min(),
+                max: dice.max(),
+            });
+        }
+        spec.walk_to
+            .as_ref()
+            .map(|room| AwaitRequest::WalkTo { room: room.clone() })
+    }
+
+    /// The answers that a list can offer, with their texts. A roll and an
+    /// action without results have none: the host answers with a value.
+    pub fn answers(&self) -> Vec<(Value, String)> {
+        match self {
+            AwaitRequest::Choice { options } => options
+                .iter()
+                .map(|o| (Value::Text(o.id.to_string()), o.text.clone()))
+                .collect(),
+            AwaitRequest::Action { results, .. } => results
+                .iter()
+                .map(|r| (Value::Text(r.to_string()), r.to_string()))
+                .collect(),
+            AwaitRequest::WalkTo { .. } => [crate::game::ARRIVED, crate::game::REFUSED]
+                .iter()
+                .map(|a| (Value::Text((*a).into()), (*a).to_string()))
+                .collect(),
+            AwaitRequest::Roll { .. } => Vec::new(),
+        }
+    }
+
+    /// Does the answer fit the request?
+    pub fn accepts(&self, answer: &Value) -> Result<(), String> {
+        match (self, answer) {
+            (AwaitRequest::Roll { min, max, .. }, Value::Int(n)) if (min..=max).contains(&n) => {
+                Ok(())
+            }
+            (AwaitRequest::Roll { min, max, dice }, _) => {
+                Err(format!("a roll of {dice} is a number from {min} to {max}"))
+            }
+            // Without a list of results, the host answers with any value.
+            (AwaitRequest::Action { results, .. }, _) if results.is_empty() => Ok(()),
+            (_, a) if self.answers().iter().any(|(v, _)| v == a) => Ok(()),
+            _ => {
+                let list: Vec<String> = self.answers().iter().map(|(v, _)| v.to_string()).collect();
+                Err(format!(
+                    "the answer `{answer}` is not one of: {}",
+                    list.join(", ")
+                ))
+            }
+        }
+    }
+
+    /// The request in words, for logs and text hosts.
+    pub fn describe(&self) -> String {
+        match self {
+            AwaitRequest::Choice { options } => format!(
+                "choose {}",
+                options
+                    .iter()
+                    .map(|o| o.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            AwaitRequest::Action { name, results, .. } if results.is_empty() => {
+                format!("the action {name}")
+            }
+            AwaitRequest::Action { name, results, .. } => format!(
+                "the action {name} ({})",
+                results
+                    .iter()
+                    .map(|r| r.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            AwaitRequest::Roll { dice, .. } => format!("roll {dice}"),
+            AwaitRequest::WalkTo { room } => format!("walk to {room}"),
+        }
+    }
 }
 
 /// Where a conversation is: the dialogue and its current node, by key, so
