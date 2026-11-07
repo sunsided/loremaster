@@ -1,0 +1,5 @@
+error: named slots of the command record (`direct: <thing>`) are not in `world!` yet: they wait for D6 (phase 4)
+ --> tests/ui/fail/command_slots.rs:5:43
+  |
+5 |     rule keeper_comments on verb(examine, direct: stove) {
+  |                                           ^^^^^^

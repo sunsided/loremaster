@@ -78,7 +78,7 @@ The crate `loremaster` embeds the web editor by default (the feature `embed-ui`)
 
 loremaster uses [cargo-release](https://github.com/crate-ci/cargo-release). The configuration is in `release.toml` and in `[package.metadata.release]` of some crates.
 
-- These crates go to crates.io: `loremaster`, `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-workbench`, `loremaster-tools`, `loremaster-dsl` and `loremaster-mcp`.
+- These crates go to crates.io: `loremaster`, `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-workbench`, `loremaster-tools`, `loremaster-dsl`, `loremaster-macros` and `loremaster-mcp`.
 - `loremaster-wasm` and `loremaster-zil` have `publish = false` and `release = false`. Their version changes together with the other crates.
 - All crates have one version. A release makes one commit "Release <version>" and one tag `v<version>`. Git signs the commit and the tag.
 - Releases come only from `main`.
@@ -90,7 +90,7 @@ The crate `loremaster-mcp` contains the built web editor in `crates/loremaster-m
 
 Thus a release has two commands:
 
-1. `cargo release` changes the version and `CHANGELOG.md`, builds the web editor, makes the commit, uploads the 7 crates without the editor, makes the tag and pushes.
+1. `cargo release` changes the version and `CHANGELOG.md`, builds the web editor, makes the commit, uploads the 8 crates without the editor, makes the tag and pushes.
 2. `task release:publish` uploads `loremaster-mcp` and `loremaster` with `--allow-dirty`. It stops if the working tree has other changes, or if `ui/` is missing.
 
 ### Before the first release
@@ -121,7 +121,7 @@ Thus a release has two commands:
    1. It runs `task release:ui` (the hook of `loremaster-mcp`). This builds the web app below `/` and copies it into `crates/loremaster-mcp/ui/`.
    2. It sets the new version in all crates and moves "Unreleased" in `CHANGELOG.md` to the new version.
    3. It makes the release commit.
-   4. It uploads `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-workbench`, `loremaster-tools` and `loremaster-dsl` in the order of their dependencies.
+   4. It uploads `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-workbench`, `loremaster-tools`, `loremaster-dsl` and `loremaster-macros` in the order of their dependencies. The proc-macro crate `loremaster-macros` comes after `loremaster-dsl`: the macro builds packs with the builder at compile time.
    5. It makes the tag and pushes the commit and the tag.
 
 5. Upload the two crates with the editor. Do this on the release commit, and do not change files before:
@@ -136,7 +136,7 @@ Thus a release has two commands:
 
 ### If a step fails
 
-A release is not one operation. Step 4 uploads 7 crates and pushes the tag before step 5 starts. crates.io does not let you remove or replace an uploaded version.
+A release is not one operation. Step 4 uploads 8 crates and pushes the tag before step 5 starts. crates.io does not let you remove or replace an uploaded version.
 
 - If step 4 stops before the upload, nothing is on crates.io. Look at `git log -1`. If the last commit is "Release <version>", remove it with `git reset --hard HEAD~1`. If not, remove the changed files with `git checkout -- .`. Then correct the problem and start again.
 - If step 4 stops after some uploads, do not change the version. Correct the problem, then run `cargo release publish --execute` and `cargo release tag --execute` and `cargo release push --execute`. cargo-release does not upload a version that is already on crates.io.
@@ -149,7 +149,7 @@ A release is not one operation. Step 4 uploads 7 crates and pushes the tag befor
 
 ### The first release
 
-crates.io lets you make only 5 new crates at one time. After that, it lets you make 1 new crate each 10 minutes. Step 4 uploads 5 new crates. Thus, for the first release, wait 20 minutes between step 4 and step 5. From the second release on, only a crate that is new in that release counts, for example `loremaster-dsl` and `loremaster-workbench` in the release after 0.1.0. Two new crates are in the limit, and you do not have to wait.
+crates.io lets you make only 5 new crates at one time. After that, it lets you make 1 new crate each 10 minutes. Step 4 uploads 5 new crates. Thus, for the first release, wait 20 minutes between step 4 and step 5. From the second release on, only a crate that is new in that release counts, for example `loremaster-dsl`, `loremaster-macros` and `loremaster-workbench` in the release after 0.1.0. Three new crates are in the limit, and you do not have to wait.
 
 ### Size of the package
 

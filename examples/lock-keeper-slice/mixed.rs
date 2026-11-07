@@ -4,33 +4,42 @@
 // `replace`, so a duplicate id is an error. The ids are the same as in
 // ../yaml and ../dsl, so all three forms give one model (rule 1).
 //
-// Behind the cargo feature `dsl`. It does not compile until DSL step L2.
+// Behind the cargo feature `dsl`. The lock machine compiles with the world!
+// core (DSL step L3, P3-03 #66); the agenda waits for D6 (P4-02 #79).
 
 #![cfg(feature = "dsl")]
 
+use loremaster::dsl::project::{SourceFile, read_dir};
 use loremaster::prelude::*;
 
-#[path = "mixed/agendas/keeper.rs"]
-pub mod agenda;
 #[path = "mixed/machines/lock.rs"]
 pub mod lock;
 
+// Pending: `cfg(any())` is never true, so the compiler does not read the file.
+// world! has no agendas yet (D6, P4-02 #79).
+#[cfg(any())]
+#[path = "mixed/agendas/keeper.rs"]
+pub mod agenda;
+
 /// The YAML files of this folder. The YAML loader reads only `*.yaml`, so
 /// the `.rs` files next to them do not count.
-const YAML: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../examples/lock-keeper-slice/mixed/"
-);
+pub fn yaml_files() -> Vec<SourceFile> {
+    let dir = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/lock-keeper-slice/mixed/"
+    );
+    read_dir(std::path::Path::new(dir)).expect("the mixed form reads")
+}
 
-/// The YAML part plus the lock machine, without the agenda. The YAML part
-/// still holds all new-syntax files; a test filters them by path, as it does
-/// for ../yaml.
-pub fn today() -> Loremaster {
-    Loremaster::new().yaml(YAML).pack(lock::pack())
+/// The given YAML files plus the lock machine, without the agenda. The YAML
+/// part still holds all new-syntax files; a test filters them by path, as it
+/// does for ../yaml, and passes the rest.
+pub fn today(files: Vec<SourceFile>) -> Loremaster {
+    Loremaster::new().yaml_files(files).pack(lock::pack())
 }
 
 /// The whole slice. `slice_equivalence` compares its model hash with the
-/// hashes of ../yaml and ../dsl.
+/// hashes of ../yaml and ../dsl. Panics until world! has agendas.
 pub fn world() -> Loremaster {
-    today().pack(agenda::pack())
+    panic!("the agenda (mixed/agendas/keeper.rs) is not in world! yet: D6, P4-02 #79")
 }

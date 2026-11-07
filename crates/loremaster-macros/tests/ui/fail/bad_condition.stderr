@@ -1,0 +1,11 @@
+error: `{` is never closed
+ --> tests/ui/fail/bad_condition.rs:8:9
+  |
+8 |         "A hall. {lamp.lit ? It is bright. | It is dark.";
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `lamp` has no property `lt`; did you mean `lamp.lit`?
+  --> tests/ui/fail/bad_condition.rs:13:28
+   |
+13 |     rule glow on turn when lamp.lt and not missing {
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^

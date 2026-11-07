@@ -53,10 +53,13 @@ jobs:
       - run: scripts/check-lock.sh
       - run: cargo clippy --workspace --all-targets --no-default-features --locked -- -D warnings
       - run: cargo test --workspace --no-default-features --locked
-      # The feature `builder` of the crate loremaster (the re-export of
-      # loremaster-dsl and its doctest). The steps above leave it off.
-      - run: cargo clippy -p loremaster --all-targets --no-default-features --features builder --locked -- -D warnings
-      - run: cargo test -p loremaster --no-default-features --features builder --locked
+      # The feature `dsl` of the crate loremaster: the re-exports of
+      # loremaster-dsl and loremaster-macros, their doctests, and the world!
+      # forms of the golden slice (tests/slice_dsl.rs). The workspace steps
+      # above turn it on through the dev-dependency of loremaster-macros;
+      # these steps check the crate alone with it.
+      - run: cargo clippy -p loremaster --all-targets --no-default-features --features dsl --locked -- -D warnings
+      - run: cargo test -p loremaster --no-default-features --features dsl --locked
 
   # Not a required check: the pending tests are expected to fail. The job
   # fails only when a pending test passes, so that its mark goes at once.

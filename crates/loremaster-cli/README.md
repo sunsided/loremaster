@@ -31,10 +31,23 @@ In a git checkout, the editor is in the build only after `task release:ui`. To b
 
 ## Stories in Rust
 
-With the cargo feature `builder`, the crate is also a library: `loremaster::prelude` gives the builder API of `loremaster-dsl`. Write a story in plain Rust, join it with YAML folders, and build the world:
+With the cargo feature `dsl`, the crate is also a library: `loremaster::prelude` gives the builder API of `loremaster-dsl` and the `world!` macro of `loremaster-macros`. Write a story in Rust, join it with YAML folders, and build the world. The feature `builder` is the old name of `dsl`.
 
 ```toml
-loremaster = { version = "0.1", default-features = false, features = ["builder"] }
+loremaster = { version = "0.1", default-features = false, features = ["dsl"] }
+```
+
+```rust
+use loremaster::prelude::*;
+
+world! {
+    story "The Lighthouse" { start: shore }
+    room shore "The Shore" {
+        "Shingle crunches underfoot.";
+    }
+}
+
+let world = Loremaster::new().pack(pack()).yaml("story/").build()?;
 ```
 
 ## License

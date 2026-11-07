@@ -1,0 +1,35 @@
+error: unknown room `garden`; for an id of another pack, write `extern { room garden; }`
+ --> tests/ui/fail/unknown_ids.rs:8:9
+  |
+8 |         exit north -> garden;
+  |         ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown room `cellar`; for an id of another pack, write `extern { room cellar; }`
+  --> tests/ui/fail/unknown_ids.rs:11:23
+   |
+11 |     thing lamp "lamp" in cellar {}
+   |                       ^^^^^^^^^
+
+error: unknown verb `light`; for an id of another pack, write `extern { verb light; }`
+  --> tests/ui/fail/unknown_ids.rs:13:19
+   |
+13 |     rule light on verb(light, lantern) {
+   |                   ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown thing `lantern`; for an id of another pack, write `extern { thing lantern; }`
+  --> tests/ui/fail/unknown_ids.rs:13:19
+   |
+13 |     rule light on verb(light, lantern) {
+   |                   ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown timer `burning`; for an id of another pack, write `extern { timer burning; }`
+  --> tests/ui/fail/unknown_ids.rs:14:9
+   |
+14 |         start burning;
+   |         ^^^^^^^^^^^^^^
+
+error: unknown ending `bright`; for an id of another pack, write `extern { ending bright; }`
+  --> tests/ui/fail/unknown_ids.rs:15:9
+   |
+15 |         end bright;
+   |         ^^^^^^^^^^^
