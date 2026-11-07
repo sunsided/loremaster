@@ -79,6 +79,14 @@ mod lock {
 
         thing keeper "keeper" in chamber {}
 
+        // Speakers with the ids of segment words.
+        thing narrate "narrator" in chamber {}
+        thing says "parrot" in chamber {}
+
+        rule odd_speakers on verb(examine, says) {
+            line narrate says "I tell the story." says says "Squawk.";
+        }
+
         rule splash on event(splashed) within chamber {
             goto kitchen;
             cancel drain;
@@ -217,7 +225,7 @@ fn rules_and_effects() {
     assert!(matches!(&jump.then[4], Effect::Start(_)));
     assert!(matches!(&jump.then[5], Effect::Emit(e) if e.as_str() == "splashed"));
     assert!(matches!(&jump.then[6], Effect::End(e) if e.as_str() == "drowned"));
-    let splash = &p.rules[2];
+    let splash = p.rules.iter().find(|r| r.id.as_str() == "splash").unwrap();
     assert_eq!(splash.within.as_ref().unwrap().as_str(), "chamber");
     assert_eq!(splash.then.len(), 3);
 }
@@ -251,6 +259,17 @@ fn speech_segments() {
             LineSegment::narrate("Water drips.").when("lock_open"),
             LineSegment::says("Pay up.").by("keeper").when("coins > 1"),
         ])
+    );
+    let odd = p
+        .rules
+        .iter()
+        .find(|r| r.id.as_str() == "odd_speakers")
+        .unwrap();
+    assert!(
+        matches!(&odd.then[0], Effect::Say(l) if *l == Line::new(vec![
+            LineSegment::says("I tell the story.").by("narrate"),
+            LineSegment::says("Squawk.").by("says"),
+        ]))
     );
     // A machine step's conditional line is its `say`.
     let m = &p.machines[0];

@@ -612,6 +612,14 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
         when: None,
         tokens: TokenStream::new(),
     };
+    // `<speaker> says` first: a speaker may have the id of a keyword of
+    // segments (`narrate says "…"`), and `narrate "…"` and `when <cond>`
+    // never have `says` as their second word.
+    if peek_word_then(input, "says") {
+        let speaker = name(input)?;
+        name(input)?;
+        return Ok(plain(SegmentVoice::Says(Some(speaker)), text(input)?));
+    }
     if peek_kw(input, "when") {
         keyword(input, "when")?;
         let cond = parse_until(input, |i| peek_kw(i, "then") || i.peek(Token![;]))?;
@@ -641,11 +649,6 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
     if peek_kw(input, "says") {
         name(input)?;
         return Ok(plain(SegmentVoice::Says(None), text(input)?));
-    }
-    if peek_word_then(input, "says") {
-        let speaker = name(input)?;
-        name(input)?;
-        return Ok(plain(SegmentVoice::Says(Some(speaker)), text(input)?));
     }
     Err(input.error(
         "expected a segment: a string, `narrate \"…\"`, `says \"…\"`, `<speaker> says \"…\"` or `when <cond> then <segment>`, or `;`",
