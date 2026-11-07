@@ -8,8 +8,6 @@ use dramaturge_model::{
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
 use std::collections::BTreeMap;
 
-/// The custom-outcome key for `add`: dramaturge can only set a fact, not add to one.
-pub const ADD_KEY: &str = "loremaster.add";
 /// The custom-outcome key for `then`: world effects that the runtime applies.
 pub const THEN_KEY: &str = "loremaster.then";
 
@@ -173,9 +171,10 @@ fn outcomes(
     }
     for (name, n) in &o.add {
         fact_name(name, scope)?;
-        out.push(Outcome::Custom {
-            key: ADD_KEY.into(),
-            args: vec![FactValue::Text(name.clone()), FactValue::Int(*n)],
+        out.push(Outcome::AddFact {
+            scope: FactScope::World,
+            fact_id: FactId::new(name.as_str()),
+            delta: *n,
         });
     }
     for (axis, delta) in &o.relation {
