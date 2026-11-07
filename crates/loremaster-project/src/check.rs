@@ -37,25 +37,11 @@ impl Checker<'_> {
     }
 
     fn error(&mut self, file: &str, at: &str, message: impl Into<String>) {
-        self.out.push(Diagnostic {
-            severity: Severity::Error,
-            file: file.to_string(),
-            at: at.to_string(),
-            message: message.into(),
-            line: None,
-            column: None,
-        });
+        self.out.push(Diagnostic::error(file, at, message));
     }
 
     fn warning(&mut self, file: &str, at: &str, message: impl Into<String>) {
-        self.out.push(Diagnostic {
-            severity: Severity::Warning,
-            file: file.to_string(),
-            at: at.to_string(),
-            message: message.into(),
-            line: None,
-            column: None,
-        });
+        self.out.push(Diagnostic::warning(file, at, message));
     }
 
     /// Report a language error, locating the source text inside the file.

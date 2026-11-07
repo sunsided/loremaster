@@ -28,6 +28,26 @@ impl Project {
     pub fn file(&self, path: &str) -> Option<&SourceFile> {
         self.files.iter().find(|f| f.path == path)
     }
+
+    /// Give a diagnostic without a file the file of its entity. `at` starts
+    /// with the entity key, as in `room:shore/exits[0]` or `story:intro`,
+    /// which is how a compile error names its place.
+    pub fn locate(&self, mut diagnostic: Diagnostic) -> Diagnostic {
+        if diagnostic.file.is_empty() {
+            let key = diagnostic.at.split(['/', '#']).next().unwrap_or_default();
+            let key = if key.starts_with("story:") {
+                "story"
+            } else {
+                key
+            };
+            diagnostic.file = self
+                .origins
+                .get(key)
+                .map(|o| o.file().to_string())
+                .unwrap_or_else(|| "story.yaml".into());
+        }
+        diagnostic
+    }
 }
 
 /// The story header (`story.yaml` in a YAML folder): everything that is not a

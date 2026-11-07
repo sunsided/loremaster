@@ -101,14 +101,7 @@ impl Workspace {
                     // A compile error joins the warnings of the check; they stay valid.
                     match World::compile(project.story.clone()) {
                         Ok(world) => self.world = Some(Arc::new(world)),
-                        Err(e) => diags.push(Diagnostic {
-                            severity: Severity::Error,
-                            file: String::new(),
-                            at: e.at.clone(),
-                            message: e.error.message,
-                            line: None,
-                            column: None,
-                        }),
+                        Err(e) => diags.push(project.locate(Diagnostic::from(&e))),
                     }
                 }
                 self.project = Some(project);

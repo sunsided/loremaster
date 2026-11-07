@@ -46,7 +46,12 @@ fn the_game_shows_the_ending_and_keeps_its_id() {
 fn an_unknown_ending_does_not_compile() {
     let mut files = lighthouse();
     files.retain(|f| !f.path.starts_with("endings/"));
-    let err = World::compile(load(files).unwrap().story).unwrap_err();
+    let project = load(files).unwrap();
+    let err = World::compile(project.story.clone()).unwrap_err();
+    // As a diagnostic, the compile error points at the file of its rule (XP-6).
+    let d = project.locate(loremaster_model::Diagnostic::from(&err));
+    assert_eq!(d.file, "rules/beacon.yaml", "{d}");
+    assert!(d.is_error());
     assert!(
         err.to_string().contains("unknown ending `beacon_lit`"),
         "{err}"

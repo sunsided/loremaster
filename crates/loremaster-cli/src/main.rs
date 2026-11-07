@@ -1,7 +1,7 @@
 //! `loremaster new <dir> [--title T] [--idea I]`, `loremaster play <dir>`, `loremaster check <dir> [--todos]`,
 //! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
-use loremaster_project::{Project, Severity, check, load, open_todos, read_dir};
+use loremaster_project::{Diagnostic, Project, Severity, check, load, open_todos, read_dir};
 use loremaster_runtime::{BlockKind, Budget, Game, Turn, Verdict, World};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
@@ -216,10 +216,10 @@ fn open(dir: &Path) -> Option<Project> {
 }
 
 fn play(project: Project) -> ExitCode {
-    let world = match World::compile(project.story) {
+    let world = match World::compile(project.story.clone()) {
         Ok(w) => Arc::new(note_behaviors(w)),
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("{}", project.locate(Diagnostic::from(&e)));
             return ExitCode::FAILURE;
         }
     };
@@ -270,10 +270,10 @@ fn note_behaviors(world: World) -> World {
 /// Run the walkthroughs in `tests/` and print what failed.
 fn walkthroughs(project: Project) -> ExitCode {
     let walks = project.walkthroughs.clone();
-    let world = match World::compile(project.story) {
+    let world = match World::compile(project.story.clone()) {
         Ok(w) => Arc::new(note_behaviors(w)),
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("{}", project.locate(Diagnostic::from(&e)));
             return ExitCode::FAILURE;
         }
     };
@@ -332,10 +332,10 @@ fn walkthroughs(project: Project) -> ExitCode {
 
 /// Walk all reachable states and print what the walk found.
 fn explore(project: Project) -> ExitCode {
-    let world = match World::compile(project.story) {
+    let world = match World::compile(project.story.clone()) {
         Ok(w) => Arc::new(note_behaviors(w)),
         Err(e) => {
-            eprintln!("error: {e}");
+            eprintln!("{}", project.locate(Diagnostic::from(&e)));
             return ExitCode::FAILURE;
         }
     };

@@ -7,6 +7,7 @@
 //! bundle stays readable and survives changes to the expression language.
 
 mod clock;
+mod diagnostic;
 mod dialogue;
 mod ending;
 mod fragment;
@@ -24,6 +25,7 @@ mod verb;
 mod walkthrough;
 
 pub use clock::{ClockConfig, Phase, TimeOfDay};
+pub use diagnostic::{Diagnostic, Severity};
 pub use dialogue::{Dialogue, DialogueNode, DialogueOption, Outcomes};
 pub use ending::{Ending, EndingKind};
 pub use fragment::{Fragment, FragmentMode, Layer};
