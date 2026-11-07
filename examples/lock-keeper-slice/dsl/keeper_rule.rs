@@ -17,6 +17,6 @@ world! {
     // `on: { verb: examine, direct: stove }`. The D2 sketch writes the old
     // form `on verb(examine, stove)`.
     rule keeper_comments on verb(examine, direct: stove) when present(keeper) {
-        say keeper_remark;
+        line keeper_remark;
     }
 }

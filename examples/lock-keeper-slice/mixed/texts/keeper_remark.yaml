@@ -1,11 +1,14 @@
 # New syntax (phase 4, R9): a named text pool. Rules and dialogue call it by id.
+# `{ keeper says: … }` is a speech segment with its speaker (#111); the
+# renderer adds the quotes. Segments in a list join with a space. A plain
+# string is narration; `{ narrate: "…" }` is the same, written out.
 pick: best
 one_of:
   - "Mind your step."
-  - when: here == kitchen
-    text: '"Do not touch the stove," the lock-keeper says.'
-  - when: here == kitchen and ash_is_fresh
+  - when: in(kitchen)
+    text: [{ keeper says: "Do not touch the stove," }, "the lock-keeper says."]
+  - when: in(kitchen) and ash_is_fresh
     mode: sticky
     variants:
-      - '"I let it go out at midnight," he says. He does not look at you.'
-      - '"Cold stove, cold supper," he says.'
+      - [{ keeper says: "I let it go out at midnight," }, "he says. He does not look at you."]
+      - [{ keeper says: "Cold stove, cold supper," }, "he says."]

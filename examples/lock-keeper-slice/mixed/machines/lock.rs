@@ -26,11 +26,11 @@ world! {
         state empty "The chamber is empty. The player can open the gear housing.";
 
         full -> emptying on verb(open, lower_paddles) instead when windlass.carried {
-            say "You fit the windlass and turn. Water roars out under the lower gate.";
+            line "You fit the windlass and turn. Water roars out under the lower gate.";
             start lock_drain;
         }
         emptying -> empty on timer(lock_drain) {
-            say "{here == lock_chamber ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
+            line "{in(lock_chamber) ? The chamber is empty. Wet ladder rungs go down into the dark. | }";
         }
     }
 }

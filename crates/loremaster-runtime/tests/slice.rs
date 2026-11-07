@@ -80,19 +80,27 @@ fn slice_baseline() {
         .collect();
     assert!(errors.is_empty(), "{errors:#?}");
 
-    let (path, walk) = project
+    // Every walkthrough without a `pending:` mark passes on today's files.
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let mut ran = Vec::new();
+    for (path, walk) in project
         .walkthroughs
         .iter()
-        .find(|(p, _)| p == "tests/slice_baseline.yaml")
-        .cloned()
-        .unwrap();
-    let world = Arc::new(World::compile(project.story).unwrap());
-    let result = run_walkthrough(world, &walk, &path);
-    assert!(
-        result.passed(),
-        "{:#?}\n\n{}",
-        result.failures,
-        result.transcript
+        .filter(|(_, w)| w.pending.is_none())
+    {
+        let result = run_walkthrough(world.clone(), walk, path);
+        assert!(
+            result.passed(),
+            "{path}: {:#?}\n\n{}",
+            result.failures,
+            result.transcript
+        );
+        ran.push(path.as_str());
+    }
+    ran.sort();
+    assert_eq!(
+        ran,
+        ["tests/slice_baseline.yaml", "tests/slice_drowning.yaml"]
     );
 }
 
@@ -155,7 +163,7 @@ fn slice_undo_after_death() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, P4-02 #79"]
+#[ignore = "pending: phase 4, D6, P4-02 #79, P3-15 #111"]
 fn slice_talk_pauses_agenda() {
     assert_passes("slice_talk_pauses_agenda", &[AGENDA, DIALOGUE, TEXTS]);
 }
@@ -167,7 +175,7 @@ fn slice_stove_text() {
 }
 
 #[test]
-#[ignore = "pending: phase 3, D3, P3-01 #64"]
+#[ignore = "pending: phase 3, D3, P3-01 #64, P3-15 #111"]
 fn slice_keeper_dialogue() {
     assert_passes("slice_keeper_dialogue", &[DIALOGUE, TEXTS]);
 }

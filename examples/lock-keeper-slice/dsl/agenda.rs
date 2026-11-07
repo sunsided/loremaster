@@ -26,7 +26,7 @@ world! {
         step at "00:00" place kitchen when in(pages, gear_housing) {
             move pages -> nowhere;
             set stove.hot = true, pages_burned = true;
-            say "{here == kitchen ? The lock-keeper comes in from the lock with something wrapped in oilcloth. He opens the stove and feeds it in. | You smell smoke from the kitchen.}";
+            line "{in(kitchen) ? The lock-keeper comes in from the lock with something wrapped in oilcloth. He opens the stove and feeds it in. | You smell smoke from the kitchen.}";
         }
         // draft: `closes [<endings>] because "<reason>"` after the step body.
         // A point of no return, not a dead end: after this step the best

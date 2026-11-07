@@ -1,0 +1,7 @@
+# Passes today: jumping into the full lock ends the game, and only the
+# rule's text shows (the rule replaces the default response of `jump`).
+name: Jump into the full lock
+steps:
+  - { do: jump, see: "Nothing happens.", ended: false }
+  - e
+  - { do: jump, see: "The water closes over you", not_see: "Nothing happens.", ended: true }
