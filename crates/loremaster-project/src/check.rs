@@ -867,6 +867,41 @@ impl Checker<'_> {
                     );
                 }
             }
+            // Quests (D8): journal text per state, only on a quest.
+            let journals = m.states.iter().filter(|s| s.journal().is_some()).count();
+            if m.quest && journals == 0 {
+                self.warning(
+                    &file,
+                    &at,
+                    "the quest has no state with `journal:` text, so it never shows in the journal",
+                );
+            }
+            for s in &m.states {
+                let place = format!("{at}.states.{}", s.name());
+                if !m.quest && (s.journal().is_some() || s.done()) {
+                    self.warning(
+                        &file,
+                        &place,
+                        "`journal` and `done` work only on a machine with `quest: true`",
+                    );
+                }
+                if let Some(line) = s.journal() {
+                    self.line(&file, &format!("{place}.journal"), line);
+                } else if m.quest && s.done() {
+                    self.warning(
+                        &file,
+                        &place,
+                        "`done: true` without `journal:` text has no effect: the quest leaves the journal in this state",
+                    );
+                }
+            }
+            if !m.quest && m.title.is_some() {
+                self.warning(
+                    &file,
+                    &at,
+                    "`title` works only on a machine with `quest: true`",
+                );
+            }
             let known = |s: &str| states.iter().any(|x| x == s);
             if !known(&m.start) {
                 self.error(

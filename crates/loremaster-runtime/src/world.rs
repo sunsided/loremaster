@@ -32,7 +32,9 @@ pub struct World {
     /// Every registered behavior, also the ones that the story does not name.
     registered: Vec<std::sync::Arc<dyn crate::Behavior>>,
     pub(crate) frames: BTreeMap<Id, CFrame>,
-    pub(crate) dialogues: Vec<std::sync::Arc<CDialogue>>,
+    pub(crate) dialogues: Vec<std::sync::Arc<CompiledDialogue>>,
+    /// The machines with `quest: true`, with the journal text of their states.
+    pub(crate) quests: Vec<CQuest>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
     pub symbols: SymbolTable,
     room_index: BTreeMap<Id, usize>,
@@ -148,9 +150,18 @@ pub(crate) struct CStep {
     pub then: Vec<CEffect>,
 }
 
+/// A quest machine, compiled: its title and the journal text per state, with
+/// `done` for a finished state.
+#[derive(Debug, Clone)]
+pub(crate) struct CQuest {
+    pub machine: Id,
+    pub title: String,
+    pub states: BTreeMap<String, (CompiledLine, bool)>,
+}
+
 /// A dialogue lowered to a dramaturge graph, with its world effects compiled.
 #[derive(Debug, Clone)]
-pub(crate) struct CDialogue {
+pub(crate) struct CompiledDialogue {
     pub id: Id,
     pub with: Id,
     /// The graph; a `then` list is a host outcome with the compiled effects,
@@ -160,7 +171,7 @@ pub(crate) struct CDialogue {
     pub keys: Vec<String>,
 }
 
-impl CDialogue {
+impl CompiledDialogue {
     pub fn node(&self, id: DialogueNodeId) -> Option<&CNode> {
         self.graph.node(id)
     }
@@ -556,7 +567,7 @@ impl World {
                 if let Some(e) = failed {
                     return Err(e);
                 }
-                Ok(Arc::new(CDialogue {
+                Ok(Arc::new(CompiledDialogue {
                     id,
                     with: Id::new(d.with.as_str()),
                     graph,
@@ -590,6 +601,25 @@ impl World {
             .enumerate()
             .map(|(i, t)| (t.id.clone(), i))
             .collect();
+        let quests = story
+            .machines
+            .iter()
+            .filter(|m| m.quest)
+            .map(|m| {
+                let states = (m.states.iter())
+                    .filter_map(|s| Some((s.name(), s.journal()?, s.done())))
+                    .map(|(name, line, done)| {
+                        let at = format!("machine:{}/states/{name}/journal", m.id);
+                        Ok((name.to_string(), (c.line(&at, line)?, done)))
+                    })
+                    .collect::<Result<_, CompileError>>()?;
+                Ok(CQuest {
+                    machine: m.id.clone(),
+                    title: m.title.clone().unwrap_or_else(|| m.id.to_string()),
+                    states,
+                })
+            })
+            .collect::<Result<_, CompileError>>()?;
         let levels = levels(&story);
         Ok(Self {
             levels,
@@ -608,6 +638,7 @@ impl World {
             registered: Vec::new(),
             frames,
             dialogues,
+            quests,
             symbols,
             room_index,
             thing_index,
@@ -691,11 +722,11 @@ impl World {
     }
 
     /// The dialogue of a thing.
-    pub(crate) fn dialogue_with(&self, thing: &str) -> Option<&std::sync::Arc<CDialogue>> {
+    pub(crate) fn dialogue_with(&self, thing: &str) -> Option<&std::sync::Arc<CompiledDialogue>> {
         self.dialogues.iter().find(|d| d.with.as_str() == thing)
     }
 
-    pub(crate) fn dialogue(&self, id: &str) -> Option<&std::sync::Arc<CDialogue>> {
+    pub(crate) fn dialogue(&self, id: &str) -> Option<&std::sync::Arc<CompiledDialogue>> {
         self.dialogues.iter().find(|d| d.id.as_str() == id)
     }
 
