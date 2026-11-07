@@ -34,6 +34,7 @@ mod world;
 pub use behavior::{Behavior, Cx, Flow};
 pub use events::{Event, Phase};
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
+pub use game::{ARRIVED, REFUSED};
 pub use game::{
     AtlasRoom, AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game,
     Inspect, MachineStepView, MachineView, MapLink, MapRoom, MapView, MarkupCheck, PartView,

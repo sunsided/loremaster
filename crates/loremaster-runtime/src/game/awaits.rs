@@ -13,20 +13,40 @@ use crate::{BlockKind, LogEntry, Turn};
 use loremaster_model::{AwaitSpec, Dice, Id, Value};
 use std::collections::BTreeMap;
 
+/// What an `await` effect does to the rest of its rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AwaitStep {
+    /// The session answered (a roll): the rule goes on.
+    Answered,
+    /// The rule pauses until `resume`.
+    Paused,
+    /// Another await is open: the rest of this rule does not run.
+    Skipped,
+}
+
 /// The answers of a walk: the host walked the player there, or did not.
 pub const ARRIVED: &str = "arrived";
 pub const REFUSED: &str = "refused";
 
 impl Game {
-    /// Start the await at effect `next - 1` of `rule`. Returns true when the
-    /// rule pauses. A roll that the session answers itself does not pause.
+    /// Start the await at effect `next - 1` of `rule`. A roll that the
+    /// session answers itself does not pause. While another await is open,
+    /// the rest of the rule is skipped: its effects need the answer.
     pub(crate) fn begin_await(
         &mut self,
         turn: &mut Turn,
         rule: &Id,
         next: usize,
         spec: &AwaitSpec,
-    ) -> bool {
+    ) -> AwaitStep {
+        if self.state.awaiting.is_some() {
+            // One await at a time: the first one of a turn wins.
+            turn.log.push(LogEntry {
+                kind: "await".into(),
+                text: format!("{rule}: skipped, another await is open"),
+            });
+            return AwaitStep::Skipped;
+        }
         if let Some(dice) = spec.roll.as_deref().and_then(Dice::parse)
             && !self.host_rolls
         {
@@ -38,18 +58,10 @@ impl Game {
             if let Some(into) = &spec.into {
                 self.set_fact(turn, into, Value::Int(total));
             }
-            return false;
-        }
-        if self.state.awaiting.is_some() {
-            // One await at a time: the first one of a turn wins.
-            turn.log.push(LogEntry {
-                kind: "await".into(),
-                text: format!("{rule}: skipped, another await is open"),
-            });
-            return false;
+            return AwaitStep::Answered;
         }
         let Some(request) = AwaitRequest::of(spec) else {
-            return false;
+            return AwaitStep::Answered;
         };
         turn.log.push(LogEntry {
             kind: "await".into(),
@@ -63,7 +75,7 @@ impl Game {
             into: spec.into.clone(),
             locals: BTreeMap::new(),
         });
-        true
+        AwaitStep::Paused
     }
 
     /// The rule that waits for the host, if any.
@@ -81,7 +93,13 @@ impl Game {
         if open.id != id {
             return Err(format!("the open await is `{}`, not `{id}`", open.id));
         }
+        if self.state.ended {
+            return Err("the story has ended".into());
+        }
         open.request.accepts(&answer)?;
+        if let Some(into) = &open.into {
+            self.check_answer_type(into, &answer)?;
+        }
         let mut turn = Turn::default();
         self.state.awaiting = None;
         if let Some(into) = &open.into {
@@ -105,7 +123,7 @@ impl Game {
         let outer = std::mem::replace(&mut self.stopped, false);
         for (k, effect) in world.rules[i].then.iter().enumerate().skip(from) {
             if let CEffect::Await(spec) = effect {
-                if self.begin_await(turn, rule, k + 1, spec) {
+                if self.begin_await(turn, rule, k + 1, spec) != AwaitStep::Answered {
                     break;
                 }
                 continue;
@@ -169,6 +187,26 @@ impl Game {
                 BlockKind::Response,
                 format!("The story waits: {}.", open.request.describe()),
             ),
+        }
+    }
+
+    /// The answer must fit a declared variable: a number for `int`, a
+    /// value of the list for an enum, true or false for `bool`. A name that
+    /// is no variable is a property and takes any value.
+    fn check_answer_type(&self, into: &str, answer: &Value) -> Result<(), String> {
+        use loremaster_model::VarType;
+        let Some(var) = self.world.story.var(into) else {
+            return Ok(());
+        };
+        let fits = match (&var.ty, answer) {
+            (VarType::Int, Value::Int(_)) | (VarType::Bool, Value::Bool(_)) => true,
+            (VarType::Enum(values), Value::Text(t)) => values.contains(t),
+            _ => false,
+        };
+        if fits {
+            Ok(())
+        } else {
+            Err(format!("`{into}` cannot hold the answer `{answer}`"))
         }
     }
 

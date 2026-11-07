@@ -80,6 +80,11 @@ pub struct Dice {
 }
 
 impl Dice {
+    /// Limits that keep a roll quick and its range in `i64`.
+    pub const MAX_COUNT: u32 = 100;
+    pub const MAX_SIDES: u32 = 1000;
+    pub const MAX_BONUS: i64 = 1_000_000;
+
     /// Read `2d6`, `d20` or `1d20+3` / `3d6-1`.
     pub fn parse(s: &str) -> Option<Dice> {
         let s = s.trim().to_ascii_lowercase();
@@ -89,12 +94,15 @@ impl Dice {
         } else {
             count.parse().ok()?
         };
-        let (sides, bonus) = match rest.find(['+', '-']) {
+        let (sides, bonus): (&str, i64) = match rest.find(['+', '-']) {
             Some(i) => (&rest[..i], rest[i..].parse().ok()?),
             None => (rest, 0),
         };
-        let sides = sides.parse().ok()?;
-        (count >= 1 && sides >= 1).then_some(Dice {
+        let sides: u32 = sides.parse().ok()?;
+        let fits = (1..=Self::MAX_COUNT).contains(&count)
+            && (1..=Self::MAX_SIDES).contains(&sides)
+            && bonus.abs() <= Self::MAX_BONUS;
+        fits.then_some(Dice {
             count,
             sides,
             bonus,
@@ -113,6 +121,13 @@ impl Dice {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dice_have_limits() {
+        assert!(Dice::parse("4294967295d6").is_none());
+        assert!(Dice::parse("1d100000").is_none());
+        assert!(Dice::parse("100d1000+1000000").is_some());
+    }
 
     #[test]
     fn dice_parse() {
