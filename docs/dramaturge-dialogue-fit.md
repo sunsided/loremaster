@@ -139,7 +139,7 @@ In addition, decision D3 made loremaster's YAML dialogue shape the shape of dram
 | File | 0.2 | 0.3 |
 | --- | --- | --- |
 | `crates/loremaster-runtime/src/game/talk.rs` | about 600 lines | 268 lines |
-| `crates/loremaster-lang/src/dialogue.rs` | about 335 lines | 215 lines |
+| `crates/loremaster-lang/src/dialogue.rs` | about 335 lines | 220 lines |
 
 Not all of the drop in `talk.rs` is removed code. The logging `NarrativeState` wrapper, the inspector view and the talk input moved into `game/talk/turned.rs`, `view.rs` and `input.rs`. The code that went away is the glue that the table above names: the side tables, the custom outcome keys, the effects index, the double store, the start-node and validator filters, and the host-side enter and back logic.
 
