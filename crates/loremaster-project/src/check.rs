@@ -6,6 +6,11 @@ use loremaster_model::{
 };
 use std::collections::BTreeSet;
 
+mod walkthroughs;
+
+pub use walkthroughs::MAX_HINTS;
+pub(crate) use walkthroughs::mentions;
+
 /// The result of the schema checks: the project, when the packs join, and
 /// every error and warning, also the ones of joining the packs.
 #[derive(Debug, Clone)]
@@ -443,6 +448,7 @@ impl Checker<'_> {
             }
             self.effects(&file, "then", &rule.then);
         }
+        self.walkthroughs();
     }
 
     /// Variables, machines, rooms and things must not take a built-in name

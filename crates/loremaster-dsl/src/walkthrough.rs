@@ -2,7 +2,7 @@
 
 use crate::convert::{IntoValue, id};
 use crate::pack::here;
-use loremaster_model::{Expect, Pending, WalkStep, Walkthrough};
+use loremaster_model::{Expect, Pending, StepPlan, WalkStep, Walkthrough};
 use loremaster_project::{Origin, Pack};
 
 /// A walkthrough of a pack, from [`BuildPack::test`](crate::BuildPack::test).
@@ -11,8 +11,11 @@ use loremaster_project::{Origin, Pack};
 /// [`not_sees`](Self::not_sees), [`fact`](Self::fact),
 /// [`in_room`](Self::in_room), [`ended`](Self::ended) and
 /// [`ending`](Self::ending) check the step added last, as
-/// `{ do: …, see: …, facts: … }` in YAML. The `expect_` methods check the
-/// game after the last step (`expect:` in YAML).
+/// `{ do: …, see: …, facts: … }` in YAML. [`id`](Self::id),
+/// [`at`](Self::at), [`needs`](Self::needs), [`before`](Self::before) and
+/// [`hint`](Self::hint) place the step added last in the solution, for the
+/// hint ladder and the dependency chart (CK-4). The `expect_` methods check
+/// the game after the last step (`expect:` in YAML).
 ///
 /// ```
 /// use loremaster_dsl::prelude::*;
@@ -70,8 +73,9 @@ impl<'a> WalkthroughBuilder<'a> {
         &mut self.walkthrough().expect
     }
 
+    /// The step added last, as a step with checks and a plan.
     #[track_caller]
-    fn step_expect(&mut self) -> &mut Expect {
+    fn checked(&mut self) -> (&mut Expect, &mut StepPlan) {
         let Some(step) = self.walkthrough().steps.last_mut() else {
             panic!("the walkthrough has no step yet: call `step` first");
         };
@@ -79,12 +83,60 @@ impl<'a> WalkthroughBuilder<'a> {
             *step = WalkStep::Checked {
                 command: std::mem::take(command),
                 expect: Expect::default(),
+                plan: Box::default(),
             };
         }
         match step {
-            WalkStep::Checked { expect, .. } => expect,
+            WalkStep::Checked { expect, plan, .. } => (expect, &mut **plan),
             WalkStep::Command(_) => unreachable!("the step was made a checked step"),
         }
+    }
+
+    #[track_caller]
+    fn step_expect(&mut self) -> &mut Expect {
+        self.checked().0
+    }
+
+    #[track_caller]
+    fn step_plan(&mut self) -> &mut StepPlan {
+        self.checked().1
+    }
+
+    /// The last step has this id, for `needs`, `before` and the chart.
+    #[track_caller]
+    pub fn id(mut self, step: impl AsRef<str>) -> Self {
+        self.step_plan().id = Some(id(step));
+        self
+    }
+
+    /// The player does the last step in this room.
+    #[track_caller]
+    pub fn at(mut self, room: impl AsRef<str>) -> Self {
+        self.step_plan().at = Some(id(room));
+        self
+    }
+
+    /// The last step needs these steps first.
+    #[track_caller]
+    pub fn needs<S: AsRef<str>>(mut self, steps: impl IntoIterator<Item = S>) -> Self {
+        let steps: Vec<_> = steps.into_iter().map(id).collect();
+        self.step_plan().needs.extend(steps);
+        self
+    }
+
+    /// These later steps need the last step.
+    #[track_caller]
+    pub fn before<S: AsRef<str>>(mut self, steps: impl IntoIterator<Item = S>) -> Self {
+        let steps: Vec<_> = steps.into_iter().map(id).collect();
+        self.step_plan().before.extend(steps);
+        self
+    }
+
+    /// One more hint for the last step, from a nudge to almost the command.
+    #[track_caller]
+    pub fn hint(mut self, text: impl Into<String>) -> Self {
+        self.step_plan().hints.push(text.into());
+        self
     }
 
     /// A command, as the player types it.
