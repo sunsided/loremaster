@@ -59,7 +59,7 @@ impl StoryStamp {
 }
 
 /// The id of a story: its title in lowercase words joined by `-`.
-fn story_id(title: &str) -> String {
+pub(crate) fn story_id(title: &str) -> String {
     title
         .split(|c: char| !c.is_alphanumeric())
         .filter(|w| !w.is_empty())

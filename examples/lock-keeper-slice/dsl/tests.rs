@@ -142,7 +142,6 @@ world! {
 
     // A death ending sends the death prompt, and undo goes back one input.
     test slice_undo_after_death "Undo after drowning" {
-        pending phase 2, needs "SE-8, SE-9, P2-03 #54";
         e;
         jump sees ["The water closes over you", "Drowned"] expect ended;
         undo sees "Lock Chamber" expect not ended, room == lock_chamber;

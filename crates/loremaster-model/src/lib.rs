@@ -8,6 +8,7 @@
 
 mod awaits;
 mod clock;
+mod de;
 mod diagnostic;
 mod dialogue;
 mod ending;

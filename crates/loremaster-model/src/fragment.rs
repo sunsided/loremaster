@@ -72,11 +72,22 @@ impl Fragment {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(untagged)]
 enum FragmentRepr {
     Plain(String),
     Full(FragmentFull),
+}
+
+impl<'de> Deserialize<'de> for FragmentRepr {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        crate::de::string_or_map(
+            d,
+            "a text, or a map with `text` or `variants`",
+            FragmentRepr::Plain,
+            FragmentRepr::Full,
+        )
+    }
 }
 
 #[derive(Serialize, Deserialize)]

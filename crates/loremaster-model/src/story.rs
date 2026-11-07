@@ -15,6 +15,7 @@ pub enum VarType {
 
 /// A declared story variable such as `bridge_collapsed` or `weather`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VarDef {
     pub id: Id,
     #[serde(rename = "type")]
@@ -25,6 +26,7 @@ pub struct VarDef {
 /// The score of the story: a number variable, its maximum and the ranks.
 /// With a score, the `score` command shows it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Score {
     /// The number variable that holds the score. The loader declares it when
     /// story.yaml does not.
@@ -41,6 +43,7 @@ fn score_var() -> Id {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rank {
     pub from: i64,
     pub name: String,
@@ -92,6 +95,10 @@ pub struct Story {
     /// The ways the story can end, from `endings/`. The `end` effect names one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub endings: Vec<Ending>,
+    /// An ending of kind `death` asks the player to undo, restart or restore
+    /// (SE-9). `death_prompt: false` in story.yaml turns the prompt off.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub death_prompt: bool,
     /// Counters that go down each turn.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,
@@ -113,6 +120,14 @@ pub struct Story {
     /// Long-range threads: promises to the reader, with their beats in notes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub threads: Vec<Thread>,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
 }
 
 impl Story {

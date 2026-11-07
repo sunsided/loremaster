@@ -217,3 +217,71 @@ fn the_rules_view_and_the_explorer_use_the_manifest() {
 fn world_thief() -> Arc<World> {
     world(true)
 }
+
+/// A behavior that reads only the narrow view of `Cx` (XP-1).
+#[derive(Debug)]
+struct Watcher;
+
+impl loremaster_runtime::Behavior for Watcher {
+    fn id(&self) -> &str {
+        "watcher"
+    }
+
+    fn handle(
+        &self,
+        event: &loremaster_runtime::Event,
+        cx: &mut loremaster_runtime::Cx<'_>,
+    ) -> loremaster_runtime::Flow {
+        if matches!(event, loremaster_runtime::Event::Turn) {
+            let dark = cx.room_has_tag(cx.here().as_str(), "dark");
+            let line = format!(
+                "turn {} dark {dark} hole {} visited {} roll {}",
+                cx.turns(),
+                cx.neighbours("cave").len(),
+                cx.visited("hole"),
+                cx.roll(6),
+            );
+            cx.say(line);
+        }
+        loremaster_runtime::Flow::Continue
+    }
+}
+
+#[test]
+fn a_behavior_reads_the_narrow_view_and_rolls_through_cx() {
+    let files = [
+        ("story.yaml", "title: Cave\nstart: cave\nbehaviors: [watcher]\n"),
+        (
+            "rooms/cave.yaml",
+            "name: Cave\ntags: [dark]\ndescription: [\"A cave.\"]\nexits:\n  - { direction: east, to: hole }\n",
+        ),
+        (
+            "rooms/hole.yaml",
+            "name: Hole\ndescription: [\"A hole.\"]\nexits:\n  - { direction: west, to: cave }\n",
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    });
+    let mut world = World::compile(load(files.into()).unwrap().story).unwrap();
+    world.register(Watcher);
+    let world = Arc::new(world);
+    let play = || {
+        let mut game = Game::new(world.clone());
+        game.start();
+        let first = game.input("wait").plain_text();
+        let second = game.input("e").plain_text();
+        (first, second, game.state().rng)
+    };
+    let (first, second, rng) = play();
+    assert!(
+        first.contains("turn 1 dark true hole 1 visited false roll"),
+        "{first}"
+    );
+    assert!(
+        second.contains("turn 2 dark false hole 1 visited true roll"),
+        "{second}"
+    );
+    assert_eq!(play(), (first, second, rng), "the rolls replay");
+}

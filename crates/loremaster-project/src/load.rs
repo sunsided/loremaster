@@ -54,6 +54,10 @@ impl Project {
     }
 }
 
+fn yes() -> bool {
+    true
+}
+
 /// The story header (`story.yaml` in a YAML folder): everything that is not a
 /// room, thing or rule. Exactly one pack of a project gives it.
 #[derive(Debug, Clone, Deserialize)]
@@ -77,6 +81,9 @@ pub struct StoryHeader {
     pub frames: loremaster_model::Frames,
     #[serde(default)]
     pub seed: u64,
+    /// `false` turns off the death prompt (SE-9).
+    #[serde(default = "yes")]
+    pub death_prompt: bool,
     #[serde(default)]
     pub notes: Vec<Note>,
     #[serde(default)]
@@ -123,6 +130,9 @@ pub struct Pack {
     pub replaces: BTreeSet<String>,
     /// Fields that this pack adds to entities of earlier packs (`extend: true`).
     pub extensions: Vec<Extension>,
+    /// Warnings from reading the pack, for example a folder that the loader
+    /// does not read yet. `assemble` passes them on.
+    pub warnings: Vec<Diagnostic>,
 }
 
 impl Pack {
@@ -134,7 +144,7 @@ impl Pack {
     }
 
     /// A pack from the files of a YAML folder. Paths use `/` and are relative
-    /// to the folder.
+    /// to the folder. On an error, the list also holds the warnings so far.
     pub fn from_files(files: Vec<SourceFile>) -> Result<Pack, Vec<Diagnostic>> {
         let mut errors = Vec::new();
         let mut origins = BTreeMap::new();
@@ -157,6 +167,8 @@ impl Pack {
 
         let mut sorted: Vec<&SourceFile> = files.iter().collect();
         sorted.sort_by(|a, b| a.path.cmp(&b.path));
+        let mut unknown_folders = BTreeSet::new();
+        let mut warnings = Vec::new();
 
         for file in sorted {
             let path = file.path.as_str();
@@ -164,6 +176,24 @@ impl Pack {
                 continue;
             };
             let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+            if dir.is_empty() && stem != "story" {
+                errors.push(unknown_file(path));
+                continue;
+            }
+            if !dir.is_empty() && !FOLDERS.contains(&dir) {
+                // One message for each folder, at its first file.
+                if unknown_folders.insert(dir) {
+                    match PLANNED_FOLDERS.iter().find(|(f, _)| *f == dir) {
+                        Some((_, what)) => warnings.push(Diagnostic::warning(
+                            path,
+                            "",
+                            format!("the folder `{dir}/` is not read yet: {what}"),
+                        )),
+                        None => errors.push(unknown_folder(path, dir)),
+                    }
+                }
+                continue;
+            }
             let parse_err = |e: serde_saphyr::Error| parse_diagnostic(path, &e.to_string());
             let (mode, file_text) = match merge_mode(&file.text) {
                 Ok(found) => found,
@@ -338,6 +368,7 @@ impl Pack {
             if header.is_none() {
                 errors.push(no_story());
             }
+            errors.append(&mut warnings);
             return Err(errors);
         }
         if header.is_some() {
@@ -361,7 +392,78 @@ impl Pack {
             origins,
             replaces,
             extensions,
+            warnings,
         })
+    }
+}
+
+/// The folders of a YAML project. A YAML file in any other folder is an
+/// error, so that a misspelled folder such as `room/` does not load as
+/// nothing. `behaviors/` holds notes about behaviors in Rust, `tests/` the
+/// walkthroughs.
+pub const FOLDERS: &[&str] = &[
+    "rooms",
+    "things",
+    "rules",
+    "threads",
+    "dialogues",
+    "endings",
+    "timers",
+    "verbs",
+    "machines",
+    "behaviors",
+    "tests",
+];
+
+/// Folders of planned features. The golden slice (`examples/lock-keeper-slice`)
+/// has drafts in them. The loader skips them with a warning instead of an
+/// error, so that their drafts can wait in a project.
+const PLANNED_FOLDERS: &[(&str, &str)] = &[
+    ("agendas", "agendas of characters are planned"),
+    ("texts", "named text pools are planned"),
+];
+
+fn unknown_folder(path: &str, dir: &str) -> Diagnostic {
+    let hint = match loremaster_lang::closest(dir, FOLDERS.iter().copied()) {
+        Some(near) => format!("did you mean `{near}/`?"),
+        None => format!(
+            "a project has story.yaml and the folders {}",
+            FOLDERS
+                .iter()
+                .map(|f| format!("{f}/"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    };
+    Diagnostic::error(path, "", format!("unknown folder `{dir}/`: {hint}"))
+}
+
+fn unknown_file(path: &str) -> Diagnostic {
+    let hint = match yaml_stem(path).and_then(|s| loremaster_lang::closest(s, ["story"])) {
+        Some(_) => "did you mean `story.yaml`?".to_string(),
+        None => "the top folder holds only story.yaml; put entities in their folders".to_string(),
+    };
+    Diagnostic::error(path, "", format!("unknown file `{path}`: {hint}"))
+}
+
+/// Add a "did you mean" to serde's message for an unknown field: `unknown
+/// field `descripton`, expected one of …` (serde-saphyr writes the names
+/// without backticks).
+pub(crate) fn suggest_field(message: &str) -> String {
+    let Some((head, rest)) = message.split_once("unknown field `") else {
+        return message.to_string();
+    };
+    let Some((field, expected)) = rest.split_once("`, expected ") else {
+        return message.to_string();
+    };
+    let known = expected
+        .trim_start_matches("one of ")
+        .split(", ")
+        .flat_map(|s| s.split(" or "))
+        .map(|s| s.trim_matches('`'));
+    match loremaster_lang::closest(field, known) {
+        Some(near) => format!("{head}unknown field `{field}`: did you mean `{near}`?"),
+        None => message.to_string(),
     }
 }
 
@@ -394,7 +496,8 @@ fn no_story() -> Diagnostic {
 /// Join packs in their order into one project (DS-1). An id that two packs
 /// define is an error that names both origins, and exactly one pack gives the
 /// story header. Machine rules and machine variables are made here, after the
-/// merge, so they are the same for each source.
+/// merge, so they are the same for each source. On an error, the list also
+/// holds the warnings so far, such as a replaced entity.
 pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut errors = Vec::new();
     let mut assembly = Vec::new();
@@ -413,7 +516,8 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut verbs: Vec<VerbDef> = Vec::new();
     let mut timers: Vec<Timer> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
-    for (i, pack) in packs.into_iter().enumerate() {
+    for (i, mut pack) in packs.into_iter().enumerate() {
+        assembly.append(&mut pack.warnings);
         // A replaced room or thing takes its nested rules with it: they come
         // from the replaced file and run `within` the entity.
         for key in &pack.replaces {
@@ -527,7 +631,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
                     "`{}` extends an entity that no earlier pack defines",
                     ext.key
                 ),
-                Err(why) => format!("`{}` cannot be extended: {why}", ext.key),
+                Err(why) => format!("`{}` cannot be extended: {}", ext.key, suggest_field(&why)),
             };
             errors.push(Diagnostic::error(ext.origin.file(), "", message));
         }
@@ -538,9 +642,11 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         .unwrap_or_else(|| Origin::yaml("story.yaml"));
     let Some(header) = header else {
         errors.push(no_story());
+        errors.append(&mut assembly);
         return Err(errors);
     };
     if !errors.is_empty() {
+        errors.append(&mut assembly);
         return Err(errors);
     }
     for m in &header.machines {
@@ -601,6 +707,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         dialogues,
         frames: header.frames,
         seed: header.seed,
+        death_prompt: header.death_prompt,
         notes: header.notes,
         threads,
     };
@@ -774,11 +881,12 @@ fn parse_diagnostic(path: &str, message: &str) -> Diagnostic {
             })
             .and_then(|n| n.parse::<u32>().ok())
     };
+    let message = suggest_field(message.lines().next().unwrap_or(message));
     Diagnostic {
         severity: Severity::Error,
         file: path.to_string(),
         at: String::new(),
-        message: message.lines().next().unwrap_or(message).to_string(),
+        message,
         line: number_after("line"),
         column: number_after("column"),
     }

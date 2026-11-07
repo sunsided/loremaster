@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 /// The loader turns each step into a rule, so the rules view, the explorer and
 /// the checks see the steps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Machine {
     pub id: Id,
     /// The state at the start of the game.
@@ -26,6 +27,7 @@ pub struct Machine {
 /// One step of a machine: in one of the `from` states, on the event, while
 /// `when` holds, the machine goes to `to`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Step {
     pub from: States,
     pub on: EventPattern,
@@ -43,7 +45,7 @@ pub struct Step {
 }
 
 /// A state of a machine: `idle`, or `{ name: idle, description: "The spirits jeer." }`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum StateDef {
     Name(String),
@@ -53,6 +55,29 @@ pub enum StateDef {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         description: Option<String>,
     },
+}
+
+/// The long form of a state, as written in the file.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DescribedState {
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for StateDef {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        crate::de::string_or_map(
+            d,
+            "a state name, or a map with `name` and `description`",
+            StateDef::Name,
+            |s: DescribedState| StateDef::Described {
+                name: s.name,
+                description: s.description,
+            },
+        )
+    }
 }
 
 impl StateDef {
