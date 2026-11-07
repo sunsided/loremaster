@@ -54,6 +54,7 @@
 	import AuthorTooltip from '#lib/design/organisms/AuthorTooltip.svelte';
 	import RulesView from '#lib/design/organisms/RulesView.svelte';
 	import MachinesView from '#lib/design/organisms/MachinesView.svelte';
+	import StepChartView from '#lib/design/organisms/StepChartView.svelte';
 	import MachineStateCard from '#lib/design/molecules/MachineStateCard.svelte';
 	import ExplorerView from '#lib/design/organisms/ExplorerView.svelte';
 	import AtlasMap from '#lib/design/organisms/AtlasMap.svelte';
@@ -371,12 +372,13 @@
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'machines' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'machines' | 'steps' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
 	let atlasRoom = $state<string | null>(null);
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
 		{ id: 'rules', label: 'Rules' },
 		...(session?.machines.length ? [{ id: 'machines', label: `Machines ${session.machines.length}` }] : []),
+		...(session?.charts.length ? [{ id: 'steps', label: `Steps ${session.charts.length}` }] : []),
 		{ id: 'state', label: 'State' },
 		{ id: 'story', label: 'Story' },
 		{ id: 'checks', label: 'Checks' },
@@ -388,6 +390,7 @@
 	$effect(() => {
 		if (atlasTab === 'ai' && !ai.reachable) atlasTab = 'map';
 		if (atlasTab === 'machines' && !session?.machines.length) atlasTab = 'map';
+		if (atlasTab === 'steps' && !session?.charts.length) atlasTab = 'map';
 	});
 
 	let proposalProblems = $state<Record<string, string>>({});
@@ -699,6 +702,7 @@
 		const items: PaletteItem[] = [];
 		items.push({ id: 'todo-add', group: 'Notes', label: 'Add a TODO, or find the done ones', keywords: 'note todo task struck', run: () => openAtlas('todos') });
 		items.push({ id: 'atlas', group: 'Atlas', label: atlasOpen ? 'Close the Atlas' : 'Open the Atlas', keywords: 'world map ctrl m', run: () => (atlasOpen ? closeAtlas() : openAtlas()) });
+		if (s.hints.length) items.push({ id: 'hint', group: 'Play', label: 'Show the next hint for this place', keywords: 'hint help stuck', run: () => s.hint() });
 		for (const tab of atlasTabs) {
 			items.push({ id: `atlas-${tab.id}`, group: 'Atlas', label: `Show ${tab.label} in the Atlas`, keywords: tab.id === 'checks' ? 'explore' : '', run: () => openAtlas(tab.id as typeof atlasTab) });
 		}
@@ -1414,6 +1418,11 @@
 				ruleCount={s.rules.length}
 				last={s.history.at(-1) ?? null}
 				talk={s.talkView}
+				hints={s.charts.some((c) => c.steps.some((st) => st.hints > 0)) || s.hints.length ? s.hints : null}
+				onhint={(step) => {
+					s.hint(step);
+					prompt?.focus();
+				}}
 				onpreview={setPreview}
 				onreset={() => (previewValues = {})}
 				{onapply}
@@ -1528,6 +1537,10 @@
 							onselect={(machine, state) => (machineState = { machine, state })}
 							onaddstate={(machine, name) => editMachineState(machine, { kind: 'add', name })}
 						/>
+					</div>
+				{:else if atlasTab === 'steps'}
+					<div class="atlas-pane">
+						<StepChartView charts={s.charts} />
 					</div>
 				{:else if atlasTab === 'todos'}
 					<section class="todos-view" aria-label="TODOs">

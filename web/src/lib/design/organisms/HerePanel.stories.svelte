@@ -35,6 +35,8 @@
 
 During a talk, a **Talk** section comes first (TalkInspector): the current node, the answers with the hidden ones and their false conditions, and the relations and memories of the character.
 
+When the story has hints (\`hints\` is not null), a **Hints** section shows the hint ladder of the room (HintLadder).
+
 1. **Around you**: a small map of the current room and its neighbours on the same level. "Map ↗" opens the full map. Set \`map\` to null when the big map shows on the left (ultrawide). Then this section does not show.
 2. **Depends on**: the values that the room text depends on, as switches (StateSwitches). A change shows a **preview** of the room text in place: the game does not move. The status line shows "PREVIEW · …", and a live region tells screen readers. "Make it so" sets the values in the game for real; "Reset" ends the preview. A turn or another room also ends it. "All texts ↗" opens the explorer.
 3. **Rules here**: the rules that matter here and now, with the reason. A click shows the rule in the rules view. "All ↗" opens all rules.
@@ -54,3 +56,10 @@ The panel is a region with the name "Here and now". Each section has a heading w
 <Story name="Preview" args={{ preview: { 'time.phase': 'night' } }} />
 <Story name="A room without values" args={{ switches: [], texts: 1, rules: [] }} />
 <Story name="In a talk" args={{ talk: blackbeardTalk }} />
+<Story
+	name="With hints"
+	args={{
+		hints: [{ step: 'drawer', shown: ['Hal kept his few things in the cottage. Look at the furniture.'], levels: 3 }],
+		onhint: fn()
+	}}
+/>
