@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// The parts of the slice that use syntax the model does not know yet. Today's
-/// loader rejects them, or ignores their folder. Each test loads today's files
-/// plus only the parts it needs, so that each feature turns its own test green.
+/// loader rejects them, or skips their folder with a warning. Each test loads
+/// today's files plus only the parts it needs, so that each feature turns its
+/// own test green.
 const AGENDA: &str = "agendas/";
 const DIALOGUE: &str = "dialogues/";
 const TEXTS: &str = "texts/";
@@ -103,6 +104,7 @@ fn slice_baseline() {
             "tests/slice_baseline.yaml",
             "tests/slice_drowning.yaml",
             "tests/slice_endings.yaml",
+            "tests/slice_undo_after_death.yaml",
         ]
     );
 }
@@ -196,7 +198,6 @@ fn slice_equivalence() {
 }
 
 #[test]
-#[ignore = "pending: phase 2, SE-8, SE-9, P2-03 #54"]
 fn slice_undo_after_death() {
     assert_passes("slice_undo_after_death", &[]);
 }

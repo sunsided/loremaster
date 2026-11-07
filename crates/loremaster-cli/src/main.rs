@@ -1,7 +1,7 @@
 //! `loremaster new <dir> [--title T] [--idea I]`, `loremaster play <dir>`, `loremaster check <dir> [--todos]`,
 //! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
-use loremaster_project::{Diagnostic, Project, Severity, check, load, open_todos, read_dir};
+use loremaster_project::{Diagnostic, Project, check_files, open_todos, read_dir};
 use loremaster_runtime::{BlockKind, Budget, Game, Turn, Verdict, World};
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
@@ -200,19 +200,12 @@ fn open(dir: &Path) -> Option<Project> {
             return None;
         }
     };
-    let project = match load(files) {
-        Ok(p) => p,
-        Err(diags) => {
-            diags.iter().for_each(|d| eprintln!("{d}"));
-            return None;
-        }
-    };
-    let diags = check(&project);
-    diags.iter().for_each(|d| eprintln!("{d}"));
-    if diags.iter().any(|d| d.severity == Severity::Error) {
+    let checked = check_files(files);
+    checked.diagnostics.iter().for_each(|d| eprintln!("{d}"));
+    if checked.has_errors() {
         return None;
     }
-    Some(project)
+    checked.project
 }
 
 fn play(project: Project) -> ExitCode {

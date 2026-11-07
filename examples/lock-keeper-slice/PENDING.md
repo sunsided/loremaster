@@ -15,7 +15,7 @@ The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine 
 
 ## Which file needs which phase
 
-Files in today's syntax load now. The other files use syntax that the model does not know yet. Today's loader rejects them (`things/stove.yaml`, `rules/keeper.yaml`, `dialogues/`) or ignores their folder (`texts/`, `agendas/`). `endings/` loads since P1-03.
+Files in today's syntax load now. The other files use syntax that the model does not know yet. Today's loader rejects them (`things/stove.yaml`, `rules/keeper.yaml`, `dialogues/`) or skips their folder with a warning (`texts/`, `agendas/`; any other unknown folder is an error since P2-14). `endings/` loads since P1-03.
 
 | Part | Files | New syntax | Phase |
 | --- | --- | --- | --- |
@@ -38,7 +38,7 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`. Each one loads
 | `slice_save_envelope` | A save from the middle of `slice_best` has an envelope and restores | Today | Passes (P1-04) | #45 |
 | `slice_model_hash` | The YAML form gives the model hash in `expected/model.hash` | Today | Passes (P1-06) | #47 |
 | `slice_equivalence` | YAML, DSL and mixed give one model hash | Today, per form | DSL steps L3 and L4 (the `world!` macro reads dsl/ and mixed/) | P3-03 #66, P4-08 #85 |
-| `slice_undo_after_death` | The death prompt, and undo after it | Today | Phase 2 | P2-03 #54 |
+| `slice_undo_after_death` | The death prompt, and undo after it | Today | Passes (P2-03) | #54 |
 | `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Phase 3 (and R9, see the log) | P3-01 #64, #111 |
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
 | `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Phase 4 | P4-02 #79 |
@@ -55,11 +55,11 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | Date | Form | What felt bad | Proposal |
 | --- | --- | --- | --- |
 | 2026-11-07 | YAML | No plural names: "a ledger pages". The thing is now an "oilcloth packet" with the alias `pages`. | A `plural: true` field (articles "some", "the"). |
-| 2026-11-07 | YAML | Today's loader ignores unknown folders. A typo such as `ending/` loads without an error. | Reject unknown folders, as unknown fields are rejected. |
+| 2026-11-07 | YAML | Today's loader ignores unknown folders. A typo such as `ending/` loads without an error. | Reject unknown folders, as unknown fields are rejected. Done in P2-14 (#130): an unknown folder is an error that names the nearest known one; `agendas/` and `texts/` of the slice are skipped with a warning. |
 | 2026-11-07 | YAML | The stove text of D2 sits in the kitchen description. It moved to the stove, so that the kitchen loads today. | None needed; both places should work after R9. |
 | 2026-11-07 | YAML | Walkthroughs to midnight need 17 lines of `wait`. | A step form `{ wait: 17 }` or `{ until: "00:00" }`. |
 | 2026-11-07 | YAML | `end: committed` reuses the field that takes a text today. | Done in P1-03 (#44): `end:` takes an ending id; an unknown id is an error, an ending that no `end` names is a warning. |
-| 2026-11-07 | YAML | `expect:` ignores unknown keys, so `expect: { ending: … }` would pass silently. The walkthroughs use `facts: { ending: …, ending.kind: …, ending.rank: … }` instead. | P1-03 (#44) added `expect: { ending: <id> }`; the kind and rank come from the ending file. Rejecting unknown keys in `expect:` is still open. |
+| 2026-11-07 | YAML | `expect:` ignores unknown keys, so `expect: { ending: … }` would pass silently. The walkthroughs use `facts: { ending: …, ending.kind: …, ending.rank: … }` instead. | P1-03 (#44) added `expect: { ending: <id> }`; the kind and rank come from the ending file. P2-14 (#130) rejects unknown keys in `expect:` and in the steps, with the nearest known key. |
 | 2026-11-07 | YAML | `seen_by(inspector)` in D2 needs a name for the player. The slice uses `seen_by(player)`. | Decide the perceiver id with D6. |
 | 2026-11-07 | YAML | `slice_keeper_dialogue` is phase 3 in the spec, but its dialogue says a text pool, which is R9 (phase 4). | Either an inline `say` in phase 3, or the test moves to phase 4. |
 | 2026-11-07 | YAML | Two candidates of the D2 sketch can never show to the player: "too hot to touch" (when the player examines, `seen_by(player)` is true, so the fresh-ash text scores higher) and "Mind your step." (the keeper never leaves the kitchen). | Keep them as D2 wrote them. `seen_by` matters only with several perceivers (D6); the winnable and quality checks of phase 4 should report a candidate that no state can show. |

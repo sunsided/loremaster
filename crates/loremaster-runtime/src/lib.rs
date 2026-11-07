@@ -31,7 +31,7 @@ mod threads;
 mod walkthrough;
 mod world;
 
-pub use behavior::{Behavior, Cx, Flow};
+pub use behavior::{Behavior, Cx, Flow, Unstable};
 pub use events::{Event, Phase};
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
 pub use game::{ARRIVED, REFUSED};
@@ -46,7 +46,10 @@ pub use outline::{DialogueOutline, OutlineNode, OutlineOption};
 pub use output::{Block, BlockKind, Choice, Link, LinkKind, LogEntry, Run, Source, TalkInfo, Turn};
 pub use parser::{Command, Preview};
 pub use save::{Restored, SAVE_FORMAT, SAVE_VERSION, Save, SaveError, StoryStamp};
-pub use session::{Effect, EndingInfo, Input, Loaded, Session, Status, Step};
+pub use session::{
+    DEFAULT_UNDO_DEPTH, Effect, EndingInfo, Input, Loaded, RESTART, RESTORE, Session, Snapshot,
+    Status, Step, UNDO,
+};
 pub use state::{AwaitOptionInfo, AwaitRequest, Awaiting, FragmentProgress, State, Talk};
 pub use text::{SourcePiece, SourceRole};
 pub use threads::ThreadReach;

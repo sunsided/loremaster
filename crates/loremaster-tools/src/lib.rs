@@ -23,7 +23,7 @@ pub use proposal::{Change, FileChange, PreviewText, Proposal, ProposalView, Room
 
 pub use tools::{ToolDef, tools};
 
-use loremaster_project::{Diagnostic, Project, Severity, SourceFile, check, load};
+use loremaster_project::{Diagnostic, Project, SourceFile, check_files};
 use loremaster_runtime::{Game, World};
 use serde::Serialize;
 use serde_json::Value;
@@ -94,10 +94,12 @@ impl Workspace {
         self.files = files;
         self.project = None;
         self.world = None;
-        self.diagnostics = match load(self.files.clone()) {
-            Ok(project) => {
-                let mut diags = check(&project);
-                if !diags.iter().any(|d| d.severity == Severity::Error) {
+        let checked = check_files(self.files.clone());
+        let errors = checked.has_errors();
+        self.diagnostics = match checked.project {
+            Some(project) => {
+                let mut diags = checked.diagnostics;
+                if !errors {
                     // A compile error joins the warnings of the check; they stay valid.
                     match World::compile(project.story.clone()) {
                         Ok(world) => self.world = Some(Arc::new(world)),
@@ -107,7 +109,7 @@ impl Workspace {
                 self.project = Some(project);
                 diags
             }
-            Err(diags) => diags,
+            None => checked.diagnostics,
         };
         self.carry_sessions();
     }

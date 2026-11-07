@@ -38,7 +38,7 @@ impl std::fmt::Display for Pending {
 }
 
 /// One command: `"open drawer"`, or `{ do: "open drawer", see: "an iron key" }`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum WalkStep {
     Command(String),
@@ -48,6 +48,49 @@ pub enum WalkStep {
         #[serde(flatten)]
         expect: Expect,
     },
+}
+
+/// A step with checks, as written in the file. The fields of [`Expect`] are
+/// spelled out instead of `#[serde(flatten)]`, so that an unknown key is an
+/// error: serde does not reject unknown fields of a flattened struct.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CheckedStep {
+    #[serde(rename = "do")]
+    command: String,
+    #[serde(default, deserialize_with = "one_or_many")]
+    see: Vec<String>,
+    #[serde(default, deserialize_with = "one_or_many")]
+    not_see: Vec<String>,
+    #[serde(default)]
+    facts: BTreeMap<String, Value>,
+    #[serde(default)]
+    room: Option<Id>,
+    #[serde(default)]
+    ended: Option<bool>,
+    #[serde(default)]
+    ending: Option<Id>,
+}
+
+impl<'de> Deserialize<'de> for WalkStep {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        crate::de::string_or_map(
+            d,
+            "a command, or a map with `do` and what the response must show",
+            WalkStep::Command,
+            |s: CheckedStep| WalkStep::Checked {
+                command: s.command,
+                expect: Expect {
+                    see: s.see,
+                    not_see: s.not_see,
+                    facts: s.facts,
+                    room: s.room,
+                    ended: s.ended,
+                    ending: s.ending,
+                },
+            },
+        )
+    }
 }
 
 impl WalkStep {
@@ -67,6 +110,7 @@ impl WalkStep {
 
 /// What a response, or the game after the last step, must show and hold.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Expect {
     /// Text that must show: in the response of a step, or anywhere in the transcript at the end.
     #[serde(
@@ -107,4 +151,28 @@ fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D:
         OneOrMany::One(s) => vec![s],
         OneOrMany::Many(v) => v,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert2::check;
+    use serde_json::json;
+
+    #[test]
+    fn steps_round_trip_in_both_forms() {
+        let steps = json!(["look", { "do": "open drawer", "see": ["a key"], "room": "cottage" }]);
+        let read: Vec<WalkStep> = serde_json::from_value(steps.clone()).unwrap();
+        check!(read[0] == WalkStep::Command("look".into()));
+        check!(read[1].expect().unwrap().see == ["a key"]);
+        check!(serde_json::to_value(&read).unwrap() == steps);
+    }
+
+    #[test]
+    fn an_unknown_field_of_a_step_names_the_field() {
+        let err = serde_json::from_value::<WalkStep>(json!({ "do": "look", "sees": "x" }))
+            .unwrap_err()
+            .to_string();
+        check!(err.contains("unknown field `sees`"), "{err}");
+    }
 }
