@@ -119,3 +119,10 @@ fn an_option_id_is_its_key_and_a_bad_start_is_at_start() {
     check!(err.source == "mett");
     check!(err.error.message == "no node `mett`");
 }
+
+#[test]
+fn an_error_without_an_issue_is_at_start() {
+    let err = not_lowered();
+    check!(err.at == "start");
+    check!(err.source == "start:");
+}

@@ -69,11 +69,9 @@ fn an_unknown_speaker_of_a_node_is_an_error() {
 #[test]
 fn a_terminal_node_does_not_hide_other_problems() {
     // A node without options ends the talk; the other checks still run.
-    let d = diagnostics(
-        &GOOD
-            .replace("    options:\n      - { say: \"Back.\", go: back }\n", "")
-            .replace("bb.talked > 1", "bb.trsut > 1"),
-    );
+    let terminal = GOOD.replace("    options:\n      - { say: \"Back.\", go: back }\n", "");
+    assert!(terminal != GOOD, "the replacement must apply");
+    let d = diagnostics(&terminal.replace("bb.talked > 1", "bb.trsut > 1"));
     check!(d.len() == 1, "{d:#?}");
     check!(d[0].at == "nodes.again.when");
 }

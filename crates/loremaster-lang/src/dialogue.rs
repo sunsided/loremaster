@@ -50,7 +50,12 @@ pub fn compile_dialogue(
             ..error
         }),
         Err(LowerError::Check(issues)) => {
-            let Some(issue) = issues.into_iter().find(|i| i.severity == Severity::Error) else {
+            // The first error; else the first issue, which explains more
+            // than no issue.
+            let first = (issues.iter())
+                .position(|i| i.severity == Severity::Error)
+                .unwrap_or(0);
+            let Some(issue) = issues.into_iter().nth(first) else {
                 return Err(not_lowered());
             };
             let source = match issue.place {
@@ -103,8 +108,13 @@ fn lang(source: &str, error: LangError) -> DialogueError {
     }
 }
 
+/// An error without an issue to show, at the dialogue's `start`.
 fn not_lowered() -> DialogueError {
-    fail("", "the dialogue can not be lowered".into())
+    let error = fail("start:", "the dialogue can not be lowered".into());
+    DialogueError {
+        at: "start".into(),
+        ..error
+    }
 }
 
 fn fail(source: &str, message: String) -> DialogueError {
