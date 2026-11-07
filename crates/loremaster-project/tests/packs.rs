@@ -123,3 +123,18 @@ fn a_machine_from_a_second_pack_gets_its_rules_and_variable() {
     );
     assert_eq!(project.origins.get("rule:tide#1"), Some(&rust_origin(7)));
 }
+
+#[test]
+fn the_header_origin_names_the_file_that_gave_it() {
+    let mut files = lighthouse();
+    for f in &mut files {
+        if f.path == "story.yaml" {
+            f.path = "story.yml".into();
+        }
+    }
+    let project = load(files).unwrap();
+    assert_eq!(
+        project.origins.get("story"),
+        Some(&Origin::yaml("story.yml"))
+    );
+}

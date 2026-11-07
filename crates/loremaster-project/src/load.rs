@@ -111,6 +111,8 @@ impl Pack {
         let mut errors = Vec::new();
         let mut origins = BTreeMap::new();
         let mut header: Option<StoryHeader> = None;
+        // `story.yaml` or `story.yml`: the origin names the file that gave the header.
+        let mut header_path = String::new();
         let mut rooms = Vec::new();
         let mut things = Vec::new();
         let mut rules = Vec::new();
@@ -135,7 +137,10 @@ impl Pack {
             let parse_err = |e: serde_saphyr::Error| parse_diagnostic(path, &e.to_string());
             match dir {
                 "" if stem == "story" => match serde_saphyr::from_str::<StoryHeader>(&file.text) {
-                    Ok(s) => header = Some(s),
+                    Ok(s) => {
+                        header = Some(s);
+                        header_path = path.to_string();
+                    }
                     Err(e) => errors.push(parse_err(e)),
                 },
                 "rooms" => match serde_saphyr::from_str::<Room>(&with_default_id(&file.text, stem))
@@ -264,7 +269,7 @@ impl Pack {
             return Err(errors);
         }
         if header.is_some() {
-            origins.insert("story".into(), Origin::yaml("story.yaml"));
+            origins.insert("story".into(), Origin::yaml(header_path));
         }
         Ok(Pack {
             name: "yaml".into(),
