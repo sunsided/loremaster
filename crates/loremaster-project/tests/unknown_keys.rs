@@ -270,3 +270,51 @@ fn other_files_than_yaml_are_not_read() {
     });
     assert!(load(files).is_ok());
 }
+
+#[test]
+fn the_warnings_stay_when_the_project_has_errors() {
+    let mut files = lighthouse_with("agendas/keeper.yaml", "actor: keeper\nsteps: []\n");
+    files.push(SourceFile {
+        path: "ending/lost.yaml".into(),
+        text: "kind: loss\ntitle: Lost\n".into(),
+    });
+    let checked = loremaster_project::check_files(files);
+    assert!(checked.project.is_none());
+    let has = |severity, text: &str| {
+        checked
+            .diagnostics
+            .iter()
+            .any(|d| d.severity == severity && d.message.contains(text))
+    };
+    assert!(
+        has(Severity::Error, "unknown folder `ending/`"),
+        "{checked:#?}"
+    );
+    assert!(
+        has(Severity::Warning, "`agendas/` is not read yet"),
+        "{checked:#?}"
+    );
+
+    // `assemble` keeps the warnings of joining too, here a replaced room.
+    let extra = Pack::from_files(vec![
+        SourceFile {
+            path: "rooms/shore.yaml".into(),
+            text: "replace: true\nname: The Beach\n".into(),
+        },
+        SourceFile {
+            path: "rooms/cottage.yaml".into(),
+            text: "extend: true\nname: Twice\n".into(),
+        },
+    ])
+    .unwrap();
+    let found = assemble(vec![Pack::from_files(lighthouse()).unwrap(), extra]).unwrap_err();
+    assert!(
+        found.iter().any(|d| d.severity == Severity::Warning
+            && d.message.contains("`room:shore` replaces")),
+        "{found:#?}"
+    );
+    assert!(
+        found.iter().any(|d| d.severity == Severity::Error),
+        "{found:#?}"
+    );
+}

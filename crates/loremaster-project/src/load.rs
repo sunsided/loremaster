@@ -137,7 +137,7 @@ impl Pack {
     }
 
     /// A pack from the files of a YAML folder. Paths use `/` and are relative
-    /// to the folder.
+    /// to the folder. On an error, the list also holds the warnings so far.
     pub fn from_files(files: Vec<SourceFile>) -> Result<Pack, Vec<Diagnostic>> {
         let mut errors = Vec::new();
         let mut origins = BTreeMap::new();
@@ -361,6 +361,7 @@ impl Pack {
             if header.is_none() {
                 errors.push(no_story());
             }
+            errors.append(&mut warnings);
             return Err(errors);
         }
         if header.is_some() {
@@ -488,7 +489,8 @@ fn no_story() -> Diagnostic {
 /// Join packs in their order into one project (DS-1). An id that two packs
 /// define is an error that names both origins, and exactly one pack gives the
 /// story header. Machine rules and machine variables are made here, after the
-/// merge, so they are the same for each source.
+/// merge, so they are the same for each source. On an error, the list also
+/// holds the warnings so far, such as a replaced entity.
 pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut errors = Vec::new();
     let mut assembly = Vec::new();
@@ -633,9 +635,11 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         .unwrap_or_else(|| Origin::yaml("story.yaml"));
     let Some(header) = header else {
         errors.push(no_story());
+        errors.append(&mut assembly);
         return Err(errors);
     };
     if !errors.is_empty() {
+        errors.append(&mut assembly);
         return Err(errors);
     }
     for m in &header.machines {
