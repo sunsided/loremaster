@@ -48,6 +48,11 @@ enum Piece {
 fn print(tokens: &[TokenTree]) -> Result<String> {
     let mut out = String::new();
     let mut last: Option<Piece> = None;
+    // A predicate can start here: at the start, or after `and`, `or`,
+    // `not`, `&&`, `||` or `!`. Only there is `in <room>` the sugar; after
+    // `==` a word `in` is a value, such as a machine state.
+    let mut predicate = true;
+    let mut last_word = String::new();
     let mut i = 0;
     while i < tokens.len() {
         match &tokens[i] {
@@ -58,7 +63,9 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
                 last = Some(Piece::Word);
                 // `in kitchen` is `in(kitchen)`: the location sugar.
                 if word == "in"
+                    && predicate
                     && let Some(TokenTree::Ident(room)) = tokens.get(i + 1)
+                    && !KEYWORDS.contains(&unraw(room).as_str())
                 {
                     out.push('(');
                     out.push_str(&unraw(room));
@@ -66,17 +73,22 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
                     last = Some(Piece::Call);
                     i += 1;
                 }
+                predicate = KEYWORDS[..3].contains(&word.as_str());
+                last_word = word;
             }
             TokenTree::Literal(lit) => {
                 space(&mut out, &last);
-                out.push_str(&lit.to_string());
+                out.push_str(&literal(lit)?);
                 last = Some(Piece::Word);
+                predicate = false;
             }
             TokenTree::Group(group) => {
                 let (open, close) = match group.delimiter() {
                     Delimiter::Parenthesis => ('(', ')'),
                     Delimiter::Bracket => ('[', ']'),
-                    Delimiter::None => (' ', ' '),
+                    // An invisible group, such as a `$c:expr` of a
+                    // macro_rules! wrapper: keep its grouping.
+                    Delimiter::None => ('(', ')'),
                     Delimiter::Brace => {
                         return Err(syn::Error::new(
                             group.span(),
@@ -85,7 +97,9 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
                     }
                 };
                 let inner: Vec<TokenTree> = group.stream().into_iter().collect();
-                let call = last == Some(Piece::Word) && open == '(';
+                let call = last == Some(Piece::Word)
+                    && open == '('
+                    && (group.delimiter() == Delimiter::Parenthesis || last_word == "in");
                 if !call {
                     space(&mut out, &last);
                 }
@@ -93,6 +107,7 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
                 out.push_str(&print(&inner)?);
                 out.push(close);
                 last = Some(if call { Piece::Call } else { Piece::Group });
+                predicate = false;
             }
             TokenTree::Punct(p) => {
                 let mut op = p.as_char().to_string();
@@ -108,10 +123,12 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
                     "." => {
                         out.push('.');
                         last = Some(Piece::Dot);
+                        predicate = false;
                     }
                     "," => {
                         out.push(',');
                         last = Some(Piece::Comma);
+                        predicate = false;
                     }
                     "!" | "-"
                         if !matches!(last, Some(Piece::Word | Piece::Call | Piece::Group)) =>
@@ -119,11 +136,13 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
                         space(&mut out, &last);
                         out.push_str(&op);
                         last = Some(Piece::Unary);
+                        predicate = op == "!";
                     }
                     _ => {
                         space(&mut out, &last);
                         out.push_str(&op);
                         last = Some(Piece::Op);
+                        predicate = op == "&&" || op == "||";
                     }
                 }
             }
@@ -131,6 +150,31 @@ fn print(tokens: &[TokenTree]) -> Result<String> {
         i += 1;
     }
     Ok(out)
+}
+
+/// `and`, `or` and `not` start a predicate; none of these is a room.
+const KEYWORDS: &[&str] = &["and", "or", "not", "true", "false"];
+
+/// A literal as the condition language reads it. A string is its value,
+/// quoted again: the language has no escapes, so `"a\tb"` must reach it as
+/// the decoded text, and a raw string as a plain one. A text with both
+/// quote characters cannot be written.
+fn literal(lit: &proc_macro2::Literal) -> Result<String> {
+    let token = TokenStream::from(TokenTree::Literal(lit.clone()));
+    let Ok(text) = syn::parse2::<LitStr>(token) else {
+        return Ok(lit.to_string());
+    };
+    let value = text.value();
+    if !value.contains('"') {
+        Ok(format!("\"{value}\""))
+    } else if !value.contains('\'') {
+        Ok(format!("'{value}'"))
+    } else {
+        Err(syn::Error::new(
+            lit.span(),
+            "a string in a condition cannot hold both `\"` and `'`",
+        ))
+    }
 }
 
 /// An identifier without the raw prefix: `r#type` is the id `type`.
@@ -174,8 +218,36 @@ mod tests {
             ("(a or b) and c", "(a or b) and c"),
             ("mood == \"calm\"", "mood == \"calm\""),
             ("in r#type and r#loop.lit", "in(type) and loop.lit"),
+            ("lock == r#in and night", "lock == in and night"),
+            ("not in kitchen || in hall", "not in(kitchen) || in(hall)"),
+            ("name == \"a\\tb\"", "name == \"a\tb\""),
+            ("name == r#\"say \"hi\"\"#", "name == 'say \"hi\"'"),
         ] {
             assert_eq!(cond(tokens), want, "{tokens}");
         }
+    }
+
+    #[test]
+    fn an_invisible_group_keeps_its_grouping() {
+        use proc_macro2::{Delimiter, Group};
+        // `$c and night` with `$c = lock_open or windlass.carried`.
+        let c: TokenStream = "lock_open or windlass.carried".parse().unwrap();
+        let rest: TokenStream = "and night".parse().unwrap();
+        let mut tokens = vec![TokenTree::Group(Group::new(Delimiter::None, c))];
+        tokens.extend(rest);
+        assert_eq!(
+            print(&tokens).unwrap(),
+            "(lock_open or windlass.carried) and night"
+        );
+        // `in $room`: the sugar still applies.
+        let room: TokenStream = "kitchen".parse().unwrap();
+        let tokens = vec![
+            TokenTree::Ident(proc_macro2::Ident::new(
+                "in",
+                proc_macro2::Span::call_site(),
+            )),
+            TokenTree::Group(Group::new(Delimiter::None, room)),
+        ];
+        assert_eq!(print(&tokens).unwrap(), "in(kitchen)");
     }
 }
