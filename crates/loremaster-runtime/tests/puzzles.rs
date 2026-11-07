@@ -440,13 +440,13 @@ steps:
 #[test]
 fn a_machine_takes_its_steps_in_order() {
     let mut g = chapel();
-    assert_eq!(g.machines()[0].state, "idle");
+    assert_eq!(g.state().facts["exorcism"].as_text(), Some("idle"));
     let text = say(&mut g, "ring bell");
     assert!(text.contains("The bell rings red hot."), "{text}");
     assert!(!text.contains("Nothing rings."), "{text}");
     say(&mut g, "take candles");
     say(&mut g, "light candles");
-    assert_eq!(g.machines()[0].state, "lit");
+    assert_eq!(g.state().facts["exorcism"].as_text(), Some("lit"));
     let text = say(&mut g, "read book");
     assert!(text.contains("The spirits flee."), "{text}");
     assert_eq!(g.state().facts["exorcism"].as_text(), Some("done"));
@@ -461,10 +461,7 @@ fn a_machine_takes_one_step_for_one_event_and_a_timer_resets_it() {
         log.push_str(&say(&mut g, "wait"));
     }
     assert!(log.contains("The spirits jeer."), "{log}");
-    assert_eq!(g.machines()[0].state, "idle");
-    let view = &g.machines()[0];
-    assert_eq!(view.states, ["idle", "rung", "lit", "done"]);
-    assert!(view.steps[0].ready);
+    assert_eq!(g.state().facts["exorcism"].as_text(), Some("idle"));
 }
 
 #[test]

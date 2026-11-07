@@ -73,7 +73,7 @@ pub struct Exploration {
     pub stuck_path: Vec<String>,
     /// For each open or resolved thread with a payoff: whether a payoff showed, and in which order.
     #[serde(default)]
-    pub threads: Vec<crate::ThreadReach>,
+    pub threads: Vec<crate::threads::ThreadReach>,
 }
 
 /// A state as the explorer compares it: the parts that change what can happen.
@@ -489,7 +489,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             .iter()
             .enumerate()
             .filter(|(t, _)| beats.iter().any(|b| b.thread == *t && b.payoff))
-            .map(|(t, id)| crate::ThreadReach {
+            .map(|(t, id)| crate::threads::ThreadReach {
                 thread: id.clone(),
                 paid_off: paid_off[t],
                 payoff_before_setup: too_early[t].clone().unwrap_or_default(),

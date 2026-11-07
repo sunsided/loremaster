@@ -1,0 +1,214 @@
+//! Primitives for the authoring views (SE-13, ADR 0003 point 8).
+//!
+//! The views are in the crate `loremaster-workbench`: atlas, rules,
+//! machines, symbols, markup and condition checks, the map, the inspectors
+//! and the variables. They read the world and the state through
+//! [`Session::world`] and [`Session::state`]. Where a view needs the engine,
+//! it calls a primitive here: a condition, a text in markup, a name stage,
+//! the scope, the fragments of a room, or a copy of the game in another
+//! situation. Views that are mostly engine work stay here whole: the
+//! assembly of a room, the room matrix, the explorer and the author commands.
+//!
+//! This module is not part of the Session API and does not follow semver on
+//! its own. Use `loremaster-workbench`.
+
+use crate::game::Game;
+use crate::{Input, Session, SourcePiece, State, Turn, World};
+use dramaturge_model::Condition;
+use loremaster_lang::{NameForm, Scope, Segment};
+use loremaster_model::Id;
+use std::sync::Arc;
+
+pub use crate::explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant};
+pub use crate::game::{
+    AuthorCommand, FragmentView, FrameFragment, FramePart, FrameUse, PartView, RoomParts,
+    TalkOptionView, TalkView,
+};
+pub use crate::matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix};
+pub use crate::threads::ThreadReach;
+
+/// Read access to the engine behind a session, for the authoring views.
+/// It changes nothing.
+#[derive(Clone, Copy)]
+pub struct Inspector<'a> {
+    game: &'a Game,
+}
+
+impl<'a> Inspector<'a> {
+    pub fn of(session: &'a Session) -> Self {
+        Self {
+            game: session.engine(),
+        }
+    }
+
+    pub fn world(&self) -> &'a World {
+        self.game.world()
+    }
+
+    pub fn state(&self) -> &'a State {
+        self.game.state()
+    }
+
+    /// The names that conditions and markup can use, to compile what the
+    /// author types.
+    pub fn scope(&self) -> &'a Scope {
+        &self.game.world().scope
+    }
+
+    /// True when the condition holds now.
+    pub fn holds(&self, condition: &Condition) -> bool {
+        self.game.eval().holds(condition)
+    }
+
+    /// Markup rendered in the state now.
+    pub fn render(&self, segments: &[Segment]) -> String {
+        crate::text::render(&self.game.eval(), segments)
+    }
+
+    /// Markup in pieces, with the branches that do not hold now marked as
+    /// not active.
+    pub fn outline(&self, segments: &[Segment]) -> Vec<SourcePiece> {
+        let mut pieces = Vec::new();
+        crate::text::outline(&self.game.eval(), segments, true, &mut pieces);
+        pieces
+    }
+
+    /// The current name of a thing in a form, for example "the oil lamp".
+    pub fn thing_name(&self, id: &str, form: NameForm) -> String {
+        self.game.eval().thing_name(id, form)
+    }
+
+    /// The index of the thing's name stage now; `None` without stages.
+    pub fn name_stage(&self, id: &str) -> Option<usize> {
+        self.game.eval().name_stage(id)
+    }
+
+    /// The nouns the player can use for a thing now. Empty for an unknown thing.
+    pub fn nouns(&self, id: &str) -> Vec<String> {
+        self.game
+            .world()
+            .story
+            .thing(id)
+            .map(|t| self.game.nouns_of(t))
+            .unwrap_or_default()
+    }
+
+    /// The things the player can see and refer to now.
+    pub fn in_scope(&self) -> Vec<Id> {
+        self.game.in_scope()
+    }
+
+    /// True when the exit with this index of the room shows now. False for
+    /// an unknown room or exit.
+    pub fn exit_visible(&self, room: &str, exit: usize) -> bool {
+        self.exit_holds(room, exit, |e| &e.visible)
+    }
+
+    /// True when the player can pass the exit now.
+    pub fn exit_passable(&self, room: &str, exit: usize) -> bool {
+        self.exit_holds(room, exit, |e| &e.passable)
+    }
+
+    fn exit_holds(
+        &self,
+        room: &str,
+        exit: usize,
+        condition: impl Fn(&crate::world::CExit) -> &Option<Condition>,
+    ) -> bool {
+        let world = self.game.world();
+        world
+            .room_idx(room)
+            .and_then(|ri| world.rooms[ri].exits.get(exit))
+            .is_some_and(|e| self.game.eval().holds_opt(condition(e)))
+    }
+
+    /// True when the condition of the rule with this index (in the order of
+    /// `story.rules`) holds now, or it has none.
+    pub fn rule_holds(&self, index: usize) -> bool {
+        self.game
+            .world()
+            .rules
+            .get(index)
+            .is_some_and(|r| self.game.eval().holds_opt(&r.when))
+    }
+
+    /// The rules that fired in the last turn.
+    pub fn last_fired(&self) -> &'a [Id] {
+        self.game.last_fired()
+    }
+
+    /// The action frame used for the last action.
+    pub fn last_frame(&self) -> Option<&'a FrameUse> {
+        self.game.last_frame()
+    }
+
+    /// How the description of the current room is assembled now.
+    pub fn assembly(&self) -> Vec<FragmentView> {
+        self.game.assembly()
+    }
+
+    /// The generated objects and exits layers of the current room.
+    pub fn room_parts(&self) -> RoomParts {
+        self.game.room_parts()
+    }
+
+    /// The talk in progress with its hidden options, or `None`.
+    pub fn talk_view(&self) -> Option<TalkView> {
+        self.game.talk_view()
+    }
+
+    /// The description of the current room as it would show now.
+    pub fn describe(&self) -> Turn {
+        self.game.describe_preview()
+    }
+
+    /// A copy of the game in one combination of the room matrix: in the room,
+    /// with each named value set. `None` for an unknown room.
+    pub fn situation(&self, room: &str, values: &[(String, String)]) -> Option<Session> {
+        let mut copy = self.game.clone();
+        crate::matrix::apply_cell(&mut copy, room, values).then(|| Session::from_engine(copy, true))
+    }
+
+    /// Walk the reachable states from the start of the story of this game.
+    /// It does not change the game.
+    pub fn explore(&self, budget: Budget) -> Exploration {
+        explore(self.game.world_arc().clone(), budget)
+    }
+
+    /// The text of a room in every combination of the values it depends on.
+    pub fn room_matrix(&self, room: &str) -> Option<RoomMatrix> {
+        crate::matrix::room_matrix(self.game, room)
+    }
+
+    /// One fragment text in every combination of the values it depends on.
+    pub fn text_matrix(&self, src: &str, when: Option<&str>) -> Option<RoomMatrix> {
+        crate::matrix::text_matrix(self.game, src, when)
+    }
+}
+
+/// The opening as a whole turn, with the rule log, for an editor transcript.
+pub fn start(session: &mut Session) -> Turn {
+    session.start_turn()
+}
+
+/// One input as a whole turn, with the rule log, for an editor transcript.
+pub fn play(session: &mut Session, input: Input) -> Turn {
+    session.turn(input)
+}
+
+/// Run an author command: it changes the state directly.
+pub fn author(session: &mut Session, command: AuthorCommand) -> Turn {
+    session.engine_mut().author(command)
+}
+
+/// The session in a changed world (SE-14). The state carries over; a value
+/// still at its start value takes the new start value, and what the new world
+/// does not have is dropped.
+pub fn carry_over(session: &Session, world: Arc<World>) -> Session {
+    Session::from_engine(session.engine().carry_over(world), session.started())
+}
+
+/// Walk the reachable states from the start of the story.
+pub fn explore(world: Arc<World>, budget: Budget) -> Exploration {
+    crate::explore::explore(&Game::new(world), budget)
+}

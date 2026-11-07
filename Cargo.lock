@@ -442,6 +442,7 @@ dependencies = [
  "loremaster-mcp",
  "loremaster-project",
  "loremaster-runtime",
+ "loremaster-workbench",
 ]
 
 [[package]]
@@ -525,6 +526,7 @@ dependencies = [
  "loremaster-model",
  "loremaster-project",
  "loremaster-runtime",
+ "loremaster-workbench",
  "serde",
  "serde_json",
  "sha2",
@@ -539,10 +541,22 @@ dependencies = [
  "loremaster-model",
  "loremaster-project",
  "loremaster-runtime",
+ "loremaster-workbench",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "loremaster-workbench"
+version = "0.1.0"
+dependencies = [
+ "loremaster-lang",
+ "loremaster-model",
+ "loremaster-project",
+ "loremaster-runtime",
+ "serde",
 ]
 
 [[package]]

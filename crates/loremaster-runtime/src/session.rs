@@ -11,6 +11,9 @@ use loremaster_model::{EndingKind, Id};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod engine;
+mod queries;
+
 /// Input from the host (SE-2).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
@@ -163,22 +166,13 @@ impl Session {
     /// The opening: the intro and the first room. A second call, or a call
     /// after a restore, starts nothing again and only reports the status.
     pub fn start(&mut self) -> Step {
-        if self.started {
-            return self.step(Turn::default());
-        }
-        self.started = true;
-        let turn = self.game.start();
+        let turn = self.start_turn();
         self.step(turn)
     }
 
     /// Handle one input (SE-2).
     pub fn submit(&mut self, input: Input) -> Step {
-        let turn = match input {
-            Input::Text(text) => self.game.input(&text),
-            Input::Command(cmd) => self.game.act(cmd),
-            Input::Choice(index) => self.game.act(Command::Choose { index }),
-            Input::Tick => self.game.tick(),
-        };
+        let turn = self.turn(input);
         self.step(turn)
     }
 
@@ -199,13 +193,6 @@ impl Session {
 
     pub fn world(&self) -> &World {
         self.game.world()
-    }
-
-    /// The engine behind the session. Hosts use the session; this is for the
-    /// authoring views until they move to the Workbench API (P2-08).
-    #[doc(hidden)]
-    pub fn game(&self) -> &Game {
-        &self.game
     }
 
     fn step(&self, turn: Turn) -> Step {

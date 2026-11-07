@@ -2,27 +2,21 @@
 //! containers, the score, machines and check rules. The tests jump to the
 //! puzzle with author commands, as the editor's state switches do.
 
+use crate::{Host, example};
 use loremaster_model::Value;
-use loremaster_project::{check, load, read_dir};
-use loremaster_runtime::{AuthorCommand, Game, World};
-use std::path::Path;
-use std::sync::Arc;
+use loremaster_workbench::{AuthorCommand, Workbench};
 
-fn zork() -> Game {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/zork1");
-    let project = load(read_dir(&root).unwrap()).unwrap_or_else(|e| panic!("{e:#?}"));
-    let problems = check(&project);
-    assert!(problems.is_empty(), "{problems:#?}");
-    let mut game = Game::new(Arc::new(World::compile(project.story).unwrap()));
+fn zork() -> Workbench {
+    let mut game = example("zork1");
     game.start();
     game
 }
 
-fn goto(g: &mut Game, room: &str) {
+fn goto(g: &mut Workbench, room: &str) {
     g.author(AuthorCommand::Goto { room: room.into() });
 }
 
-fn give(g: &mut Game, things: &[&str]) {
+fn give(g: &mut Workbench, things: &[&str]) {
     for t in things {
         g.author(AuthorCommand::Give {
             thing: t.to_string(),
@@ -30,11 +24,11 @@ fn give(g: &mut Game, things: &[&str]) {
     }
 }
 
-fn say(g: &mut Game, cmd: &str) -> String {
+fn say(g: &mut Workbench, cmd: &str) -> String {
     g.input(cmd).plain_text()
 }
 
-fn flag(g: &Game, name: &str) -> bool {
+fn flag(g: &Workbench, name: &str) -> bool {
     g.state().flag(name)
 }
 

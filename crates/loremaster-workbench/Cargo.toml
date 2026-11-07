@@ -1,0 +1,27 @@
+[package]
+name = "loremaster-workbench"
+description = "Authoring views for loremaster stories: atlas, rules, machines, checks, previews, room matrix and explorer over a running session."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["text-adventure", "interactive-fiction", "editor", "authoring", "game"]
+categories = ["game-development"]
+# The tests read the stories in ../../examples. They are not in the package.
+exclude = ["tests/"]
+
+[dependencies]
+loremaster-lang.workspace = true
+loremaster-model.workspace = true
+loremaster-runtime.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+loremaster-project.workspace = true
+
+[lints]
+workspace = true

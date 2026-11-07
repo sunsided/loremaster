@@ -1,8 +1,11 @@
+//! Thread reach from the explorer: a payoff before its setup.
+
 use loremaster_project::{SourceFile, load};
-use loremaster_runtime::{Budget, Game, World, explore};
+use loremaster_runtime::World;
+use loremaster_workbench::{Budget, Workbench};
 use std::sync::Arc;
 
-fn game(files: &[(&str, &str)]) -> Game {
+fn game(files: &[(&str, &str)]) -> Workbench {
     let files = files
         .iter()
         .map(|(path, text)| SourceFile {
@@ -11,7 +14,7 @@ fn game(files: &[(&str, &str)]) -> Game {
         })
         .collect();
     let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
-    Game::new(Arc::new(World::compile(project.story).unwrap()))
+    Workbench::new(Arc::new(World::compile(project.story).unwrap()))
 }
 
 /// A hall with a cellar to the north and an attic to the east. The cellar has the payoff,
@@ -29,7 +32,7 @@ fn a_payoff_before_its_setup_is_found() {
         ("rooms/attic.yaml", ATTIC),
         ("threads/key.yaml", "name: The key\n"),
     ]);
-    let found = explore(&g, Budget::default());
+    let found = g.explore(Budget::default());
     let key = found.threads.iter().find(|t| t.thread == "key").unwrap();
     assert!(key.paid_off);
     assert_eq!(key.payoff_before_setup, ["go north"], "{key:?}");
@@ -48,7 +51,7 @@ fn a_payoff_that_never_shows_is_found() {
         ("rooms/attic.yaml", ATTIC),
         ("threads/key.yaml", "name: The key\n"),
     ]);
-    let found = explore(&g, Budget::default());
+    let found = g.explore(Budget::default());
     let key = found.threads.iter().find(|t| t.thread == "key").unwrap();
     assert!(!key.paid_off, "{key:?}");
     assert!(key.payoff_before_setup.is_empty());
@@ -63,5 +66,5 @@ fn a_dropped_thread_is_not_checked() {
         ("rooms/attic.yaml", ATTIC),
         ("threads/key.yaml", "name: The key\nstatus: dropped\n"),
     ]);
-    assert!(explore(&g, Budget::default()).threads.is_empty());
+    assert!(g.explore(Budget::default()).threads.is_empty());
 }

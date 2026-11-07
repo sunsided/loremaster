@@ -21,6 +21,7 @@ loremaster-dsl = { workspace = true, optional = true }
 loremaster-mcp.workspace = true
 loremaster-project.workspace = true
 loremaster-runtime.workspace = true
+loremaster-workbench.workspace = true
 
 [features]
 # `loremaster serve` serves the web editor. The crates.io package contains the editor.

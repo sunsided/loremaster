@@ -2,7 +2,8 @@
 //! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
 use loremaster_project::{Diagnostic, Project, Severity, check, load, open_todos, read_dir};
-use loremaster_runtime::{BlockKind, Budget, Game, Turn, Verdict, World};
+use loremaster_runtime::{BlockKind, Effect, Input, Session, Status, Step, Verdict, World};
+use loremaster_workbench::Budget;
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
@@ -224,9 +225,9 @@ fn play(project: Project) -> ExitCode {
         }
     };
     let style = std::io::stdout().is_terminal();
-    let mut game = Game::new(world.clone());
+    let mut session = Session::new(world.clone());
     println!("{}\n", bold(&world.story.title, style));
-    print_turn(&game.start(), style);
+    print_step(&session.start(), style);
     let stdin = std::io::stdin();
     loop {
         print!("\n> ");
@@ -241,14 +242,14 @@ fn play(project: Project) -> ExitCode {
             break;
         }
         if line == "time" {
-            let s = game.scene();
+            let s = session.scene();
             println!("Day {}, {} ({}), turn {}.", s.day, s.time, s.phase, s.turns);
             continue;
         }
-        let turn = game.input(line);
+        let step = session.submit(Input::Text(line.to_string()));
         println!();
-        print_turn(&turn, style);
-        if turn.ended {
+        print_step(&step, style);
+        if matches!(step.status, Status::Ended { .. }) {
             println!("\n*** The End ***");
             break;
         }
@@ -339,7 +340,7 @@ fn explore(project: Project) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let result = loremaster_runtime::explore(&Game::new(world), Budget::default());
+    let result = loremaster_workbench::explore(world, Budget::default());
     let more = if result.truncated {
         " (budget reached; results are incomplete)"
     } else {
@@ -397,9 +398,13 @@ fn explore(project: Project) -> ExitCode {
     }
 }
 
-fn print_turn(turn: &Turn, style: bool) {
+fn print_step(step: &Step, style: bool) {
     let mut first = true;
-    for block in &turn.blocks {
+    let blocks = step.effects.iter().filter_map(|e| match e {
+        Effect::Text { block } => Some(block),
+        _ => None,
+    });
+    for block in blocks {
         if block.kind == BlockKind::Command {
             continue;
         }
@@ -414,9 +419,13 @@ fn print_turn(turn: &Turn, style: bool) {
             _ => println!("{}", wrap(&text, 78)),
         }
     }
-    if !turn.choices.is_empty() {
+    let choices = step.effects.iter().find_map(|e| match e {
+        Effect::Choices { choices, .. } => Some(choices),
+        _ => None,
+    });
+    if let Some(choices) = choices.filter(|c| !c.is_empty()) {
         println!();
-        for c in &turn.choices {
+        for c in choices {
             println!(
                 "{}",
                 wrap(

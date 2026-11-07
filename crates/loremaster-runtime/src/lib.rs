@@ -13,6 +13,8 @@
 //! answers derived values, such as the time of day or the player's room,
 //! through dramaturge's `Custom` condition.
 
+#[doc(hidden)]
+pub mod authoring;
 mod behavior;
 mod eval;
 mod events;
@@ -33,14 +35,7 @@ mod world;
 
 pub use behavior::{Behavior, Cx, Flow};
 pub use events::{Event, Phase};
-pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
-pub use game::{
-    AtlasRoom, AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game,
-    Inspect, MachineStepView, MachineView, MapLink, MapRoom, MapView, MarkupCheck, PartView,
-    PhaseView, RoomParts, RuleView, Scene, TalkOptionView, TalkView, TextError, ThingInfo, VarView,
-    VerbInfo,
-};
-pub use matrix::{Dimension, MAX_CELLS, MatrixCell, RoomMatrix, room_matrix, text_matrix};
+pub use game::{ExitInfo, Game, Scene, ThingInfo, VerbInfo};
 pub use outline::{DialogueOutline, OutlineNode, OutlineOption};
 pub use output::{Block, BlockKind, Choice, Link, LinkKind, LogEntry, Run, Source, TalkInfo, Turn};
 pub use parser::{Command, Preview};
@@ -48,6 +43,5 @@ pub use save::{Restored, SAVE_FORMAT, SAVE_VERSION, Save, SaveError, StoryStamp}
 pub use session::{Effect, EndingInfo, Input, Loaded, Session, Status, Step};
 pub use state::{FragmentProgress, State, Talk};
 pub use text::{SourcePiece, SourceRole};
-pub use threads::ThreadReach;
 pub use walkthrough::{Verdict, WalkResult, run_walkthrough};
 pub use world::{CompileError, World};
