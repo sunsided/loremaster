@@ -31,8 +31,8 @@ mod threads;
 mod walkthrough;
 mod world;
 
-pub use behavior::{Behavior, Cx, Flow, Unstable};
-pub use events::{Event, Phase};
+pub use behavior::{Behavior, Cx, Flow, Manifest, Unstable};
+pub use events::{Event, EventKind, Phase};
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
 pub use game::{ARRIVED, REFUSED};
 pub use game::{

@@ -1986,11 +1986,14 @@ impl Game {
             })
             .chain(self.world.story.behaviors.iter().map(|id| {
                 let found = self.world.behavior(id.as_str());
-                let when = match found.map(|b| b.description()) {
+                let mut when = match found.map(|b| b.description()) {
                     Some("") | None if found.is_some() => "code in this game".to_string(),
                     Some(d) => format!("code in this game: {d}"),
                     None => "code in the game, which this build does not have".to_string(),
                 };
+                if let Some(m) = self.world.manifest(id.as_str()) {
+                    when.push_str(&format!(" ({})", m.describe()));
+                }
                 RuleView {
                     id: format!("behavior:{id}"),
                     trigger: "event".into(),
@@ -2306,15 +2309,20 @@ impl Game {
             }
         }
         // Behaviors run after the rules of the event.
-        for b in &world.behaviors {
+        let kind = event.kind();
+        for (b, manifest) in world.behaviors.iter().zip(&world.manifests) {
             if self.stopped || self.state.ended {
                 break;
+            }
+            if !manifest.handles(kind) {
+                continue;
             }
             let mut cx = crate::Cx {
                 owner: Id::new(format!("behavior:{}", b.id())),
                 game: self,
                 turn,
                 depth,
+                manifest,
             };
             if b.handle(event, &mut cx) == crate::Flow::Stop {
                 self.stopped = true;

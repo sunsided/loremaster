@@ -475,8 +475,9 @@ Some logic is too large for rules, for example a character that walks the map an
 1. Write a type that implements `loremaster_runtime::Behavior`. Its `handle` method gets each event, after the rules of the event.
 2. Read and change the world only through `Cx`. It reads facts, locations, the player's room (`here`), `neighbours`, `carried` things, `present`, `room_has_tag`, `visited`, `turns` and `minutes`. It changes facts, things, the player, text and events. Random numbers come only from `cx.roll(n)`: do not read a clock, the host or files. Then the save game, the walkthroughs and the explorer see all changes, and play replays. Do not keep state in fields of the type.
    `cx.unstable()` gives the whole state and world, read-only, for what `Cx` does not say yet. It is not a stable API.
-3. Register the behavior: `world.register(Thief::zork())`.
-4. Name the behavior in the story: `behaviors: [thief]` in story.yaml, or a file `behaviors/thief.yaml` with notes.
+3. Give a manifest: what the behavior reads, what it writes and which events it handles, for example `Manifest::new().events([EventKind::Start, EventKind::Turn]).reads(["here", "carried", "random"]).writes(["thief.location", "random"])`. Names are facts, `<thing>.location`, or `here`, `carried`, `turns`, `minutes`, `visits` and `random` for the parts of the state that `Cx` reads without a fact name. With `events`, the game sends the behavior only those kinds; without it, every event. When the manifest names its writes, a `set`, `move_thing`, `goto` or `roll` that it does not name is a note in the log. The rules view shows the manifest. Without a manifest, a behavior is opaque: it gets every event and may read and write anything.
+4. Register the behavior: `world.register(Thief::zork())`.
+5. Name the behavior in the story: `behaviors: [thief]` in story.yaml, or a file `behaviors/thief.yaml` with notes.
 
 A build without the code, such as the editor or `loremaster play`, plays the story without the behavior. The rules view shows the behavior as code, and the terminal commands show a note.
 

@@ -114,6 +114,128 @@ fn the_zork_thief_knows_the_things_of_zork() {
     assert!(world.missing_behaviors().is_empty());
 }
 
+/// Counts the events it gets in `seen`, and writes `other`, which its
+/// manifest does not name.
+#[derive(Debug)]
+struct Counter;
+
+impl loremaster_runtime::Behavior for Counter {
+    fn id(&self) -> &str {
+        "counter"
+    }
+
+    fn manifest(&self) -> loremaster_runtime::Manifest {
+        loremaster_runtime::Manifest::new()
+            .events([loremaster_runtime::EventKind::Custom])
+            .reads(["seen"])
+            .writes(["seen"])
+    }
+
+    fn handle(
+        &self,
+        _: &loremaster_runtime::Event,
+        cx: &mut loremaster_runtime::Cx<'_>,
+    ) -> loremaster_runtime::Flow {
+        let seen = match cx.fact("seen") {
+            Some(loremaster_model::Value::Int(n)) => *n,
+            _ => 0,
+        };
+        cx.set("seen", loremaster_model::Value::Int(seen + 1));
+        cx.set("other", loremaster_model::Value::Bool(true));
+        loremaster_runtime::Flow::Continue
+    }
+}
+
+fn counter_world() -> Arc<World> {
+    let files = [
+        (
+            "story.yaml",
+            "title: Bell\nstart: hall\nbehaviors: [counter]\nvars:\n  - { id: seen, type: int, initial: 0 }\n  - { id: other, type: bool, initial: false }\n",
+        ),
+        ("rooms/hall.yaml", "name: Hall\ndescription: [\"A hall.\"]\n"),
+        ("verbs/ring.yaml", "label: Ring\nwords: [ring]\nslots: none\n"),
+        (
+            "rules/ring.yaml",
+            "- id: ring\n  on: { verb: [ring] }\n  instead: true\n  then: [{ emit: bell }]\n",
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    });
+    let mut world = World::compile(load(files.into()).unwrap().story).unwrap();
+    world.register(Counter);
+    Arc::new(world)
+}
+
+#[test]
+fn a_behavior_gets_only_the_events_of_its_manifest() {
+    let mut game = Game::new(counter_world());
+    game.start();
+    game.input("wait");
+    game.input("wait");
+    assert_eq!(
+        game.state().facts.get("seen"),
+        Some(&loremaster_model::Value::Int(0)),
+        "no turn events"
+    );
+    let turn = game.input("ring");
+    assert_eq!(
+        game.state().facts.get("seen"),
+        Some(&loremaster_model::Value::Int(1))
+    );
+    // A write that the manifest does not name is a note for the author.
+    assert!(
+        turn.log
+            .iter()
+            .any(|l| l.kind == "author" && l.text.contains("`other`")),
+        "{:?}",
+        turn.log
+    );
+    assert!(!turn.log.iter().any(|l| l.text.contains("`seen`")));
+}
+
+#[test]
+fn the_rules_view_and_the_explorer_use_the_manifest() {
+    let world = counter_world();
+    assert!(!world.behaviors_watch_time());
+    let game = Game::new(world);
+    let view = game
+        .rules()
+        .into_iter()
+        .find(|r| r.id == "behavior:counter")
+        .unwrap();
+    assert!(
+        view.when.contains("on custom; reads seen; writes seen"),
+        "{}",
+        view.when
+    );
+    // The thief declares start and turn events: waiting matters.
+    let thief = world_thief();
+    assert_eq!(
+        thief.manifest("thief").unwrap().events,
+        Some(vec![
+            loremaster_runtime::EventKind::Start,
+            loremaster_runtime::EventKind::Turn
+        ])
+    );
+    assert!(thief.behaviors_watch_time());
+}
+
+#[test]
+fn manifest_new_handles_every_event_until_events_narrows_it() {
+    use loremaster_runtime::{EventKind, Manifest};
+    let m = Manifest::new().reads(["here"]);
+    assert!(m.handles(EventKind::Turn) && m.handles(EventKind::Custom));
+    let m = m.events([EventKind::Custom]);
+    assert!(!m.handles(EventKind::Turn) && m.handles(EventKind::Custom));
+    assert!(!m.may_write("here"));
+}
+
+fn world_thief() -> Arc<World> {
+    world(true)
+}
+
 /// A behavior that reads only the narrow view of `Cx` (XP-1).
 #[derive(Debug)]
 struct Watcher;

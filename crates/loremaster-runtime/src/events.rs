@@ -44,7 +44,37 @@ pub enum Event {
     },
 }
 
+/// The kind of an event, without its data. A behavior names the kinds it
+/// handles in its [`Manifest`](crate::Manifest).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum EventKind {
+    Start,
+    Turn,
+    Enter,
+    Leave,
+    Time,
+    Verb,
+    Timer,
+    Custom,
+    Talk,
+}
+
 impl Event {
+    pub fn kind(&self) -> EventKind {
+        match self {
+            Event::Start => EventKind::Start,
+            Event::Turn => EventKind::Turn,
+            Event::Enter(_) => EventKind::Enter,
+            Event::Leave(_) => EventKind::Leave,
+            Event::Time { .. } => EventKind::Time,
+            Event::Verb { .. } => EventKind::Verb,
+            Event::Timer(_) => EventKind::Timer,
+            Event::Custom(_) => EventKind::Custom,
+            Event::Talk { .. } => EventKind::Talk,
+        }
+    }
+
     /// Does the rule listen for this event? Scope (`within`) and the
     /// condition are not part of this test.
     pub fn matches(&self, rule: &Rule) -> bool {

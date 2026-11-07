@@ -25,6 +25,8 @@ pub struct World {
     pub(crate) timers: Vec<CTimer>,
     /// Registered behaviors that the story names, in story order.
     pub(crate) behaviors: Vec<std::sync::Arc<dyn crate::Behavior>>,
+    /// The manifests of `behaviors`, in the same order.
+    pub(crate) manifests: Vec<crate::Manifest>,
     /// Every registered behavior, also the ones that the story does not name.
     registered: Vec<std::sync::Arc<dyn crate::Behavior>>,
     pub(crate) frames: BTreeMap<Id, CFrame>,
@@ -506,6 +508,7 @@ impl World {
             rule_order,
             timers,
             behaviors: Vec::new(),
+            manifests: Vec::new(),
             registered: Vec::new(),
             frames,
             dialogues,
@@ -529,7 +532,24 @@ impl World {
                     .cloned()
             })
             .collect();
+        self.manifests = self.behaviors.iter().map(|b| b.manifest()).collect();
         self
+    }
+
+    /// The manifest of a behavior, as `register` took it.
+    pub fn manifest(&self, id: &str) -> Option<&crate::Manifest> {
+        self.behaviors
+            .iter()
+            .position(|b| b.id() == id)
+            .and_then(|i| self.manifests.get(i))
+    }
+
+    /// Does a behavior of the story react to the passing of time (turn or
+    /// time events)? An opaque one may.
+    pub fn behaviors_watch_time(&self) -> bool {
+        self.manifests
+            .iter()
+            .any(|m| m.handles(crate::EventKind::Turn) || m.handles(crate::EventKind::Time))
     }
 
     /// The behaviors that the story names and that this build does not have.
