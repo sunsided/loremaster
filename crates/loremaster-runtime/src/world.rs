@@ -123,7 +123,6 @@ pub(crate) struct CTimer {
     pub at: BTreeMap<u32, Vec<CEffect>>,
 }
 
-/// A dialogue lowered to a dramaturge graph, with its world effects compiled.
 /// A quest machine, compiled: its title and the journal text per state, with
 /// `done` for a finished state.
 #[derive(Debug, Clone)]
@@ -133,6 +132,7 @@ pub(crate) struct CQuest {
     pub states: BTreeMap<String, (CompiledLine, bool)>,
 }
 
+/// A dialogue lowered to a dramaturge graph, with its world effects compiled.
 #[derive(Debug, Clone)]
 pub(crate) struct CDialogue {
     pub id: Id,
