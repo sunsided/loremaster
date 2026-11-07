@@ -151,7 +151,9 @@ pub mod on {
 /// [`start_timer_for`](Self::start_timer_for) join a call that directly
 /// follows the same effect into it, as one YAML map does:
 /// `.set("beacon_lit", true).set("lens.lit", true)` is
-/// `set: { beacon_lit: true, lens.lit: true }`.
+/// `set: { beacon_lit: true, lens.lit: true }`. A key that the map has
+/// already starts a new effect, so `.add("gold", -5).add("gold", 5)` is two
+/// `add` effects and adds 0, as two YAML entries do.
 pub trait Effects: Sized {
     #[doc(hidden)]
     fn effects_mut(&mut self) -> &mut Vec<Effect>;
@@ -166,7 +168,7 @@ pub trait Effects: Sized {
     fn set(mut self, name: impl Into<String>, value: impl IntoValue) -> Self {
         let (name, value) = (name.into(), value.into_value());
         match self.effects_mut().last_mut() {
-            Some(Effect::Set(map)) => {
+            Some(Effect::Set(map)) if !map.contains_key(&name) => {
                 map.insert(name, value);
             }
             _ => self.effects_mut().push(Effect::Set([(name, value)].into())),
@@ -178,7 +180,7 @@ pub trait Effects: Sized {
     fn add(mut self, name: impl Into<String>, amount: i64) -> Self {
         let name = name.into();
         match self.effects_mut().last_mut() {
-            Some(Effect::Add(map)) => {
+            Some(Effect::Add(map)) if !map.contains_key(&name) => {
                 map.insert(name, amount);
             }
             _ => self
@@ -198,7 +200,7 @@ pub trait Effects: Sized {
     fn move_to(mut self, thing: impl AsRef<str>, target: impl AsRef<str>) -> Self {
         let (thing, target) = (id(thing), id(target));
         match self.effects_mut().last_mut() {
-            Some(Effect::Move(map)) => {
+            Some(Effect::Move(map)) if !map.contains_key(&thing) => {
                 map.insert(thing, target);
             }
             _ => self
@@ -237,7 +239,7 @@ pub trait Effects: Sized {
     fn start_timer_for(mut self, timer: impl AsRef<str>, turns: u32) -> Self {
         let timer = id(timer);
         match self.effects_mut().last_mut() {
-            Some(Effect::Start(StartTimers::Many(map))) => {
+            Some(Effect::Start(StartTimers::Many(map))) if !map.contains_key(&timer) => {
                 map.insert(timer, turns);
             }
             _ => self
