@@ -48,4 +48,11 @@ mod plain_line_markup {
     }
 }
 
+mod speaker_without_string {
+    use loremaster::prelude::*;
+    world! {
+        rule r on turn { line keeper says foo; }
+    }
+}
+
 fn main() {}

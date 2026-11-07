@@ -580,7 +580,9 @@ fn line(input: ParseStream) -> Result<Vec<Segment>> {
             && !peek_kw(input, "when")
             && !peek_kw(input, "narrate")
             && !peek_kw(input, "says")
-            && !peek_speaker(input)
+            // Two words are enough here: `keeper says foo` is a segment
+            // with a missing string, not a text pool.
+            && !peek_word_then(input, "says")
         {
             return Err(input.error(
                 "a line from a text pool is not in `world!` yet: it waits for the text core (R9, P4-01 #78)",
@@ -659,6 +661,12 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
     if peek_kw(input, "says") {
         name(input)?;
         return Ok(plain(SegmentVoice::Says(None), text(input)?));
+    }
+    // `<speaker> says` without its string: report the missing string.
+    if peek_word_then(input, "says") {
+        name(input)?;
+        name(input)?;
+        text(input)?;
     }
     Err(input.error(
         "expected a segment: a string, `narrate \"…\"`, `says \"…\"`, `<speaker> says \"…\"` or `when <cond> then <segment>`, or `;`",

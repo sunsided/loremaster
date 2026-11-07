@@ -33,3 +33,9 @@ error: unknown name `bogus`
    |
 44 |                 line "It opens. {bogus ? Yes. | No.}";
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected a string
+  --> tests/ui/fail/speech_segments.rs:54:43
+   |
+54 |         rule r on turn { line keeper says foo; }
+   |                                           ^^^
