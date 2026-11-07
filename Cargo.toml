@@ -4,6 +4,7 @@ members = [
     "crates/loremaster-cli",
     "crates/loremaster-dsl",
     "crates/loremaster-lang",
+    "crates/loremaster-macros",
     "crates/loremaster-mcp",
     "crates/loremaster-model",
     "crates/loremaster-project",
@@ -26,6 +27,7 @@ rust-version = "1.89"
 [workspace.dependencies]
 loremaster-dsl = { version = "0.1.0", path = "crates/loremaster-dsl" }
 loremaster-lang = { version = "0.1.0", path = "crates/loremaster-lang" }
+loremaster-macros = { version = "0.1.0", path = "crates/loremaster-macros" }
 loremaster-model = { version = "0.1.0", path = "crates/loremaster-model" }
 loremaster-project = { version = "0.1.0", path = "crates/loremaster-project" }
 loremaster-runtime = { version = "0.1.0", path = "crates/loremaster-runtime" }
@@ -44,6 +46,10 @@ tiny_http = "0.12"
 include_dir = "0.7"
 assert2 = "0.4"
 proptest = "1.12"
+proc-macro2 = "1"
+quote = "1"
+syn = "2"
+trybuild = "1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -188,19 +188,9 @@ fn slice_model_hash() {
     );
 }
 
-#[test]
-#[ignore = "pending: phase 3, DS-4, P3-03 #66 (world! core, DSL step L3) and P4-08 #85 (L4)"]
-fn slice_equivalence() {
-    // The three forms must assemble to one canonical model (DS-11..DS-15).
-    // This compares the part in today's syntax; the parts with new syntax join
-    // when they load. The `world!` files of dsl/ and mixed/ need the macro, so
-    // today's loader cannot read those forms.
-    let hash = |name: &str| model_hash(&project(with(name, &[])).story);
-    let expected = expected_hash();
-    assert_eq!(hash("yaml"), expected, "yaml");
-    assert_eq!(hash("mixed"), expected, "mixed");
-    assert_eq!(hash("dsl"), expected, "dsl");
-}
+// `slice_equivalence` (YAML, DSL and mixed give one model hash) is in
+// crates/loremaster-cli/tests/slice_dsl.rs: the DSL and mixed forms need the
+// world! macro, with the cargo feature `dsl` of the crate `loremaster`.
 
 #[test]
 fn slice_undo_after_death() {

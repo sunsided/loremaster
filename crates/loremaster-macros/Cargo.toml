@@ -1,0 +1,38 @@
+[package]
+name = "loremaster-macros"
+description = "The world! macro for loremaster stories: rooms, things, rules and tests in Rust, checked at compile time."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["text-adventure", "interactive-fiction", "macro", "dsl", "game"]
+categories = ["game-development"]
+# The tests compile stories with the crate `loremaster`. They are not in the package.
+exclude = ["tests/"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+# The macro builds the pack at compile time with the builder, to run the
+# schema checks (check_packs) on it.
+loremaster-dsl.workspace = true
+loremaster-model.workspace = true
+loremaster-project.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+# The expansion names `::loremaster::dsl`, so the tests use the crate
+# `loremaster` with its feature `dsl`. A path dependency without a version:
+# cargo drops it from the published package.
+loremaster = { path = "../loremaster-cli", default-features = false, features = ["dsl"] }
+trybuild.workspace = true
+
+[lints]
+workspace = true

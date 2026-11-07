@@ -1,10 +1,9 @@
 // Part "Today": the story header, the vars, the three rooms, the things (not
 // the stove), the lock machine and its timer, the lock and accuse rules, and
-// the verbs. The YAML form of this part loads now. This form waits for the
-// world! core (DSL step L3) and for machines, timers and verbs (step L4).
+// the verbs. It compiles since the world! core (DSL step L3, P3-03 #66).
 // `end committed` names an ending entity (YAML since P1-03, #44).
 //
-// Draft syntax. It does not compile. Read ../PENDING.md.
+// Read ../PENDING.md.
 
 use loremaster::prelude::*;
 
@@ -117,6 +116,25 @@ world! {
     // draft: a timer line. YAML `timers/lock_drain.yaml` with `turns: 3`.
     timer lock_drain turns 3;
 
+    // Accuse rules. Rules keep their order in the model (equal rules run in
+    // file order), and the YAML loader reads rules/accuse.yaml before
+    // rules/lock.yaml, so the accuse rules come first here too.
+
+    rule accuse_with_pages on verb(accuse, keeper) when pages.carried {
+        line "You lay the pages on the table. The lock-keeper looks at them for a long time.";
+        end committed;
+    }
+
+    rule accuse_without_pages on verb(accuse, keeper) when not pages.carried {
+        // `line` shows text, as `say:` does in YAML. A line will be made of
+        // segments: narration, `<speaker> says "…"` and `narrate "…"` (#111):
+        //     line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
+        // `line` instead of `say`, because "say … says" reads like a stutter.
+        // Until #111, the line is one raw string, as in rules/accuse.yaml.
+        line r#"The lock-keeper shrugs. "Prove it," he says."#;
+        end ashes;
+    }
+
     // Lock rules
 
     // draft: `on check(verb, thing)` is YAML `on: { check: [verb, thing] }`,
@@ -136,21 +154,6 @@ world! {
     rule jump_into_the_lock on verb(jump) instead when in(lock_chamber) and lock == full {
         line "The water closes over you, colder than anything.";
         end drowned;
-    }
-
-    // Accuse rules
-
-    rule accuse_with_pages on verb(accuse, keeper) when pages.carried {
-        line "You lay the pages on the table. The lock-keeper looks at them for a long time.";
-        end committed;
-    }
-
-    rule accuse_without_pages on verb(accuse, keeper) when not pages.carried {
-        // draft: `line` shows text, as `say:` does in YAML. A line is made of
-        // segments: narration, `<speaker> says "…"` and `narrate "…"` (#111).
-        // `line` instead of `say`, because "say … says" reads like a stutter.
-        line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
-        end ashes;
     }
 
     // Verbs

@@ -1,14 +1,14 @@
 // The walkthroughs of the slice, as test blocks. They are the same as
-// ../yaml/tests/, with the same names and the same pending marks. Waits for
-// test blocks (DSL step L4, DS-6). Each test passes after the phase in its
-// pending mark.
+// ../yaml/tests/, with the same names and the same pending marks. Test blocks
+// compile since the world! core (DSL step L3, P3-03 #66). Each test passes
+// after the phase in its pending mark.
 //
 // draft: in this slice the test blocks are data in their own pack. The DSL
 // doc makes each test block a #[test] that assembles all packs. But each
 // slice test loads only some parts, so slice.rs picks the parts and runs the
 // walkthrough, as it does for YAML.
 //
-// Draft syntax. It does not compile. Read ../PENDING.md.
+// Read ../PENDING.md.
 
 use loremaster::prelude::*;
 
@@ -66,7 +66,8 @@ world! {
     test slice_drowning "Jump into the full lock" {
         jump sees "Nothing happens." expect not ended;
         e;
-        jump sees "The water closes over you" not_sees "Nothing happens." expect ended;
+        jump sees ["The water closes over you", "Drowned"] not_sees "Nothing happens."
+            expect ended, ending drowned;
     }
 
     // The best path: take the pages before midnight and accuse the keeper.

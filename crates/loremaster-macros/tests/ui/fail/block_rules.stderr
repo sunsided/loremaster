@@ -1,0 +1,35 @@
+error: a `var` belongs to the story header, and this block has no `story`; for a variable of another pack, write `extern { var lit; }`
+ --> tests/ui/fail/block_rules.rs:7:13
+  |
+7 |         var lit: bool = false;
+  |             ^^^
+
+error: the room `hall` is defined in this block, so it is not extern
+  --> tests/ui/fail/block_rules.rs:14:23
+   |
+14 |         extern { room hall; }
+   |                       ^^^^
+
+error: not a time of day: time out of range: `25:00`
+  --> tests/ui/fail/block_rules.rs:23:52
+   |
+23 |         story "Tiny" { start: hall, clock { start: "25:00" } }
+   |                                                    ^^^^^^^
+
+error: not a time of day: expected HH:MM, got `7 pm`
+  --> tests/ui/fail/block_rules.rs:25:24
+   |
+25 |         rule r on time("7 pm") { stop; }
+   |                        ^^^^^^
+
+error: the test `t` is there twice
+  --> tests/ui/fail/block_rules.rs:33:14
+   |
+33 |         test t "Two" { wait; }
+   |              ^
+
+error: the initial value does not match the type
+  --> tests/ui/fail/block_rules.rs:41:35
+   |
+41 |         var mood: [calm, angry] = sad;
+   |                                   ^^^

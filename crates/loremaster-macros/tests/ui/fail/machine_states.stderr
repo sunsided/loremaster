@@ -1,0 +1,11 @@
+error: unknown state `ajar`
+  --> tests/ui/fail/machine_states.rs:12:9
+   |
+12 |         closed -> ajar on verb(pull, lever);
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot set `gate` to `ajar`
+ --> tests/ui/fail/machine_states.rs:9:13
+  |
+9 |     machine gate starts closed {
+  |             ^^^^

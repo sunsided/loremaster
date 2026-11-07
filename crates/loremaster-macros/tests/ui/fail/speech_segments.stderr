@@ -1,0 +1,5 @@
+error: speech segments (`says`, `narrate`) are not in `world!` yet (P3-15 #111); write the line as one string, for example a raw string r#"…"#
+ --> tests/ui/fail/speech_segments.rs:6:40
+  |
+6 |         line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
+  |                                        ^^^^^^
