@@ -47,9 +47,10 @@ pub struct Cx<'a> {
     pub(crate) depth: u8,
 }
 
-/// The whole state and world, read-only. Not part of the stable behavior
-/// API: what it gives can change in any version. A script host must not
-/// hand it to scripts.
+/// The whole state and world, read-only. The type follows semver like the
+/// rest of the crate, but `State` and `World` change with the model, so code
+/// that reads them changes more often than code that uses only `Cx`. A
+/// script host must not hand it to scripts.
 pub struct Unstable<'a> {
     game: &'a Game,
 }
@@ -66,7 +67,7 @@ impl<'a> Unstable<'a> {
 
 impl Cx<'_> {
     /// The escape hatch for Rust code: the whole state and world, read-only.
-    /// It is not stable; prefer the other methods of `Cx`.
+    /// Prefer the other methods of `Cx`, which stay when the model changes.
     pub fn unstable(&self) -> Unstable<'_> {
         Unstable { game: self.game }
     }
@@ -86,7 +87,9 @@ impl Cx<'_> {
         self.game.state().visits_to(room) > 0
     }
 
-    /// The room has the tag, for example `dark`.
+    /// The room has the tag, for example `dark`. An unknown room has no tags,
+    /// so a misspelled id gives false; `loremaster check` does not see ids in
+    /// Rust code.
     pub fn room_has_tag(&self, room: &str, tag: &str) -> bool {
         self.game
             .world()
