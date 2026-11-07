@@ -8,21 +8,17 @@ use dramaturge_model::{
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
 use std::collections::BTreeMap;
 
-/// The custom-outcome key for `then`: world effects that the runtime applies.
-pub const THEN_KEY: &str = "loremaster.then";
-
 /// A dialogue lowered to a dramaturge graph.
 ///
-/// dramaturge holds the structure, the conditions and the outcomes. The text
+/// dramaturge holds the structure, the conditions and the outcomes. A `then`
+/// list is a host outcome ([`Outcome::Host`]) that the runtime applies. The text
 /// stays loremaster markup: the graph holds the source as
 /// [`DialogText::Inline`], and `node_say` / `option_say` hold the compiled
 /// markup that the runtime renders.
 #[derive(Debug, Clone)]
 pub struct CompiledDialogue {
     /// The start nodes are its entry nodes, in order.
-    pub graph: DialogueGraph,
-    /// The `then` lists, by the index that their `THEN_KEY` outcome carries.
-    pub effects: Vec<Vec<Effect>>,
+    pub graph: DialogueGraph<Vec<Effect>>,
     pub node_say: BTreeMap<DialogueNodeId, Vec<Segment>>,
     pub option_say: BTreeMap<DialogueOptionId, Vec<Segment>>,
 }
@@ -72,8 +68,7 @@ pub fn compile_dialogue(
     };
     let speaker = CharacterId::new(with);
     let mut out = CompiledDialogue {
-        graph: DialogueGraph::new(),
-        effects: Vec::new(),
+        graph: DialogueGraph::typed(),
         node_say: BTreeMap::new(),
         option_say: BTreeMap::new(),
     };
@@ -101,8 +96,8 @@ pub fn compile_dialogue(
                 compile_condition(when, scope).map_err(|e| fail(format!("{at}.when"), when, e))?,
             );
         }
-        node.outcomes_on_enter = outcomes(d, &n.outcomes, scope, &mut out.effects)
-            .map_err(|(source, e)| fail(at.clone(), &source, e))?;
+        node.outcomes_on_enter =
+            outcomes(d, &n.outcomes, scope).map_err(|(source, e)| fail(at.clone(), &source, e))?;
         for (i, o) in n.options.iter().enumerate() {
             let at = format!("{at}.options[{i}]");
             let oid = symbols.intern_option(&option_key(d.id.as_str(), &n.key, i));
@@ -114,14 +109,14 @@ pub fn compile_dialogue(
                 key => DialogTarget::Node(symbols.intern_node(&node_key(d.id.as_str(), key))),
             };
             let mut option =
-                DialogueOption::new(oid.0, DialogText::Inline(o.say.clone()), target, id);
+                DialogueOption::typed(oid.0, DialogText::Inline(o.say.clone()), target, id);
             if let Some(when) = &o.when {
                 option.conditions.push(
                     compile_condition(when, scope)
                         .map_err(|e| fail(format!("{at}.when"), when, e))?,
                 );
             }
-            option.outcomes = outcomes(d, &o.outcomes, scope, &mut out.effects)
+            option.outcomes = outcomes(d, &o.outcomes, scope)
                 .map_err(|(source, e)| fail(at.clone(), &source, e))?;
             node.options.push(option);
         }
@@ -146,8 +141,7 @@ fn outcomes(
     d: &Dialogue,
     o: &Outcomes,
     scope: &Scope,
-    effects: &mut Vec<Vec<Effect>>,
-) -> Result<Vec<Outcome>, (String, LangError)> {
+) -> Result<Vec<Outcome<Vec<Effect>>>, (String, LangError)> {
     let player = scope.player();
     // `compile_dialogue` checked `with`.
     let with = scope.entity(d.with.as_str()).unwrap_or(player);
@@ -204,11 +198,7 @@ fn outcomes(
         });
     }
     if !o.then.is_empty() {
-        out.push(Outcome::Custom {
-            key: THEN_KEY.into(),
-            args: vec![FactValue::Int(effects.len() as i64)],
-        });
-        effects.push(o.then.clone());
+        out.push(Outcome::Host(o.then.clone()));
     }
     Ok(out)
 }
@@ -292,9 +282,8 @@ mod tests {
             Outcome::AddFact { scope: FactScope::World, fact_id, delta: 2 } if fact_id.0.as_ref() == "visits_bb"
         ));
         check!(
-            matches!(&names.outcomes_on_enter[2], Outcome::Custom { key, .. } if key == THEN_KEY)
+            matches!(&names.outcomes_on_enter[2], Outcome::Host(then) if matches!(then.as_slice(), [Effect::Goto(room)] if room.as_str() == "bar"))
         );
-        check!(c.effects.len() == 1);
         check!(matches!(
             c.graph.nodes[0].conditions[0],
             Condition::HasMemory { .. }

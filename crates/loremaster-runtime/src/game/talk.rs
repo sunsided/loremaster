@@ -10,7 +10,7 @@
 use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
-use crate::world::CDialogue;
+use crate::world::{CDialogue, CEffect};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
 use dramaturge_model::{
     AlignmentAxisId, AlignmentPoleId, DialogTagKind, DialogTarget, DialogueNodeId, DialogueOption,
@@ -18,10 +18,9 @@ use dramaturge_model::{
     Outcome, RelationshipAxisId,
 };
 use dramaturge_runtime::{
-    CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
-    DefaultRuntime, DialogueRuntime, NarrativeState, OutcomeApplier, select_entry,
+    AvailableOptionsIter, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
+    DefaultRuntime, DialogueRuntime, HostHandler, NarrativeState, OutcomeApplier, select_entry,
 };
-use loremaster_lang::THEN_KEY;
 use loremaster_model::{Id, Layer, Value};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -172,29 +171,22 @@ impl NarrativeState for Turned<'_> {
     }
 }
 
-/// Applies the world effects of `then`, which dramaturge can not. They write into the turn of the [`Turned`] state.
+/// Applies the world effects of `then` (a host outcome), which dramaturge
+/// can not. They write into the turn of the [`Turned`] state.
 struct WorldEffects {
-    dialogue: Arc<CDialogue>,
+    owner: Id,
 }
 
-impl CustomHandler<Turned<'_>> for WorldEffects {
-    fn outcome(&mut self, key: &str, args: &[FactValue], state: &mut Turned<'_>) {
+impl CustomHandler<Turned<'_>> for WorldEffects {}
+
+impl HostHandler<Arc<[CEffect]>, Turned<'_>> for WorldEffects {
+    fn host_outcome(&mut self, effects: &Arc<[CEffect]>, state: &mut Turned<'_>) {
         let Turned { game, turn } = state;
-        let (THEN_KEY, [FactValue::Int(i)]) = (key, args) else {
-            return;
-        };
-        let owner = Id::new(format!("dialogue:{}", self.dialogue.id));
-        let Some(effects) = usize::try_from(*i)
-            .ok()
-            .and_then(|i| self.dialogue.effects.get(i))
-        else {
-            return;
-        };
         // A `stop` (or `Flow::Stop` of a called behavior) ends the
         // node's effects, as it ends a rule.
         let outer = std::mem::replace(&mut game.stopped, false);
-        for effect in effects {
-            game.apply(turn, &owner, effect, 1);
+        for effect in effects.iter() {
+            game.apply(turn, &self.owner, effect, 1);
             if game.stopped || game.state.ended {
                 break;
             }
@@ -256,7 +248,7 @@ impl Game {
     }
 
     /// The options the player can choose now.
-    fn available(&self) -> Vec<DialogueOption> {
+    fn available(&self) -> Vec<DialogueOption<Arc<[CEffect]>>> {
         let Some(talk) = &self.state.talk else {
             return Vec::new();
         };
@@ -267,8 +259,9 @@ impl Game {
         else {
             return Vec::new();
         };
-        let runtime = DefaultRuntime::with_parts(evaluator(), DefaultOutcomeApplier::new());
-        runtime.available_options(node, self).cloned().collect()
+        AvailableOptionsIter::new(node, &evaluator(), self)
+            .cloned()
+            .collect()
     }
 
     /// The answers the player can choose now, numbered from 0: the answers
@@ -291,7 +284,6 @@ impl Game {
             .map(|(index, o)| Choice {
                 index,
                 text: d
-                    .graph
                     .option_say
                     .get(&o.id)
                     .map(|s| self.render(s))
@@ -317,7 +309,7 @@ impl Game {
         let Some(d) = self.world.dialogue_with(thing.as_str()).cloned() else {
             return false;
         };
-        let Some(start) = select_entry(&d.graph.graph, &evaluator(), &*self) else {
+        let Some(start) = select_entry(&d.graph, &evaluator(), &*self) else {
             return false;
         };
         self.state.talk = Some(Talk {
@@ -345,7 +337,7 @@ impl Game {
             return;
         };
         let key = d.key_of(id).unwrap_or_default().to_string();
-        if let Some(say) = d.graph.node_say.get(&id) {
+        if let Some(say) = d.node_say.get(&id) {
             let text = self.render(say);
             turn.push(
                 BlockKind::Speech,
@@ -387,9 +379,14 @@ impl Game {
     }
 
     /// Apply outcomes through dramaturge. The [`Turned`] state logs each change.
-    fn apply_outcomes(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, outcomes: &[Outcome]) {
+    fn apply_outcomes(
+        &mut self,
+        turn: &mut Turn,
+        d: &Arc<CDialogue>,
+        outcomes: &[Outcome<Arc<[CEffect]>>],
+    ) {
         let mut applier = DefaultOutcomeApplier::with_custom(WorldEffects {
-            dialogue: d.clone(),
+            owner: Id::new(format!("dialogue:{}", d.id)),
         });
         let mut state = Turned { game: self, turn };
         for o in outcomes {
@@ -414,7 +411,6 @@ impl Game {
             return;
         };
         let line = d
-            .graph
             .option_say
             .get(&option.id)
             .map(|s| self.render(s))
@@ -426,7 +422,7 @@ impl Game {
         let mut runtime = DefaultRuntime::with_parts(
             evaluator(),
             DefaultOutcomeApplier::with_custom(WorldEffects {
-                dialogue: d.clone(),
+                owner: Id::new(format!("dialogue:{}", d.id)),
             }),
         );
         let target = runtime.choose_option(&option, &mut Turned { game: self, turn });
