@@ -1,7 +1,7 @@
 use crate::eval::Eval;
 use crate::world::CFragment;
 use crate::{Run, Source, rng};
-use loremaster_lang::Segment;
+use loremaster_lang::{CompiledLine, Segment};
 use loremaster_model::FragmentMode;
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +28,53 @@ fn render_into(ev: &Eval, segments: &[Segment], out: &mut String) {
             }
         }
     }
+}
+
+/// Render a compiled line to runs, one for each segment that shows, with a
+/// run of one space between them. Speech gets straight double quotes and its
+/// speaker. Each segment's run is a copy of `base` with its text and speaker.
+///
+/// A line of one segment renders as before segments existed: its text is not
+/// trimmed. In a longer line each segment is trimmed, so that the join has
+/// exactly one space. A segment whose `when` does not hold, or whose markup
+/// renders to nothing, is left out.
+pub(crate) fn line_runs(ev: &Eval, line: &CompiledLine, base: &Run) -> Vec<Run> {
+    let mut out: Vec<Run> = Vec::new();
+    for part in line {
+        if !ev.holds_opt(&part.when) {
+            continue;
+        }
+        let rendered = render(ev, &part.text);
+        let text = if line.len() > 1 || part.speech {
+            rendered.trim()
+        } else {
+            rendered.as_str()
+        };
+        if text.trim().is_empty() {
+            continue;
+        }
+        if !out.is_empty() {
+            out.push(Run::plain(" "));
+        }
+        out.push(Run {
+            text: if part.speech {
+                format!("\"{text}\"")
+            } else {
+                text.to_string()
+            },
+            speaker: part.speaker.clone(),
+            ..base.clone()
+        });
+    }
+    out
+}
+
+/// A compiled line as one string: the text of its runs.
+pub(crate) fn line_text(ev: &Eval, line: &CompiledLine) -> String {
+    line_runs(ev, line, &Run::plain(""))
+        .iter()
+        .map(|r| r.text.as_str())
+        .collect()
 }
 
 /// Fragment source text split into pieces, each marked as active or not in
@@ -190,6 +237,7 @@ pub(crate) fn runs(ev: &Eval, fragments: &[CFragment], picks: &[Pick]) -> Vec<Ru
                 variant: p.variant,
             }),
             link: None,
+            speaker: None,
         });
     }
     out

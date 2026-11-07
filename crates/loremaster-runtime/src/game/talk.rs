@@ -10,6 +10,7 @@
 use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
+use crate::text;
 use crate::world::CDialogue;
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
 use dramaturge_model::{
@@ -301,7 +302,7 @@ impl Game {
                     .graph
                     .option_say
                     .get(&o.id)
-                    .map(|s| self.render(s))
+                    .map(|s| text::line_text(&self.eval(), s))
                     .unwrap_or_default(),
             })
             .collect()
@@ -358,21 +359,20 @@ impl Game {
         };
         let key = d.key_of(id).unwrap_or_default().to_string();
         if let Some(say) = d.graph.node_say.get(&id) {
-            let text = self.render(say);
-            turn.push(
-                BlockKind::Speech,
-                vec![Run {
-                    text,
-                    source: Some(Source {
-                        owner: format!("dialogue:{}", d.id),
-                        fragment: d.keys.iter().position(|k| *k == key).unwrap_or(0),
-                        layer: Layer::Characters,
-                        condition: self.node_when(d, &key),
-                        variant: 0,
-                    }),
-                    link: None,
-                }],
-            );
+            let base = Run {
+                text: String::new(),
+                source: Some(Source {
+                    owner: format!("dialogue:{}", d.id),
+                    fragment: d.keys.iter().position(|k| *k == key).unwrap_or(0),
+                    layer: Layer::Characters,
+                    condition: self.node_when(d, &key),
+                    variant: 0,
+                }),
+                link: None,
+                speaker: None,
+            };
+            let runs = text::line_runs(&self.eval(), say, &base);
+            turn.push(BlockKind::Speech, runs);
         }
         if outcomes {
             self.apply_outcomes(turn, d, &node.outcomes_on_enter);
@@ -425,16 +425,14 @@ impl Game {
             self.end_talk();
             return;
         };
-        let line = d
+        let base = rule_run(String::new(), &Id::new(format!("dialogue:{}", d.id)));
+        let runs = d
             .graph
             .option_say
             .get(&option.id)
-            .map(|s| self.render(s))
+            .map(|s| text::line_runs(&self.eval(), s, &base))
             .unwrap_or_default();
-        turn.push(
-            BlockKind::Said,
-            vec![rule_run(line, &Id::new(format!("dialogue:{}", d.id)))],
-        );
+        turn.push(BlockKind::Said, runs);
         let mut runtime = DefaultRuntime::with_parts(
             evaluator(),
             DefaultOutcomeApplier::with_custom(WorldEffects {
@@ -565,7 +563,7 @@ impl Game {
             .zip(&src.options)
             .map(|(o, s)| TalkOptionView {
                 choice: available.iter().position(|a| *a == o.id),
-                say: s.say.clone(),
+                say: s.say.source(),
                 when: s.when.clone(),
                 go: s.go.clone(),
                 outcomes: crate::outline::describe(&s.outcomes),
@@ -590,7 +588,7 @@ impl Game {
             with: with.to_string(),
             name: self.the(&d.with, true),
             node: talk.node.clone(),
-            say: src.say.clone(),
+            say: src.say.source(),
             when: src.when.clone(),
             outcomes: crate::outline::describe(&src.outcomes),
             options,

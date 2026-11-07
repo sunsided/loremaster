@@ -1,10 +1,13 @@
 use crate::lower::{memory_tag, resolve};
-use crate::{LangError, Operand, Scope, Segment, compile_condition, compile_markup, parse_expr};
+use crate::{
+    CompiledLine, LangError, LineError, Operand, Scope, compile_condition, compile_line, parse_expr,
+};
 use dramaturge_model::{
     CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
     DialogueOption, DialogueOptionId, Fact, FactId, FactScope, FactValue, Memory, Outcome,
     RelationshipAxisId, SymbolTable,
 };
+use loremaster_model::PLAYER_SPEAKER;
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
 use std::collections::BTreeMap;
 
@@ -16,9 +19,11 @@ pub const THEN_KEY: &str = "loremaster.then";
 /// A dialogue lowered to a dramaturge graph.
 ///
 /// dramaturge holds the structure, the conditions and the outcomes. The text
-/// stays loremaster markup: the graph holds the source as
+/// stays loremaster markup: the graph holds the line as written as
 /// [`DialogText::Inline`], and `node_say` / `option_say` hold the compiled
-/// markup that the runtime renders.
+/// lines that the runtime renders. The speech of a node is spoken by the
+/// dialogue's thing, the speech of an option by the player, unless a segment
+/// names its speaker with `by`.
 #[derive(Debug, Clone)]
 pub struct CompiledDialogue {
     pub graph: DialogueGraph,
@@ -26,8 +31,8 @@ pub struct CompiledDialogue {
     pub starts: Vec<DialogueNodeId>,
     /// The `then` lists, by the index that their `THEN_KEY` outcome carries.
     pub effects: Vec<Vec<Effect>>,
-    pub node_say: BTreeMap<DialogueNodeId, Vec<Segment>>,
-    pub option_say: BTreeMap<DialogueOptionId, Vec<Segment>>,
+    pub node_say: BTreeMap<DialogueNodeId, CompiledLine>,
+    pub option_say: BTreeMap<DialogueOptionId, CompiledLine>,
 }
 
 /// A problem in a dialogue, with the place it was found.
@@ -66,6 +71,15 @@ pub fn compile_dialogue(
         source: source.to_string(),
         error,
     };
+    let line_fail = |at: &str, e: LineError| DialogueError {
+        at: if e.at.is_empty() {
+            at.to_string()
+        } else {
+            format!("{at}.say{}", e.at)
+        },
+        source: e.source,
+        error: e.error,
+    };
     let Some(with) = scope.entity(d.with.as_str()) else {
         return Err(fail(
             "with".into(),
@@ -88,12 +102,13 @@ pub fn compile_dialogue(
         .collect();
     for (n, &id) in d.nodes.iter().zip(&ids) {
         let at = format!("nodes.{}", n.key);
-        let say = compile_markup(&n.say, scope).map_err(|e| fail(at.clone(), &n.say, e))?;
+        let say =
+            compile_line(&n.say, Some(d.with.as_str()), scope).map_err(|e| line_fail(&at, e))?;
         out.node_say.insert(id, say);
         let mut node = DialogueNode {
             id,
             speaker,
-            text: DialogText::Inline(n.say.clone()),
+            text: DialogText::Inline(n.say.source()),
             conditions: Vec::new(),
             outcomes_on_enter: Vec::new(),
             options: Vec::new(),
@@ -108,7 +123,8 @@ pub fn compile_dialogue(
         for (i, o) in n.options.iter().enumerate() {
             let at = format!("{at}.options[{i}]");
             let oid = symbols.intern_option(&option_key(d.id.as_str(), &n.key, i));
-            let say = compile_markup(&o.say, scope).map_err(|e| fail(at.clone(), &o.say, e))?;
+            let say =
+                compile_line(&o.say, Some(PLAYER_SPEAKER), scope).map_err(|e| line_fail(&at, e))?;
             out.option_say.insert(oid, say);
             let target = match o.go.as_str() {
                 "end" => DialogTarget::End,
@@ -116,7 +132,7 @@ pub fn compile_dialogue(
                 key => DialogTarget::Node(symbols.intern_node(&node_key(d.id.as_str(), key))),
             };
             let mut option =
-                DialogueOption::new(oid.0, DialogText::Inline(o.say.clone()), target, id);
+                DialogueOption::new(oid.0, DialogText::Inline(o.say.source()), target, id);
             if let Some(when) = &o.when {
                 option.conditions.push(
                     compile_condition(when, scope)

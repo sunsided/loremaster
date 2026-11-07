@@ -1270,6 +1270,7 @@ impl Game {
                         kind: LinkKind::Exit,
                         id: dir.clone(),
                     }),
+                    speaker: None,
                 });
             }
             runs.push(Run::plain("."));
@@ -1546,9 +1547,9 @@ impl Game {
                     self.set_fact(turn, k, Value::Int(cur + n));
                 }
             }
-            CEffect::Say(segments) => {
-                let text = self.render(segments);
-                turn.push(BlockKind::Narration, vec![rule_run(text, rule)]);
+            CEffect::Say(line) => {
+                let runs = text::line_runs(&self.eval(), line, &rule_run(String::new(), rule));
+                turn.push(BlockKind::Narration, runs);
             }
             CEffect::Move(moves) => {
                 for (thing, to) in moves {
@@ -2036,6 +2037,7 @@ pub(crate) fn rule_run(text: String, rule: &Id) -> Run {
             variant: 0,
         }),
         link: None,
+        speaker: None,
     }
 }
 
@@ -2085,6 +2087,7 @@ fn split_links(run: Run, needles: &[(String, String)], out: &mut Vec<Run>) {
         text: text.to_string(),
         source: run.source.clone(),
         link,
+        speaker: run.speaker.clone(),
     };
     if i > 0 {
         out.push(piece(&run.text[..i], None));

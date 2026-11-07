@@ -153,7 +153,7 @@ impl CDialogue {
 pub(crate) enum CEffect {
     Set(BTreeMap<String, Value>),
     Add(BTreeMap<String, i64>),
-    Say(Vec<Segment>),
+    Say(loremaster_lang::CompiledLine),
     Move(BTreeMap<Id, Id>),
     Goto(Id),
     /// End the game with an ending: its id, title and text.
@@ -214,6 +214,23 @@ impl Compiler {
         compile_markup(src, &self.scope).map_err(|error| CompileError {
             at: at.to_string(),
             error,
+        })
+    }
+
+    /// A line of a rule or a timer. Its speech has no speaker unless a
+    /// segment names one.
+    fn line(
+        &self,
+        at: &str,
+        line: &loremaster_model::Line,
+    ) -> Result<loremaster_lang::CompiledLine, CompileError> {
+        loremaster_lang::compile_line(line, None, &self.scope).map_err(|e| CompileError {
+            at: if e.at.is_empty() {
+                at.to_string()
+            } else {
+                format!("{at}/say{}", e.at)
+            },
+            error: e.error,
         })
     }
 
@@ -278,7 +295,7 @@ impl Compiler {
             }
             Effect::Set(m) => CEffect::Set(m.clone()),
             Effect::Add(m) => CEffect::Add(m.clone()),
-            Effect::Say(s) => CEffect::Say(self.markup(at, s)?),
+            Effect::Say(line) => CEffect::Say(self.line(at, line)?),
             Effect::Move(m) => CEffect::Move(m.clone()),
             Effect::Goto(r) => CEffect::Goto(r.clone()),
             Effect::End(id) => {

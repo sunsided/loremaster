@@ -1,7 +1,7 @@
 use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
-    Effect, EventPattern, Fragment, Location, Story, ThreadStatus, standard_verbs,
+    Effect, EventPattern, Fragment, Line, Location, Story, ThreadStatus, standard_verbs,
 };
 use std::collections::BTreeSet;
 
@@ -150,6 +150,36 @@ impl Checker<'_> {
     fn markup(&mut self, file: &str, at: &str, source: &str) {
         if let Err(e) = compile_markup(source, &self.scope) {
             self.lang_error(file, at, source, e);
+        }
+    }
+
+    /// A line: the markup and the condition of each segment, the speaker
+    /// of each `says`, and a warning for a bare string right after speech.
+    /// `at` is the place of the effect, node or option; a segment is at
+    /// `<at>.say[i]`.
+    fn line(&mut self, file: &str, at: &str, line: &Line) {
+        if let Some(text) = line.as_plain() {
+            self.markup(file, at, text);
+            return;
+        }
+        for (i, s) in line.segments.iter().enumerate() {
+            let at = format!("{at}.say[{i}]");
+            self.markup(file, &at, &s.text);
+            if let Some(when) = &s.when {
+                self.condition(file, &format!("{at}.when"), when);
+            }
+            if let Some(by) = s.speaker()
+                && let Err(e) = loremaster_lang::check_speaker(by.as_str(), &self.scope)
+            {
+                self.error(file, &format!("{at}.by"), e.message);
+            }
+        }
+        for i in line.bare_after_speech() {
+            self.warning(
+                file,
+                &format!("{at}.say[{i}]"),
+                "a bare string after `says` reads like more speech; write `{ narrate: \"…\" }` for narration",
+            );
         }
     }
 
@@ -507,10 +537,24 @@ impl Checker<'_> {
                     }
                 }
             }
+            for n in &d.nodes {
+                let at = format!("nodes.{}", n.key);
+                self.line(&file, &at, &n.say);
+                for (i, o) in n.options.iter().enumerate() {
+                    self.line(&file, &format!("{at}.options[{i}]"), &o.say);
+                }
+            }
             let compiled = match loremaster_lang::compile_dialogue(d, &self.scope, &mut symbols) {
                 Ok(c) => c,
                 Err(e) => {
-                    self.lang_error(&file, &e.at, &e.source, e.error);
+                    // The lines are checked above; report their problems once.
+                    let known = self
+                        .out
+                        .iter()
+                        .any(|x| x.file == file && x.at == e.at && x.message == e.error.message);
+                    if !known {
+                        self.lang_error(&file, &e.at, &e.source, e.error);
+                    }
                     continue;
                 }
             };
@@ -550,7 +594,7 @@ impl Checker<'_> {
         for (i, effect) in effects.iter().enumerate() {
             let at = format!("{at}[{i}]");
             match effect {
-                Effect::Say(text) => self.markup(file, &at, text),
+                Effect::Say(line) => self.line(file, &at, line),
                 Effect::Await(spec) => self.await_spec(file, &at, spec),
                 Effect::End(ending) => {
                     if self.story().ending(ending.as_str()).is_none() {
