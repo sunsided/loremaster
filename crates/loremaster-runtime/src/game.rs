@@ -813,6 +813,19 @@ impl Game {
         self.finish(turn)
     }
 
+    /// Let one turn of time pass without an action of the player: no command
+    /// echo, no action counts, and also during a talk (SE-2).
+    pub fn tick(&mut self) -> Turn {
+        self.last_frame = None;
+        let mut turn = Turn::default();
+        if self.state.ended {
+            turn.say(BlockKind::Response, "The story has ended.");
+            return turn;
+        }
+        self.advance(&mut turn);
+        self.finish(turn)
+    }
+
     /// Handle a command picked on the verb bar.
     pub fn act(&mut self, cmd: Command) -> Turn {
         self.last_frame = None;

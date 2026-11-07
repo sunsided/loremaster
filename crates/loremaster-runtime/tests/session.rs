@@ -2,7 +2,7 @@
 
 use loremaster_model::{EndingKind, Id};
 use loremaster_project::{load, read_dir};
-use loremaster_runtime::{Command, Effect, Input, Session, Status, Step, World};
+use loremaster_runtime::{BlockKind, Command, Effect, Input, Session, Status, Step, World};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -134,16 +134,74 @@ fn the_same_seed_and_input_give_the_same_effects() {
         steps
     };
     assert_eq!(play(42), play(42));
+    // The seed is applied, not only repeatable.
+    assert_eq!(Session::with_seed(world("zork1"), 42).state().rng, 42);
+    assert_eq!(Session::with_seed(world("zork1"), 7).state().rng, 7);
 }
 
 #[test]
 fn a_tick_lets_time_pass() {
     let mut s = Session::new(world("lighthouse"));
     s.start();
-    let before = s.state().turns;
+    let (turns, minutes) = (s.state().turns, s.state().minutes);
     let step = s.submit(Input::Tick);
     assert_eq!(step.status, Status::Ready);
-    assert_eq!(s.state().turns, before + 1);
+    assert_eq!(s.state().turns, turns + 1);
+    let per_turn = u32::from(s.world().story.clock.minutes_per_turn);
+    assert!(per_turn > 0);
+    assert_eq!(s.state().minutes, minutes + per_turn);
+    // No echo of a command, and no action counted.
+    assert!(
+        !step
+            .effects
+            .iter()
+            .any(|e| matches!(e, Effect::Text { block } if block.kind == BlockKind::Command)),
+        "{step:?}"
+    );
+    assert!(
+        s.state().action_counts.is_empty(),
+        "{:?}",
+        s.state().action_counts
+    );
+}
+
+#[test]
+fn a_tick_passes_time_during_a_talk() {
+    let mut s = Session::new(world("cantina"));
+    s.start();
+    s.submit(text("in"));
+    s.submit(text("talk to figure"));
+    let turns = s.state().turns;
+    s.submit(Input::Tick);
+    assert_eq!(s.state().turns, turns + 1);
+}
+
+#[test]
+fn frames_and_rules_are_not_notices() {
+    let mut s = Session::new(world("lighthouse"));
+    s.start();
+    let step = s.submit(text("look"));
+    let kinds: Vec<_> = step
+        .effects
+        .iter()
+        .filter_map(|e| match e {
+            Effect::Notice { entry } => Some(entry.kind.clone()),
+            _ => None,
+        })
+        .collect();
+    assert!(kinds.is_empty(), "{kinds:?}");
+}
+
+#[test]
+fn a_second_start_starts_nothing() {
+    let mut s = Session::new(world("lighthouse"));
+    s.start();
+    s.submit(text("n"));
+    let state = s.state().clone();
+    let again = s.start();
+    assert!(again.effects.is_empty(), "{again:?}");
+    assert_eq!(again.status, Status::Ready);
+    assert_eq!(s.state(), &state);
 }
 
 #[test]
@@ -167,7 +225,9 @@ fn a_session_restores_from_a_save() {
     s.start();
     s.submit(text("n"));
     let save = serde_json::to_value(s.save()).unwrap();
-    let (restored, loaded) = Session::load(w, save).unwrap();
+    let (restored, loaded) = Session::load(w.clone(), save).unwrap();
     assert!(!loaded.story_changed);
     assert_eq!(restored.state(), s.state());
+    let (typed, _) = Session::from_save(w, &s.save()).unwrap();
+    assert_eq!(typed.state(), s.state());
 }
