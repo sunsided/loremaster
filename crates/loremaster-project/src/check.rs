@@ -651,7 +651,7 @@ impl Checker<'_> {
         }
     }
 
-    /// Timers: their conditions and effects.
+    /// Endings: unique ids, a rank of 1 or more, valid markup, and an `end` that names each one.
     fn endings(&mut self) {
         let endings = self.story().endings.clone();
         let named = ended_endings(self.story());
@@ -677,6 +677,7 @@ impl Checker<'_> {
         }
     }
 
+    /// Timers: their conditions and effects.
     fn timers(&mut self) {
         let timers = self.story().timers.clone();
         let mut seen = BTreeSet::new();
