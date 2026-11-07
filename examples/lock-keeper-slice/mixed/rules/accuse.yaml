@@ -11,5 +11,5 @@
   on: { verb: [accuse, keeper] }
   when: not pages.carried
   then:
-    - say: "The lock-keeper shrugs. \"Prove it,\" he says."
+    - say: ["The lock-keeper shrugs.", { says: "Prove it,", by: keeper }, { narrate: "he says." }]
     - end: ashes

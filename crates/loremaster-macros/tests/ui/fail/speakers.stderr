@@ -1,0 +1,11 @@
+error: unknown speaker `ghost`: `by` names a thing or `player`
+  --> tests/ui/fail/speakers.rs:11:25
+   |
+11 |         line "He nods." ghost says "Boo." when keeper.awake then narrate "He yawns.";
+   |                         ^^^^^
+
+error: `keeper` has no property `awake`
+  --> tests/ui/fail/speakers.rs:11:48
+   |
+11 |         line "He nods." ghost says "Boo." when keeper.awake then narrate "He yawns.";
+   |                                                ^^^^^^^^^^^^

@@ -1,5 +1,35 @@
-error: speech segments (`says`, `narrate`) are not in `world!` yet (P3-15 #111); write the line as one string, for example a raw string r#"…"#
- --> tests/ui/fail/speech_segments.rs:6:40
+error: a bare string after `says` reads like more speech; write `narrate "…"` for narration
+ --> tests/ui/fail/speech_segments.rs:8:61
   |
-6 |         line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
-  |                                        ^^^^^^
+8 |             line "The lock-keeper shrugs." says "Prove it," "he says.";
+  |                                                             ^^^^^^^^^^
+
+error: expected `then` and the segment after the condition
+  --> tests/ui/fail/speech_segments.rs:16:49
+   |
+16 |         rule r on turn { line when night "Dark."; }
+   |                                                 ^
+
+error: speech segments (`says`, `narrate`) belong in a `line` effect; a description or a presence is one text
+  --> tests/ui/fail/speech_segments.rs:23:38
+   |
+23 |         room hall "Hall" { "A hall." keeper says "Hello."; }
+   |                                      ^^^^^^
+
+error: a line from a text pool is not in `world!` yet: it waits for the text core (R9, P4-01 #78)
+  --> tests/ui/fail/speech_segments.rs:30:31
+   |
+30 |         rule r on turn { line keeper_remark; }
+   |                               ^^^^^^^^^^^^^
+
+error: unknown name `bogus`
+  --> tests/ui/fail/speech_segments.rs:47:31
+   |
+47 |         rule r on turn { line "Tick. {bogus ? Yes. | No.}"; }
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unknown name `bogus`
+  --> tests/ui/fail/speech_segments.rs:44:22
+   |
+44 |                 line "It opens. {bogus ? Yes. | No.}";
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

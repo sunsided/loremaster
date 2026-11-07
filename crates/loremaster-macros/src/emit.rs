@@ -387,17 +387,58 @@ fn event(e: &Event, span: Span) -> TokenStream {
     }
 }
 
+/// A `Line`: one bare string as `Line::from`, which is what YAML makes of a
+/// plain `say:`, or its segments in order.
+fn line(segments: &[Segment], span: Span) -> TokenStream {
+    if let [
+        Segment {
+            voice: SegmentVoice::Plain,
+            text: t,
+            when: None,
+            ..
+        },
+    ] = segments
+    {
+        let t = text(t);
+        return quote_spanned!(span=> ::loremaster::dsl::model::Line::from(#t));
+    }
+    let list = segments.iter().map(|segment| {
+        let t = text(&segment.text);
+        let mut seg = match &segment.voice {
+            SegmentVoice::Plain => {
+                quote_spanned!(span=> ::loremaster::dsl::model::LineSegment::plain(#t))
+            }
+            SegmentVoice::Narrate => {
+                quote_spanned!(span=> ::loremaster::dsl::model::LineSegment::narrate(#t))
+            }
+            SegmentVoice::Says(by) => {
+                let mut seg =
+                    quote_spanned!(span=> ::loremaster::dsl::model::LineSegment::says(#t));
+                if let Some(by) = by {
+                    let by = name(by);
+                    seg.extend(quote_spanned!(span=> .by(::loremaster::dsl::model::Id::new(#by))));
+                }
+                seg
+            }
+        };
+        if let Some(when) = &segment.when {
+            let c = s(&when.source, span);
+            seg.extend(quote_spanned!(span=> .when(#c)));
+        }
+        seg
+    });
+    quote_spanned!(span=> ::loremaster::dsl::model::Line::new(::std::vec![#(#list),*]))
+}
+
 fn effects(list: &[Effect], span: Span) -> TokenStream {
     let mut out = TokenStream::new();
     for e in list {
         out.extend(match &e.kind {
             // Not `.say(t)`: on a machine, that is the inherent method for
             // the step's `say:` field.
-            EffectKind::Line(t) => {
-                let t = text(t);
-                quote_spanned!(span=> .effect(::loremaster::dsl::model::Effect::Say(
-                    ::loremaster::dsl::model::Line::from(#t)
-                )))
+            EffectKind::Line(segments) => {
+                let l = line(segments, span);
+                quote_spanned!(span=> .effect(::loremaster::dsl::model::Effect::Say(#l)))
             }
             EffectKind::Set(pairs) => pairs
                 .iter()
@@ -521,9 +562,9 @@ fn machine(m: &Machine) -> TokenStream {
             chain.extend(quote_spanned!(span=> .instead()));
         }
         if let Some(say) = &step.say {
-            let t = text(say);
+            let l = line(say, span);
             // The inherent `MachineBuilder::say`: the step's `say:` field.
-            chain.extend(quote_spanned!(span=> .say(#t)));
+            chain.extend(quote_spanned!(span=> .say(#l)));
         }
         chain.extend(effects(&step.effects, span));
     }
