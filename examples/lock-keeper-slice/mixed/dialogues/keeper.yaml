@@ -1,29 +1,31 @@
-# New syntax (phase 3, D3 one dialogue format): a node says a text pool.
-# `says` is a speech segment (#111): the renderer adds the quotes. A plain
-# string is narration. The speaker of an option is the player; the speaker of
-# a node is the thing of the dialogue.
+# The first node says a text pool, `say: { text: keeper_remark }`: new syntax
+# (phase 4, R9). The rest loads today. A line is a text, or a list of
+# segments (P3-15, #111): a bare string or `{ narrate: … }` is narration,
+# `{ says: … }` is speech, and the renderer adds the quotes. The speaker of a
+# node's speech is the thing of the dialogue; the speaker of an option's
+# speech is the player.
 with: keeper
 start: [stove]
 nodes:
   stove:
     say: { text: keeper_remark }
     options:
-      - says: "Who fed it?"
+      - say: [{ says: "Who fed it?" }]
         when: ash_is_fresh
         go: who_fed_it
-      - says: "What do you burn at night?"
+      - say: [{ says: "What do you burn at night?" }]
         go: what_burns
-      - says: "Good night."
+      - say: [{ says: "Good night." }]
         go: end
   what_burns:
-    says: "Coal, when the company sends it. Driftwood, when it does not."
+    say: [{ says: "Coal, when the company sends it. Driftwood, when it does not." }]
     options:
-      - says: "And paper?"
+      - say: [{ says: "And paper?" }]
         go: who_fed_it
-      - says: "Good night."
+      - say: [{ says: "Good night." }]
         go: end
   who_fed_it:
     say: ["He turns the poker in his hands.", { says: "Nobody. The stove was cold all night." }]
     options:
-      - says: "Good night."
+      - say: [{ says: "Good night." }]
         go: end

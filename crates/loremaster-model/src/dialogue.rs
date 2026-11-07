@@ -1,4 +1,4 @@
-use crate::{Effect, Id, Note, Value};
+use crate::{Effect, Id, Line, Note, Value};
 use serde::de::{MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -12,14 +12,16 @@ use std::fmt;
 /// start: [again, meet]
 /// nodes:
 ///   meet:
-///     say: "\"Sit, if you like.\""
+///     say: ["He pulls out a chair.", { says: "Sit, if you like." }]
 ///     options:
-///       - { say: "Who are you?", go: names }
-///       - { say: "Goodbye.", go: end }
+///       - { say: [{ says: "Who are you?" }], go: names }
+///       - { say: "Leave.", go: end }
 /// ```
 ///
 /// The talk starts at the first node in `start` whose `when` holds. A node is
 /// one line of the other character; its options are the player's answers.
+/// Each `say` is a [`Line`](crate::Line); the speech of a node is spoken by
+/// the thing `with`, the speech of an option by the player.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Dialogue {
@@ -80,8 +82,9 @@ pub struct DialogueNode {
     pub key: String,
     /// The node can start the talk only when this holds.
     pub when: Option<String>,
-    /// The line, in inline markup.
-    pub say: String,
+    /// The line. Its speech is spoken by the dialogue's thing unless a
+    /// segment names another speaker with `by`.
+    pub say: Line,
     /// Applied when the talk enters the node.
     pub outcomes: Outcomes,
     pub options: Vec<DialogueOption>,
@@ -91,8 +94,9 @@ pub struct DialogueNode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(from = "OptionRepr")]
 pub struct DialogueOption {
-    /// The player's line, also the label of the choice.
-    pub say: String,
+    /// The player's line, also the label of the choice. Its speech is
+    /// spoken by the player unless a segment names another speaker.
+    pub say: Line,
     /// The option shows only when this holds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
@@ -113,7 +117,8 @@ fn end() -> String {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct OptionRepr {
-    say: String,
+    #[serde(alias = "line")]
+    say: Line,
     #[serde(default)]
     when: Option<String>,
     #[serde(default = "end")]
@@ -154,7 +159,8 @@ impl From<OptionRepr> for DialogueOption {
 struct NodeRepr {
     #[serde(default)]
     when: Option<String>,
-    say: String,
+    #[serde(alias = "line")]
+    say: Line,
     #[serde(default)]
     options: Vec<DialogueOption>,
     #[serde(default)]
@@ -174,7 +180,7 @@ struct NodeRepr {
 struct NodeBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     when: Option<String>,
-    say: String,
+    say: Line,
     #[serde(flatten)]
     outcomes: Outcomes,
     #[serde(skip_serializing_if = "Vec::is_empty")]

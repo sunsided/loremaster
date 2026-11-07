@@ -109,6 +109,11 @@ pub struct Run {
     pub source: Option<Source>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<Link>,
+    /// Who speaks the run, when it is speech (a `says` segment): a thing id
+    /// or `player`. The text has the quotes already; a front end can style
+    /// the run by its speaker. Speech in a rule without `by` has no speaker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
 }
 
 impl Run {
@@ -117,6 +122,7 @@ impl Run {
             text: text.into(),
             source: None,
             link: None,
+            speaker: None,
         }
     }
 }

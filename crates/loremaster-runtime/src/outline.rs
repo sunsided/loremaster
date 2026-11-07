@@ -75,13 +75,13 @@ impl DialogueOutline {
                     key: n.key.clone(),
                     start: d.start.iter().position(|s| *s == n.key),
                     when: n.when.clone(),
-                    say: n.say.clone(),
+                    say: n.say.source(),
                     outcomes: describe(&n.outcomes),
                     options: n
                         .options
                         .iter()
                         .map(|o| OutlineOption {
-                            say: o.say.clone(),
+                            say: o.say.source(),
                             when: o.when.clone(),
                             go: o.go.clone(),
                             missing: !matches!(o.go.as_str(), "end" | "back")

@@ -1,6 +1,6 @@
 use dramaturge_model::{Condition, DialogueGraph, DialogueNodeId, SymbolTable};
 use loremaster_lang::{
-    LangError, Scope, Segment, compile_condition, compile_dialogue, compile_markup,
+    CompiledLine, LangError, Scope, Segment, compile_condition, compile_dialogue, compile_markup,
 };
 use loremaster_model::{
     Effect, Fragment, FragmentMode, Id, Layer, Story, Value, VerbDef, standard_verbs,
@@ -127,8 +127,8 @@ pub(crate) struct CDialogue {
     pub id: Id,
     pub with: Id,
     /// The graph; a `then` list is a host outcome with the compiled effects,
-    /// and a line is host text, the compiled markup.
-    pub graph: DialogueGraph<Arc<[CEffect]>, Vec<Segment>>,
+    /// and a line is host text, the compiled line.
+    pub graph: DialogueGraph<Arc<[CEffect]>, CompiledLine>,
     /// The node keys, in the order of the graph's nodes.
     pub keys: Vec<String>,
 }
@@ -150,16 +150,16 @@ impl CDialogue {
 }
 
 /// A dialogue node with its compiled `then` lists.
-pub(crate) type CNode = dramaturge_model::DialogueNode<Arc<[CEffect]>, Vec<Segment>>;
+pub(crate) type CNode = dramaturge_model::DialogueNode<Arc<[CEffect]>, CompiledLine>;
 
 /// A dialogue option with its compiled `then` list and line.
-pub(crate) type COption = dramaturge_model::DialogueOption<Arc<[CEffect]>, Vec<Segment>>;
+pub(crate) type COption = dramaturge_model::DialogueOption<Arc<[CEffect]>, CompiledLine>;
 
 #[derive(Debug, Clone)]
 pub(crate) enum CEffect {
     Set(BTreeMap<String, Value>),
     Add(BTreeMap<String, i64>),
-    Say(Vec<Segment>),
+    Say(loremaster_lang::CompiledLine),
     Move(BTreeMap<Id, Id>),
     Goto(Id),
     /// End the game with an ending: its id, title and text.
@@ -220,6 +220,23 @@ impl Compiler {
         compile_markup(src, &self.scope).map_err(|error| CompileError {
             at: at.to_string(),
             error,
+        })
+    }
+
+    /// A line of a rule or a timer. Its speech has no speaker unless a
+    /// segment names one.
+    fn line(
+        &self,
+        at: &str,
+        line: &loremaster_model::Line,
+    ) -> Result<loremaster_lang::CompiledLine, CompileError> {
+        loremaster_lang::compile_line(line, None, &self.scope).map_err(|e| CompileError {
+            at: if e.at.is_empty() {
+                at.to_string()
+            } else {
+                format!("{at}/say{}", e.at)
+            },
+            error: e.error,
         })
     }
 
@@ -284,7 +301,7 @@ impl Compiler {
             }
             Effect::Set(m) => CEffect::Set(m.clone()),
             Effect::Add(m) => CEffect::Add(m.clone()),
-            Effect::Say(s) => CEffect::Say(self.markup(at, s)?),
+            Effect::Say(line) => CEffect::Say(self.line(at, line)?),
             Effect::Move(m) => CEffect::Move(m.clone()),
             Effect::Goto(r) => CEffect::Goto(r.clone()),
             Effect::End(id) => {

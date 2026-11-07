@@ -2,7 +2,7 @@
 
 use crate::convert::{IntoValue, id, strings};
 use crate::pack::{register, replaceable, with_notes};
-use loremaster_model::{Dialogue, DialogueNode, DialogueOption, Effect, Id, Outcomes};
+use loremaster_model::{Dialogue, DialogueNode, DialogueOption, Effect, Id, Line, Outcomes};
 use loremaster_project::Pack;
 
 /// A dialogue of a pack, from [`BuildPack::dialogue`](crate::BuildPack::dialogue).
@@ -78,8 +78,9 @@ impl<'a> DialogueBuilder<'a> {
         self
     }
 
-    /// A node: the other character's line.
-    pub fn node(mut self, key: impl Into<String>, say: impl Into<String>) -> Self {
+    /// A node: the other character's line: a text, or a [`Line`] of
+    /// segments, whose speech the dialogue's thing speaks.
+    pub fn node(mut self, key: impl Into<String>, say: impl Into<Line>) -> Self {
         self.dialogue().nodes.push(DialogueNode {
             key: key.into(),
             when: None,
@@ -91,9 +92,9 @@ impl<'a> DialogueBuilder<'a> {
     }
 
     /// An answer of the last node: the player's line and where it goes (a
-    /// node key, `end` or `back`).
+    /// node key, `end` or `back`). The speech of the line is the player's.
     #[track_caller]
-    pub fn option(mut self, say: impl Into<String>, go: impl Into<String>) -> Self {
+    pub fn option(mut self, say: impl Into<Line>, go: impl Into<String>) -> Self {
         self.last_node().options.push(DialogueOption {
             say: say.into(),
             when: None,

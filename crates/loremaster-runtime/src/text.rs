@@ -1,7 +1,7 @@
 use crate::eval::Eval;
 use crate::world::CFragment;
 use crate::{Run, Source, rng};
-use loremaster_lang::Segment;
+use loremaster_lang::{CompiledLine, Segment};
 use loremaster_model::FragmentMode;
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +28,55 @@ fn render_into(ev: &Eval, segments: &[Segment], out: &mut String) {
             }
         }
     }
+}
+
+/// Render a compiled line to runs, one for each segment that shows, with a
+/// run of one space between them. Speech gets straight double quotes and its
+/// speaker. Each segment's run is a copy of `base` with its text and speaker.
+///
+/// A line that shows one narration segment renders as before segments
+/// existed: its text is not trimmed. Speech is always trimmed, so that the
+/// quotes sit on the words, and when more than one segment shows, each is
+/// trimmed, so that the join has exactly one space. Only the segments that
+/// show count: a segment whose `when` does not hold, or whose markup renders
+/// to nothing, is left out and does not change the text of the others.
+pub(crate) fn line_runs(ev: &Eval, line: &CompiledLine, base: &Run) -> Vec<Run> {
+    let shown: Vec<(&loremaster_lang::LinePart, String)> = line
+        .iter()
+        .filter(|part| ev.holds_opt(&part.when))
+        .map(|part| (part, render(ev, &part.text)))
+        .filter(|(_, rendered)| !rendered.trim().is_empty())
+        .collect();
+    let several = shown.len() > 1;
+    let mut out: Vec<Run> = Vec::new();
+    for (part, rendered) in &shown {
+        let text = if several || part.speech {
+            rendered.trim()
+        } else {
+            rendered.as_str()
+        };
+        if !out.is_empty() {
+            out.push(Run::plain(" "));
+        }
+        out.push(Run {
+            text: if part.speech {
+                format!("\"{text}\"")
+            } else {
+                text.to_string()
+            },
+            speaker: part.speaker.clone(),
+            ..base.clone()
+        });
+    }
+    out
+}
+
+/// A compiled line as one string: the text of its runs.
+pub(crate) fn line_text(ev: &Eval, line: &CompiledLine) -> String {
+    line_runs(ev, line, &Run::plain(""))
+        .iter()
+        .map(|r| r.text.as_str())
+        .collect()
 }
 
 /// Fragment source text split into pieces, each marked as active or not in
@@ -190,6 +239,7 @@ pub(crate) fn runs(ev: &Eval, fragments: &[CFragment], picks: &[Pick]) -> Vec<Ru
                 variant: p.variant,
             }),
             link: None,
+            speaker: None,
         });
     }
     out

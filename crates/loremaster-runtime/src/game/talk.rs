@@ -10,6 +10,7 @@
 use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
+use crate::text;
 use crate::world::{CDialogue, CEffect, COption};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
 use dramaturge_model::{
@@ -21,7 +22,7 @@ use dramaturge_runtime::{
     AvailableOptionsIter, CustomHandler, DefaultConditionEvaluator, DefaultOutcomeApplier,
     DefaultRuntime, DialogCursor, DialogueRuntime, HostHandler, NarrativeState, select_entry,
 };
-use loremaster_lang::Segment;
+use loremaster_lang::CompiledLine;
 use loremaster_model::{Id, Layer, Value};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -308,7 +309,11 @@ impl Game {
             .enumerate()
             .map(|(index, o)| Choice {
                 index,
-                text: self.line(&o.text),
+                text: o
+                    .text
+                    .as_host()
+                    .map(|l| text::line_text(&self.eval(), l))
+                    .unwrap_or_default(),
             })
             .collect()
     }
@@ -375,20 +380,20 @@ impl Game {
     fn show(&mut self, turn: &mut Turn, d: &CDialogue, id: DialogueNodeId) {
         let Some(node) = d.node(id) else { return };
         let key = d.key_of(id).unwrap_or_default();
-        turn.push(
-            BlockKind::Speech,
-            vec![Run {
-                text: self.line(&node.text),
-                source: Some(Source {
-                    owner: format!("dialogue:{}", d.id),
-                    fragment: d.keys.iter().position(|k| k == key).unwrap_or(0),
-                    layer: Layer::Characters,
-                    condition: self.node_when(d, key),
-                    variant: 0,
-                }),
-                link: None,
-            }],
-        );
+        let base = Run {
+            text: String::new(),
+            source: Some(Source {
+                owner: format!("dialogue:{}", d.id),
+                fragment: d.keys.iter().position(|k| k == key).unwrap_or(0),
+                layer: Layer::Characters,
+                condition: self.node_when(d, key),
+                variant: 0,
+            }),
+            link: None,
+            speaker: None,
+        };
+        let runs = self.line(&node.text, &base);
+        turn.push(BlockKind::Speech, runs);
     }
 
     /// A node with no option to choose ends the talk.
@@ -408,9 +413,11 @@ impl Game {
             .and_then(|n| n.when.clone())
     }
 
-    /// A line of the dialogue: its markup, rendered now.
-    fn line(&self, text: &DialogText<Vec<Segment>>) -> String {
-        text.as_host().map(|s| self.render(s)).unwrap_or_default()
+    /// A line of the dialogue, rendered now, as runs like `base`.
+    fn line(&self, text: &DialogText<CompiledLine>, base: &Run) -> Vec<Run> {
+        text.as_host()
+            .map(|l| text::line_runs(&self.eval(), l, base))
+            .unwrap_or_default()
     }
 
     pub(super) fn end_talk(&mut self) {
@@ -429,11 +436,9 @@ impl Game {
             self.end_talk();
             return;
         };
-        let line = self.line(&option.text);
-        turn.push(
-            BlockKind::Said,
-            vec![rule_run(line, &Id::new(format!("dialogue:{}", d.id)))],
-        );
+        let base = rule_run(String::new(), &Id::new(format!("dialogue:{}", d.id)));
+        let runs = self.line(&option.text, &base);
+        turn.push(BlockKind::Said, runs);
         let target = runtime(&d).choose_option(option, &mut Turned { game: self, turn });
         // A world effect can end the story or take the player away.
         let here = self.eval().present(d.with.as_str());
@@ -551,7 +556,7 @@ impl Game {
             .zip(&src.options)
             .map(|(o, s)| TalkOptionView {
                 choice: available.iter().position(|a| *a == o.id),
-                say: s.say.clone(),
+                say: s.say.source(),
                 when: s.when.clone(),
                 go: s.go.clone(),
                 outcomes: crate::outline::describe(&s.outcomes),
@@ -576,7 +581,7 @@ impl Game {
             with: with.to_string(),
             name: self.the(&d.with, true),
             node: talk.node.clone(),
-            say: src.say.clone(),
+            say: src.say.source(),
             when: src.when.clone(),
             outcomes: crate::outline::describe(&src.outcomes),
             options,

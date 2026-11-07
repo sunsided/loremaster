@@ -1,10 +1,13 @@
 use crate::lower::resolve;
-use crate::{LangError, Operand, Scope, Segment, compile_condition, compile_markup, parse_expr};
+use crate::{
+    CompiledLine, LangError, LineError, Operand, Scope, compile_condition, compile_line, parse_expr,
+};
 use dramaturge_model::{
     CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
     DialogueOption, EntityId, Fact, FactId, FactScope, FactValue, Memory, Outcome,
     RelationshipAxisId, SymbolTable,
 };
+use loremaster_model::PLAYER_SPEAKER;
 use loremaster_model::{Dialogue, Effect, Outcomes, Value};
 
 /// A dialogue lowered to a dramaturge graph.
@@ -12,8 +15,10 @@ use loremaster_model::{Dialogue, Effect, Outcomes, Value};
 /// dramaturge holds the structure, the conditions and the outcomes. The start
 /// nodes are the entry nodes, in order. A `then` list is a host outcome
 /// ([`Outcome::Host`]) that the runtime applies. A line is host text
-/// ([`DialogText::Host`]): the compiled markup that the runtime renders.
-pub type CompiledDialogue = DialogueGraph<Vec<Effect>, Vec<Segment>>;
+/// ([`DialogText::Host`]): the compiled line that the runtime renders. The
+/// speech of a node is spoken by the dialogue's thing, the speech of an
+/// option by the player, unless a segment names its speaker with `by`.
+pub type CompiledDialogue = DialogueGraph<Vec<Effect>, CompiledLine>;
 
 /// A problem in a dialogue, with the place it was found.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,6 +56,15 @@ pub fn compile_dialogue(
         source: source.to_string(),
         error,
     };
+    let line_fail = |at: &str, e: LineError| DialogueError {
+        at: if e.at.is_empty() {
+            at.to_string()
+        } else {
+            format!("{at}.say{}", e.at)
+        },
+        source: e.source,
+        error: e.error,
+    };
     let Some(with) = scope.entity(d.with.as_str()) else {
         return Err(fail(
             "with".into(),
@@ -67,7 +81,8 @@ pub fn compile_dialogue(
         .collect();
     for (n, &id) in d.nodes.iter().zip(&ids) {
         let at = format!("nodes.{}", n.key);
-        let say = compile_markup(&n.say, scope).map_err(|e| fail(at.clone(), &n.say, e))?;
+        let say =
+            compile_line(&n.say, Some(d.with.as_str()), scope).map_err(|e| line_fail(&at, e))?;
         let mut node = DialogueNode::typed(id.0, speaker, DialogText::Host(say));
         if let Some(when) = &n.when {
             node.conditions.push(
@@ -79,7 +94,8 @@ pub fn compile_dialogue(
         for (i, o) in n.options.iter().enumerate() {
             let at = format!("{at}.options[{i}]");
             let oid = symbols.intern_option(&option_key(d.id.as_str(), &n.key, i));
-            let say = compile_markup(&o.say, scope).map_err(|e| fail(at.clone(), &o.say, e))?;
+            let say =
+                compile_line(&o.say, Some(PLAYER_SPEAKER), scope).map_err(|e| line_fail(&at, e))?;
             let target = match o.go.as_str() {
                 "end" => DialogTarget::End,
                 "back" => DialogTarget::Return,
@@ -241,7 +257,9 @@ mod tests {
         let meet = &c.nodes[1];
         check!(meet.options[0].target == DialogTarget::Node(c.nodes[2].id));
         // The lines are compiled markup in the graph.
-        check!(meet.text == DialogText::Host(vec![Segment::Text("Sit.".into())]));
+        let line = meet.text.as_host().expect("host text");
+        check!(line.len() == 1);
+        check!(line[0].text == vec![crate::Segment::Text("Sit.".into())]);
         check!(meet.options[1].target == DialogTarget::Return);
         check!(meet.options[2].target == DialogTarget::End);
         assert!(let [Outcome::AddRelationship { delta: 1, .. }] = meet.options[0].outcomes.as_slice());
