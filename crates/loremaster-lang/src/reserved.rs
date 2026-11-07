@@ -1,14 +1,15 @@
 //! Names that the condition language keeps for itself.
 
 /// The names that conditions read as built-ins before they look at the
-/// story: keywords, values that the runtime derives, and functions.
+/// story: keywords, values that the runtime derives, the starts of built-in
+/// paths, and functions.
 ///
 /// A variable, room or thing with a keyword's id cannot be named in a
 /// condition; with a derived value's id, conditions read the built-in instead
 /// of it (`resolve_path` in `lower.rs` resolves built-ins first). A function
-/// name is a built-in only in call position (`carried(x)`); it is reserved
-/// for the function and for syntax to come. [`reserved`] tells the three
-/// apart. The checker reports such an id at its declaration, and the ZIL
+/// name is a built-in only in call position (`carried(x)`), and a path start
+/// only with a dot (`time.hour`); both are reserved for the built-ins and for
+/// syntax to come. [`reserved`] tells the four kinds apart. The checker reports such an id at its declaration, and the ZIL
 /// importer renames such names. The list also holds names of planned
 /// built-ins (`seen_by`), so that no story takes them now.
 pub const RESERVED_NAMES: &[&str] = &[
@@ -40,7 +41,8 @@ pub const RESERVED_NAMES: &[&str] = &[
 
 /// True for a name in [`RESERVED_NAMES`].
 pub fn is_reserved(name: &str) -> bool {
-    RESERVED_NAMES.contains(&name)
+    // One source of truth with the kinds: the checker asks both.
+    reserved(name).is_some()
 }
 
 /// Why a name is reserved, in the words of a diagnostic.
@@ -104,6 +106,11 @@ mod tests {
     fn the_list_and_the_kinds_agree() {
         for name in RESERVED_NAMES {
             assert!(reserved(name).is_some(), "{name} has no kind");
+        }
+        // A kind without a list entry: the list is what the ZIL importer and
+        // the docs use, so it must name every reserved word.
+        for probe in ["and", "here", "time", "seen_by", "level", "visits"] {
+            assert_eq!(reserved(probe).is_some(), RESERVED_NAMES.contains(&probe));
         }
         let kinds = [
             "and",

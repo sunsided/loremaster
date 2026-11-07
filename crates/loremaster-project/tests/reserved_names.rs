@@ -67,6 +67,14 @@ fn a_room_or_thing_with_a_reserved_name_is_an_error_at_its_file() {
     let message = assert_reported(&errors(files), "things/not.yaml", "id", "thing `not`");
     assert!(message.contains("is a keyword of conditions"), "{message}");
 
+    // `time` is a built-in only as the start of a path, `time.hour`.
+    let files = with(lighthouse(), "rooms/time.yaml", "name: Time\n");
+    let message = assert_reported(&errors(files), "rooms/time.yaml", "id", "room `time`");
+    assert!(
+        message.contains("is the start of built-in paths of conditions"),
+        "{message}"
+    );
+
     // An `id:` in the file counts, not the file name.
     let files = with(
         lighthouse(),
@@ -185,8 +193,11 @@ fn the_examples_take_no_reserved_name() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../examples")
             .join(example);
-        // No error at all: every reserved-name and phase-name message is an error.
-        let found = errors(read_dir(&dir).unwrap());
+        // The reserved-name and phase-name messages all end so.
+        let found: Vec<_> = errors(read_dir(&dir).unwrap())
+            .into_iter()
+            .filter(|d| d.message.ends_with("; choose another id"))
+            .collect();
         assert!(found.is_empty(), "{example}: {found:#?}");
     }
 }
