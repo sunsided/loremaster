@@ -52,9 +52,10 @@ pub struct Scope {
     pub symbols: SymbolTable,
 }
 
-/// The entity key of the player. Things use their id as the key; an id can
-/// not start with `@`, so the two never meet.
-pub const PLAYER: &str = "@player";
+/// The entity key of the player, dramaturge's `SymbolTable::PLAYER_KEY`.
+/// Things use their id as the key; an id can not start with `@`, so the two
+/// never meet. Saves keep it, so it must not change.
+pub const PLAYER: &str = SymbolTable::PLAYER_KEY;
 
 impl Scope {
     pub fn from_story(story: &Story) -> Self {
@@ -104,7 +105,8 @@ impl Scope {
             .cloned()
             .collect();
         let mut symbols = SymbolTable::new();
-        symbols.intern_entity(PLAYER);
+        // The player first, so it gets the same id in every story.
+        symbols.player();
         for t in &story.things {
             symbols.intern_entity(t.id.as_str());
         }
