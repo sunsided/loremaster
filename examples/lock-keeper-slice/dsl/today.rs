@@ -147,7 +147,7 @@ world! {
 
     rule accuse_without_pages on verb(accuse, keeper) when not pages.carried {
         // draft: a speech segment with its speaker (#111).
-        say "The lock-keeper shrugs." keeper says "Prove it," "he says.";
+        say "The lock-keeper shrugs." keeper says "Prove it," narrate "he says.";
         end ashes;
     }
 

@@ -17,8 +17,10 @@ world! {
 
     // draft: `says "<text>"` is a speech segment (#111). The renderer adds
     // the quotes, so the line has no escapes. A plain string is narration.
-    // Segments in a row join with a space. An option's speaker is the player;
-    // a node's speaker is the thing of the dialogue.
+    // Segments in a row join with a space, in any order:
+    // `"He turns the poker." says "Nobody."` or
+    // `says "Nobody." narrate "He turns the poker."`. An option's speaker is
+    // the player; a node's speaker is the thing of the dialogue.
     dialogue with keeper start [stove] {
         // draft: a node with an id in place of a string says a text pool,
         // as `say keeper_remark;` does in a rule (D2 side note).

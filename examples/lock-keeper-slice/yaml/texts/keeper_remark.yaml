@@ -1,6 +1,7 @@
 # New syntax (phase 4, R9): a named text pool. Rules and dialogue call it by id.
 # `{ keeper says: … }` is a speech segment with its speaker (#111); the
-# renderer adds the quotes. Segments in a list join with a space.
+# renderer adds the quotes. Segments in a list join with a space. A plain
+# string is narration; `{ narrate: "…" }` is the same, written out.
 pick: best
 one_of:
   - "Mind your step."
