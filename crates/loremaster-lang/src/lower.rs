@@ -1,7 +1,5 @@
 use crate::{CmpOp, Derived, Expr, LangError, NameForm, Operand, Scope, Span, Ty, parse_expr};
-use dramaturge_model::{
-    Condition, FactId, FactScope, FactValue, MemoryQuery, MemoryTag, RelationshipAxisId,
-};
+use dramaturge_model::{Condition, FactId, FactScope, FactValue, MemoryQuery, RelationshipAxisId};
 use loremaster_model::Id;
 
 /// Parse, type-check and lower a condition to a dramaturge condition tree.
@@ -326,24 +324,24 @@ fn remembers(args: &[Expr], span: &Span, scope: &Scope) -> Result<Condition, Lan
     };
     let thing = thing_arg(std::slice::from_ref(thing), span, scope)?;
     let memory = single_ident(std::slice::from_ref(memory), span)?;
-    if !scope.memories.contains(memory) {
+    let Some(id) = scope
+        .memories
+        .contains(memory)
+        .then(|| scope.symbols.memory(memory))
+        .flatten()
+    else {
         return Err(LangError::new(
             format!("no dialogue remembers `{memory}`"),
             args[1].span(),
         ));
-    }
+    };
     let owner = scope
         .entity(thing.as_str())
         .ok_or_else(|| LangError::new(format!("unknown thing `{thing}`"), args[0].span()))?;
     Ok(Condition::HasMemory {
         owner,
-        query: MemoryQuery::by_tag(MemoryTag::Custom(memory.into())),
+        query: MemoryQuery::by_id(id),
     })
-}
-
-/// The tag of a memory key, as [`remembers`] queries it.
-pub fn memory_tag(key: &str) -> MemoryTag {
-    MemoryTag::Custom(key.into())
 }
 
 fn single_ident<'a>(args: &'a [Expr], span: &Span) -> Result<&'a str, LangError> {

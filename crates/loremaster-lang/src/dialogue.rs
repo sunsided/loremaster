@@ -1,4 +1,4 @@
-use crate::lower::{memory_tag, resolve};
+use crate::lower::resolve;
 use crate::{LangError, Operand, Scope, Segment, compile_condition, compile_markup, parse_expr};
 use dramaturge_model::{
     CharacterId, DialogTarget, DialogText, DialogueGraph, DialogueNode, DialogueNodeId,
@@ -203,9 +203,7 @@ fn outcomes(
         })?;
         out.push(Outcome::AddMemory {
             owner: with,
-            memory: Memory::new(id)
-                .with_subject(player)
-                .with_tag(memory_tag(key)),
+            memory: Memory::new(id).with_subject(player),
         });
     }
     if !o.then.is_empty() {
