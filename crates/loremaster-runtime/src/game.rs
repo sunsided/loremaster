@@ -1165,7 +1165,10 @@ impl Game {
                     Some(Location::Carried) => true,
                     _ if dark => false,
                     Some(Location::Room(r)) if r.as_str() == room => true,
-                    _ => ev.is_backdrop_of(t, room, self.state.location_of(id)),
+                    _ => {
+                        !t.also_in.is_empty()
+                            && ev.is_backdrop_of(t, room, self.state.location_of(id))
+                    }
                 };
                 visible && self.state.closed_around(id, true).is_none()
             })

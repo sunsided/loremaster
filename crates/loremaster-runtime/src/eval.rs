@@ -56,6 +56,10 @@ impl Eval<'_> {
         let Some(t) = self.world.thing(thing) else {
             return false;
         };
+        // Most things are no scenery: skip the place lookup for them.
+        if t.also_in.is_empty() {
+            return false;
+        }
         self.is_backdrop_of(t, room, self.state.location_of(thing))
     }
 
