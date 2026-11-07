@@ -368,6 +368,7 @@ text: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, a
 - When an `end` effect runs, the game shows the title and the text, and the game ends. The save game keeps the id of the ending.
 - `loremaster check` gives an error for an `end` that names no ending, and a warning for an ending that no `end` names.
 - A walkthrough checks the ending with `ending:`, for example `expect: { ending: beacon_lit }`.
+- An ending of kind `death` asks the player to undo the last input, restart or restore a save (the death prompt). A walkthrough step `undo` goes back one input. `death_prompt: false` in story.yaml turns the prompt off.
 
 ## Timers
 

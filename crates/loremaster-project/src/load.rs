@@ -54,6 +54,10 @@ impl Project {
     }
 }
 
+fn yes() -> bool {
+    true
+}
+
 /// The story header (`story.yaml` in a YAML folder): everything that is not a
 /// room, thing or rule. Exactly one pack of a project gives it.
 #[derive(Debug, Clone, Deserialize)]
@@ -77,6 +81,9 @@ pub struct StoryHeader {
     pub frames: loremaster_model::Frames,
     #[serde(default)]
     pub seed: u64,
+    /// `false` turns off the death prompt (SE-9).
+    #[serde(default = "yes")]
+    pub death_prompt: bool,
     #[serde(default)]
     pub notes: Vec<Note>,
     #[serde(default)]
@@ -601,6 +608,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         dialogues,
         frames: header.frames,
         seed: header.seed,
+        death_prompt: header.death_prompt,
         notes: header.notes,
         threads,
     };

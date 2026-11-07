@@ -107,6 +107,10 @@ pub enum AwaitRequest {
     Roll { dice: String, min: i64, max: i64 },
     /// Walk the player to a room; answer `arrived` or `refused`.
     WalkTo { room: Id },
+    /// The player died (SE-9): answer `undo`, `restart` or `restore`. The
+    /// session does `undo` and `restart` itself; for `restore`, the host
+    /// loads a save with `Session::restore` or `Session::load`.
+    DeathPrompt { ending: Id, options: Vec<Id> },
 }
 
 /// An option of a choice: its id and the text to show.
@@ -165,6 +169,10 @@ impl AwaitRequest {
                 .iter()
                 .map(|a| (Value::Text((*a).into()), (*a).to_string()))
                 .collect(),
+            AwaitRequest::DeathPrompt { options, .. } => options
+                .iter()
+                .map(|o| (Value::Text(o.to_string()), o.to_string()))
+                .collect(),
             AwaitRequest::Roll { .. } => Vec::new(),
         }
     }
@@ -214,6 +222,14 @@ impl AwaitRequest {
             ),
             AwaitRequest::Roll { dice, .. } => format!("roll {dice}"),
             AwaitRequest::WalkTo { room } => format!("walk to {room}"),
+            AwaitRequest::DeathPrompt { options, .. } => format!(
+                "you died: {}",
+                options
+                    .iter()
+                    .map(|o| o.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }
