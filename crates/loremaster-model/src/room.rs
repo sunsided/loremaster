@@ -4,6 +4,7 @@ use std::fmt;
 
 /// A room: a node in the world graph.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Room {
     pub id: Id,
     pub name: String,
@@ -139,6 +140,7 @@ impl From<Direction> for String {
 /// An exit without `to` is a message exit: it leads nowhere, and a move in its
 /// direction only prints `blocked`, for example "The rocks drop sheer into the surf."
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Exit {
     pub direction: Direction,
     #[serde(default, skip_serializing_if = "Option::is_none")]

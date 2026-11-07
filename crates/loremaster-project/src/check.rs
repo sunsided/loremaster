@@ -1,12 +1,65 @@
-use crate::{Diagnostic, Origin, Project, Severity};
+use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
     Effect, EventPattern, Fragment, Location, Story, ThreadStatus, standard_verbs,
 };
 use std::collections::BTreeSet;
 
+/// The result of the schema checks: the project, when the packs join, and
+/// every error and warning, also the ones of joining the packs.
+#[derive(Debug, Clone)]
+pub struct Checked {
+    /// None when a pack does not read or the packs do not join.
+    pub project: Option<Project>,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+impl Checked {
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+    }
+}
+
+/// The schema checks as one library function (XP-5): join the packs in their
+/// order, then check ids, references, facts, conditions and markup of the
+/// model, and the names that conditions keep for themselves.
+///
+/// Every source of a story runs the same checks through this function: the
+/// YAML loader at load time ([`check_files`]), and the `world!` macro at
+/// compile time on its packs. It needs no files and no I/O. Diagnostics name
+/// the file of each entity's origin, YAML or Rust, and the place in the
+/// entity (`at`). The line comes from the text of a YAML file, or from the
+/// Rust origin of the entity.
+pub fn check_packs(packs: Vec<Pack>) -> Checked {
+    match assemble(packs) {
+        Ok(project) => Checked {
+            diagnostics: check(&project),
+            project: Some(project),
+        },
+        Err(diagnostics) => Checked {
+            project: None,
+            diagnostics,
+        },
+    }
+}
+
+/// [`check_packs`] for the files of one YAML folder: a file that does not
+/// read (an unknown field, an unknown folder) is an error too.
+pub fn check_files(files: Vec<SourceFile>) -> Checked {
+    match Pack::from_files(files) {
+        Ok(pack) => check_packs(vec![pack]),
+        Err(diagnostics) => Checked {
+            project: None,
+            diagnostics,
+        },
+    }
+}
+
 /// Check a loaded project: every reference resolves, every condition and
-/// every piece of markup parses and type-checks.
+/// every piece of markup parses and type-checks. [`check_packs`] joins packs
+/// and runs this.
 pub fn check(project: &Project) -> Vec<Diagnostic> {
     let mut c = Checker {
         project,
@@ -145,9 +198,11 @@ impl Checker<'_> {
 
     fn run(&mut self) {
         let story = self.story().clone();
-        self.room_ref("story.yaml", "start", story.start.as_str());
-        self.fragments("story.yaml", "intro", &story.intro);
-        self.frames("story.yaml", "frames", &story.frames);
+        // The header comes from story.yaml, or from a pack in Rust.
+        let header = self.file_of("story");
+        self.room_ref(&header, "start", story.start.as_str());
+        self.fragments(&header, "intro", &story.intro);
+        self.frames(&header, "frames", &story.frames);
         for v in &story.vars {
             let ok = match (&v.ty, &v.initial) {
                 (loremaster_model::VarType::Bool, loremaster_model::Value::Bool(_)) => true,
@@ -159,7 +214,7 @@ impl Checker<'_> {
             };
             if !ok {
                 self.error(
-                    "story.yaml",
+                    &header,
                     &format!("vars.{}", v.id),
                     "initial value does not match the type",
                 );
@@ -254,6 +309,7 @@ impl Checker<'_> {
             }
         }
 
+        self.reserved_names();
         self.threads();
         self.dialogues();
         self.timers();
@@ -346,6 +402,74 @@ impl Checker<'_> {
             }
             self.effects(&file, "then", &rule.then);
         }
+    }
+
+    /// Variables, machines, rooms and things must not take a built-in name
+    /// of conditions, such as `here` or `turns`: conditions would read the
+    /// built-in instead (P2-12). A variable or machine must not take the name
+    /// of a phase of the story's clock either: it would hide the phase.
+    fn reserved_names(&mut self) {
+        let story = self.story().clone();
+        let phases = story.clock.phase_names();
+        for v in &story.vars {
+            let phase = phases.contains(&v.id.as_str());
+            if !phase && !loremaster_lang::is_reserved(v.id.as_str()) {
+                continue;
+            }
+            let (file, at, kind) = if story.machines.iter().any(|m| m.id == v.id) {
+                (
+                    self.file_of(&format!("machine:{}", v.id)),
+                    format!("machines.{}", v.id),
+                    "machine",
+                )
+            } else if story.score.as_ref().is_some_and(|s| s.var == v.id) {
+                (self.file_of("story"), "score.var".into(), "score variable")
+            } else {
+                (self.file_of("story"), format!("vars.{}", v.id), "variable")
+            };
+            if phase {
+                // A bare phase name tests the time of day only while no
+                // variable has that name (`lower_bool` in loremaster-lang).
+                self.error(
+                    &file,
+                    &at,
+                    format!(
+                        "the {kind} `{}` has the name of a phase of the clock, so conditions would read it instead of the phase; choose another id",
+                        v.id
+                    ),
+                );
+            } else {
+                self.reserved(&file, &at, kind, v.id.as_str());
+            }
+        }
+        for r in &story.rooms {
+            if loremaster_lang::is_reserved(r.id.as_str()) {
+                let file = self.file_of(&format!("room:{}", r.id));
+                self.reserved(&file, "id", "room", r.id.as_str());
+            }
+        }
+        for t in &story.things {
+            if loremaster_lang::is_reserved(t.id.as_str()) {
+                let file = self.file_of(&format!("thing:{}", t.id));
+                self.reserved(&file, "id", "thing", t.id.as_str());
+            }
+        }
+    }
+
+    fn reserved(&mut self, file: &str, at: &str, kind: &str, id: &str) {
+        use loremaster_lang::Reserved;
+        let why = match loremaster_lang::reserved(id) {
+            Some(Reserved::Keyword) => "is a keyword of conditions, so conditions cannot name it",
+            Some(Reserved::Function) => {
+                "has the name of a function of conditions, which is reserved for it"
+            }
+            _ => "has a name that conditions use for a built-in, so they would not read it",
+        };
+        self.error(
+            file,
+            at,
+            format!("the {kind} `{id}` {why}; choose another id"),
+        );
     }
 
     /// Dialogues: references, conditions and markup, then the structure of
@@ -567,7 +691,7 @@ impl Checker<'_> {
         let Some(score) = self.story().score.clone() else {
             return;
         };
-        let file = "story.yaml";
+        let file = &self.file_of("story");
         if score.max <= 0 {
             self.error(file, "score.max", "the highest score must be more than 0");
         }

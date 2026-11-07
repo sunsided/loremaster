@@ -11,9 +11,14 @@
 //! threads/*.yaml    one long-range thread per file
 //! ```
 //!
-//! An entity's `id` defaults to its file name. Loading works on in-memory
-//! files so the same code runs in the browser; [`read_dir`] collects them
-//! from disk.
+//! The other folders are in [`FOLDERS`]. A YAML file in an unknown folder, and
+//! an unknown field in any file, is an error. An entity's `id` defaults to its
+//! file name. Loading works on in-memory files so the same code runs in the
+//! browser; [`read_dir`] collects them from disk.
+//!
+//! [`check_packs`] is the one function for the schema checks: the YAML loader
+//! runs it through [`check_files`], and the `world!` macro runs it on its
+//! packs at compile time.
 
 mod check;
 mod hash;
@@ -23,9 +28,9 @@ mod notes;
 mod origin;
 mod scaffold;
 
-pub use check::check;
+pub use check::{Checked, check, check_files, check_packs};
 pub use hash::model_hash;
-pub use load::{Pack, Project, SourceFile, StoryHeader, assemble, load};
+pub use load::{FOLDERS, Pack, Project, SourceFile, StoryHeader, assemble, load};
 /// The one diagnostic form of loremaster (XP-6). It lives in `loremaster-model`.
 pub use loremaster_model::{Diagnostic, Severity};
 pub use merge::{Extension, MergeMode};

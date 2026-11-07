@@ -23,6 +23,8 @@ A story is a folder of YAML files. Each entity has its own file.
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
+The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folders `agendas/` and `texts/` are for planned parts: the loader skips them with a warning.
+
 To examine a story for problems, run `task check:story` or `cargo run -p loremaster --no-default-features -- check <folder>`.
 
 ## Start a new story
@@ -71,6 +73,8 @@ Conditions use variables, thing properties and values that the runtime calculate
 - The current action: `action.repeat`, `action.count`, `action.total`, `action.verb`.
 
 Use `and`, `or`, `not` and parentheses to join conditions.
+
+These names are built-ins of conditions: `and`, `or`, `not`, `true`, `false`, `here`, `turns`, `level`, `first_visit`, `time`, `action`, `timer`, `in`, `carried`, `present`, `visited`, `visits`, `chance`, `remembers` and `seen_by` (planned). A variable, machine, room or thing must not use one of them as its id: a condition cannot name a keyword, it reads the built-in value instead of a `here` or `turns` of the story, and the function names are kept for the functions. The checker reports such an id as an error at its declaration. A variable or machine must not use the name of a phase of the clock (`night`, `dawn`, `day`, `dusk` by default) either: a bare `dusk` would read the variable instead of the phase.
 
 ## Action frames
 
@@ -369,6 +373,7 @@ text: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, a
 - When an `end` effect runs, the game shows the title and the text, and the game ends. The save game keeps the id of the ending.
 - `loremaster check` gives an error for an `end` that names no ending, and a warning for an ending that no `end` names.
 - A walkthrough checks the ending with `ending:`, for example `expect: { ending: beacon_lit }`.
+- An ending of kind `death` asks the player to undo the last input, restart or restore a save (the death prompt). A walkthrough step `undo` goes back one input. `death_prompt: false` in story.yaml turns the prompt off.
 
 ## Timers
 
@@ -469,7 +474,8 @@ The checker finds unknown states and states that no step goes to.
 Some logic is too large for rules, for example a character that walks the map and steals. A game that uses loremaster as a library can write this logic in Rust as a behavior.
 
 1. Write a type that implements `loremaster_runtime::Behavior`. Its `handle` method gets each event, after the rules of the event.
-2. Change the world only through `Cx`: facts, things, the player, text, events and `roll`. Then the save game, the walkthroughs and the explorer see all changes. Do not keep state in fields of the type.
+2. Read and change the world only through `Cx`. It reads facts, locations, the player's room (`here`), `neighbours`, `carried` things, `present`, `room_has_tag`, `visited`, `turns` and `minutes`. It changes facts, things, the player, text and events. Random numbers come only from `cx.roll(n)`: do not read a clock, the host or files. Then the save game, the walkthroughs and the explorer see all changes, and play replays. Do not keep state in fields of the type.
+   `cx.unstable()` gives the whole state and world, read-only, for what `Cx` does not say yet. It is not a stable API.
 3. Give a manifest: what the behavior reads, what it writes and which events it handles, for example `Manifest::new().events([EventKind::Start, EventKind::Turn]).writes(["thief.location"])`. Names are facts or `<thing>.location`. The game sends the behavior only those events; a write that the manifest does not name is a note in the log, and the rules view shows the manifest. Without a manifest, a behavior is opaque: it gets every event.
 4. Register the behavior: `world.register(Thief::zork())`.
 5. Name the behavior in the story: `behaviors: [thief]` in story.yaml, or a file `behaviors/thief.yaml` with notes.

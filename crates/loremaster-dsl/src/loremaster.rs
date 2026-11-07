@@ -162,6 +162,9 @@ fn prefix_paths(pack: &mut Pack, prefix: &str) {
     for (key, _) in &mut pack.walkthroughs {
         prefixed(key);
     }
+    for warning in &mut pack.warnings {
+        prefixed(&mut warning.file);
+    }
     let origins = pack
         .origins
         .values_mut()
