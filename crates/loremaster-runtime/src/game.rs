@@ -502,6 +502,10 @@ impl Game {
         &self.world
     }
 
+    pub(crate) fn world_arc(&self) -> Arc<World> {
+        self.world.clone()
+    }
+
     pub(crate) fn eval(&self) -> Eval<'_> {
         Eval {
             world: &self.world,
@@ -519,6 +523,24 @@ impl Game {
         self.enter_room(&mut turn, 0);
         self.fire(&mut turn, &Event::Start, 0);
         self.finish(turn)
+    }
+
+    /// The description of the current room, without a turn: the state does
+    /// not change. For undo and restore, which show where the player is.
+    pub fn describe_here(&mut self) -> Turn {
+        let state = self.state.clone();
+        let mut turn = Turn::default();
+        self.describe_room(&mut turn);
+        self.state = state;
+        turn
+    }
+
+    /// Put another state in place, for undo and restore.
+    pub(crate) fn set_state(&mut self, state: State) {
+        self.state = state;
+        self.stopped = false;
+        self.last_fired.clear();
+        self.last_frame = None;
     }
 
     /// What a command that is still being typed refers to, for the verb bar.

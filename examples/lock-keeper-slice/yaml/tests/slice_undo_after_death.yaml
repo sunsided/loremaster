@@ -1,6 +1,5 @@
 # A death ending sends the death prompt, and undo goes back one input.
 name: Undo after drowning
-pending: { phase: 2, needs: "SE-8, SE-9, P2-03 #54" }
 steps:
   - e
   - { do: jump, see: ["The water closes over you", "Drowned"], ended: true }
