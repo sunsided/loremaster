@@ -23,6 +23,8 @@ A story is a folder of YAML files. Each entity has its own file.
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
+The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folders `agendas/` and `texts/` are for planned parts: the loader skips them with a warning.
+
 To examine a story for problems, run `task check:story` or `cargo run -p loremaster --no-default-features -- check <folder>`.
 
 ## Start a new story
@@ -71,6 +73,8 @@ Conditions use variables, thing properties and values that the runtime calculate
 - The current action: `action.repeat`, `action.count`, `action.total`, `action.verb`.
 
 Use `and`, `or`, `not` and parentheses to join conditions.
+
+These names are built-ins of conditions: `and`, `or`, `not`, `true`, `false`, `here`, `turns`, `level`, `first_visit`, `time`, `action`, `timer`, `in`, `carried`, `present`, `visited`, `visits`, `chance`, `remembers` and `seen_by` (planned). A variable, machine, room or thing must not use one of them as its id: a condition cannot name a keyword, it reads the built-in value instead of a `here` or `turns` of the story, and the function names are kept for the functions. The checker reports such an id as an error at its declaration. A variable or machine must not use the name of a phase of the clock (`night`, `dawn`, `day`, `dusk` by default) either: a bare `dusk` would read the variable instead of the phase.
 
 ## Action frames
 

@@ -21,6 +21,7 @@ use std::fmt;
 /// The talk starts at the first node in `start` whose `when` holds. A node is
 /// one line of the other character; its options are the player's answers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Dialogue {
     pub id: Id,
     /// The thing the player talks to.
@@ -43,6 +44,7 @@ impl Dialogue {
 
 /// What a node or an option changes when it applies.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Outcomes {
     /// Set variables or properties, as in a rule.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -87,6 +89,7 @@ pub struct DialogueNode {
 
 /// An answer the player can choose.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(from = "OptionRepr")]
 pub struct DialogueOption {
     /// The player's line, also the label of the choice.
     pub say: String,
@@ -104,15 +107,77 @@ fn end() -> String {
     "end".into()
 }
 
-/// A node as written in the file, without its key.
-#[derive(Serialize, Deserialize)]
+/// An option as written in the file. The fields of [`Outcomes`] are spelled
+/// out instead of `#[serde(flatten)]`, so that an unknown key is an error:
+/// serde does not reject unknown fields of a flattened struct.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OptionRepr {
+    say: String,
+    #[serde(default)]
+    when: Option<String>,
+    #[serde(default = "end")]
+    go: String,
+    #[serde(default)]
+    set: BTreeMap<String, Value>,
+    #[serde(default)]
+    add: BTreeMap<String, i64>,
+    #[serde(default)]
+    relation: BTreeMap<String, i32>,
+    #[serde(default)]
+    remember: Vec<String>,
+    #[serde(default)]
+    then: Vec<Effect>,
+}
+
+impl From<OptionRepr> for DialogueOption {
+    fn from(o: OptionRepr) -> Self {
+        DialogueOption {
+            say: o.say,
+            when: o.when,
+            outcomes: Outcomes {
+                set: o.set,
+                add: o.add,
+                relation: o.relation,
+                remember: o.remember,
+                then: o.then,
+            },
+            go: o.go,
+        }
+    }
+}
+
+/// A node as written in the file, without its key, with the fields of
+/// [`Outcomes`] spelled out as in [`OptionRepr`].
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeRepr {
+    #[serde(default)]
+    when: Option<String>,
+    say: String,
+    #[serde(default)]
+    options: Vec<DialogueOption>,
+    #[serde(default)]
+    set: BTreeMap<String, Value>,
+    #[serde(default)]
+    add: BTreeMap<String, i64>,
+    #[serde(default)]
+    relation: BTreeMap<String, i32>,
+    #[serde(default)]
+    remember: Vec<String>,
+    #[serde(default)]
+    then: Vec<Effect>,
+}
+
+/// A node as it is written out, without its key.
+#[derive(Serialize)]
 struct NodeBody {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     when: Option<String>,
     say: String,
     #[serde(flatten)]
     outcomes: Outcomes,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     options: Vec<DialogueOption>,
 }
 
@@ -146,12 +211,18 @@ mod ordered_nodes {
 
             fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
                 let mut out = Vec::new();
-                while let Some((key, body)) = map.next_entry::<String, NodeBody>()? {
+                while let Some((key, body)) = map.next_entry::<String, NodeRepr>()? {
                     out.push(DialogueNode {
                         key,
                         when: body.when,
                         say: body.say,
-                        outcomes: body.outcomes,
+                        outcomes: Outcomes {
+                            set: body.set,
+                            add: body.add,
+                            relation: body.relation,
+                            remember: body.remember,
+                            then: body.then,
+                        },
                         options: body.options,
                     });
                 }

@@ -15,6 +15,7 @@ pub enum VarType {
 
 /// A declared story variable such as `bridge_collapsed` or `weather`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VarDef {
     pub id: Id,
     #[serde(rename = "type")]
@@ -25,6 +26,7 @@ pub struct VarDef {
 /// The score of the story: a number variable, its maximum and the ranks.
 /// With a score, the `score` command shows it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Score {
     /// The number variable that holds the score. The loader declares it when
     /// story.yaml does not.
@@ -41,6 +43,7 @@ fn score_var() -> Id {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rank {
     pub from: i64,
     pub name: String,

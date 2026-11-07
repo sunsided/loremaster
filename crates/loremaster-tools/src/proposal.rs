@@ -10,7 +10,7 @@
 //! view of a proposal can change when the project changes.
 
 use crate::{ToolError, Workspace, err};
-use loremaster_project::{Diagnostic, Project, Severity, SourceFile, check, load};
+use loremaster_project::{Diagnostic, Project, SourceFile, check_files};
 use loremaster_runtime::{Game, World};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -346,19 +346,18 @@ struct Built {
 }
 
 fn build(files: Vec<SourceFile>) -> Built {
-    let project = match load(files) {
-        Ok(p) => p,
-        Err(check) => {
-            return Built {
-                project: None,
-                check,
-                world: None,
-            };
-        }
+    let checked = check_files(files);
+    let errors = checked.has_errors();
+    let mut check = checked.diagnostics;
+    let Some(project) = checked.project else {
+        return Built {
+            project: None,
+            check,
+            world: None,
+        };
     };
-    let mut check = check(&project);
     let mut world = None;
-    if !check.iter().any(|d| d.severity == Severity::Error) {
+    if !errors {
         match World::compile(project.story.clone()) {
             Ok(w) => world = Some(Arc::new(w)),
             Err(e) => check.push(project.locate(Diagnostic::from(&e))),

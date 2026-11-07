@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 /// most specific frame for the verb is used: the first object's thing, then
 /// the current room, then the story.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Frame {
     /// Shown before the response.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
