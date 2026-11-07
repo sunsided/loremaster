@@ -84,8 +84,11 @@ impl Behavior for Thief {
     fn manifest(&self) -> Manifest {
         Manifest::new()
             .events([EventKind::Start, EventKind::Turn])
-            .reads(self.places().chain(["here".to_string()]))
-            .writes(self.places())
+            .reads(
+                self.places()
+                    .chain(["here", "carried", "random"].map(String::from)),
+            )
+            .writes(self.places().chain(["random".to_string()]))
     }
 
     fn handle(&self, event: &Event, cx: &mut Cx<'_>) -> Flow {

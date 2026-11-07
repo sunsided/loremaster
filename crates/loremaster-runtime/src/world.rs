@@ -548,7 +548,7 @@ impl World {
         self.behaviors
             .iter()
             .position(|b| b.id() == id)
-            .map(|i| &self.manifests[i])
+            .and_then(|i| self.manifests.get(i))
     }
 
     /// Does a behavior of the story react to the passing of time (turn or
