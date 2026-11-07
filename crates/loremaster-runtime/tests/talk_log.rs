@@ -2,11 +2,17 @@
 //! with its new value, in the order of the changes.
 
 use loremaster_project::{SourceFile, load, read_dir};
-use loremaster_runtime::{Game, World};
+use loremaster_runtime::authoring;
+use loremaster_runtime::{Input, Session, Turn, World};
 use std::path::Path;
 use std::sync::Arc;
 
-fn cantina(dialogue: impl Fn(String) -> String) -> Game {
+/// One typed command as a whole turn.
+fn input(session: &mut Session, text: &str) -> Turn {
+    authoring::play(session, Input::Text(text.into()))
+}
+
+fn cantina(dialogue: impl Fn(String) -> String) -> Session {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/cantina");
     let mut files: Vec<SourceFile> = read_dir(&dir).unwrap();
     for f in &mut files {
@@ -15,16 +21,16 @@ fn cantina(dialogue: impl Fn(String) -> String) -> Game {
         }
     }
     let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
-    let mut game = Game::new(world);
-    game.start();
-    game.input("in");
-    game.input("talk to figure");
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    input(&mut game, "in");
+    input(&mut game, "talk to figure");
     game
 }
 
 /// The log lines of a turn, without the rule lines.
-fn changes(game: &mut Game, input: &str) -> Vec<String> {
-    game.input(input)
+fn changes(game: &mut Session, text: &str) -> Vec<String> {
+    input(game, text)
         .log
         .iter()
         .filter(|e| e.kind != "rule")

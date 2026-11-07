@@ -1,6 +1,6 @@
 // The story that the author plays and edits: the project files and the play session on them.
 
-import { Game, ProjectError, type Diagnostic, type SourceFile } from '#lib/engine/index.ts';
+import { ProjectError, Workbench, type Diagnostic, type SourceFile } from '#lib/engine/index.ts';
 import { Session } from '#lib/player/session.svelte.ts';
 import { Project } from './project.svelte.ts';
 import { fromZip } from './store.ts';
@@ -38,9 +38,9 @@ export class Workspace {
 		return true;
 	}
 
-	async #build(files: SourceFile[]): Promise<Game | null> {
+	async #build(files: SourceFile[]): Promise<Workbench | null> {
 		try {
-			const game = await Game.open(files);
+			const game = await Workbench.open(files);
 			this.problems = [];
 			return game;
 		} catch (e) {

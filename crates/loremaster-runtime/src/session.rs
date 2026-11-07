@@ -211,22 +211,28 @@ impl Session {
     /// the story has a verb with that word. While the death prompt waits, the
     /// text `undo` or `restart` answers it.
     pub fn submit(&mut self, input: Input) -> Step {
-        if let Input::Text(text) = &input {
-            let word = text.trim().to_lowercase();
-            if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
-                return self.answer_death(&word).unwrap_or_else(|e| self.message(e));
-            }
-            // While a rule waits or a talk is open, the text is an answer.
-            if word == UNDO
-                && self.game.awaiting().is_none()
-                && self.game.talk().is_none()
-                && !self.parser_knows(UNDO)
-            {
-                return self.undo();
-            }
-        }
         let turn = self.turn(input);
         self.step(turn)
+    }
+
+    /// The turn of a session word in typed text, or `None` when the text is
+    /// a command for the story. While the death prompt waits, `undo`,
+    /// `restart` and `restore` answer it. Otherwise `undo` undoes, unless a
+    /// rule waits or a talk is open (then the text is an answer) or the
+    /// story has a verb with that word.
+    fn session_word(&mut self, input: &Input) -> Option<Turn> {
+        let Input::Text(text) = input else {
+            return None;
+        };
+        let word = text.trim().to_lowercase();
+        if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
+            return Some(self.death_turn(&word).unwrap_or_else(Self::note_turn));
+        }
+        (word == UNDO
+            && self.game.awaiting().is_none()
+            && self.game.talk().is_none()
+            && !self.parser_knows(UNDO))
+        .then(|| self.undo_turn())
     }
 
     /// Answer the request of a rule that waits, and run the rest of the rule
@@ -235,29 +241,34 @@ impl Session {
     /// The death prompt is answered here too: `undo` and `restart` run in the
     /// session; for `restore`, the host restores a save itself.
     pub fn resume(&mut self, await_id: &str, value: Value) -> Result<Step, String> {
-        if let Some(prompt) = self.death_prompt()
-            && prompt.id == await_id
-        {
-            prompt.request.accepts(&value)?;
-            return match value {
-                Value::Text(answer) => self.answer_death(&answer),
-                _ => Err("the death prompt takes a text answer".into()),
-            };
-        }
-        let before = self.before();
-        let turn = self.game.resume(await_id, value)?;
-        self.remember(before);
+        let turn = self.resume_turn(await_id, value)?;
         Ok(self.step(turn))
     }
 
     /// Go back to the state before the last input (SE-8).
     pub fn undo(&mut self) -> Step {
-        match self.history.pop_back() {
-            Some(state) => {
-                self.game.set_state(state);
-                self.shown_here("Undone.")
+        let turn = self.undo_turn();
+        self.step(turn)
+    }
+
+    /// What the session waits for now: the same status as the last step
+    /// returned.
+    pub fn status(&self) -> Status {
+        let state = self.game.state();
+        if let Some(prompt) = self.death_prompt() {
+            Status::Await { awaiting: prompt }
+        } else if let Some(awaiting) = self.game.awaiting()
+            && !state.ended
+        {
+            Status::Await {
+                awaiting: awaiting.clone(),
             }
-            None => self.message("There is nothing to undo.".into()),
+        } else if state.ended {
+            Status::Ended {
+                ending: self.ending(),
+            }
+        } else {
+            Status::Ready
         }
     }
 
@@ -296,21 +307,14 @@ impl Session {
         self.game.set_state(snapshot.state.clone());
         self.started = true;
         self.remember(before);
-        Ok(self.shown_here("Restored."))
+        let turn = self.here_turn("Restored.");
+        Ok(self.step(turn))
     }
 
     /// Start the story again with the seed of this session. `undo` can go
     /// back to the state before it.
     pub fn restart(&mut self) -> Step {
-        let before = self.before();
-        let host_rolls = self.game.host_rolls;
-        let mut game = Game::new(self.game.world_arc());
-        game.state_mut().rng = self.seed;
-        game.host_rolls = host_rolls;
-        self.game = game;
-        self.started = true;
-        let turn = self.game.start();
-        self.remember(before);
+        let turn = self.restart_turn();
         self.step(turn)
     }
 
@@ -369,10 +373,10 @@ impl Session {
             .any(|v| v.words.iter().any(|w| w.eq_ignore_ascii_case(word)))
     }
 
-    fn answer_death(&mut self, answer: &str) -> Result<Step, String> {
+    fn death_turn(&mut self, answer: &str) -> Result<Turn, String> {
         match answer {
-            UNDO => Ok(self.undo()),
-            RESTART => Ok(self.restart()),
+            UNDO => Ok(self.undo_turn()),
+            RESTART => Ok(self.restart_turn()),
             RESTORE => Err("restore a save with `Session::restore` or `Session::load`".into()),
             _ => Err(format!("`{answer}` is not an answer of the death prompt")),
         }
@@ -409,7 +413,7 @@ impl Session {
     }
 
     /// A note and the room as it is now, without a turn.
-    fn shown_here(&mut self, note: &str) -> Step {
+    fn here_turn(&mut self, note: &str) -> Turn {
         let mut turn = self.game.describe_here();
         turn.blocks.insert(
             0,
@@ -418,19 +422,18 @@ impl Session {
                 runs: vec![crate::output::Run::plain(note)],
             },
         );
-        self.step(turn)
+        turn
     }
 
     /// A note for the player, without a change.
-    fn message(&self, text: String) -> Step {
-        let turn = Turn {
+    fn note_turn(text: String) -> Turn {
+        Turn {
             blocks: vec![Block {
                 kind: BlockKind::Note,
                 runs: vec![crate::output::Run::plain(text)],
             }],
             ..Turn::default()
-        };
-        self.step(turn)
+        }
     }
 
     fn step(&self, turn: Turn) -> Step {
@@ -457,33 +460,18 @@ impl Session {
                 choices: turn.choices,
             });
         }
-        let status = if let Some(prompt) = self.death_prompt() {
-            if turn.ended
-                && let Some(ending) = self.ending()
-            {
-                effects.push(Effect::Ending { ending });
-            }
-            Status::Await { awaiting: prompt }
-        } else if let Some(awaiting) = self.game.awaiting()
-            && !self.game.state().ended
+        // The turn that ended the story shows the ending, also when the death
+        // prompt waits after it.
+        if turn.ended
+            && self.game.state().ended
+            && let Some(ending) = self.ending()
         {
-            Status::Await {
-                awaiting: awaiting.clone(),
-            }
-        } else if self.game.state().ended {
-            let ending = self.ending();
-            if let Some(ending) = &ending
-                && turn.ended
-            {
-                effects.push(Effect::Ending {
-                    ending: ending.clone(),
-                });
-            }
-            Status::Ended { ending }
-        } else {
-            Status::Ready
-        };
-        Step { effects, status }
+            effects.push(Effect::Ending { ending });
+        }
+        Step {
+            effects,
+            status: self.status(),
+        }
     }
 
     fn ending(&self) -> Option<EndingInfo> {

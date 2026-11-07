@@ -202,8 +202,36 @@ pub fn start(session: &mut Session) -> Turn {
 }
 
 /// One input as a whole turn, with the rule log, for an editor transcript.
+/// Typed session words (`undo`, the death prompt) run as in [`Session::submit`].
 pub fn play(session: &mut Session, input: Input) -> Turn {
     session.turn(input)
+}
+
+/// The answer to a paused rule or the death prompt as a whole turn, with the
+/// rule log, for an editor transcript. Read [`Session::resume`].
+pub fn resume(
+    session: &mut Session,
+    await_id: &str,
+    value: loremaster_model::Value,
+) -> Result<Turn, String> {
+    session.resume_turn(await_id, value)
+}
+
+/// [`Session::undo`] as a whole turn, for an editor transcript.
+pub fn undo(session: &mut Session) -> Turn {
+    session.undo_turn()
+}
+
+/// [`Session::restart`] as a whole turn, with the rule log of the opening.
+pub fn restart(session: &mut Session) -> Turn {
+    session.restart_turn()
+}
+
+/// A session on a bare state, as it is: no migration and no check against
+/// the story. `start` does not run again. For tests and tools that build a
+/// state by hand; hosts restore saves with [`Session::load`].
+pub fn session_of(world: Arc<World>, state: State) -> Session {
+    Session::detached(Game::restore(world, state))
 }
 
 /// Run an author command: it changes the state directly. `undo` can go back

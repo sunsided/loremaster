@@ -521,3 +521,84 @@ export interface AtlasRoom {
 	/** Editor only: the AI proposal that removes the room. */
 	removed?: string;
 }
+
+// ---- The Session API (ADR 0003) ----------------------------------------------
+
+/** Input from the host: a typed command, a command record, a choice by index, or a tick. */
+export type Input =
+	| { type: 'text'; value: string }
+	| { type: 'command'; value: Command }
+	| { type: 'choice'; value: number }
+	| { type: 'tick' };
+
+/** An ending from `endings/`. */
+export interface EndingInfo {
+	id: string;
+	kind: 'win' | 'loss' | 'death' | 'neutral';
+	rank?: number;
+	title: string;
+}
+
+/** An option of an await choice: its id and the text to show. */
+export interface AwaitOptionInfo {
+	id: string;
+	text: string;
+}
+
+/** What a paused rule asks the host. */
+export type AwaitRequest =
+	| { kind: 'choice'; options: AwaitOptionInfo[] }
+	| { kind: 'action'; name: string; args?: Record<string, Value>; results?: string[] }
+	| { kind: 'roll'; dice: string; min: number; max: number }
+	| { kind: 'walk_to'; room: string }
+	/** The player died: answer `undo`, `restart` or `restore`. */
+	| { kind: 'death_prompt'; ending: string; options: string[] };
+
+/** A paused rule: answer it with `resume(id, value)`. */
+export interface Awaiting {
+	id: string;
+	rule: string;
+	next: number;
+	request: AwaitRequest;
+	into?: string;
+	locals?: Record<string, Value>;
+}
+
+/** What the session waits for after a step. */
+export type Status =
+	| { type: 'ready' }
+	| { type: 'ended'; ending: EndingInfo | null }
+	| { type: 'await'; awaiting: Awaiting };
+
+/** One thing the session shows or tells the host. */
+export type Effect =
+	| { type: 'text'; block: Block }
+	| { type: 'notice'; entry: LogEntry }
+	| { type: 'choices'; talk: TalkInfo; choices: Choice[] }
+	| { type: 'ending'; ending: EndingInfo };
+
+/** The result of one call of the Session API: the effects in order, then the status. */
+export interface Step {
+	effects: Effect[];
+	status: Status;
+}
+
+/** Where a talk is: the dialogue and its current node. */
+export interface Talk {
+	dialogue: string;
+	node: string;
+	back?: string[];
+}
+
+/** What a restore of a save had to change. */
+export interface Loaded {
+	/** The save was made with another version of the story. */
+	story_changed: boolean;
+	/** The save version before migration. */
+	from_version: number;
+	/** What the changed story no longer has, for example `fact:lamp.lit`. */
+	dropped: string[];
+}
+
+/** The state of a running game, to put back with `restore`. Opaque to the host. */
+export type Snapshot = { readonly story: string; readonly state: unknown };

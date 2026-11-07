@@ -1,9 +1,15 @@
 //! The `end` effect ends the game with an ending from `endings/`.
 
 use loremaster_project::{SourceFile, load, read_dir};
-use loremaster_runtime::{Game, State, World};
+use loremaster_runtime::authoring;
+use loremaster_runtime::{Input, Session, State, Turn, World};
 use std::path::Path;
 use std::sync::Arc;
+
+/// One typed command as a whole turn.
+fn input(session: &mut Session, text: &str) -> Turn {
+    authoring::play(session, Input::Text(text.into()))
+}
 
 fn lighthouse() -> Vec<SourceFile> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse");
@@ -26,13 +32,13 @@ const WIN: &[&str] = &[
 #[test]
 fn the_game_shows_the_ending_and_keeps_its_id() {
     let world = Arc::new(World::compile(load(lighthouse()).unwrap().story).unwrap());
-    let mut game = Game::new(world);
-    game.start();
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
     for command in WIN {
-        game.input(command);
+        input(&mut game, command);
     }
     assert_eq!(game.state().ending, None);
-    let text = game.input("light beacon").plain_text();
+    let text = input(&mut game, "light beacon").plain_text();
     assert!(text.contains("The beacon is lit"), "{text}");
     assert!(text.contains("masthead light"), "{text}");
     assert!(game.state().ended);
@@ -61,14 +67,14 @@ fn an_unknown_ending_does_not_compile() {
 #[test]
 fn a_save_without_an_ending_still_loads() {
     let world = Arc::new(World::compile(load(lighthouse()).unwrap().story).unwrap());
-    let mut game = Game::new(world.clone());
-    game.start();
+    let mut game = Session::new(world.clone());
+    authoring::start(&mut game);
     let mut save = serde_json::to_value(game.state()).unwrap();
     assert!(save.get("ending").is_none(), "no ending yet: {save:#}");
     save.as_object_mut().unwrap().remove("ending");
     let state: State = serde_json::from_value(save).unwrap();
     assert_eq!(state.ending, None);
-    Game::restore(world, state);
+    authoring::session_of(world, state);
 }
 
 #[test]

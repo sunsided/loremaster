@@ -17,7 +17,7 @@
 	import type { Source } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
-	import { Game, newStory, notesOf, threadsOf, type NoteRef, type ThreadView } from '#lib/engine/index.ts';
+	import { Workbench, markupTokens, newStory, notesOf, threadsOf, type NoteRef, type ThreadView } from '#lib/engine/index.ts';
 	import type { AtlasRoom, MapView } from '#lib/engine/types.ts';
 	import { changesWorld, filesAfter, mapWithProposals } from '#lib/project/proposal-world.ts';
 	import type { Session } from '#lib/player/session.svelte.ts';
@@ -32,6 +32,7 @@
 	import { settings } from '#lib/settings.svelte.ts';
 	import Button from '#lib/design/atoms/Button.svelte';
 	import CommandPrompt from '#lib/design/molecules/CommandPrompt.svelte';
+	import AwaitPrompt from '#lib/design/molecules/AwaitPrompt.svelte';
 	import StatusLine from '#lib/design/organisms/StatusLine.svelte';
 	import AppHeader from '#lib/design/organisms/AppHeader.svelte';
 	import MapPanel from '#lib/design/organisms/MapPanel.svelte';
@@ -361,7 +362,7 @@
 		const s = session;
 		if (!n || !s) return;
 		const [kind, id] = n.entity.split(':');
-		const room = kind === 'room' ? id : kind === 'thing' ? s.game.atlas().find((r) => r.things.some((t) => t.id === id))?.id : undefined;
+		const room = kind === 'room' ? id : kind === 'thing' ? s.bench.atlas().find((r) => r.things.some((t) => t.id === id))?.id : undefined;
 		if (room) {
 			if (room !== s.scene.room) s.author({ type: 'goto', room });
 			closeAtlas();
@@ -424,7 +425,7 @@
 	async function aiJob(task: string, args: Record<string, unknown>) {
 		const s = session;
 		if (!s) return;
-		const problem = await ai.startJob(task, args, s.game.save());
+		const problem = await ai.startJob(task, args, s.bench.save());
 		if (problem) failure = problem;
 	}
 	let now = $state(Date.now());
@@ -451,7 +452,7 @@
 		const job = ai.jobs.find((j) => j.id === id);
 		const idea = job?.args.idea;
 		if (!session || typeof idea !== 'string') return;
-		const problem = await ai.bootstrap(session.game.title, idea);
+		const problem = await ai.bootstrap(session.bench.title, idea);
 		if (problem) failure = problem;
 	}
 	const runningJob = $derived(aiJobs.find((j) => j.status === 'running'));
@@ -461,22 +462,22 @@
 
 	// The worlds after the proposals that add or remove rooms and exits: the ghosts on the maps.
 	// A world is built again only when the files of the editor change.
-	let proposalGames = $state.raw<Map<string, Game>>(new Map());
-	let builtFor: { files: unknown; games: Map<string, Game> } = { files: null, games: new Map() };
+	let proposalGames = $state.raw<Map<string, Workbench>>(new Map());
+	let builtFor: { files: unknown; games: Map<string, Workbench> } = { files: null, games: new Map() };
 	$effect(() => {
 		const files = workspace?.project.files;
 		const views = ai.proposals.filter(changesWorld);
 		if (!files) return;
 		let current = true;
 		(async () => {
-			const old = builtFor.files === files ? builtFor.games : new Map<string, Game>();
-			const games = new Map<string, Game>();
+			const old = builtFor.files === files ? builtFor.games : new Map<string, Workbench>();
+			const games = new Map<string, Workbench>();
 			for (const v of views) {
 				const known = old.get(v.id);
 				if (known) games.set(v.id, known);
 				else
 					try {
-						games.set(v.id, await Game.open(filesAfter(files, v)));
+						games.set(v.id, await Workbench.open(filesAfter(files, v)));
 					} catch {
 						// A proposal that does not build has no ghosts; its card shows the problems.
 					}
@@ -509,9 +510,9 @@
 		const ws = workspace;
 		const base = ws?.session;
 		if (!view || !ws || !base) return;
-		let game: Game;
+		let game: Workbench;
 		try {
-			game = await Game.open(filesAfter(ws.project.files, view));
+			game = await Workbench.open(filesAfter(ws.project.files, view));
 		} catch {
 			failure = 'The proposal does not build, so it cannot be played.';
 			return;
@@ -530,7 +531,7 @@
 		const old = sandbox;
 		sandbox = null;
 		// The sandbox has its own engine; give its memory back.
-		old?.session.game.free();
+		old?.session.bench.free();
 	}
 	// The sandbox ends when its proposal goes: accepted, rejected or withdrawn.
 	$effect(() => {
@@ -600,7 +601,7 @@
 		const s = session;
 		if (!s || !atlasOpen) return [];
 		s.entries.length;
-		const rooms: AtlasRoom[] = s.game.atlas();
+		const rooms: AtlasRoom[] = s.bench.atlas();
 		if (sandbox) return rooms;
 		// The rooms of the proposals, and the rooms that they remove.
 		const ids = new Set(rooms.map((r) => r.id));
@@ -770,6 +771,7 @@
 			run: () => (settings.tooltips = !settings.tooltips)
 		});
 		items.push({ id: 'settings', group: 'Look', label: 'Open look and motion settings', run: () => (showSettings = true) });
+		if (s.undoSteps > 0) items.push({ id: 'undo', group: 'Game', label: 'Undo the last turn', keywords: 'back', run: () => s.undo() });
 		items.push({ id: 'restart', group: 'Game', label: 'Restart the game', run: () => s.restart() });
 		items.push({ id: 'write-toggle', group: 'Write', label: writing ? 'Stop writing' : 'Write in the game', keywords: 'edit mode', run: toggleWriting });
 		items.push({ id: 'create-exit', group: 'Write', label: `Create an exit from ${s.scene.room_name}`, keywords: 'new room door', run: () => openPanel({ creating: { kind: 'exit' } }) });
@@ -889,21 +891,21 @@
 	const writerTools = $derived.by<WriterTools | null>(() => {
 		const s = session;
 		if (!s) return null;
-		const game = s.game;
+		const bench = s.bench;
 		const problem = (e: { start: number; end: number; message: string } | null) =>
 			e ? { from: e.start, to: e.end, message: e.message } : null;
 		s.entries.length; // The values change with each turn.
 		return {
-			symbols: game.symbols(),
-			textMatrix: (text, when) => game.textMatrix(text, when),
-			tokenize: (text, condition) => game.tokens(text, condition) as ReturnType<WriterTools['tokenize']>,
+			symbols: bench.symbols(),
+			textMatrix: (text, when) => bench.textMatrix(text, when),
+			tokenize: (text, condition) => markupTokens(text, condition) as ReturnType<WriterTools['tokenize']>,
 			tryMarkup: (text) => {
 				const values = Object.entries(previewValues);
-				const c = values.length ? game.tryMarkupIn(s.scene.room, values, text) : game.tryMarkup(text);
+				const c = values.length ? bench.tryMarkupIn(s.scene.room, values, text) : bench.tryMarkup(text);
 				return { problem: problem(c.error), text: c.text, pieces: c.pieces };
 			},
 			tryCondition: (text) => {
-				const c = game.tryCondition(text);
+				const c = bench.tryCondition(text);
 				return { problem: problem(c.error), holds: c.holds };
 			}
 		};
@@ -936,7 +938,7 @@
 	function renderMarkup(markup: string): string | null {
 		const s = session;
 		const values = Object.entries(previewValues);
-		const c = s && values.length ? s.game.tryMarkupIn(s.scene.room, values, markup) : s?.game.tryMarkup(markup);
+		const c = s && values.length ? s.bench.tryMarkupIn(s.scene.room, values, markup) : s?.bench.tryMarkup(markup);
 		return !c || c.error ? null : c.text;
 	}
 
@@ -1146,7 +1148,7 @@
 	/** The room matrix of the current room. It follows the state, so it shows only while the tab is open. */
 	const matrix = $derived(
 		session && atlasOpen && atlasTab === 'checks' && exploreMode === 'room'
-			? (session.scene, session.game.roomMatrix(session.scene.room))
+			? (session.scene, session.bench.roomMatrix(session.scene.room))
 			: null
 	);
 
@@ -1195,9 +1197,9 @@
 		const s = session;
 		if (!s || atlasOpen) return { switches: [], texts: 0 };
 		s.entries.length;
-		const m = s.game.roomMatrix(s.scene.room);
+		const m = s.bench.roomMatrix(s.scene.room);
 		if (!m) return { switches: [], texts: 0 };
-		const symbols = new Map(s.game.symbols().map((sym) => [sym.name, sym.value ?? '']));
+		const symbols = new Map(s.bench.symbols().map((sym) => [sym.name, sym.value ?? '']));
 		return {
 			switches: m.dimensions.map((d) => ({ name: d.name, options: d.values, value: symbols.get(d.name) ?? d.values[0] })),
 			texts: new Set(m.cells.map((c) => c.text)).size
@@ -1255,7 +1257,7 @@
 	const previewTurn = $derived.by(() => {
 		const s = session;
 		const entries = Object.entries(previewValues);
-		return s && entries.length && !writing ? s.game.previewSituation(s.scene.room, entries) : null;
+		return s && entries.length && !writing ? s.bench.previewSituation(s.scene.room, entries) : null;
 	});
 
 	function runExplorer() {
@@ -1264,7 +1266,7 @@
 		exploring = true;
 		// Let the button show "Exploring…" before the walk blocks the page.
 		setTimeout(() => {
-			exploration = s.game.explore();
+			exploration = s.bench.explore();
 			exploring = false;
 		}, 30);
 	}
@@ -1308,7 +1310,7 @@
 />
 
 <svelte:head>
-	<title>{session ? `${session.game.title} · loremaster` : 'loremaster'}</title>
+	<title>{session ? `${session.bench.title} · loremaster` : 'loremaster'}</title>
 </svelte:head>
 
 {#snippet notesSection()}
@@ -1478,7 +1480,7 @@
 	<AtlasLayout tabs={atlasTabs} selected={atlasTab} onselect={(id) => (atlasTab = id as typeof atlasTab)}>
 		{#snippet header()}
 			<AppHeader
-				title={s.game.title}
+				title={s.bench.title}
 				saved={storageLabel}
 				savedState={workspace?.project.storage === 'folder-locked' ? 'attention' : 'ok'}
 				{projectItems}
@@ -1658,7 +1660,7 @@
 	<PlayerLayout {fxClass} {glow}>
 		{#snippet header()}
 			<AppHeader
-				title={s.game.title}
+				title={s.bench.title}
 				saved={sandbox ? 'sandbox · nothing is saved' : aiDiffers ? `${storageLabel} · AI sees other files` : storageLabel}
 				savedState={workspace?.project.storage === 'folder-locked' || aiDiffers ? 'attention' : 'ok'}
 				{projectItems}
@@ -1681,7 +1683,10 @@
 				time={s.scene.time}
 				phase={s.scene.phase}
 				turn={s.scene.turns}
-				turnItems={[{ id: 'restart', label: 'Restart the game', run: () => s.restart() }]}
+				turnItems={[
+					...(s.undoSteps > 0 ? [{ id: 'undo', label: 'Undo the last turn', run: () => s.undo() }] : []),
+					{ id: 'restart', label: 'Restart the game', run: () => s.restart() }
+				]}
 				onroom={() => openAtlas('map')}
 			>
 				{#snippet marks()}
@@ -1802,7 +1807,10 @@
 					{/if}
 				{/snippet}
 			</Transcript>
-			{#if !s.scene.ended}
+			{#if s.awaiting}
+				<!-- A paused rule or the death prompt waits: its answers replace the verb bar until the player answers. -->
+				<AwaitPrompt awaiting={s.awaiting} onanswer={(value) => s.resume(value)} />
+			{:else if !s.scene.ended}
 				<CommandPrompt bind:value={s.draft} bind:input={prompt} oncommand={play} verbs={promptVerbs} nouns={promptNouns} />
 				<VerbBar
 					verbs={s.barVerbs}
@@ -1851,7 +1859,7 @@
 {/if}
 {#if session}
 	{@const s = session}
-	<AuthorTooltip inspect={(kind, id) => s.game.inspect(kind, id)} enabled={settings.tooltips} />
+	<AuthorTooltip inspect={(kind, id) => s.bench.inspect(kind, id)} enabled={settings.tooltips} />
 	<CommandPalette bind:open={showPalette} items={paletteItems} fallback={playFallback} />
 	<input
 		bind:this={zipInput}

@@ -7,7 +7,7 @@
 mod thief;
 
 use loremaster_project::{load, read_dir};
-use loremaster_runtime::{Game, World};
+use loremaster_runtime::{Input, Session, Status, World};
 use std::io::{BufRead, Write};
 use std::path::Path;
 use std::sync::Arc;
@@ -17,8 +17,8 @@ fn main() {
     let project = load(read_dir(&root).expect("read examples/zork1")).expect("load Zork I");
     let mut world = World::compile(project.story).expect("compile Zork I");
     world.register(thief::Thief::zork());
-    let mut game = Game::new(Arc::new(world));
-    println!("{}", game.start().plain_text());
+    let mut session = Session::new(Arc::new(world));
+    println!("{}", session.start().plain_text());
     let stdin = std::io::stdin();
     loop {
         print!("\n> ");
@@ -27,9 +27,11 @@ fn main() {
         if stdin.lock().read_line(&mut line).unwrap_or(0) == 0 || line.trim().is_empty() {
             break;
         }
-        let turn = game.input(line.trim());
-        println!("{}", turn.plain_text());
-        if game.state().ended {
+        let step = session.submit(Input::Text(line.trim().into()));
+        println!("{}", step.plain_text());
+        // The death prompt waits as `Status::Await` after a death ending:
+        // the player answers it with `undo` or `restart` on the next line.
+        if matches!(step.status, Status::Ended { .. }) {
             break;
         }
     }

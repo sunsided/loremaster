@@ -9,10 +9,16 @@ mod thief;
 
 use loremaster_model::{Id, Location};
 use loremaster_project::{SourceFile, load, read_dir};
-use loremaster_runtime::{Game, State, World};
+use loremaster_runtime::authoring;
+use loremaster_runtime::{Input, Session, State, Turn, World};
 use proptest::prelude::*;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
+
+/// One typed command as a whole turn.
+fn input(session: &mut Session, text: &str) -> Turn {
+    authoring::play(session, Input::Text(text.into()))
+}
 
 // ---- worlds -----------------------------------------------------------------
 
@@ -160,18 +166,18 @@ fn commands(list: &'static [&'static str], max: usize) -> impl Strategy<Value = 
 }
 
 /// Play the commands from the start. Returns the transcript and the game.
-fn play(world: &Arc<World>, cmds: &[&str]) -> (String, Game) {
-    let mut game = Game::new(world.clone());
-    let mut out = game.start().plain_text();
+fn play(world: &Arc<World>, cmds: &[&str]) -> (String, Session) {
+    let mut game = Session::new(world.clone());
+    let mut out = authoring::start(&mut game).plain_text();
     for c in cmds {
-        out.push_str(&game.input(c).plain_text());
+        out.push_str(&input(&mut game, c).plain_text());
         out.push('\n');
         check_invariants(&game);
     }
     (out, game)
 }
 
-fn check_invariants(game: &Game) {
+fn check_invariants(game: &Session) {
     let state = game.state();
     let story = &game.world().story;
     for id in state.locations.keys() {
@@ -220,7 +226,7 @@ proptest! {
     /// Any places, loops of holders too: the walks up the holders end, and they agree.
     #[test]
     fn walks_up_the_holders_end_and_agree(places in prop::collection::vec(place(6), 1..6)) {
-        let mut state: State = Game::new(museum()).state().clone();
+        let mut state: State = Session::new(museum()).state().clone();
         state.locations = places
             .iter()
             .enumerate()
@@ -265,10 +271,10 @@ proptest! {
         let split = split.min(cmds.len());
         let (_, mut game) = play(&world, &cmds[..split]);
         let save = serde_json::to_string(game.state()).unwrap();
-        let mut restored = Game::restore(world.clone(), serde_json::from_str(&save).unwrap());
+        let mut restored = authoring::session_of(world.clone(), serde_json::from_str(&save).unwrap());
         prop_assert_eq!(restored.state(), game.state());
         for c in &cmds[split..] {
-            prop_assert_eq!(game.input(c).plain_text(), restored.input(c).plain_text());
+            prop_assert_eq!(input(&mut game, c).plain_text(), input(&mut restored, c).plain_text());
             check_invariants(&restored);
         }
         prop_assert_eq!(game.state(), restored.state());
@@ -277,11 +283,11 @@ proptest! {
     /// The lamp battery of Zork only counts down: no command adds turns to it.
     #[test]
     fn the_lamp_battery_only_counts_down(cmds in commands(ZORK_COMMANDS, 40)) {
-        let mut game = Game::new(zork());
-        game.start();
+        let mut game = Session::new(zork());
+        authoring::start(&mut game);
         let mut last = game.state().timers.get("lamp_battery").copied().unwrap_or(0);
         for c in &cmds {
-            game.input(c);
+            input(&mut game, c);
             let now = game.state().timers.get("lamp_battery").copied().unwrap_or(0);
             prop_assert!(now <= last, "{c}: {last} -> {now}");
             last = now;
