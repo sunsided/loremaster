@@ -457,12 +457,18 @@ impl Checker<'_> {
     }
 
     fn reserved(&mut self, file: &str, at: &str, kind: &str, id: &str) {
+        use loremaster_lang::Reserved;
+        let why = match loremaster_lang::reserved(id) {
+            Some(Reserved::Keyword) => "is a keyword of conditions, so conditions cannot name it",
+            Some(Reserved::Function) => {
+                "has the name of a function of conditions, which is reserved for it"
+            }
+            _ => "has a name that conditions use for a built-in, so they would not read it",
+        };
         self.error(
             file,
             at,
-            format!(
-                "the {kind} `{id}` has a name that conditions use for a built-in, so they would not read it; choose another id"
-            ),
+            format!("the {kind} `{id}` {why}; choose another id"),
         );
     }
 

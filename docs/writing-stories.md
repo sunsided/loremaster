@@ -74,7 +74,7 @@ Conditions use variables, thing properties and values that the runtime calculate
 
 Use `and`, `or`, `not` and parentheses to join conditions.
 
-These names are built-ins of conditions: `and`, `or`, `not`, `true`, `false`, `here`, `turns`, `level`, `first_visit`, `time`, `action`, `timer`, `in`, `carried`, `present`, `visited`, `visits`, `chance`, `remembers` and `seen_by` (planned). A variable, machine, room or thing must not use one of them as its id: conditions would read the built-in instead. The checker reports such an id as an error at its declaration. A variable or machine must not use the name of a phase of the clock (`night`, `dawn`, `day`, `dusk` by default) either: a bare `dusk` would read the variable instead of the phase.
+These names are built-ins of conditions: `and`, `or`, `not`, `true`, `false`, `here`, `turns`, `level`, `first_visit`, `time`, `action`, `timer`, `in`, `carried`, `present`, `visited`, `visits`, `chance`, `remembers` and `seen_by` (planned). A variable, machine, room or thing must not use one of them as its id: a condition cannot name a keyword, it reads the built-in value instead of a `here` or `turns` of the story, and the function names are kept for the functions. The checker reports such an id as an error at its declaration. A variable or machine must not use the name of a phase of the clock (`night`, `dawn`, `day`, `dusk` by default) either: a bare `dusk` would read the variable instead of the phase.
 
 ## Action frames
 

@@ -26,28 +26,46 @@ fn with(mut files: Vec<SourceFile>, path: &str, text: &str) -> Vec<SourceFile> {
     files
 }
 
-fn assert_reported(found: &[Diagnostic], file: &str, at: &str, kind_and_id: &str) {
-    assert!(
-        found.iter().any(|d| d.file == file
-            && d.at == at
-            && d.message.starts_with(&format!(
-                "the {kind_and_id} has a name that conditions use for a built-in"
-            ))),
-        "{found:#?}"
-    );
+fn assert_reported(found: &[Diagnostic], file: &str, at: &str, kind_and_id: &str) -> String {
+    found
+        .iter()
+        .find(|d| {
+            d.file == file
+                && d.at == at
+                && d.message.starts_with(&format!("the {kind_and_id} "))
+                && d.message.ends_with("; choose another id")
+        })
+        .unwrap_or_else(|| panic!("{found:#?}"))
+        .message
+        .clone()
 }
 
 #[test]
 fn a_room_or_thing_with_a_reserved_name_is_an_error_at_its_file() {
     let files = with(lighthouse(), "rooms/here.yaml", "name: Here\n");
-    assert_reported(&errors(files), "rooms/here.yaml", "id", "room `here`");
+    let message = assert_reported(&errors(files), "rooms/here.yaml", "id", "room `here`");
+    assert!(message.contains("so they would not read it"), "{message}");
 
     let files = with(
         lighthouse(),
         "things/chance.yaml",
         "name: chance\nlocation: nowhere\n",
     );
-    assert_reported(&errors(files), "things/chance.yaml", "id", "thing `chance`");
+    // A function is a built-in only in call position, `chance(30)`; the
+    // name is reserved for it, and the message says so.
+    let message = assert_reported(&errors(files), "things/chance.yaml", "id", "thing `chance`");
+    assert!(
+        message.contains("has the name of a function of conditions"),
+        "{message}"
+    );
+
+    let files = with(
+        lighthouse(),
+        "things/not.yaml",
+        "name: knot\nlocation: nowhere\n",
+    );
+    let message = assert_reported(&errors(files), "things/not.yaml", "id", "thing `not`");
+    assert!(message.contains("is a keyword of conditions"), "{message}");
 
     // An `id:` in the file counts, not the file name.
     let files = with(
