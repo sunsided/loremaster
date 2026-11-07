@@ -254,8 +254,8 @@ export class Game {
 		return this.#engine.save();
 	}
 
-	/** Continue from a save state, also one from an earlier version of the story. */
-	restore(state: unknown): void {
-		this.#engine.restore(state);
+	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
+	restore(save: unknown): { storyChanged: boolean; dropped: string[] } {
+		return this.#engine.restore(save);
 	}
 }
