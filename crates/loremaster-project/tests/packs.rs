@@ -228,3 +228,26 @@ fn the_id_of_an_extension_comes_from_the_parsed_file() {
     );
     assert_eq!(extra.extensions[0].key, "room:cottage");
 }
+
+#[test]
+fn replace_drops_the_nested_rules_of_the_replaced_file() {
+    // rooms/cellar.yaml with a nested rule, then a replacement without it.
+    let mut files = lighthouse();
+    files.push(SourceFile {
+        path: "rooms/cellar.yaml".into(),
+        text: "name: Cellar\nrules:\n  - id: cellar_drip\n    on: { enter: cellar }\n    then: [{ say: \"Drip.\" }]\n".into(),
+    });
+    let first = Pack::from_files(files).unwrap();
+    assert!(first.rules.iter().any(|r| r.id.as_str() == "cellar_drip"));
+    let extra = second("rooms/cellar.yaml", "replace: true\nname: Dry Cellar\n");
+    let project = assemble(vec![first, extra]).unwrap();
+    assert!(
+        !project
+            .story
+            .rules
+            .iter()
+            .any(|r| r.id.as_str() == "cellar_drip")
+    );
+    assert!(!project.origins.contains_key("rule:cellar_drip"));
+    assert_eq!(project.story.room("cellar").unwrap().name, "Dry Cellar");
+}

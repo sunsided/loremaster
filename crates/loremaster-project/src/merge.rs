@@ -24,13 +24,15 @@ pub struct Extension {
     pub origin: Origin,
 }
 
-/// Read `extend: true` or `replace: true` from the top level of a YAML file.
-/// Returns the mode and the text without that line.
+/// Read `extend: true` or `replace: true` from the top level of a YAML file:
+/// a whole line at column 0, so a nested value never counts. Returns the mode
+/// and the text with that line blanked, so that the line numbers of parse
+/// errors stay right.
 pub(crate) fn merge_mode(text: &str) -> (Option<MergeMode>, String) {
     let mut mode = None;
     let kept: Vec<&str> = text
         .lines()
-        .filter(|line| {
+        .map(|line| {
             let found = match line.trim_end() {
                 "extend: true" => Some(MergeMode::Extend),
                 "replace: true" => Some(MergeMode::Replace),
@@ -38,8 +40,10 @@ pub(crate) fn merge_mode(text: &str) -> (Option<MergeMode>, String) {
             };
             if found.is_some() {
                 mode = found;
+                ""
+            } else {
+                line
             }
-            found.is_none()
         })
         .collect();
     match mode {
@@ -103,7 +107,8 @@ mod tests {
     fn the_mode_line_is_taken_out() {
         let (mode, text) = merge_mode("extend: true\nexits: []\n");
         assert_eq!(mode, Some(MergeMode::Extend));
-        assert_eq!(text, "exits: []\n");
+        // Blanked, not removed: the line numbers stay.
+        assert_eq!(text, "\nexits: []\n");
         let (mode, text) = merge_mode("name: Cellar\n");
         assert_eq!(mode, None);
         assert_eq!(text, "name: Cellar\n");

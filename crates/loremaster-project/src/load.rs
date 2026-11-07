@@ -408,6 +408,30 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut timers: Vec<Timer> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
     for (i, pack) in packs.into_iter().enumerate() {
+        // A replaced room or thing takes its nested rules with it: they come
+        // from the replaced file and run `within` the entity.
+        for key in &pack.replaces {
+            let Some(first) = origins.get(key).cloned() else {
+                continue;
+            };
+            let Some(id) = key
+                .strip_prefix("room:")
+                .or_else(|| key.strip_prefix("thing:"))
+            else {
+                continue;
+            };
+            let nested: Vec<String> = rules
+                .iter()
+                .filter(|r: &&Rule| r.within.as_ref().is_some_and(|w| w.as_str() == id))
+                .map(|r| format!("rule:{}", r.id))
+                .filter(|k| origins.get(k) == Some(&first))
+                .collect();
+            rules.retain(|r| !nested.contains(&format!("rule:{}", r.id)));
+            for k in &nested {
+                origins.remove(k);
+                owner.remove(k);
+            }
+        }
         for (key, origin) in pack.origins {
             // Within one pack, the checks report a duplicate, as before.
             if let Some(&j) = owner.get(&key)
