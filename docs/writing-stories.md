@@ -532,6 +532,30 @@ In the editor, Atlas › Machines shows each machine: the states in a row, and t
 
 The checker finds unknown states and states that no step goes to.
 
+### Quests
+
+A quest is a machine with `quest: true`. Its states give the player's journal: a state with `journal:` text shows the quest in the journal, and `done: true` marks the quest as finished in that state. A state without `journal:` keeps the quest out of the journal, for example before the player hears of it.
+
+```yaml
+# machines/pages.yaml
+quest: true
+title: The missing pages
+start: unknown
+states:
+  - unknown
+  - { name: searching, journal: "Find the pages of the lock log." }
+  - { name: found, journal: "You found the pages.", done: true }
+steps:
+  - { from: unknown, on: { verb: [ask, keeper] }, to: searching }
+  - { from: searching, on: { verb: [take, pages] }, to: found }
+```
+
+- `title` is the name in the journal. Without it, the journal shows the id.
+- The journal text is a line: markup and speech segments work.
+- The steps move the quest, and so does `set: { pages: found }` in a rule or in a dialogue's `then`.
+- The player types `journal` to read it. It takes no turn. Hosts read it with `Session::journal()`, open quests first.
+- The checker warns about a quest without journal text, and about `journal`, `done` or `title` on a machine without `quest: true`.
+
 ## Behaviors in Rust
 
 Some logic is too large for rules, for example a character that walks the map and steals. A game that uses loremaster as a library can write this logic in Rust as a behavior.

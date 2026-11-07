@@ -41,6 +41,8 @@ impl<'a> MachineBuilder<'a> {
             start,
             states: Vec::new(),
             steps: Vec::new(),
+            quest: false,
+            title: None,
             notes: Vec::new(),
         });
         let i = pack.machines.len() - 1;
@@ -75,6 +77,27 @@ impl<'a> MachineBuilder<'a> {
         self.machine().states.push(StateDef::Described {
             name: name.into(),
             description: Some(description.into()),
+            journal: None,
+            done: false,
+        });
+        self
+    }
+
+    /// Make the machine a quest with this title in the journal (D8).
+    pub fn quest(mut self, title: impl Into<String>) -> Self {
+        let m = self.machine();
+        m.quest = true;
+        m.title = Some(title.into());
+        self
+    }
+
+    /// A quest state with its journal text; `done` marks a finished quest.
+    pub fn journal(mut self, state: impl Into<String>, text: impl Into<Line>, done: bool) -> Self {
+        self.machine().states.push(StateDef::Described {
+            name: state.into(),
+            description: None,
+            journal: Some(text.into()),
+            done,
         });
         self
     }

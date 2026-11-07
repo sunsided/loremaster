@@ -19,6 +19,13 @@ pub struct Machine {
     pub states: Vec<StateDef>,
     #[serde(default)]
     pub steps: Vec<Step>,
+    /// The machine is a quest (decision D8): its states give the player's
+    /// journal (`journal:` text per state).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub quest: bool,
+    /// The quest's name in the journal. Without it, the journal uses the id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     /// Author notes. The player never sees them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<Note>,
@@ -51,6 +58,8 @@ pub struct Step {
 }
 
 /// A state of a machine: `idle`, or `{ name: idle, description: "The spirits jeer." }`.
+/// A quest state can also have `journal:` (the player's journal text) and
+/// `done: true` (the quest is finished in this state).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum StateDef {
@@ -60,6 +69,13 @@ pub enum StateDef {
         /// Author text about the state, for the Atlas. The player never sees it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         description: Option<String>,
+        /// The journal text of a quest in this state. Without it, the quest
+        /// is not in the journal (for example, before it starts).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        journal: Option<Line>,
+        /// The quest is finished in this state.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        done: bool,
     },
 }
 
@@ -70,6 +86,10 @@ struct DescribedState {
     name: String,
     #[serde(default)]
     description: Option<String>,
+    #[serde(default)]
+    journal: Option<Line>,
+    #[serde(default)]
+    done: bool,
 }
 
 impl<'de> Deserialize<'de> for StateDef {
@@ -81,6 +101,8 @@ impl<'de> Deserialize<'de> for StateDef {
             |s: DescribedState| StateDef::Described {
                 name: s.name,
                 description: s.description,
+                journal: s.journal,
+                done: s.done,
             },
         )
     }
@@ -98,6 +120,19 @@ impl StateDef {
             StateDef::Name(_) => None,
             StateDef::Described { description, .. } => description.as_deref(),
         }
+    }
+
+    /// The journal text of a quest in this state.
+    pub fn journal(&self) -> Option<&Line> {
+        match self {
+            StateDef::Name(_) => None,
+            StateDef::Described { journal, .. } => journal.as_ref(),
+        }
+    }
+
+    /// The quest is finished in this state.
+    pub fn done(&self) -> bool {
+        matches!(self, StateDef::Described { done: true, .. })
     }
 }
 
@@ -133,6 +168,11 @@ impl Machine {
             }
         }
         out
+    }
+
+    /// The declared state with this name.
+    pub fn state(&self, state: &str) -> Option<&StateDef> {
+        self.states.iter().find(|s| s.name() == state)
     }
 
     /// The description of a state, if the list of states has one.
