@@ -25,7 +25,7 @@ Files in today's syntax load now. The other files use syntax that the model does
 | Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky` | 4 (R9) |
 | Stove | `things/stove.yaml` | `one_of`, `pick: best`, `seen_by(player)`, `learn` | 4 (R9) |
 | Keeper rule | `rules/keeper.yaml` | `on: { verb: examine, direct: stove }` (Command record), `say: { text: … }` | 4 (D6, R9) |
-| Agenda | `agendas/keeper.yaml` | `actor`, `steps` with `at`, `place`, `when`, `then`, `allow_unwinnable` | 4 (D6, CK) |
+| Agenda | `agendas/keeper.yaml` | `actor`, `steps` with `at`, `place`, `when`, `then`, `closes`, `reason` | 4 (D6, CK) |
 
 ## Pending tests
 
@@ -42,7 +42,7 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`. Each one loads
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
 | `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Phase 4 | P4-02 #79 |
 | `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 2 (talk as an await), then phase 4 | P4-02 #79 |
-| `slice_winnable` | The agenda step is an unwinnable edge, and `allow_unwinnable` accepts it | All | Phase 4 | P4-04 #81 |
+| `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Phase 4 | P4-04 #81 |
 | `slice_best`, `slice_ashes` | The two full walkthroughs | All | Phase 4 | P4-07 #84 |
 
 Run the pending tests with `task test:pending`. When a test passes, remove its `#[ignore]` mark and the `pending:` line of its walkthrough in the same pull request.
@@ -72,4 +72,5 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | Mixed | A third to half of each Rust file is `extern` lines for YAML ids, and the macro checks nothing across the seam until load time. | Sealed mode `world!(yaml = "..")` for mixed forms, or accept that mixed pays off only for large Rust parts. |
 | 2026-11-07 | Mixed | The agenda id comes from the file name in YAML, but from `agenda for keeper` in Rust. Parallel file names needed `#[path]` in `mod.rs`. | An explicit id in both forms: `agenda keeper for keeper`, or `id:` in YAML. |
 | 2026-11-07 | DSL | The draft uses `loremaster::prelude::*`, but the crate `loremaster` has no library target yet. | L1 decides which crate exports `world!` and `Pack`. |
+| 2026-11-07 | All | `allow_unwinnable` called the agenda step "unwinnable", but the game can still end (ashes). A dead end (no ending reachable, as in early King's Quest) and a point of no return (a better ending drops out) are different. | Two checks: a dead end is an error; a rank drop is a warning, which `closes: [<endings>]` with a `reason` accepts. Done in the slice. |
 | 2026-11-07 | YAML | The roadmap wants Markus to write one part in each form and note how it felt. | Open: Markus. |

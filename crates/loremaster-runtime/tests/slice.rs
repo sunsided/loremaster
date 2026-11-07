@@ -180,23 +180,42 @@ fn slice_keeper_agenda() {
 
 #[test]
 #[ignore = "pending: phase 4, CK, P4-04 #81"]
-fn slice_winnable() {
-    // The keeper's agenda step makes the best ending unreachable. The check
-    // reports the edge, and `allow_unwinnable` turns it from an error into a note.
-    let project = project(with("yaml", NEW_SYNTAX));
-    let found = check(&project);
-    let edge: Vec<_> = found
-        .iter()
-        .filter(|d| d.message.contains("unwinnable"))
-        .collect();
+fn slice_endings_reachable() {
+    // Two checks on the endings. A dead end (a state from which no ending can
+    // be reached) is an error. A point of no return (a step after which the
+    // best reachable ending gets worse) is a warning, unless the step names
+    // the endings it closes. The keeper's agenda step closes `committed`; the
+    // ashes ending stays reachable, so the slice has no dead end.
+    let marked = check(&project(with("yaml", NEW_SYNTAX)));
     assert!(
-        edge.iter()
-            .any(|d| d.file == "agendas/keeper.yaml" && d.severity != Severity::Error),
-        "no accepted unwinnable edge in agendas/keeper.yaml: {found:#?}"
+        !marked.iter().any(|d| d.severity == Severity::Error),
+        "{marked:#?}"
     );
     assert!(
-        !found.iter().any(|d| d.severity == Severity::Error),
-        "{found:#?}"
+        !marked.iter().any(|d| d.file == "agendas/keeper.yaml"),
+        "the `closes` mark does not accept the rank drop: {marked:#?}"
+    );
+
+    // Without the mark, the check reports the rank drop and names the ending.
+    let mut files = with("yaml", NEW_SYNTAX);
+    let agenda = files
+        .iter_mut()
+        .find(|f| f.path == "agendas/keeper.yaml")
+        .unwrap();
+    agenda.text = agenda
+        .text
+        .lines()
+        .filter(|l| {
+            !l.trim_start().starts_with("closes:") && !l.trim_start().starts_with("reason:")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let unmarked = check(&project(files));
+    assert!(
+        unmarked.iter().any(|d| d.file == "agendas/keeper.yaml"
+            && d.severity == Severity::Warning
+            && d.message.contains("committed")),
+        "no warning for the rank drop at the agenda step: {unmarked:#?}"
     );
 }
 
