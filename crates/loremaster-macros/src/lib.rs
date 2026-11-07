@@ -79,9 +79,30 @@
 //! assert_eq!(p.rooms[0].id.as_str(), "chamber");
 //! ```
 //!
+//! A `line` is one string, or speech segments (P3-15, #111): bare strings
+//! and `narrate "…"` are narration, `says "…"` and `keeper says "…"` are
+//! speech, and `when <cond> then <segment>` shows the one segment after
+//! `then` only while the condition holds (a bare string there is
+//! narration). A bare string right after `says` reads like more speech, so
+//! it is a compile error that suggests `narrate`; YAML loads it with a
+//! warning.
+//!
+//! ```
+//! use loremaster::prelude::*;
+//!
+//! world! {
+//!     extern { thing keeper; room chamber; }
+//!     rule accuse on turn {
+//!         line "The lock-keeper shrugs." keeper says "Prove it," narrate "he says."
+//!             when in chamber then "Water drips.";
+//!     }
+//! }
+//! # let _ = pack();
+//! ```
+//!
 //! Not in the grammar yet: dialogues (they come with dramaturge's
-//! `dialogue!`), text pools, `one_of` groups, agendas and speech segments.
-//! The macro names the step or issue that brings each one.
+//! `dialogue!`), text pools, `one_of` groups and agendas. The macro names
+//! the step or issue that brings each one.
 
 mod ast;
 mod check;
