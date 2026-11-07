@@ -34,9 +34,10 @@ fn render_into(ev: &Eval, segments: &[Segment], out: &mut String) {
 /// run of one space between them. Speech gets straight double quotes and its
 /// speaker. Each segment's run is a copy of `base` with its text and speaker.
 ///
-/// A line of one segment renders as before segments existed: its text is not
-/// trimmed. In a longer line each segment is trimmed, so that the join has
-/// exactly one space. A segment whose `when` does not hold, or whose markup
+/// A line of one narration segment renders as before segments existed: its
+/// text is not trimmed. Speech is always trimmed, so that the quotes sit on
+/// the words, and in a longer line each segment is trimmed, so that the join
+/// has exactly one space. A segment whose `when` does not hold, or whose markup
 /// renders to nothing, is left out.
 pub(crate) fn line_runs(ev: &Eval, line: &CompiledLine, base: &Run) -> Vec<Run> {
     let mut out: Vec<Run> = Vec::new();
