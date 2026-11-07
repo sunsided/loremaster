@@ -104,6 +104,7 @@ fn slice_baseline() {
             "tests/slice_baseline.yaml",
             "tests/slice_drowning.yaml",
             "tests/slice_endings.yaml",
+            "tests/slice_undo_after_death.yaml",
         ]
     );
 }
@@ -197,7 +198,6 @@ fn slice_equivalence() {
 }
 
 #[test]
-#[ignore = "pending: phase 2, SE-8, SE-9, P2-03 #54"]
 fn slice_undo_after_death() {
     assert_passes("slice_undo_after_death", &[]);
 }

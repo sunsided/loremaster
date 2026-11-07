@@ -1,6 +1,6 @@
 //! Walkthrough tests: play commands and check what shows and what holds.
 
-use crate::{Game, World};
+use crate::{Input, Session, State, World};
 use loremaster_model::{Expect, Pending, Walkthrough};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -52,21 +52,26 @@ impl WalkResult {
     }
 }
 
-/// Play a walkthrough from the start of the story.
+/// Play a walkthrough from the start of the story, through the Session API.
 pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> WalkResult {
-    let mut game = Game::new(world);
-    let mut transcript = game.start().plain_text();
+    let mut session = Session::new(world);
+    let mut transcript = session.start().plain_text();
     let mut failures = Vec::new();
     for (i, step) in walk.steps.iter().enumerate() {
         let command = step.command();
-        let text = game.input(command).plain_text();
+        let text = session.submit(Input::Text(command.into())).plain_text();
         transcript.push_str(&format!("\n\n> {command}\n{text}"));
         if let Some(expect) = step.expect() {
             let at = format!("step {} (`{command}`)", i + 1);
-            failures.extend(check(&game, expect, &text, &at));
+            failures.extend(check(session.state(), expect, &text, &at));
         }
     }
-    failures.extend(check(&game, &walk.expect, &transcript, "at the end"));
+    failures.extend(check(
+        session.state(),
+        &walk.expect,
+        &transcript,
+        "at the end",
+    ));
     WalkResult {
         name: walk.name.clone().unwrap_or_else(|| name.to_string()),
         failures,
@@ -75,7 +80,7 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
     }
 }
 
-fn check(game: &Game, expect: &Expect, text: &str, at: &str) -> Vec<String> {
+fn check(state: &State, expect: &Expect, text: &str, at: &str) -> Vec<String> {
     let mut out = Vec::new();
     for s in &expect.see {
         if !text.contains(s.as_str()) {
@@ -87,7 +92,6 @@ fn check(game: &Game, expect: &Expect, text: &str, at: &str) -> Vec<String> {
             out.push(format!("{at}: shows \"{s}\""));
         }
     }
-    let state = game.state();
     for (name, want) in &expect.facts {
         match state.facts.get(name) {
             Some(v) if v == want => {}

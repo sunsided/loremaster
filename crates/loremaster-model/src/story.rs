@@ -95,6 +95,10 @@ pub struct Story {
     /// The ways the story can end, from `endings/`. The `end` effect names one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub endings: Vec<Ending>,
+    /// An ending of kind `death` asks the player to undo, restart or restore
+    /// (SE-9). `death_prompt: false` in story.yaml turns the prompt off.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub death_prompt: bool,
     /// Counters that go down each turn.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,
@@ -116,6 +120,14 @@ pub struct Story {
     /// Long-range threads: promises to the reader, with their beats in notes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub threads: Vec<Thread>,
+}
+
+fn yes() -> bool {
+    true
+}
+
+fn is_true(b: &bool) -> bool {
+    *b
 }
 
 impl Story {

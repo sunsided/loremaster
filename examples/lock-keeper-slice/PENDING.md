@@ -38,7 +38,7 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`. Each one loads
 | `slice_save_envelope` | A save from the middle of `slice_best` has an envelope and restores | Today | Passes (P1-04) | #45 |
 | `slice_model_hash` | The YAML form gives the model hash in `expected/model.hash` | Today | Passes (P1-06) | #47 |
 | `slice_equivalence` | YAML, DSL and mixed give one model hash | Today, per form | DSL steps L3 and L4 (the `world!` macro reads dsl/ and mixed/) | P3-03 #66, P4-08 #85 |
-| `slice_undo_after_death` | The death prompt, and undo after it | Today | Phase 2 | P2-03 #54 |
+| `slice_undo_after_death` | The death prompt, and undo after it | Today | Passes (P2-03) | #54 |
 | `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Phase 3 (and R9, see the log) | P3-01 #64, #111 |
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
 | `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Phase 4 | P4-02 #79 |

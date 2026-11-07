@@ -372,6 +372,7 @@ text: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, a
 - When an `end` effect runs, the game shows the title and the text, and the game ends. The save game keeps the id of the ending.
 - `loremaster check` gives an error for an `end` that names no ending, and a warning for an ending that no `end` names.
 - A walkthrough checks the ending with `ending:`, for example `expect: { ending: beacon_lit }`.
+- An ending of kind `death` asks the player to undo the last input, restart or restore a save (the death prompt). A walkthrough step `undo` goes back one input. `death_prompt: false` in story.yaml turns the prompt off.
 
 ## Timers
 
@@ -472,7 +473,8 @@ The checker finds unknown states and states that no step goes to.
 Some logic is too large for rules, for example a character that walks the map and steals. A game that uses loremaster as a library can write this logic in Rust as a behavior.
 
 1. Write a type that implements `loremaster_runtime::Behavior`. Its `handle` method gets each event, after the rules of the event.
-2. Change the world only through `Cx`: facts, things, the player, text, events and `roll`. Then the save game, the walkthroughs and the explorer see all changes. Do not keep state in fields of the type.
+2. Read and change the world only through `Cx`. It reads facts, locations, the player's room (`here`), `neighbours`, `carried` things, `present`, `room_has_tag`, `visited`, `turns` and `minutes`. It changes facts, things, the player, text and events. Random numbers come only from `cx.roll(n)`: do not read a clock, the host or files. Then the save game, the walkthroughs and the explorer see all changes, and play replays. Do not keep state in fields of the type.
+   `cx.unstable()` gives the whole state and world, read-only, for what `Cx` does not say yet. It is not a stable API.
 3. Register the behavior: `world.register(Thief::zork())`.
 4. Name the behavior in the story: `behaviors: [thief]` in story.yaml, or a file `behaviors/thief.yaml` with notes.
 
