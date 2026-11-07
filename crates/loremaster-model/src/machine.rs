@@ -42,6 +42,12 @@ pub struct Step {
     /// For verb events: the step replaces the default response.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub instead: bool,
+    /// The endings that this step closes on purpose, as `closes` of a rule.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closes: Vec<Id>,
+    /// Why the step closes the endings in `closes`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// A state of a machine: `idle`, or `{ name: idle, description: "The spirits jeer." }`.

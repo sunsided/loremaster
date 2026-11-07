@@ -1,7 +1,7 @@
 //! Puzzle machines: named states and the steps between them.
 
 use crate::Effects;
-use crate::convert::IntoStates;
+use crate::convert::{IntoStates, ids};
 use crate::pack::{register, replaceable, with_notes};
 use loremaster_model::{Effect, EventPattern, Id, Line, Machine, StateDef, Step};
 use loremaster_project::Pack;
@@ -89,6 +89,8 @@ impl<'a> MachineBuilder<'a> {
             say: None,
             then: Vec::new(),
             instead: false,
+            closes: Vec::new(),
+            reason: None,
         });
         self
     }
@@ -113,6 +115,20 @@ impl<'a> MachineBuilder<'a> {
     #[track_caller]
     pub fn instead(mut self) -> Self {
         self.last_step().instead = true;
+        self
+    }
+
+    /// `closes:` and `reason:` of the last step: the endings that it closes
+    /// on purpose, and why.
+    #[track_caller]
+    pub fn closes(
+        mut self,
+        endings: impl IntoIterator<Item = impl AsRef<str>>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let step = self.last_step();
+        step.closes = ids(endings);
+        step.reason = Some(reason.into());
         self
     }
 }

@@ -38,7 +38,13 @@ impl Project {
     /// which is how a compile error names its place.
     pub fn locate(&self, mut diagnostic: Diagnostic) -> Diagnostic {
         if diagnostic.file.is_empty() {
-            let key = diagnostic.at.split(['/', '#']).next().unwrap_or_default();
+            // A whole key first: the rule of a machine step is `rule:lock#1`.
+            let whole = diagnostic.at.split('/').next().unwrap_or_default();
+            let key = if self.origins.contains_key(whole) {
+                whole
+            } else {
+                diagnostic.at.split(['/', '#']).next().unwrap_or_default()
+            };
             let key = if key.starts_with("story:") {
                 "story"
             } else {
@@ -841,6 +847,8 @@ fn machine_rules(m: &Machine) -> Vec<Rule> {
                 within: None,
                 priority: 0,
                 machine: Some(m.id.clone()),
+                closes: step.closes.clone(),
+                reason: step.reason.clone(),
                 notes: Vec::new(),
             }
         })
