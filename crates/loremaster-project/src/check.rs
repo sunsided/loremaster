@@ -1,4 +1,4 @@
-use crate::{Diagnostic, Project, Severity};
+use crate::{Diagnostic, Origin, Project, Severity};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
     Effect, EventPattern, Fragment, Location, Story, ThreadStatus, standard_verbs,
@@ -12,6 +12,7 @@ pub fn check(project: &Project) -> Vec<Diagnostic> {
         project,
         scope: Scope::from_story(&project.story),
         out: project.assembly.clone(),
+        place: None,
     };
     c.run();
     c.out
@@ -21,6 +22,10 @@ struct Checker<'a> {
     project: &'a Project,
     scope: Scope,
     out: Vec<Diagnostic>,
+    /// The Rust place (file, line, column) of the entity being checked, when
+    /// it comes from Rust. Its diagnostics get the line and column, which a
+    /// YAML entity gets from the text of its file.
+    place: Option<(String, u32, u32)>,
 }
 
 impl Checker<'_> {
@@ -28,20 +33,38 @@ impl Checker<'_> {
         &self.project.story
     }
 
-    fn file_of(&self, key: &str) -> String {
-        self.project
-            .origins
-            .get(key)
+    /// The file of an entity. The checks of the entity follow, so this also
+    /// sets the Rust place for their diagnostics.
+    fn file_of(&mut self, key: &str) -> String {
+        let origin = self.project.origins.get(key);
+        self.place = match origin {
+            Some(Origin::Rust {
+                file, line, column, ..
+            }) => Some((file.clone(), *line, *column)),
+            _ => None,
+        };
+        origin
             .map(|o| o.file().to_string())
             .unwrap_or_else(|| "story.yaml".into())
     }
 
+    fn push(&mut self, mut diagnostic: Diagnostic) {
+        if diagnostic.line.is_none()
+            && let Some((file, line, column)) = &self.place
+            && *file == diagnostic.file
+        {
+            diagnostic.line = Some(*line);
+            diagnostic.column = Some(*column);
+        }
+        self.out.push(diagnostic);
+    }
+
     fn error(&mut self, file: &str, at: &str, message: impl Into<String>) {
-        self.out.push(Diagnostic::error(file, at, message));
+        self.push(Diagnostic::error(file, at, message));
     }
 
     fn warning(&mut self, file: &str, at: &str, message: impl Into<String>) {
-        self.out.push(Diagnostic::warning(file, at, message));
+        self.push(Diagnostic::warning(file, at, message));
     }
 
     /// Report a language error, locating the source text inside the file.
@@ -55,7 +78,7 @@ impl Checker<'_> {
                     .map(|pos| line_col(&f.text, pos + err.span.start))
             })
             .map_or((None, None), |(l, c)| (Some(l), Some(c)));
-        self.out.push(Diagnostic {
+        self.push(Diagnostic {
             severity: Severity::Error,
             file: file.to_string(),
             at: at.to_string(),
