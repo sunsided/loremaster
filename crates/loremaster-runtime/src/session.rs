@@ -115,7 +115,7 @@ pub struct Session {
 /// The kinds of log entries that are changes of state, which hosts get as
 /// notices. The others (`rule`, `frame`, `event`, `author`) are for the
 /// authoring views.
-const NOTICE_KINDS: &[&str] = &["set", "move", "timer", "talk", "memory"];
+const NOTICE_KINDS: &[&str] = &["set", "move", "timer", "talk", "memory", "relation"];
 
 impl Session {
     /// A new game of `world`, with the story's own seed.
