@@ -232,7 +232,7 @@ impl Session {
         }
         let free = self.game.awaiting().is_none() && self.game.talk().is_none();
         if word == JOURNAL && free && !self.parser_knows(JOURNAL) {
-            return Some(Self::note_turn(self.journal_text()));
+            return Some(self.journal_turn());
         }
         (word == UNDO && free && !self.parser_knows(UNDO)).then(|| self.undo_turn())
     }
@@ -427,22 +427,32 @@ impl Session {
         turn
     }
 
-    /// A note for the player, without a change.
-    /// The journal as text, for the `journal` command.
-    fn journal_text(&self) -> String {
+    /// The journal for the `journal` command: one block per quest.
+    fn journal_turn(&self) -> Turn {
         let entries = self.game.journal();
-        if entries.is_empty() {
-            return "Your journal is empty.".into();
-        }
-        (entries.iter())
-            .map(|e| {
-                let mark = if e.done { " (done)" } else { "" };
-                format!("{}{mark}: {}", e.title, e.text)
+        let lines = if entries.is_empty() {
+            vec!["Your journal is empty.".to_string()]
+        } else {
+            (entries.iter())
+                .map(|e| {
+                    let mark = if e.done { " (done)" } else { "" };
+                    format!("{}{mark}: {}", e.title, e.text)
+                })
+                .collect()
+        };
+        let blocks = (lines.into_iter())
+            .map(|line| Block {
+                kind: BlockKind::Response,
+                runs: vec![crate::output::Run::plain(line)],
             })
-            .collect::<Vec<_>>()
-            .join("\n")
+            .collect();
+        Turn {
+            blocks,
+            ..Turn::default()
+        }
     }
 
+    /// A note for the player, without a change.
     fn note_turn(text: String) -> Turn {
         Turn {
             blocks: vec![Block {

@@ -129,3 +129,78 @@ fn the_checks_warn_about_journal_text_outside_a_quest() {
     );
     assert!(warnings(QUEST).is_empty(), "{:?}", warnings(QUEST));
 }
+
+/// A second quest, finished from the start, declared before `pages`.
+const DONE_FIRST: &str = r#"
+quest: true
+title: The lamp
+start: lit
+states:
+  - { name: lit, journal: "The lamp is lit.", done: true }
+"#;
+
+#[test]
+fn open_quests_come_before_finished_ones() {
+    let mut f = files(QUEST);
+    f.insert(0, file("machines/lamp.yaml", DONE_FIRST));
+    let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    s.submit(Input::Text("ask".into()));
+    let order: Vec<_> = s.journal().into_iter().map(|e| e.quest).collect();
+    assert_eq!(order, ["pages", "lamp"]);
+    let text = s.submit(Input::Text("journal".into())).plain_text();
+    assert_eq!(
+        text,
+        "The missing pages: Find the pages of the lock log.\n\nThe lamp (done): The lamp is lit.",
+        "one block per quest"
+    );
+}
+
+#[test]
+fn a_dialogue_steps_a_quest() {
+    let mut f = files(QUEST);
+    f.push(file(
+        "things/keeper.yaml",
+        "name: keeper\nlocation: { room: hall }\n",
+    ));
+    f.push(file(
+        "dialogues/keeper.yaml",
+        "with: keeper\nstart: [hi]\nnodes:\n  hi:\n    say: \"Yes?\"\n    options:\n      - say: \"The pages?\"\n        then: [{ set: { pages: searching } }]\n        go: end\n",
+    ));
+    let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    s.submit(Input::Text("talk to keeper".into()));
+    s.choose(0);
+    assert_eq!(s.journal()[0].state, "searching");
+}
+
+#[test]
+fn a_gated_out_journal_line_shows_no_entry() {
+    let quest = QUEST.replace(
+        "journal: \"Find the pages of the lock log.\"",
+        "journal: [{ narrate: \"Find the pages.\", when: \"false\" }]",
+    );
+    let mut s = session(&quest);
+    s.submit(Input::Text("ask".into()));
+    assert!(s.journal().is_empty());
+}
+
+#[test]
+fn done_without_journal_text_is_a_warning() {
+    let quest = QUEST.replace(
+        "{ name: found, journal: \"You found the pages.\", done: true }",
+        "{ name: found, done: true }",
+    );
+    let warnings: Vec<_> = check(&load(files(&quest)).unwrap())
+        .into_iter()
+        .map(|d| d.message)
+        .collect();
+    assert!(
+        warnings
+            .iter()
+            .any(|m| m.contains("`done: true` without `journal:`")),
+        "{warnings:?}"
+    );
+}

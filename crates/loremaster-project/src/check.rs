@@ -902,6 +902,12 @@ impl Checker<'_> {
                 }
                 if let Some(line) = s.journal() {
                     self.line(&file, &format!("{place}.journal"), line);
+                } else if m.quest && s.done() {
+                    self.warning(
+                        &file,
+                        &place,
+                        "`done: true` without `journal:` text has no effect: the quest leaves the journal in this state",
+                    );
                 }
             }
             if !m.quest && m.title.is_some() {
