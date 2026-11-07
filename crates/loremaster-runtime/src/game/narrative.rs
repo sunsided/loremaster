@@ -121,10 +121,16 @@ impl NarrativeState for Game {
         let (Some(thing), Some(key)) = (symbols.entity_key(owner), symbols.memory_key(id)) else {
             return false;
         };
-        self.state
-            .memories
-            .get_mut(thing)
-            .is_some_and(|keys| keys.remove(key))
+        let memories = &mut self.state.memories;
+        let Some(keys) = memories.get_mut(thing) else {
+            return false;
+        };
+        let removed = keys.remove(key);
+        // An empty set would stay in the save file.
+        if keys.is_empty() {
+            memories.remove(thing);
+        }
+        removed
     }
 
     fn matches_memory_query(&self, owner: EntityId, query: &MemoryQuery) -> bool {
@@ -211,5 +217,7 @@ mod tests {
         check!(game.state.memories["blackbeard"].contains("asked_marigold"));
         check!(game.remove_memory(blackbeard, id));
         check!(!game.matches_memory_query(blackbeard, &query));
+        check!(!game.state.memories.contains_key("blackbeard"));
+        check!(!game.remove_memory(blackbeard, id));
     }
 }
