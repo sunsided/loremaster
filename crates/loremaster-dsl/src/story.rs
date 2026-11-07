@@ -30,6 +30,7 @@ impl<'a> StoryBuilder<'a> {
             relations: Vec::new(),
             frames: Frames::default(),
             seed: 0,
+            death_prompt: true,
             notes: Vec::new(),
             timers: Vec::new(),
             machines: Vec::new(),
@@ -50,6 +51,13 @@ impl<'a> StoryBuilder<'a> {
     /// `author:`.
     pub fn author(mut self, author: impl Into<String>) -> Self {
         self.header().author = Some(author.into());
+        self
+    }
+
+    /// `death_prompt: false`: an ending of kind `death` does not ask to undo,
+    /// restart or restore.
+    pub fn no_death_prompt(mut self) -> Self {
+        self.header().death_prompt = false;
         self
     }
 
