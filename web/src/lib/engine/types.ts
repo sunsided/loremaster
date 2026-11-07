@@ -148,6 +148,15 @@ export interface ExitInfo {
 	to_name: string;
 }
 
+/** A quest in the player's journal (a machine with `quest: true`). */
+export interface JournalEntry {
+	quest: string;
+	title: string;
+	state: string;
+	text: string;
+	done: boolean;
+}
+
 export interface Scene {
 	room: string;
 	room_name: string;

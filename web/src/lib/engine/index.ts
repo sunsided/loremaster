@@ -14,6 +14,7 @@ import type {
 	AuthorCommand,
 	Choice,
 	Input,
+	JournalEntry,
 	Loaded,
 	Snapshot,
 	Status,
@@ -210,6 +211,11 @@ export class Session {
 		return this.#session.scene();
 	}
 
+	/** The quest journal: open quests first, then finished ones. */
+	journal(): JournalEntry[] {
+		return this.#session.journal();
+	}
+
 	verbs(): VerbInfo[] {
 		return this.#session.verbs();
 	}
@@ -314,6 +320,11 @@ export class Workbench {
 
 	scene(): Scene {
 		return this.#bench.scene();
+	}
+
+	/** The quest journal of the session. */
+	journal(): JournalEntry[] {
+		return this.#bench.journal();
 	}
 
 	verbs(): VerbInfo[] {

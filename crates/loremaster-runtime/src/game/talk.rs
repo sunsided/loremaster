@@ -21,7 +21,7 @@ use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
 use crate::text;
-use crate::world::{CDialogue, CEffect, COption};
+use crate::world::{CEffect, COption, CompiledDialogue};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
 use dramaturge_model::{DialogTarget, DialogText, DialogueNodeId};
 use dramaturge_runtime::{
@@ -44,7 +44,7 @@ type Runtime =
 type Then = Arc<[CEffect]>;
 
 /// dramaturge for a turn of a talk, with the world effects of the dialogue.
-fn runtime(d: &CDialogue) -> Runtime {
+fn runtime(d: &CompiledDialogue) -> Runtime {
     DefaultRuntime::with_parts(
         evaluator(),
         DefaultOutcomeApplier::with_custom(WorldEffects {
@@ -55,7 +55,7 @@ fn runtime(d: &CDialogue) -> Runtime {
 
 /// The talk as a dramaturge cursor. The save keeps node keys, which stay
 /// valid when a story changes (see `save.rs`); the cursor uses node ids.
-fn cursor(d: &CDialogue, talk: &Talk) -> Option<DialogCursor> {
+fn cursor(d: &CompiledDialogue, talk: &Talk) -> Option<DialogCursor> {
     let id = |key: &str| d.node_by_key(key).map(|n| n.id);
     let mut cursor = DialogCursor::new(id(&talk.node)?);
     cursor.back = talk.back.iter().filter_map(|k| id(k)).collect();
@@ -64,7 +64,7 @@ fn cursor(d: &CDialogue, talk: &Talk) -> Option<DialogCursor> {
 
 /// Store the cursor in the talk, as node keys. An id without a node is
 /// not stored: the talk keeps its node, and the return stack skips it.
-fn keep(d: &CDialogue, cursor: &DialogCursor, talk: &mut Talk) {
+fn keep(d: &CompiledDialogue, cursor: &DialogCursor, talk: &mut Talk) {
     let key = |id| d.key_of(id).map(str::to_string);
     let Some(node) = key(cursor.current) else {
         return;
@@ -79,7 +79,7 @@ impl Game {
         self.state.talk.as_ref()
     }
 
-    fn current(&self) -> Option<Arc<CDialogue>> {
+    fn current(&self) -> Option<Arc<CompiledDialogue>> {
         let talk = self.state.talk.as_ref()?;
         self.world.dialogue(talk.dialogue.as_str()).cloned()
     }
@@ -161,7 +161,7 @@ impl Game {
     /// Enter a node through dramaturge: show its line, apply its outcomes
     /// and let world rules hear about it. A node whose `when` does not hold
     /// can not be entered, and the talk ends. True when the node was entered.
-    fn enter(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, id: DialogueNodeId) -> bool {
+    fn enter(&mut self, turn: &mut Turn, d: &Arc<CompiledDialogue>, id: DialogueNodeId) -> bool {
         let Some(node) = d.node(id) else {
             self.end_talk();
             return false;
@@ -186,7 +186,7 @@ impl Game {
     }
 
     /// Show a node's line.
-    fn show(&mut self, turn: &mut Turn, d: &CDialogue, id: DialogueNodeId) {
+    fn show(&mut self, turn: &mut Turn, d: &CompiledDialogue, id: DialogueNodeId) {
         let Some(node) = d.node(id) else { return };
         let key = d.key_of(id).unwrap_or_default();
         let base = Run {
