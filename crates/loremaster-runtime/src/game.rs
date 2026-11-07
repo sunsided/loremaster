@@ -283,9 +283,8 @@ impl Game {
         let talk_ok = state.talk.as_ref().is_some_and(|t| {
             world
                 .story
-                .dialogues
-                .iter()
-                .any(|d| d.id == t.dialogue && d.node(&t.node).is_some())
+                .dialogue(t.dialogue.as_str())
+                .is_some_and(|d| d.node(&t.node).is_some())
         });
         if !talk_ok {
             state.talk = None;

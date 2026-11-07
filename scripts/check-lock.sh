@@ -27,7 +27,12 @@ manifest = tomllib.load(open("Cargo.toml", "rb"))
 deps = manifest["workspace"]["dependencies"]
 registry = "registry+https://github.com/rust-lang/crates.io-index"
 bad = False
-for crate in ("dramaturge-model", "dramaturge-runtime", "dramaturge-authoring"):
+for crate in (
+    "dramaturge-model",
+    "dramaturge-runtime",
+    "dramaturge-authoring",
+    "dramaturge-syntax",
+):
     want = deps[crate]
     want = want if isinstance(want, str) else want.get("version", "")
     want = want.removeprefix("=")

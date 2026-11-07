@@ -1,241 +1,210 @@
-use crate::{Effect, Id, Line, Note, Value};
-use serde::de::{MapAccess, Visitor};
+//! Dialogues: dramaturge's dialogue AST with loremaster's payloads (D3).
+//!
+//! A conversation with a thing, in `dialogues/<id>.yaml`:
+//!
+//! ```yaml
+//! with: blackbeard
+//! start: [again, meet]
+//! nodes:
+//!   meet:
+//!     say: ["He pulls out a chair.", { says: "Sit, if you like." }]
+//!     options:
+//!       - { say: [{ says: "Who are you?" }], go: names }
+//!       - { say: "Leave.", go: end }
+//! ```
+//!
+//! The shape is the one of `dramaturge-syntax` (with its `serde` feature);
+//! loremaster sets the payloads: conditions are strings in loremaster's
+//! condition language, each `say` is a [`Line`], `then` holds world
+//! [`Effect`]s and `notes` hold [`Note`]s. The talk starts at the first node
+//! in `start` whose `when` holds. A node is one line of the other character;
+//! its options are the player's answers. The speech of a node is spoken by
+//! the thing `with`, the speech of an option by the player.
+
+use crate::{Effect, Line, Note, Value};
+use dramaturge_syntax as syntax;
 use serde::ser::SerializeMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
-use std::fmt;
 
-/// A conversation with a thing, in `dialogues/<id>.yaml`.
-///
-/// ```yaml
-/// with: blackbeard
-/// start: [again, meet]
-/// nodes:
-///   meet:
-///     say: ["He pulls out a chair.", { says: "Sit, if you like." }]
-///     options:
-///       - { say: [{ says: "Who are you?" }], go: names }
-///       - { say: "Leave.", go: end }
-/// ```
-///
-/// The talk starts at the first node in `start` whose `when` holds. A node is
-/// one line of the other character; its options are the player's answers.
-/// Each `say` is a [`Line`](crate::Line); the speech of a node is spoken by
-/// the thing `with`, the speech of an option by the player.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Dialogue {
-    pub id: Id,
-    /// The thing the player talks to.
-    pub with: Id,
-    /// Node keys, in order. The first one whose `when` holds starts the talk.
-    pub start: Vec<String>,
-    /// The nodes, in the order of the file.
-    #[serde(with = "ordered_nodes")]
-    pub nodes: Vec<DialogueNode>,
-    /// Author notes. The player never sees them.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub notes: Vec<Note>,
-}
+pub use syntax::Target as DialogueTarget;
 
-impl Dialogue {
-    pub fn node(&self, key: &str) -> Option<&DialogueNode> {
-        self.nodes.iter().find(|n| n.key == key)
-    }
-}
-
-/// What a node or an option changes when it applies.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Outcomes {
-    /// Set variables or properties, as in a rule.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub set: BTreeMap<String, Value>,
-    /// Add to integer variables, as in a rule.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub add: BTreeMap<String, i64>,
-    /// Add to the relation of the player to the dialogue's thing: `{ trust: 1 }`.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub relation: BTreeMap<String, i32>,
-    /// Memories that the dialogue's thing keeps from now on.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub remember: Vec<String>,
-    /// World effects: `move`, `goto`, `end`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub then: Vec<Effect>,
-}
-
-impl Outcomes {
-    pub fn is_empty(&self) -> bool {
-        self.set.is_empty()
-            && self.add.is_empty()
-            && self.relation.is_empty()
-            && self.remember.is_empty()
-            && self.then.is_empty()
-    }
-}
-
+/// A conversation with a thing. The loader sets its `id` to the file stem,
+/// unless the file has an `id`. Without an id, it is `""` ([`DialogueId`]).
+pub type Dialogue = syntax::Dialogue<String, Line, Effect, Note>;
 /// One line of the other character, and the answers the player can give.
-#[derive(Debug, Clone, PartialEq)]
-pub struct DialogueNode {
-    /// The key of the node in `nodes`.
-    pub key: String,
-    /// The node can start the talk only when this holds.
-    pub when: Option<String>,
-    /// The line. Its speech is spoken by the dialogue's thing unless a
-    /// segment names another speaker with `by`.
-    pub say: Line,
-    /// Applied when the talk enters the node.
-    pub outcomes: Outcomes,
-    pub options: Vec<DialogueOption>,
-}
-
+pub type DialogueNode = syntax::Node<String, Line, Effect, Note>;
 /// An answer the player can choose.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(from = "OptionRepr")]
-pub struct DialogueOption {
-    /// The player's line, also the label of the choice. Its speech is
-    /// spoken by the player unless a segment names another speaker.
-    pub say: Line,
-    /// The option shows only when this holds.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub when: Option<String>,
-    #[serde(flatten)]
-    pub outcomes: Outcomes,
-    /// A node key, `end` or `back`.
-    #[serde(default = "end")]
-    pub go: String,
+pub type DialogueOption = syntax::Choice<String, Line, Effect, Note>;
+/// What a node or an option changes when it applies.
+pub type Outcomes = syntax::Outcomes<Effect>;
+
+/// The id of a dialogue as a string.
+pub trait DialogueId {
+    /// The id, or `""` for a dialogue without one (the loader always sets it).
+    fn id_str(&self) -> &str;
 }
 
-fn end() -> String {
-    "end".into()
+impl DialogueId for Dialogue {
+    fn id_str(&self) -> &str {
+        self.id.as_deref().unwrap_or_default()
+    }
 }
 
-/// An option as written in the file. The fields of [`Outcomes`] are spelled
-/// out instead of `#[serde(flatten)]`, so that an unknown key is an error:
-/// serde does not reject unknown fields of a flattened struct.
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct OptionRepr {
-    #[serde(alias = "line")]
-    say: Line,
-    #[serde(default)]
-    when: Option<String>,
-    #[serde(default = "end")]
-    go: String,
-    #[serde(default)]
-    set: BTreeMap<String, Value>,
-    #[serde(default)]
-    add: BTreeMap<String, i64>,
-    #[serde(default)]
-    relation: BTreeMap<String, i32>,
-    #[serde(default)]
-    remember: Vec<String>,
-    #[serde(default)]
-    then: Vec<Effect>,
-}
-
-impl From<OptionRepr> for DialogueOption {
-    fn from(o: OptionRepr) -> Self {
-        DialogueOption {
-            say: o.say,
-            when: o.when,
-            outcomes: Outcomes {
-                set: o.set,
-                add: o.add,
-                relation: o.relation,
-                remember: o.remember,
-                then: o.then,
-            },
-            go: o.go,
+impl From<&syntax::Value> for Value {
+    fn from(v: &syntax::Value) -> Self {
+        match v {
+            syntax::Value::Bool(b) => Value::Bool(*b),
+            syntax::Value::Int(i) => Value::Int(*i),
+            syntax::Value::Text(t) => Value::Text(t.clone()),
+            // A value kind that loremaster does not know yet.
+            other => Value::Text(format!("{other:?}")),
         }
     }
 }
 
-/// A node as written in the file, without its key, with the fields of
-/// [`Outcomes`] spelled out as in [`OptionRepr`].
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct NodeRepr {
-    #[serde(default)]
-    when: Option<String>,
-    #[serde(alias = "line")]
-    say: Line,
-    #[serde(default)]
-    options: Vec<DialogueOption>,
-    #[serde(default)]
-    set: BTreeMap<String, Value>,
-    #[serde(default)]
-    add: BTreeMap<String, i64>,
-    #[serde(default)]
-    relation: BTreeMap<String, i32>,
-    #[serde(default)]
-    remember: Vec<String>,
-    #[serde(default)]
-    then: Vec<Effect>,
+impl From<Value> for syntax::Value {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Bool(b) => syntax::Value::Bool(b),
+            Value::Int(i) => syntax::Value::Int(i),
+            Value::Text(t) => syntax::Value::Text(t),
+        }
+    }
 }
 
-/// A node as it is written out, without its key.
+/// The dialogues of a [`Story`](crate::Story) as the story serializes them.
+///
+/// The story's JSON is the input of the model hash and of the save stamp.
+/// Before D3, an option wrote its `go` after its outcomes, and always
+/// (`go: end` too). This form keeps that, so that existing stories keep
+/// their model hash and their saves. Everything else is the shape of
+/// `dramaturge-syntax`. Reading takes that shape as it is.
+pub(crate) fn story_form<S: Serializer>(dialogues: &[Dialogue], s: S) -> Result<S::Ok, S::Error> {
+    #[derive(Serialize)]
+    struct DialogueOut<'a> {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        id: &'a Option<String>,
+        with: &'a str,
+        start: &'a [String],
+        nodes: Nodes<'a>,
+        #[serde(skip_serializing_if = "<[_]>::is_empty")]
+        notes: &'a [Note],
+    }
+    struct Nodes<'a>(&'a [DialogueNode]);
+    impl Serialize for Nodes<'_> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut map = s.serialize_map(Some(self.0.len()))?;
+            for n in self.0 {
+                map.serialize_entry(&n.key, &NodeOut::of(n))?;
+            }
+            map.end()
+        }
+    }
+    s.collect_seq(dialogues.iter().map(|d| DialogueOut {
+        id: &d.id,
+        with: &d.with,
+        start: &d.start,
+        nodes: Nodes(&d.nodes),
+        notes: &d.notes,
+    }))
+}
+
+/// The outcomes of a node or an option, next to its other fields.
 #[derive(Serialize)]
-struct NodeBody {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    when: Option<String>,
-    say: Line,
-    #[serde(flatten)]
-    outcomes: Outcomes,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    options: Vec<DialogueOption>,
+struct OutcomesOut<'a> {
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    set: &'a BTreeMap<String, syntax::Value>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    add: &'a BTreeMap<String, i64>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    relation: &'a BTreeMap<String, i32>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    remember: &'a [String],
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    then: &'a [Effect],
 }
 
-/// `nodes` is a map in the file. Its order is the order of the outline in the
-/// editor, so it is read into a list.
-mod ordered_nodes {
-    use super::*;
-
-    pub fn serialize<S: Serializer>(nodes: &[DialogueNode], s: S) -> Result<S::Ok, S::Error> {
-        let mut map = s.serialize_map(Some(nodes.len()))?;
-        for n in nodes {
-            let body = NodeBody {
-                when: n.when.clone(),
-                say: n.say.clone(),
-                outcomes: n.outcomes.clone(),
-                options: n.options.clone(),
-            };
-            map.serialize_entry(&n.key, &body)?;
+impl<'a> OutcomesOut<'a> {
+    fn of(o: &'a Outcomes) -> Self {
+        Self {
+            set: &o.set,
+            add: &o.add,
+            relation: &o.relation,
+            remember: &o.remember,
+            then: &o.then,
         }
-        map.end()
     }
+}
 
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<DialogueNode>, D::Error> {
-        struct Nodes;
-        impl<'de> Visitor<'de> for Nodes {
-            type Value = Vec<DialogueNode>;
+#[derive(Serialize)]
+struct NodeOut<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    speaker: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    when: &'a Option<String>,
+    say: &'a Line,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    lines: &'a [syntax::Line<Line>],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next: &'a Option<DialogueTarget>,
+    #[serde(flatten)]
+    outcomes: OutcomesOut<'a>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    options: Vec<OptionOut<'a>>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    notes: &'a [Note],
+}
 
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a map of node keys to nodes")
-            }
-
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-                let mut out = Vec::new();
-                while let Some((key, body)) = map.next_entry::<String, NodeRepr>()? {
-                    out.push(DialogueNode {
-                        key,
-                        when: body.when,
-                        say: body.say,
-                        outcomes: Outcomes {
-                            set: body.set,
-                            add: body.add,
-                            relation: body.relation,
-                            remember: body.remember,
-                            then: body.then,
-                        },
-                        options: body.options,
-                    });
-                }
-                Ok(out)
-            }
+impl<'a> NodeOut<'a> {
+    fn of(n: &'a DialogueNode) -> Self {
+        Self {
+            speaker: &n.speaker,
+            when: &n.when,
+            say: &n.say,
+            lines: &n.lines,
+            next: &n.next,
+            outcomes: OutcomesOut::of(&n.outcomes),
+            options: n.options.iter().map(OptionOut::of).collect(),
+            notes: &n.notes,
         }
-        d.deserialize_map(Nodes)
+    }
+}
+
+#[derive(Serialize)]
+struct OptionOut<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: &'a Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    say: &'a Option<Line>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    when: &'a Option<String>,
+    #[serde(flatten)]
+    outcomes: OutcomesOut<'a>,
+    go: &'a DialogueTarget,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    tags: &'a [syntax::Tag],
+    #[serde(skip_serializing_if = "syntax::Intentions::is_empty")]
+    intentions: &'a syntax::Intentions,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hint: &'a Option<syntax::Hint>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    notes: &'a [Note],
+}
+
+impl<'a> OptionOut<'a> {
+    fn of(o: &'a DialogueOption) -> Self {
+        Self {
+            id: &o.id,
+            say: &o.say,
+            when: &o.when,
+            outcomes: OutcomesOut::of(&o.outcomes),
+            go: &o.go,
+            tags: &o.tags,
+            intentions: &o.intentions,
+            hint: &o.hint,
+            notes: &o.notes,
+        }
     }
 }
 
@@ -244,9 +213,8 @@ mod tests {
     use super::*;
     use assert2::{assert, check};
 
-    #[test]
-    fn nodes_keep_the_order_of_the_file() {
-        let d: Dialogue = serde_json::from_value(serde_json::json!({
+    fn blackbeard() -> serde_json::Value {
+        serde_json::json!({
             "id": "bb",
             "with": "blackbeard",
             "start": ["meet"],
@@ -254,18 +222,26 @@ mod tests {
                 "meet": {
                     "say": "Sit.",
                     "relation": { "trust": 1 },
-                    "options": [{ "say": "Who are you?", "go": "names", "remember": ["asked"] }]
+                    "options": [
+                        { "say": "Who are you?", "go": "names", "remember": ["asked"] },
+                        { "say": "Bye." }
+                    ]
                 },
                 "names": { "say": "Blackbeard.", "set": { "known": true } }
             }
-        }))
-        .unwrap();
+        })
+    }
+
+    #[test]
+    fn nodes_keep_the_order_of_the_file() {
+        let d: Dialogue = serde_json::from_value(blackbeard()).unwrap();
         let keys: Vec<&str> = d.nodes.iter().map(|n| n.key.as_str()).collect();
         check!(keys == ["meet", "names"]);
         assert!(let Some(meet) = d.node("meet"));
         check!(meet.outcomes.relation["trust"] == 1);
         check!(meet.options[0].outcomes.remember == ["asked"]);
         check!(d.node("names").unwrap().options.is_empty());
+        check!(d.id_str() == "bb");
 
         let json = serde_json::to_value(&d).unwrap();
         check!(json["nodes"]["names"]["set"]["known"] == true);
@@ -276,6 +252,30 @@ mod tests {
     fn an_option_without_go_ends_the_talk() {
         let o: DialogueOption =
             serde_json::from_value(serde_json::json!({ "say": "Bye." })).unwrap();
-        check!(o.go == "end");
+        check!(o.go == DialogueTarget::End);
+    }
+
+    #[test]
+    fn the_story_form_writes_go_after_the_outcomes() {
+        let mut d: Dialogue = serde_json::from_value(blackbeard()).unwrap();
+        d.nodes[1].options.push(DialogueOption::new(
+            Line::from("Back."),
+            DialogueTarget::Back,
+        ));
+        let mut out = Vec::new();
+        story_form(&[d], &mut serde_json::Serializer::new(&mut out)).unwrap();
+        // The whole dialogue, byte for byte, as before D3: the model hash
+        // and the save stamp of a story read it.
+        let text = String::from_utf8(out).unwrap();
+        check!(
+            text == concat!(
+                r#"[{"id":"bb","with":"blackbeard","start":["meet"],"nodes":{"#,
+                r#""meet":{"say":"Sit.","relation":{"trust":1},"options":["#,
+                r#"{"say":"Who are you?","remember":["asked"],"go":"names"},"#,
+                r#"{"say":"Bye.","go":"end"}]},"#,
+                r#""names":{"say":"Blackbeard.","set":{"known":true},"#,
+                r#""options":[{"say":"Back.","go":"back"}]}}}]"#
+            )
+        );
     }
 }

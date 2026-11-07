@@ -22,7 +22,7 @@ mod reserved;
 mod scope;
 
 pub use derived::{CmpOp, Derived, NameForm, Operand};
-pub use dialogue::{CompiledDialogue, DialogueError, compile_dialogue, node_key, option_key};
+pub use dialogue::{CompiledDialogue, DialogueError, compile_dialogue};
 pub use error::{LangError, Span};
 pub use expr::{Expr, parse_expr};
 pub use highlight::{Token, TokenKind, condition_tokens, markup_tokens};

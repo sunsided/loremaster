@@ -3,7 +3,7 @@ use loremaster_lang::{
     CompiledLine, LangError, Scope, Segment, compile_condition, compile_dialogue, compile_markup,
 };
 use loremaster_model::{
-    Effect, Fragment, FragmentMode, Id, Layer, Story, Value, VerbDef, standard_verbs,
+    DialogueId, Effect, Fragment, FragmentMode, Id, Layer, Story, Value, VerbDef, standard_verbs,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -474,7 +474,8 @@ impl World {
             .dialogues
             .iter()
             .map(|d| {
-                let owner = format!("dialogue:{}", d.id);
+                let id = Id::new(d.id_str());
+                let owner = format!("dialogue:{id}");
                 let lowered =
                     compile_dialogue(d, &c.scope, &mut symbols).map_err(|e| CompileError {
                         at: format!("{owner}/{}", e.at),
@@ -494,8 +495,8 @@ impl World {
                     return Err(e);
                 }
                 Ok(Arc::new(CDialogue {
-                    id: d.id.clone(),
-                    with: d.with.clone(),
+                    id,
+                    with: Id::new(d.with.as_str()),
                     graph,
                     keys: d.nodes.iter().map(|n| n.key.clone()).collect(),
                 }))

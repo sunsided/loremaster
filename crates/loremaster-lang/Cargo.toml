@@ -14,6 +14,7 @@ categories = ["game-development", "parser-implementations"]
 
 [dependencies]
 dramaturge-model.workspace = true
+dramaturge-syntax.workspace = true
 loremaster-model.workspace = true
 serde.workspace = true
 thiserror.workspace = true

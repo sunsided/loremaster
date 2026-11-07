@@ -30,7 +30,9 @@ mod walkthrough;
 pub use awaits::{AwaitOption, AwaitSpec, Dice};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
 pub use diagnostic::{Diagnostic, Severity};
-pub use dialogue::{Dialogue, DialogueNode, DialogueOption, Outcomes};
+pub use dialogue::{Dialogue, DialogueId, DialogueNode, DialogueOption, DialogueTarget, Outcomes};
+/// The dialogue AST of dramaturge (decision D3).
+pub use dramaturge_syntax;
 pub use ending::{Ending, EndingKind};
 pub use fragment::{Fragment, FragmentMode, Layer};
 pub use frame::{Frame, Frames};

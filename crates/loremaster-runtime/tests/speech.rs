@@ -69,7 +69,7 @@ nodes:
   hi:
     say: ["He looks up.", { says: "Yes?" }]
     options:
-      - line: [{ says: "Who are you?" }]
+      - say: [{ says: "Who are you?" }]
         go: name
       - say: "Leave."
         go: end

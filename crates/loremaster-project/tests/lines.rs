@@ -1,5 +1,6 @@
 //! Lines in YAML (P3-15, #111): every `say` is a text or a list of segments,
-//! `line:` is the same key, and a line that is one text keeps the model hash.
+//! `line:` is the same key outside dialogues, and a line that is one text
+//! keeps the model hash.
 
 use assert2::{assert, check};
 use loremaster_model::{Effect, Line, LineSegment, Story};
@@ -14,6 +15,8 @@ fn file(path: &str, text: &str) -> SourceFile {
 
 /// A story with a line in each place: a rule, a machine step, a timer, a
 /// dialogue node and an option. `key` is `say` or `line`, `text` the value.
+/// A dialogue always writes `say`: its shape is dramaturge's (D3), which has
+/// no `line`.
 fn story(key: &str, text: &str) -> Story {
     let files = vec![
         file(
@@ -37,7 +40,7 @@ fn story(key: &str, text: &str) -> Story {
         file(
             "dialogues/bb.yaml",
             &format!(
-                "with: bb\nstart: [hi]\nnodes:\n  hi:\n    {key}: {text}\n    options:\n      - {{ {key}: {text} }}\n"
+                "with: bb\nstart: [hi]\nnodes:\n  hi:\n    say: {text}\n    options:\n      - {{ say: {text} }}\n"
             ),
         ),
     ];
@@ -57,7 +60,7 @@ fn lines(s: &Story) -> Vec<Line> {
         s.machines[0].steps[0].say.clone().unwrap(),
         say(&s.timers[0].at[&1][0]),
         node.say.clone(),
-        node.options[0].say.clone(),
+        node.options[0].say.clone().unwrap(),
     ]
 }
 

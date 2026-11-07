@@ -1,7 +1,7 @@
 use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
-    Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
+    DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
     ThreadStatus, standard_verbs,
 };
 use std::collections::BTreeSet;
@@ -396,7 +396,7 @@ impl Checker<'_> {
                 }
                 EventPattern::Timer(t) => self.timer_ref(&file, "on.timer", t.as_str()),
                 EventPattern::Talk(parts) => match parts.split_first() {
-                    Some((d, node)) => match self.story().dialogues.iter().find(|x| x.id == *d) {
+                    Some((d, node)) => match self.story().dialogue(d.as_str()) {
                         None => self.error(&file, "on.talk", format!("unknown dialogue `{d}`")),
                         Some(dialogue) => {
                             if let Some(n) = node.first()
@@ -516,17 +516,18 @@ impl Checker<'_> {
         );
     }
 
-    /// Dialogues: references, conditions and markup, then the structure of
-    /// the graph through dramaturge's validator.
+    /// Dialogues: the structure (dramaturge-syntax's check), references,
+    /// conditions and markup, then the graph through dramaturge's validator.
     fn dialogues(&mut self) {
         use dramaturge_authoring::{
             GraphValidator, ValidationIssueKind, ValidationOptions, ValidationSeverity,
         };
+        use dramaturge_syntax::IssueKind;
         let story = self.story().clone();
         let mut symbols = self.scope.symbols.clone();
         let mut with = BTreeSet::new();
         for d in &story.dialogues {
-            let file = self.file_of(&format!("dialogue:{}", d.id));
+            let file = self.file_of(&format!("dialogue:{}", d.id_str()));
             if self.story().thing(d.with.as_str()).is_some() && !with.insert(d.with.clone()) {
                 self.warning(
                     &file,
@@ -534,6 +535,22 @@ impl Checker<'_> {
                     format!("`{}` has two dialogues; the talk uses the first", d.with),
                 );
             }
+            // Keys, start nodes, targets and labels. A node without options
+            // ends the talk in loremaster by design, so `NoWayOn` is no issue.
+            let mut issues = dramaturge_syntax::check(d);
+            issues.retain(|i| i.kind != IssueKind::NoWayOn);
+            let broken = issues
+                .iter()
+                .any(|i| i.severity == dramaturge_syntax::Severity::Error);
+            for issue in &issues {
+                match issue.severity {
+                    dramaturge_syntax::Severity::Error => {
+                        self.error(&file, &issue.path, issue.message.clone())
+                    }
+                    _ => self.warning(&file, &issue.path, issue.message.clone()),
+                }
+            }
+            self.not_played_yet(&file, d);
             for n in &d.nodes {
                 for (at, o) in std::iter::once((format!("nodes.{}", n.key), &n.outcomes)).chain(
                     n.options
@@ -544,7 +561,8 @@ impl Checker<'_> {
                     self.effects(&file, &format!("{at}.then"), &o.then);
                     self.no_await(&file, &format!("{at}.then"), &o.then);
                     for (name, value) in &o.set {
-                        if !self.settable(name, value) {
+                        let value = loremaster_model::Value::from(value);
+                        if !self.settable(name, &value) {
                             self.error(&file, &at, format!("cannot set `{name}` to `{value}`"));
                         }
                     }
@@ -554,8 +572,13 @@ impl Checker<'_> {
                 let at = format!("nodes.{}", n.key);
                 self.line(&file, &at, &n.say);
                 for (i, o) in n.options.iter().enumerate() {
-                    self.line(&file, &format!("{at}.options[{i}]"), &o.say);
+                    if let Some(say) = &o.say {
+                        self.line(&file, &format!("{at}.options[{i}]"), say);
+                    }
                 }
+            }
+            if broken {
+                continue;
             }
             let compiled = match loremaster_lang::compile_dialogue(d, &self.scope, &mut symbols) {
                 Ok(c) => c,
@@ -571,7 +594,7 @@ impl Checker<'_> {
                     continue;
                 }
             };
-            let prefix = format!("{}/", d.id);
+            let prefix = format!("{}/", d.id_str());
             let node_at = |id| {
                 symbols
                     .node_key(id)
@@ -593,6 +616,32 @@ impl Checker<'_> {
                 match issue.severity {
                     ValidationSeverity::Error => self.error(&file, &at, message),
                     _ => self.warning(&file, &at, message),
+                }
+            }
+        }
+    }
+
+    /// Fields of the dialogue shape that the talks of loremaster do not
+    /// play yet: more lines and `next` (auto-continue), and the option
+    /// fields `hint`, `tags` and `intentions`.
+    fn not_played_yet(&mut self, file: &str, d: &loremaster_model::Dialogue) {
+        for n in &d.nodes {
+            let at = format!("nodes.{}", n.key);
+            for (field, used) in [("lines", !n.lines.is_empty()), ("next", n.next.is_some())] {
+                if used {
+                    self.error(file, &format!("{at}.{field}"), not_yet(field));
+                }
+            }
+            for (i, o) in n.options.iter().enumerate() {
+                let at = format!("{at}.options[{i}]");
+                for (field, used) in [
+                    ("hint", o.hint.is_some()),
+                    ("tags", !o.tags.is_empty()),
+                    ("intentions", !o.intentions.is_empty()),
+                ] {
+                    if used {
+                        self.error(file, &format!("{at}.{field}"), not_yet(field));
+                    }
                 }
             }
         }
@@ -1016,6 +1065,10 @@ impl Checker<'_> {
     }
 }
 
+fn not_yet(field: &str) -> String {
+    format!("`{field}` is in the dialogue shape, but loremaster's talks do not play it yet")
+}
+
 /// A state name is one word that conditions can name: `exorcism == lit`.
 fn is_state_name(s: &str) -> bool {
     let mut chars = s.chars();
@@ -1053,9 +1106,9 @@ fn uses_speech(story: &Story) -> bool {
         _ => None,
     });
     let dialogue_lines = story.dialogues.iter().flat_map(|d| {
-        d.nodes
-            .iter()
-            .flat_map(|n| std::iter::once(&n.say).chain(n.options.iter().map(|o| &o.say)))
+        d.nodes.iter().flat_map(|n| {
+            std::iter::once(&n.say).chain(n.options.iter().filter_map(|o| o.say.as_ref()))
+        })
     });
     effect_lines
         .chain(dialogue_lines)

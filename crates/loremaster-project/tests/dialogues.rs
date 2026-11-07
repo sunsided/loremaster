@@ -47,13 +47,35 @@ fn a_good_dialogue_has_no_problems() {
 }
 
 #[test]
-fn a_missing_node_is_an_error_from_the_graph_validator() {
+fn a_missing_node_is_an_error_from_the_dialogue_check() {
+    // dramaturge-syntax's check finds it, at the `go` of the option.
     let d = diagnostics(&GOOD.replace("go: names, relation", "go: nmes, relation"));
     check!(d.len() == 1, "{d:#?}");
     check!(d[0].severity == Severity::Error);
     check!(d[0].file == "dialogues/bb.yaml");
-    check!(d[0].at == "nodes.meet");
-    check!(d[0].message.contains("targets nonexistent node 'nmes'"));
+    check!(d[0].at == "nodes.meet.options[0].go");
+    check!(d[0].message == "no node `nmes`");
+}
+
+#[test]
+fn an_unknown_speaker_of_a_node_is_an_error() {
+    let d =
+        diagnostics(&GOOD.replace("    say: \"Sit.\"", "    speaker: ghost\n    say: \"Sit.\""));
+    check!(d.len() == 1, "{d:#?}");
+    check!(d[0].at == "nodes.meet.speaker");
+    check!(d[0].message == "unknown thing `ghost`");
+}
+
+#[test]
+fn a_terminal_node_does_not_hide_other_problems() {
+    // A node without options ends the talk; the other checks still run.
+    let d = diagnostics(
+        &GOOD
+            .replace("    options:\n      - { say: \"Back.\", go: back }\n", "")
+            .replace("bb.talked > 1", "bb.trsut > 1"),
+    );
+    check!(d.len() == 1, "{d:#?}");
+    check!(d[0].at == "nodes.again.when");
 }
 
 #[test]
