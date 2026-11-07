@@ -96,13 +96,13 @@ tasks:
     desc: Install web dependencies
     dir: web
     cmds:
-      - pnpm install
+      - yarn install
 
   web:serve:
     desc: Start the Vite dev server only
     dir: web
     cmds:
-      - pnpm dev
+      - yarn dev
 
   dev:
     desc: Build WASM once, then run trunk watch and the Vite dev server together
@@ -122,19 +122,19 @@ tasks:
     desc: Start Storybook for the design system on port 6006
     dir: web
     cmds:
-      - pnpm storybook
+      - yarn storybook
 
   storybook:build:
     desc: Build a static Storybook into web/storybook-static
     dir: web
     cmds:
-      - pnpm build-storybook
+      - yarn build-storybook
 
   web:check:
     desc: Type-check and lint the Svelte code and the stories
     dir: web
     cmds:
-      - pnpm check
+      - yarn check
 
   web:build:
     desc: Build the static web app
@@ -142,7 +142,7 @@ tasks:
       - wasm
     dir: web
     cmds:
-      - pnpm build
+      - yarn build
 
   build:static:
     desc: Build the browser-only site for GitHub Pages into web/build (below /loremaster)
@@ -153,7 +153,7 @@ tasks:
       BASE_PATH: /loremaster
       FALLBACK: 404.html
     cmds:
-      - pnpm build
+      - yarn build
 
   release:ui:
     desc: Build the web app below / and copy it into crates/loremaster-mcp/ui for the embedded editor
@@ -163,7 +163,8 @@ tasks:
       BASE_PATH: ""
       FALLBACK: 200.html
     cmds:
-      - pnpm --dir web build
+      # Run Yarn inside web/, so that corepack finds the version that web/package.json pins.
+      - cd web && yarn build
       - rm -rf crates/loremaster-mcp/ui
       - cp -r web/build crates/loremaster-mcp/ui
 

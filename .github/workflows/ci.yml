@@ -90,20 +90,19 @@ jobs:
       - name: Build the WASM package
         working-directory: crates/loremaster-wasm
         run: trunk build --release
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          version: 12
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
+      # Yarn comes through corepack, in the version that web/package.json pins
+      # (`packageManager`). No setup-node cache: it would call the runner's
+      # global Yarn 1 before corepack is enabled.
+      - run: corepack enable
       - working-directory: web
-        run: pnpm install --frozen-lockfile
+        run: yarn install --immutable
       - working-directory: web
-        run: pnpm check
+        run: yarn check
       - working-directory: web
-        run: pnpm build
+        run: yarn build
       # The same as `task release:ui`: the build is below `/` (no BASE_PATH).
       - name: Copy the web editor into loremaster-mcp
         run: cp -r web/build crates/loremaster-mcp/ui
@@ -114,4 +113,4 @@ jobs:
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
         run: cargo package --workspace --exclude loremaster-wasm --exclude loremaster-zil --allow-dirty
       - working-directory: web
-        run: pnpm build-storybook
+        run: yarn build-storybook

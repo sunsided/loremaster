@@ -31,3 +31,7 @@ Thumbs.db
 
 # The web editor that loremaster-mcp embeds (task release:ui)
 /crates/loremaster-mcp/ui/
+
+# Yarn (through corepack). No zero-installs: the cache and the install state stay local.
+.yarn/
+.pnp.*
