@@ -270,7 +270,11 @@ fn apply(game: &mut Game, room: &Id, key: &Key, value: &str) {
         Key::Hour => game.state_mut().minutes = day + value.parse::<u32>().unwrap_or(0) * 60,
         Key::Relation(key) => {
             // A relation that no dialogue changed is not stored and reads as 0.
-            let n: i32 = value.parse().unwrap_or(0);
+            // The values next to a limit can leave the i32 range; clamp them.
+            let n = value
+                .parse::<i64>()
+                .map(|n| n.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32)
+                .unwrap_or(0);
             let relations = &mut game.state_mut().relations;
             if n == 0 {
                 relations.remove(key);
