@@ -163,6 +163,7 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                             .join(", ")
                     ),
                     loremaster_model::Effect::Cancel(t) => format!("cancel {t}"),
+                    loremaster_model::Effect::Call(b) => format!("run the behavior {b}"),
                     loremaster_model::Effect::Await(spec) => {
                         match loremaster_runtime::authoring::describe_await(spec) {
                             Some(r) => format!("wait for the host: {r}"),
@@ -203,11 +204,14 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
         })
         .chain(ins.world().story.behaviors.iter().map(|id| {
             let found = ins.world().behavior(id.as_str());
-            let when = match found.map(|b| b.description()) {
+            let mut when = match found.map(|b| b.description()) {
                 Some("") | None if found.is_some() => "code in this game".to_string(),
                 Some(d) => format!("code in this game: {d}"),
                 None => "code in the game, which this build does not have".to_string(),
             };
+            if let Some(m) = ins.world().manifest(id.as_str()) {
+                when.push_str(&format!(" ({})", m.describe()));
+            }
             RuleView {
                 id: format!("behavior:{id}"),
                 trigger: "event".into(),

@@ -211,7 +211,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     // Waiting, when the story reacts to time.
     // Waiting matters when the story reacts to time: rules on time and turns, and timers.
     if !story.timers.is_empty()
-        || !story.behaviors.is_empty()
+        || world.behaviors_watch_time()
         || story
             .rules
             .iter()

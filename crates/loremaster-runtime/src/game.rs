@@ -1334,15 +1334,20 @@ impl Game {
             }
         }
         // Behaviors run after the rules of the event.
-        for b in &world.behaviors {
+        let kind = event.kind();
+        for (b, manifest) in world.behaviors.iter().zip(&world.manifests) {
             if self.stopped || self.state.ended {
                 break;
+            }
+            if !manifest.handles(kind) {
+                continue;
             }
             let mut cx = crate::Cx {
                 owner: Id::new(format!("behavior:{}", b.id())),
                 game: self,
                 turn,
                 depth,
+                manifest,
             };
             if b.handle(event, &mut cx) == crate::Flow::Stop {
                 self.stopped = true;
@@ -1472,6 +1477,35 @@ impl Game {
         say(turn, "Done.".into());
     }
 
+    /// Run a behavior at this place in a rule (`call`). A direct call does not
+    /// depend on the event kinds of the manifest. `Flow::Stop` works as the
+    /// `stop` effect.
+    fn call_behavior(&mut self, turn: &mut Turn, rule: &Id, id: &Id, depth: u8) {
+        let world = self.world.clone();
+        let Some(i) = world.behaviors.iter().position(|b| b.id() == id.as_str()) else {
+            turn.log.push(LogEntry {
+                kind: "author".into(),
+                text: if world.is_registered(id.as_str()) {
+                    format!("{rule} calls {id}, which the story does not name under `behaviors`")
+                } else {
+                    format!("{rule} calls {id}, which this build does not have")
+                },
+            });
+            return;
+        };
+        let (b, manifest) = (&world.behaviors[i], &world.manifests[i]);
+        let mut cx = crate::Cx {
+            owner: Id::new(format!("behavior:{id}")),
+            game: self,
+            turn,
+            depth,
+            manifest,
+        };
+        if b.handle(&Event::Call(rule.clone()), &mut cx) == crate::Flow::Stop {
+            self.stopped = true;
+        }
+    }
+
     fn apply(&mut self, turn: &mut Turn, rule: &Id, effect: &CEffect, depth: u8) {
         match effect {
             CEffect::Set(values) => {
@@ -1518,6 +1552,7 @@ impl Game {
                 self.state.awaiting = None;
             }
             CEffect::Stop => self.stopped = true,
+            CEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             // Only a rule can pause (the fire loop handles it there); the checks
             // reject `await` in timers and dialogues.
             CEffect::Await(_) => turn.log.push(LogEntry {

@@ -3,6 +3,7 @@
 
 // The cases are in `workbench/`: one test binary, with the helpers below.
 mod workbench {
+    mod behaviors;
     mod lighthouse;
     mod machines;
     mod reload;

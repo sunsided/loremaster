@@ -114,6 +114,124 @@ fn the_zork_thief_knows_the_things_of_zork() {
     assert!(world.missing_behaviors().is_empty());
 }
 
+/// Counts the events it gets in `seen`, and writes `other`, which its
+/// manifest does not name.
+#[derive(Debug)]
+struct Counter;
+
+impl loremaster_runtime::Behavior for Counter {
+    fn id(&self) -> &str {
+        "counter"
+    }
+
+    fn manifest(&self) -> loremaster_runtime::Manifest {
+        loremaster_runtime::Manifest::new()
+            .events([loremaster_runtime::EventKind::Custom])
+            .reads(["seen"])
+            .writes(["seen"])
+    }
+
+    fn handle(
+        &self,
+        _: &loremaster_runtime::Event,
+        cx: &mut loremaster_runtime::Cx<'_>,
+    ) -> loremaster_runtime::Flow {
+        let seen = match cx.fact("seen") {
+            Some(loremaster_model::Value::Int(n)) => *n,
+            _ => 0,
+        };
+        cx.set("seen", loremaster_model::Value::Int(seen + 1));
+        cx.set("other", loremaster_model::Value::Bool(true));
+        loremaster_runtime::Flow::Continue
+    }
+}
+
+fn counter_world() -> Arc<World> {
+    let files = [
+        (
+            "story.yaml",
+            "title: Bell\nstart: hall\nbehaviors: [counter]\nvars:\n  - { id: seen, type: int, initial: 0 }\n  - { id: other, type: bool, initial: false }\n",
+        ),
+        ("rooms/hall.yaml", "name: Hall\ndescription: [\"A hall.\"]\n"),
+        ("verbs/ring.yaml", "label: Ring\nwords: [ring]\nslots: none\n"),
+        (
+            "rules/ring.yaml",
+            "- id: ring\n  on: { verb: [ring] }\n  instead: true\n  then: [{ emit: bell }]\n",
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    });
+    let mut world = World::compile(load(files.into()).unwrap().story).unwrap();
+    world.register(Counter);
+    Arc::new(world)
+}
+
+#[test]
+fn a_behavior_gets_only_the_events_of_its_manifest() {
+    let mut game = Game::new(counter_world());
+    game.start();
+    game.input("wait");
+    game.input("wait");
+    assert_eq!(
+        game.state().facts.get("seen"),
+        Some(&loremaster_model::Value::Int(0)),
+        "no turn events"
+    );
+    let turn = game.input("ring");
+    assert_eq!(
+        game.state().facts.get("seen"),
+        Some(&loremaster_model::Value::Int(1))
+    );
+    // A write that the manifest does not name is a note for the author.
+    assert!(
+        turn.log
+            .iter()
+            .any(|l| l.kind == "author" && l.text.contains("`other`")),
+        "{:?}",
+        turn.log
+    );
+    assert!(!turn.log.iter().any(|l| l.text.contains("`seen`")));
+}
+
+#[test]
+fn the_rules_view_and_the_explorer_use_the_manifest() {
+    let world = counter_world();
+    assert!(!world.behaviors_watch_time());
+    // The rules view shows the manifest: loremaster-workbench tests it
+    // (tests/workbench/behaviors.rs).
+    assert!(
+        world
+            .manifest("counter")
+            .is_some_and(|m| m.describe().contains("on custom"))
+    );
+    // The thief declares start and turn events: waiting matters.
+    let thief = world_thief();
+    assert_eq!(
+        thief.manifest("thief").unwrap().events,
+        Some(vec![
+            loremaster_runtime::EventKind::Start,
+            loremaster_runtime::EventKind::Turn
+        ])
+    );
+    assert!(thief.behaviors_watch_time());
+}
+
+#[test]
+fn manifest_new_handles_every_event_until_events_narrows_it() {
+    use loremaster_runtime::{EventKind, Manifest};
+    let m = Manifest::new().reads(["here"]);
+    assert!(m.handles(EventKind::Turn) && m.handles(EventKind::Custom));
+    let m = m.events([EventKind::Custom]);
+    assert!(!m.handles(EventKind::Turn) && m.handles(EventKind::Custom));
+    assert!(!m.may_write("here"));
+}
+
+fn world_thief() -> Arc<World> {
+    world(true)
+}
+
 /// A behavior that reads only the narrow view of `Cx` (XP-1).
 #[derive(Debug)]
 struct Watcher;
@@ -180,4 +298,123 @@ fn a_behavior_reads_the_narrow_view_and_rolls_through_cx() {
         "{second}"
     );
     assert_eq!(play(), (first, second, rng), "the rolls replay");
+}
+
+/// Says where it was called from; stops when the fact `block` is true.
+#[derive(Debug)]
+struct Gate;
+
+impl loremaster_runtime::Behavior for Gate {
+    fn id(&self) -> &str {
+        "gate"
+    }
+
+    fn manifest(&self) -> loremaster_runtime::Manifest {
+        loremaster_runtime::Manifest::new().reads(["block"])
+    }
+
+    fn handle(
+        &self,
+        event: &loremaster_runtime::Event,
+        cx: &mut loremaster_runtime::Cx<'_>,
+    ) -> loremaster_runtime::Flow {
+        let loremaster_runtime::Event::Call(rule) = event else {
+            return loremaster_runtime::Flow::Continue;
+        };
+        cx.say(format!("The gate hears {rule}."));
+        if cx.fact("block") == Some(&loremaster_model::Value::Bool(true)) {
+            loremaster_runtime::Flow::Stop
+        } else {
+            loremaster_runtime::Flow::Continue
+        }
+    }
+}
+
+fn gate_files(behaviors: &str) -> Vec<SourceFile> {
+    [
+        (
+            "story.yaml",
+            format!("title: Gate\nstart: hall\nbehaviors: [{behaviors}]\nvars:\n  - {{ id: block, type: bool, initial: false }}\n"),
+        ),
+        ("rooms/hall.yaml", "name: Hall\ndescription: [\"A hall.\"]\n".into()),
+        ("verbs/knock.yaml", "label: Knock\nwords: [knock]\nslots: none\n".into()),
+        ("verbs/bar.yaml", "label: Bar\nwords: [bar]\nslots: none\n".into()),
+        (
+            "rules/knock.yaml",
+            "- id: knock\n  on: { verb: [knock] }\n  instead: true\n  then:\n    - say: \"You knock.\"\n    - call: gate\n    - say: \"It opens.\"\n- id: bar\n  on: { verb: [bar] }\n  instead: true\n  then: [{ set: { block: true } }]\n".into(),
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text,
+    })
+    .into()
+}
+
+#[test]
+fn call_runs_a_behavior_at_its_place_in_the_rule() {
+    let mut world = World::compile(load(gate_files("gate")).unwrap().story).unwrap();
+    world.register(Gate);
+    let world = Arc::new(world);
+    let mut game = Game::new(world.clone());
+    game.start();
+    let text = game.input("knock").plain_text();
+    let (a, b, c) = (
+        text.find("You knock.").unwrap(),
+        text.find("The gate hears knock.").unwrap(),
+        text.find("It opens.").unwrap(),
+    );
+    assert!(a < b && b < c, "{text}");
+
+    // `Flow::Stop` stops the rule, like `stop`.
+    let mut game = Game::new(world);
+    game.start();
+    game.input("bar");
+    let text = game.input("knock").plain_text();
+    assert!(text.contains("The gate hears knock."), "{text}");
+    assert!(!text.contains("It opens."), "{text}");
+}
+
+#[test]
+fn a_call_without_the_behavior_is_a_note_and_a_wrong_call_is_an_error() {
+    let world = Arc::new(World::compile(load(gate_files("gate")).unwrap().story).unwrap());
+    let mut game = Game::new(world);
+    game.start();
+    let turn = game.input("knock");
+    assert!(turn.plain_text().contains("It opens."));
+    assert!(
+        turn.log
+            .iter()
+            .any(|l| l.kind == "author" && l.text.contains("knock calls gate")),
+        "{:?}",
+        turn.log
+    );
+
+    let project = load(gate_files("other")).unwrap();
+    let errors: Vec<_> = loremaster_project::check(&project)
+        .into_iter()
+        .map(|d| d.message)
+        .collect();
+    assert!(
+        errors
+            .iter()
+            .any(|m| m.contains("`call: gate` names no behavior")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn a_call_to_a_registered_but_unnamed_behavior_says_so() {
+    let mut world = World::compile(load(gate_files("other")).unwrap().story).unwrap();
+    world.register(Gate);
+    let mut game = Game::new(Arc::new(world));
+    game.start();
+    let turn = game.input("knock");
+    assert!(
+        turn.log
+            .iter()
+            .any(|l| l.kind == "author" && l.text.contains("does not name")),
+        "{:?}",
+        turn.log
+    );
 }
