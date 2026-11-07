@@ -17,6 +17,7 @@ dramaturge-authoring.workspace = true
 loremaster-lang.workspace = true
 loremaster-model.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 serde-saphyr.workspace = true
 thiserror.workspace = true
 

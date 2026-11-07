@@ -138,3 +138,83 @@ fn the_header_origin_names_the_file_that_gave_it() {
         Some(&Origin::yaml("story.yml"))
     );
 }
+
+/// A second YAML pack with one file.
+fn second(path: &str, text: &str) -> Pack {
+    Pack::from_files(vec![SourceFile {
+        path: path.into(),
+        text: text.into(),
+    }])
+    .unwrap()
+}
+
+#[test]
+fn replace_takes_the_place_of_the_earlier_entity_with_a_warning() {
+    let extra = second(
+        "rooms/shore.yaml",
+        "replace: true\nname: The Beach\ndescription: [\"Sand.\"]\nexits:\n  - { direction: north, to: cottage }\n",
+    );
+    assert!(extra.replaces.contains("room:shore"));
+    let project = assemble(vec![Pack::from_files(lighthouse()).unwrap(), extra]).unwrap();
+    let shore = project.story.room("shore").unwrap();
+    assert_eq!(shore.name, "The Beach");
+    assert_eq!(
+        project
+            .story
+            .rooms
+            .iter()
+            .filter(|r| r.id.as_str() == "shore")
+            .count(),
+        1
+    );
+    let warnings: Vec<_> = loremaster_project::check(&project)
+        .into_iter()
+        .filter(|d| d.message.contains("replaces"))
+        .map(|d| d.message)
+        .collect();
+    assert_eq!(
+        warnings,
+        ["`room:shore` replaces the one in rooms/shore.yaml"]
+    );
+}
+
+#[test]
+fn extend_adds_fragments_and_exits_to_the_earlier_entity() {
+    let extra = second(
+        "rooms/cottage.yaml",
+        "extend: true\ndescription: [\"A gull sits on the sill.\"]\n",
+    );
+    assert_eq!(extra.extensions.len(), 1);
+    let base = load(lighthouse()).unwrap();
+    let project = assemble(vec![Pack::from_files(lighthouse()).unwrap(), extra]).unwrap();
+    let before = base.story.room("cottage").unwrap().description.len();
+    let after = &project.story.room("cottage").unwrap().description;
+    assert_eq!(after.len(), before + 1);
+    assert_eq!(
+        project.story.room("cottage").unwrap().name,
+        base.story.room("cottage").unwrap().name
+    );
+}
+
+#[test]
+fn extend_and_replace_report_conflicts_and_missing_entities() {
+    let yaml = || Pack::from_files(lighthouse()).unwrap();
+    let conflict = second("rooms/cottage.yaml", "extend: true\nname: The Hut\n");
+    assert_eq!(
+        messages(assemble(vec![yaml(), conflict])),
+        ["`room:cottage` cannot be extended: both packs set `name`"]
+    );
+    let nowhere = second(
+        "rooms/attic.yaml",
+        "extend: true\ndescription: [\"Dust.\"]\n",
+    );
+    assert_eq!(
+        messages(assemble(vec![yaml(), nowhere])),
+        ["`room:attic` extends an entity that no earlier pack defines"]
+    );
+    let nothing = second("rooms/attic.yaml", "replace: true\nname: Attic\n");
+    assert_eq!(
+        messages(assemble(vec![yaml(), nothing])),
+        ["`room:attic` replaces an entity that no earlier pack defines"]
+    );
+}
