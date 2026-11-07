@@ -23,6 +23,7 @@ pub const RESERVED_NAMES: &[&str] = &[
     "turns",
     "level",
     "first_visit",
+    // Built-in paths: `time.hour`, `action.count`, `timer.fuse`.
     "time",
     "action",
     "timer",
@@ -49,6 +50,9 @@ pub enum Reserved {
     Keyword,
     /// `here`, `turns`, …: a bare name reads the built-in, not the story's.
     Derived,
+    /// `time`, `action`, `timer`: built-in paths with a dot (`time.hour`). A
+    /// bare name still reads the story's; the name is kept for the paths.
+    Path,
     /// `carried`, `chance`, …: a built-in only in call position, `carried(x)`.
     /// A bare name still reads the story's; the name is kept for the function
     /// and for syntax to come.
@@ -57,11 +61,14 @@ pub enum Reserved {
 
 /// The kind of a reserved name, or None when the name is free.
 pub fn reserved(name: &str) -> Option<Reserved> {
-    let at = RESERVED_NAMES.iter().position(|n| *n == name)?;
-    Some(match at {
-        0..5 => Reserved::Keyword,
-        5..12 => Reserved::Derived,
-        _ => Reserved::Function,
+    // By the name itself, so a change of the list's order cannot change a kind.
+    Some(match name {
+        "and" | "or" | "not" | "true" | "false" => Reserved::Keyword,
+        "here" | "turns" | "level" | "first_visit" => Reserved::Derived,
+        "time" | "action" | "timer" => Reserved::Path,
+        "in" | "carried" | "present" | "visited" | "visits" | "chance" | "remembers"
+        | "seen_by" => Reserved::Function,
+        _ => return None,
     })
 }
 
@@ -86,10 +93,41 @@ mod tests {
         assert_eq!(reserved("not"), Some(Reserved::Keyword));
         assert_eq!(reserved("false"), Some(Reserved::Keyword));
         assert_eq!(reserved("here"), Some(Reserved::Derived));
-        assert_eq!(reserved("timer"), Some(Reserved::Derived));
+        assert_eq!(reserved("first_visit"), Some(Reserved::Derived));
+        assert_eq!(reserved("timer"), Some(Reserved::Path));
         assert_eq!(reserved("in"), Some(Reserved::Function));
         assert_eq!(reserved("seen_by"), Some(Reserved::Function));
         assert_eq!(reserved("lamp"), None);
+    }
+
+    #[test]
+    fn the_list_and_the_kinds_agree() {
+        for name in RESERVED_NAMES {
+            assert!(reserved(name).is_some(), "{name} has no kind");
+        }
+        let kinds = [
+            "and",
+            "or",
+            "not",
+            "true",
+            "false",
+            "here",
+            "turns",
+            "level",
+            "first_visit",
+            "time",
+            "action",
+            "timer",
+            "in",
+            "carried",
+            "present",
+            "visited",
+            "visits",
+            "chance",
+            "remembers",
+            "seen_by",
+        ];
+        assert_eq!(kinds.len(), RESERVED_NAMES.len());
     }
 
     #[test]

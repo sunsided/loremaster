@@ -185,10 +185,8 @@ fn the_examples_take_no_reserved_name() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../examples")
             .join(example);
-        let found: Vec<_> = errors(read_dir(&dir).unwrap())
-            .into_iter()
-            .filter(|d| d.message.contains("built-in"))
-            .collect();
+        // No error at all: every reserved-name and phase-name message is an error.
+        let found = errors(read_dir(&dir).unwrap());
         assert!(found.is_empty(), "{example}: {found:#?}");
     }
 }

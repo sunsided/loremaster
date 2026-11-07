@@ -463,6 +463,9 @@ impl Checker<'_> {
             Some(Reserved::Function) => {
                 "has the name of a function of conditions, which is reserved for it"
             }
+            Some(Reserved::Path) => {
+                "starts built-in paths of conditions (such as `time.hour`), which is reserved for them"
+            }
             _ => "has a name that conditions use for a built-in, so they would not read it",
         };
         self.error(
