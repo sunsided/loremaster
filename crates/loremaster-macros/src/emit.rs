@@ -396,7 +396,7 @@ fn effects(list: &[Effect], span: Span) -> TokenStream {
             EffectKind::Line(t) => {
                 let t = text(t);
                 quote_spanned!(span=> .effect(::loremaster::dsl::model::Effect::Say(
-                    ::std::string::String::from(#t)
+                    ::loremaster::dsl::model::Line::from(#t)
                 )))
             }
             EffectKind::Set(pairs) => pairs

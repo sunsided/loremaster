@@ -1,4 +1,4 @@
-use crate::{Effect, EventPattern, Id, Note};
+use crate::{Effect, EventPattern, Id, Line, Note};
 use serde::{Deserialize, Serialize};
 
 /// A puzzle with named states and the steps between them, for example a dam
@@ -34,9 +34,9 @@ pub struct Step {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
     pub to: String,
-    /// Text for the step, before the effects.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub say: Option<String>,
+    /// Text for the step, before the effects. `line:` is the same key.
+    #[serde(default, alias = "line", skip_serializing_if = "Option::is_none")]
+    pub say: Option<Line>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub then: Vec<Effect>,
     /// For verb events: the step replaces the default response.

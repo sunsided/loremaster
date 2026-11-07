@@ -198,7 +198,9 @@ fn rules_and_effects() {
     assert!(jump.instead && jump.once);
     assert_eq!(jump.priority, 2);
     assert_eq!(jump.when.as_deref(), Some("in(chamber) and not lock_open"));
-    assert!(matches!(&jump.then[0], Effect::Say(t) if t == "The water closes over you."));
+    assert!(
+        matches!(&jump.then[0], Effect::Say(t) if t.as_plain() == Some("The water closes over you."))
+    );
     assert!(matches!(&jump.then[1], Effect::Set(m) if m.len() == 3));
     assert!(matches!(&jump.then[2], Effect::Add(m) if m["coins"] == -1));
     assert!(matches!(&jump.then[3], Effect::Move(m) if m.len() == 2));
@@ -217,8 +219,13 @@ fn machines_timers_endings_verbs() {
     assert_eq!(m.start, "full");
     assert_eq!(m.states.len(), 2);
     // The first line of a step is its `say`; the next one is an effect.
-    assert_eq!(m.steps[0].say.as_deref(), Some("Water roars out."));
-    assert!(matches!(&m.steps[0].then[0], Effect::Say(t) if t == "Then it is quiet."));
+    assert_eq!(
+        m.steps[0].say.as_ref().and_then(|l| l.as_plain()),
+        Some("Water roars out.")
+    );
+    assert!(
+        matches!(&m.steps[0].then[0], Effect::Say(t) if t.as_plain() == Some("Then it is quiet."))
+    );
     assert!(m.steps[0].instead);
     assert_eq!(
         m.steps[1].from,

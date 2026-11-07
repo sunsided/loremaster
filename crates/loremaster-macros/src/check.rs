@@ -577,7 +577,7 @@ fn event(e: &Event) -> EventPattern {
 fn effects<B: Effects>(mut b: B, list: &[Effect], key: &str, then: &str, spans: &mut Spans) -> B {
     for e in list {
         b = match &e.kind {
-            EffectKind::Line(t) => b.effect(loremaster_model::Effect::Say(t.value.clone())),
+            EffectKind::Line(t) => b.effect(loremaster_model::Effect::Say(t.value.as_str().into())),
             EffectKind::Set(pairs) => pairs
                 .iter()
                 .fold(b, |b, (n, v)| b.set(n.value.as_str(), value(v))),
