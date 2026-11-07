@@ -144,7 +144,7 @@ pub struct Session {
 /// The kinds of log entries that are changes of state, which hosts get as
 /// notices. The others (`rule`, `frame`, `event`, `author`) are for the
 /// authoring views.
-const NOTICE_KINDS: &[&str] = &["set", "move", "timer", "talk", "memory", "relation"];
+const NOTICE_KINDS: &[&str] = &["set", "move", "timer", "talk", "memory", "relation", "roll"];
 
 impl Session {
     /// A new game of `world`, with the story's own seed.
@@ -323,7 +323,8 @@ impl Session {
     }
 
     /// Let the host answer rolls (SE-7). Without it, the session answers a
-    /// roll from its own RNG in the same step.
+    /// roll from its own RNG in the same step. The setting belongs to the
+    /// session, not the save: set it again after `load` or `from_save`.
     pub fn set_host_rolls(&mut self, host_rolls: bool) {
         self.game.host_rolls = host_rolls;
     }
@@ -460,8 +461,11 @@ impl Session {
                 .filter(|e| NOTICE_KINDS.contains(&e.kind.as_str()))
                 .map(|entry| Effect::Notice { entry }),
         );
+        // While a rule waits, its answers come with `Status::Await`, not as
+        // the choices of a talk.
         if let Some(talk) = turn.talk
             && !turn.choices.is_empty()
+            && self.game.awaiting().is_none()
         {
             effects.push(Effect::Choices {
                 talk,

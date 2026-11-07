@@ -2287,7 +2287,8 @@ impl Game {
             for (k, effect) in world.rules[i].then.iter().enumerate() {
                 if let CEffect::Await(spec) = effect {
                     // The rule pauses; the other rules of the event still run.
-                    if self.begin_await(turn, &rule.id, k + 1, spec) {
+                    if self.begin_await(turn, &rule.id, k + 1, spec) != awaits::AwaitStep::Answered
+                    {
                         break;
                     }
                     continue;
@@ -2479,6 +2480,8 @@ impl Game {
                 }
                 self.state.ended = true;
                 self.state.ending = Some(ending.clone());
+                // An ended story answers no await.
+                self.state.awaiting = None;
             }
             CEffect::Stop => self.stopped = true,
             // Only a rule can pause (the fire loop handles it there); the checks

@@ -262,3 +262,79 @@ fn an_action_without_results_takes_any_answer_and_time_waits() {
         done.plain_text()
     );
 }
+
+#[test]
+fn a_second_await_skips_the_rest_of_its_rule() {
+    let rules = r#"
+- id: pull_lever
+  on: { verb: [pull, lever] }
+  instead: true
+  then:
+    - await: { choice: [left, right], into: path }
+    - say: "You go {path}."
+- id: also
+  on: { verb: [pull, lever] }
+  then:
+    - await: { choice: [left, right], into: path }
+    - say: "This line needs an answer."
+"#;
+    let mut s = session(rules);
+    let step = s.submit(Input::Text("pull lever".into()));
+    assert!(matches!(step.status, Status::Await { .. }));
+    assert!(
+        !step.plain_text().contains("needs an answer"),
+        "{}",
+        step.plain_text()
+    );
+}
+
+#[test]
+fn an_answer_must_fit_the_variable() {
+    let rule = r#"
+- id: pull_lever
+  on: { verb: [pull, lever] }
+  instead: true
+  then:
+    - await: { action: open_sluice, into: total }
+"#;
+    let mut s = session(rule);
+    let (id, _) = awaiting(&s.submit(Input::Text("pull lever".into())));
+    assert!(s.resume(&id, Value::Text("many".into())).is_err());
+    assert!(s.resume(&id, Value::Int(2)).is_ok());
+}
+
+#[test]
+fn a_changed_story_drops_the_waiting_rule() {
+    let mut s = session(CHOICE);
+    s.submit(Input::Text("pull lever".into()));
+    let save = serde_json::to_value(s.save()).unwrap();
+    let changed = CHOICE.replace("You go {path}.", "You walk {path}.");
+    let world = Arc::new(World::compile(load(files(&changed)).unwrap().story).unwrap());
+    let (restored, loaded) = Session::load(world, save).unwrap();
+    assert!(loaded.story_changed);
+    assert!(
+        loaded.dropped.iter().any(|d| d.starts_with("await:")),
+        "{:?}",
+        loaded.dropped
+    );
+    assert!(restored.state().awaiting.is_none());
+}
+
+#[test]
+fn compile_rejects_an_await_of_two_kinds() {
+    let rule = "- id: two\n  on: { verb: [pull, lever] }\n  then:\n    - await: { choice: [a], roll: 1d6 }\n";
+    let story = load(files(rule)).unwrap().story;
+    assert!(World::compile(story).is_err());
+}
+
+#[test]
+fn the_session_roll_is_a_notice() {
+    let mut s = session(ROLL);
+    let step = s.submit(Input::Text("pull lever".into()));
+    assert!(
+        step.effects.iter().any(
+            |e| matches!(e, loremaster_runtime::Effect::Notice { entry } if entry.kind == "roll")
+        ),
+        "{step:?}"
+    );
+}
