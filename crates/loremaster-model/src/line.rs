@@ -72,9 +72,11 @@ impl Line {
         }
     }
 
-    /// The line as one readable string for outlines and editors: speech in
-    /// quotes, segments joined with a space, markup and conditions as
-    /// written. A plain line is its text.
+    /// The line as one readable string for outlines and editors: the text of
+    /// every segment with its markup as written, speech in quotes, joined
+    /// with a space. A plain line is its text. Speakers and `when`
+    /// conditions are left out, and so a segment shows here even when its
+    /// condition would hide it in the game.
     pub fn source(&self) -> String {
         if let Some(text) = self.as_plain() {
             return text.to_string();
