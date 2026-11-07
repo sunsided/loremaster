@@ -209,7 +209,7 @@ say:
 ```
 
 - `{ says: "…" }` is speech. The game puts straight double quotes around it, so write it without quotes: the line above shows `The lock-keeper shrugs. "Prove it," he says.`
-- `by` names the speaker: a thing id or `player`. Without `by`, the speaker is the thing of the dialogue in a node, the player in an option, and nobody in a rule. Front ends get the speaker with the text and can style the speech by it.
+- `by` names the speaker: a thing id or `player`. `player` always means the player, so in a story with speech, a thing with the id `player` gets a warning. Without `by`, the speaker is the thing of the dialogue in a node, the player in an option, and nobody in a rule. Front ends get the speaker with the text and can style the speech by it.
 - `{ narrate: "…" }` and a bare string are both narration. Right after `says`, a bare string reads like more speech, so `loremaster check` warns there and suggests `narrate`.
 - The segments that show join with one space. Each segment's text uses inline markup.
 - A segment with `when` shows only while its condition holds. Use it instead of a choice with an empty branch:

@@ -1,7 +1,8 @@
 use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
-    Effect, EventPattern, Fragment, Line, Location, Story, ThreadStatus, standard_verbs,
+    Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
+    ThreadStatus, standard_verbs,
 };
 use std::collections::BTreeSet;
 
@@ -158,6 +159,15 @@ impl Checker<'_> {
     /// `at` is the place of the effect, node or option; a segment is at
     /// `<at>.say[i]`.
     fn line(&mut self, file: &str, at: &str, line: &Line) {
+        // YAML cannot write an empty line; a builder or `world!` can.
+        if line.segments.is_empty() {
+            self.error(
+                file,
+                at,
+                "the line is empty: give it a text or at least one segment",
+            );
+            return;
+        }
         if let Some(text) = line.as_plain() {
             self.markup(file, at, text);
             return;
@@ -342,6 +352,7 @@ impl Checker<'_> {
         self.reserved_names();
         self.threads();
         self.dialogues();
+        self.player_thing();
         self.timers();
         self.endings();
         self.machines();
@@ -655,6 +666,22 @@ impl Checker<'_> {
                 Effect::Stop | Effect::Emit(_) => {}
             }
         }
+    }
+
+    /// `by: player` and the speech of an option name the player. A thing
+    /// with the id `player` could never speak, and front ends could not tell
+    /// its speech from the player's, so it gets a warning once the story has
+    /// speech.
+    fn player_thing(&mut self) {
+        if self.story().thing(PLAYER_SPEAKER).is_none() || !uses_speech(self.story()) {
+            return;
+        }
+        let file = self.file_of(&format!("thing:{PLAYER_SPEAKER}"));
+        self.warning(
+            &file,
+            "id",
+            "`player` names the player as a speaker (`by: player`, the speech of an option), so this thing cannot speak in a line; give it another id",
+        );
     }
 
     /// Notes name known threads; an open thread that is set up gets paid off.
@@ -1023,6 +1050,22 @@ fn emitted_events(story: &Story) -> BTreeSet<String> {
             _ => None,
         })
         .collect()
+}
+
+/// Does a line of the story have speech? Machine steps are rules by now.
+fn uses_speech(story: &Story) -> bool {
+    let effect_lines = all_effects(story).filter_map(|e| match e {
+        Effect::Say(line) => Some(line),
+        _ => None,
+    });
+    let dialogue_lines = story.dialogues.iter().flat_map(|d| {
+        d.nodes
+            .iter()
+            .flat_map(|n| std::iter::once(&n.say).chain(n.options.iter().map(|o| &o.say)))
+    });
+    effect_lines
+        .chain(dialogue_lines)
+        .any(|l| l.segments.iter().any(LineSegment::is_speech))
 }
 
 /// The effects of all rules (machine steps included), timers and dialogues.

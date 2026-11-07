@@ -55,6 +55,9 @@ pub enum Voice {
 }
 
 impl Line {
+    /// A line of these segments. A line needs at least one: YAML rejects
+    /// an empty list, and `loremaster check` reports an empty line that a
+    /// builder made.
     pub fn new(segments: Vec<LineSegment>) -> Self {
         Self { segments }
     }

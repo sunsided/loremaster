@@ -3,7 +3,7 @@
 
 use assert2::{assert, check};
 use loremaster_model::{Effect, Line, LineSegment, Story};
-use loremaster_project::{SourceFile, load, model_hash};
+use loremaster_project::{Severity, SourceFile, check, load, model_hash};
 
 fn file(path: &str, text: &str) -> SourceFile {
     SourceFile {
@@ -132,4 +132,43 @@ fn a_bad_line_does_not_load() {
     assert!(load_rule("[]").is_err());
     assert!(load_rule("{ says: \"A.\" }").is_err());
     assert!(load_rule("\"Fine.\"").is_ok());
+}
+
+fn speech_story(extra: &[(&str, &str)]) -> loremaster_project::Project {
+    let mut files = vec![
+        file("story.yaml", "title: L\nstart: bar\n"),
+        file("rooms/bar.yaml", "name: Bar\n"),
+        file(
+            "rules/r.yaml",
+            "- id: r\n  on: { verb: [wait] }\n  then:\n    - say: [{ says: \"Hm.\" }]\n",
+        ),
+    ];
+    files.extend(extra.iter().map(|(p, t)| file(p, t)));
+    load(files).unwrap_or_else(|e| panic!("{e:#?}"))
+}
+
+#[test]
+fn a_thing_with_the_id_player_gets_a_warning_in_a_story_with_speech() {
+    let project = speech_story(&[("things/player.yaml", "name: man\nlocation: { room: bar }\n")]);
+    let problems = check(&project);
+    assert!(problems.len() == 1, "{problems:#?}");
+    check!(problems[0].severity == Severity::Warning);
+    check!(problems[0].file == "things/player.yaml");
+    check!(problems[0].message.contains("cannot speak"));
+
+    // Without speech the id means nothing special.
+    let mut project = project;
+    project.story.rules[0].then[0] = Effect::Say(Line::plain("Hm."));
+    check!(check(&project).is_empty());
+}
+
+#[test]
+fn an_empty_line_is_a_check_error() {
+    // YAML rejects `say: []`; a builder can still make one.
+    let mut project = speech_story(&[]);
+    project.story.rules[0].then[0] = Effect::Say(Line::new(Vec::new()));
+    let problems = check(&project);
+    assert!(problems.len() == 1, "{problems:#?}");
+    check!(problems[0].severity == Severity::Error);
+    check!(problems[0].message.contains("the line is empty"));
 }
