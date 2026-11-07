@@ -7,6 +7,7 @@
 //! bundle stays readable and survives changes to the expression language.
 
 mod clock;
+mod de;
 mod diagnostic;
 mod dialogue;
 mod ending;

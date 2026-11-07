@@ -15,6 +15,7 @@ pub enum VerbSlots {
 /// A verb the player can use. The standard library is built in; stories add
 /// custom verbs with the same shape.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VerbDef {
     pub id: Id,
     /// Label on the verb bar, e.g. "Pick up".

@@ -11,8 +11,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// The parts of the slice that use syntax the model does not know yet. Today's
-/// loader rejects them, or ignores their folder. Each test loads today's files
-/// plus only the parts it needs, so that each feature turns its own test green.
+/// loader rejects them, or skips their folder with a warning. Each test loads
+/// today's files plus only the parts it needs, so that each feature turns its
+/// own test green.
 const AGENDA: &str = "agendas/";
 const DIALOGUE: &str = "dialogues/";
 const TEXTS: &str = "texts/";

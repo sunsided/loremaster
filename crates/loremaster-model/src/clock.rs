@@ -54,6 +54,7 @@ impl<'de> Deserialize<'de> for TimeOfDay {
 
 /// A named range of the day, starting at `from` and lasting until the next phase.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Phase {
     pub name: String,
     pub from: TimeOfDay,
@@ -61,7 +62,7 @@ pub struct Phase {
 
 /// How turns map to time, and which phases the day has.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ClockConfig {
     pub start: TimeOfDay,
     pub minutes_per_turn: u16,

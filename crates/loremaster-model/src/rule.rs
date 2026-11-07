@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 /// When / if / then.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Rule {
     pub id: Id,
     pub on: EventPattern,

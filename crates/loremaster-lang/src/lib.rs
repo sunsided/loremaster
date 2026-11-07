@@ -28,4 +28,4 @@ pub use expr::{Expr, parse_expr};
 pub use highlight::{Token, TokenKind, condition_tokens, markup_tokens};
 pub use lower::{compile_condition, memory_tag};
 pub use markup::{ChoiceSyntax, Segment, compile_markup};
-pub use scope::{PLAYER, Scope, Ty};
+pub use scope::{PLAYER, Scope, Ty, closest};

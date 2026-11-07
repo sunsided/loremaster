@@ -23,6 +23,8 @@ A story is a folder of YAML files. Each entity has its own file.
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
+The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folders `agendas/` and `texts/` are for planned parts: the loader skips them with a warning.
+
 To examine a story for problems, run `task check:story` or `cargo run -p loremaster --no-default-features -- check <folder>`.
 
 ## Start a new story
