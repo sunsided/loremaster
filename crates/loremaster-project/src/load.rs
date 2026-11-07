@@ -165,7 +165,13 @@ impl Pack {
             };
             let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
             let parse_err = |e: serde_saphyr::Error| parse_diagnostic(path, &e.to_string());
-            let (mode, file_text) = merge_mode(&file.text);
+            let (mode, file_text) = match merge_mode(&file.text) {
+                Ok(found) => found,
+                Err(message) => {
+                    errors.push(parse_diagnostic(path, &message));
+                    continue;
+                }
+            };
             if let Some(mode) = mode {
                 let Some(kind) = entity_kind(dir) else {
                     errors.push(parse_diagnostic(

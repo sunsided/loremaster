@@ -27,8 +27,8 @@ pub struct Extension {
 /// Read `extend: true` or `replace: true` from the top level of a YAML file:
 /// a whole line at column 0, so a nested value never counts. Returns the mode
 /// and the text with that line blanked, so that the line numbers of parse
-/// errors stay right.
-pub(crate) fn merge_mode(text: &str) -> (Option<MergeMode>, String) {
+/// errors stay right. A file with both is an error.
+pub(crate) fn merge_mode(text: &str) -> Result<(Option<MergeMode>, String), String> {
     let mut mode = None;
     let mut conflict = false;
     let kept: Vec<&str> = text
@@ -49,10 +49,11 @@ pub(crate) fn merge_mode(text: &str) -> (Option<MergeMode>, String) {
         })
         .collect();
     match mode {
-        // Both modes: keep the text, so the parser reports the unknown keys.
-        Some(_) if conflict => (None, text.to_string()),
-        Some(m) => (Some(m), kept.join("\n") + "\n"),
-        None => (None, text.to_string()),
+        Some(_) if conflict => {
+            Err("a file can say `extend: true` or `replace: true`, not both".into())
+        }
+        Some(m) => Ok((Some(m), kept.join("\n") + "\n")),
+        None => Ok((None, text.to_string())),
     }
 }
 
@@ -109,21 +110,20 @@ mod tests {
 
     #[test]
     fn the_mode_line_is_taken_out() {
-        let (mode, text) = merge_mode("extend: true\nexits: []\n");
+        let (mode, text) = merge_mode("extend: true\nexits: []\n").unwrap();
         assert_eq!(mode, Some(MergeMode::Extend));
         // Blanked, not removed: the line numbers stay.
         assert_eq!(text, "\nexits: []\n");
-        let (mode, text) = merge_mode("name: Cellar\n");
+        let (mode, text) = merge_mode("name: Cellar\n").unwrap();
         assert_eq!(mode, None);
         assert_eq!(text, "name: Cellar\n");
         // Only a whole top-level line counts, not a nested value.
         let nested = "name: Cellar\nnotes:\n  - extend: true\n  - { replace: true }\n";
-        let (mode, text) = merge_mode(nested);
+        let (mode, text) = merge_mode(nested).unwrap();
         assert_eq!(mode, None);
         assert_eq!(text, nested);
-        // Both modes in one file: no mode, and the text stays for the parser.
-        let both = "extend: true\nreplace: true\nname: Cellar\n";
-        assert_eq!(merge_mode(both), (None, both.to_string()));
+        // Both modes in one file are an error.
+        assert!(merge_mode("extend: true\nreplace: true\nname: Cellar\n").is_err());
     }
 
     #[test]
