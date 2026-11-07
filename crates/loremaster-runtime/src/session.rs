@@ -48,6 +48,7 @@ pub enum Effect {
 
 /// An ending from `endings/`, as the host needs it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct EndingInfo {
     pub id: Id,
     pub kind: EndingKind,
@@ -63,7 +64,8 @@ pub struct EndingInfo {
 pub enum Status {
     /// Ready for the next input.
     Ready,
-    /// The story has ended. `ending` is `None` for a story without endings.
+    /// The story has ended. `ending` is `None` when the ending is unknown:
+    /// a save restored into a changed story that no longer has it.
     Ended { ending: Option<EndingInfo> },
     /// A rule waits for the host (SE-5). Answer with `resume(id, value)`.
     Await { awaiting: Awaiting },
@@ -71,6 +73,7 @@ pub enum Status {
 
 /// The result of one call: the effects in order, then the status.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Step {
     pub effects: Vec<Effect>,
     pub status: Status,
@@ -92,6 +95,7 @@ impl Step {
 
 /// What a restore had to change (ADR 0001).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Loaded {
     /// The save was made with another version of the story.
     pub story_changed: bool,
@@ -104,13 +108,21 @@ pub struct Loaded {
 /// A running game, as the hosts see it.
 pub struct Session {
     game: Game,
+    /// `start` ran, or the game came from a save.
+    started: bool,
 }
+
+/// The kinds of log entries that are changes of state, which hosts get as
+/// notices. The others (`rule`, `frame`, `event`, `author`) are for the
+/// authoring views.
+const NOTICE_KINDS: &[&str] = &["set", "move", "timer", "talk", "memory"];
 
 impl Session {
     /// A new game of `world`, with the story's own seed.
     pub fn new(world: Arc<World>) -> Self {
         Self {
             game: Game::new(world),
+            started: false,
         }
     }
 
@@ -119,7 +131,10 @@ impl Session {
     pub fn with_seed(world: Arc<World>, seed: u64) -> Self {
         let mut game = Game::new(world);
         game.state_mut().rng = seed;
-        Self { game }
+        Self {
+            game,
+            started: false,
+        }
     }
 
     /// Restore a save game (ADR 0001). The report says what the restore had
@@ -136,11 +151,26 @@ impl Session {
             from_version,
             dropped,
         };
-        Ok((Self { game }, loaded))
+        let session = Self {
+            game,
+            started: true,
+        };
+        Ok((session, loaded))
     }
 
-    /// The opening: the intro and the first room.
+    /// Restore a typed save game, as [`Session::save`] gives it.
+    pub fn from_save(world: Arc<World>, save: &Save) -> Result<(Self, Loaded), SaveError> {
+        let json = serde_json::to_value(save).map_err(|e| SaveError::Invalid(e.to_string()))?;
+        Self::load(world, json)
+    }
+
+    /// The opening: the intro and the first room. A second call, or a call
+    /// after a restore, starts nothing again and only reports the status.
     pub fn start(&mut self) -> Step {
+        if self.started {
+            return self.step(Turn::default());
+        }
+        self.started = true;
         let turn = self.game.start();
         self.step(turn)
     }
@@ -151,10 +181,7 @@ impl Session {
             Input::Text(text) => self.game.input(&text),
             Input::Command(cmd) => self.game.act(cmd),
             Input::Choice(index) => self.game.act(Command::Choose { index }),
-            Input::Tick => self.game.act(Command::Verb {
-                verb: Id::new("wait"),
-                objects: Vec::new(),
-            }),
+            Input::Tick => self.game.tick(),
         };
         self.step(turn)
     }
@@ -198,11 +225,6 @@ impl Session {
         &self.game
     }
 
-    #[doc(hidden)]
-    pub fn game_mut(&mut self) -> &mut Game {
-        &mut self.game
-    }
-
     fn step(&self, turn: Turn) -> Step {
         let mut effects: Vec<Effect> = turn
             .blocks
@@ -213,7 +235,7 @@ impl Session {
         effects.extend(
             turn.log
                 .into_iter()
-                .filter(|e| e.kind != "rule")
+                .filter(|e| NOTICE_KINDS.contains(&e.kind.as_str()))
                 .map(|entry| Effect::Notice { entry }),
         );
         if let Some(talk) = turn.talk
