@@ -226,11 +226,15 @@ fn cursor(d: &CDialogue, talk: &Talk) -> Option<DialogCursor> {
     Some(cursor)
 }
 
-/// Store the cursor in the talk, as node keys.
+/// Store the cursor in the talk, as node keys. An id without a node is
+/// not stored: the talk keeps its node, and the return stack skips it.
 fn keep(d: &CDialogue, cursor: &DialogCursor, talk: &mut Talk) {
-    let key = |id| d.key_of(id).unwrap_or_default().to_string();
-    talk.node = key(cursor.current);
-    talk.back = cursor.back.iter().map(|id| key(*id)).collect();
+    let key = |id| d.key_of(id).map(str::to_string);
+    let Some(node) = key(cursor.current) else {
+        return;
+    };
+    talk.node = node;
+    talk.back = cursor.back.iter().filter_map(|id| key(*id)).collect();
 }
 
 /// The state of an option in the current node, for the inspector.
