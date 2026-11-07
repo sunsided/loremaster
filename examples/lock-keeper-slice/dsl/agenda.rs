@@ -11,6 +11,7 @@ world! {
     extern {
         thing keeper;
         thing pages;
+        thing gear_housing;
         thing stove;
         room kitchen;
         var pages_burned;
