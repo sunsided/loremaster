@@ -50,22 +50,28 @@ pub fn compile_dialogue(
             ..error
         }),
         Err(LowerError::Check(issues)) => {
-            // The first error; else the first issue, which explains more
-            // than no issue.
-            let first = (issues.iter())
-                .position(|i| i.severity == Severity::Error)
-                .unwrap_or(0);
-            let Some(issue) = issues.into_iter().nth(first) else {
-                return Err(not_lowered());
+            // `lower` fails on a check error; without one (not possible with
+            // dramaturge 0.3.0-alpha.4) name the first issue in the message,
+            // so `check` does not fold it into the warning of the same issue.
+            let Some(issue) = issues.iter().find(|i| i.severity == Severity::Error) else {
+                let why = (issues.first())
+                    .map_or(String::new(), |i| format!(": {} ({})", i.message, i.path));
+                let error = fail("start:", format!("the dialogue can not be lowered{why}"));
+                return Err(DialogueError {
+                    at: "start".into(),
+                    ..error
+                });
             };
+            // Find the text of the place: a start key, else the node key.
             let source = match issue.place {
-                Place::Start(i) => d.start.get(i).map_or("", String::as_str),
-                _ => "",
+                Place::Start(i) => d.start.get(i).cloned().unwrap_or_default(),
+                _ => (issue.path.strip_prefix("nodes."))
+                    .and_then(|rest| rest.split(['.', '[']).next())
+                    .map_or(String::new(), |k| format!("{k}:")),
             };
-            let at = issue.path;
             Err(DialogueError {
-                at,
-                ..fail(source, issue.message)
+                at: issue.path.clone(),
+                ..fail(&source, issue.message.clone())
             })
         }
         // A kind of error that a later dramaturge adds.
