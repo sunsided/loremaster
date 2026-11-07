@@ -12,6 +12,8 @@
 
 use loremaster::prelude::*;
 
+// A test sees rendered text, with the quotes that the renderer adds. Raw
+// strings (`r#"…"#`, #111) keep those expectations free of escapes.
 world! {
     extern {
         room kitchen;
@@ -74,7 +76,7 @@ world! {
         "open gear housing";
         "take pages";
         w;
-        "examine stove" sees "\"Do not touch the stove,\" the lock-keeper says.";
+        "examine stove" sees r#""Do not touch the stove," the lock-keeper says."#;
         "accuse keeper" sees "Committed for trial";
         // draft: `not_sees` in `expect` is YAML `expect: { not_see: .. }`.
         expect ending == committed, ending.kind == win, ending.rank == 1, pages_burned == false,
@@ -100,8 +102,8 @@ world! {
     // One dialogue format: a dialogue node says a named text pool, and an
     // option shows only after the player learned a fact.
     test slice_keeper_dialogue "Ask the keeper about the stove" {
-        pending phase 3, needs "D3, P3-01 #64";
-        "talk to keeper" sees "\"Do not touch the stove,\" the lock-keeper says." not_sees "Who fed it?";
+        pending phase 3, needs "D3, P3-01 #64, P3-15 #111";
+        "talk to keeper" sees r#""Do not touch the stove," the lock-keeper says."# not_sees "Who fed it?";
         "1" sees "Coal, when the company sends it.";
         "2" expect not ended;
         expect room == kitchen;
@@ -124,9 +126,9 @@ world! {
     // Midnight is after command 18 (22:30 + 18 × 5 minutes): the talk starts
     // then.
     test slice_talk_pauses_agenda "Talk through midnight" {
-        pending phase 4, needs "D6, P4-02 #79";
+        pending phase 4, needs "D6, P4-02 #79, P3-15 #111";
         wait * 17;
-        "talk to keeper" sees "\"Do not touch the stove,\" the lock-keeper says.";
+        "talk to keeper" sees r#""Do not touch the stove," the lock-keeper says."#;
         "1" sees "Coal, when the company sends it." not_sees "feeds it in";
         "1" sees "The stove was cold all night." not_sees "feeds it in";
         "1" sees "He opens the stove and feeds it in.";

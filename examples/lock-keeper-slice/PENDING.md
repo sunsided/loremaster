@@ -21,8 +21,8 @@ Files in today's syntax load now. The other files use syntax that the model does
 | --- | --- | --- | --- |
 | Today | `story.yaml`, `rooms/`, `things/` (not the stove), `machines/`, `timers/`, `rules/lock.yaml`, `rules/accuse.yaml`, `verbs/` | None | Now |
 | Endings | `endings/` | Ending entities with `kind`, `rank`, `title`; `end: <ending id>` | 1 (P1-03) |
-| Dialogue | `dialogues/keeper.yaml` | A node says a text pool: `say: { text: keeper_remark }` | 3 (D3) |
-| Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky` | 4 (R9) |
+| Dialogue | `dialogues/keeper.yaml` | A node says a text pool: `say: { text: keeper_remark }`; speech segments `says:` | 3 (D3, #111) |
+| Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky`; speech segments with a speaker | 4 (R9, #111) |
 | Stove | `things/stove.yaml` | `one_of`, `pick: best`, `seen_by(player)`, `learn` | 4 (R9) |
 | Keeper rule | `rules/keeper.yaml` | `on: { verb: examine, direct: stove }` (Command record), `say: { text: … }` | 4 (D6, R9) |
 | Agenda | `agendas/keeper.yaml` | `actor`, `steps` with `at`, `place`, `when`, `then`, `closes`, `reason` | 4 (D6, CK) |
@@ -38,10 +38,10 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`. Each one loads
 | `slice_save_envelope` | A save from the middle of `slice_best` has an envelope and restores | + Endings | Phase 1 | P1-04 #45 |
 | `slice_equivalence` | YAML, DSL and mixed give one model | Today, per form | Phase 1 and DSL step L2 | P1-06 #47 |
 | `slice_undo_after_death` | The death prompt, and undo after it | + Endings | Phase 2 | P2-03 #54 |
-| `slice_keeper_dialogue` | One dialogue format with a text pool | + Dialogue, Texts | Phase 3 (and R9, see the log) | P3-01 #64 |
+| `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Phase 3 (and R9, see the log) | P3-01 #64, #111 |
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
 | `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Phase 4 | P4-02 #79 |
-| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 2 (talk as an await), then phase 4 | P4-02 #79 |
+| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 2 (talk as an await), then phase 4 | P4-02 #79, #111 |
 | `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Phase 4 | P4-04 #81 |
 | `slice_best`, `slice_ashes` | The two full walkthroughs | All | Phase 4 | P4-07 #84 |
 
@@ -63,7 +63,7 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | YAML | `slice_keeper_dialogue` is phase 3 in the spec, but its dialogue says a text pool, which is R9 (phase 4). | Either an inline `say` in phase 3, or the test moves to phase 4. |
 | 2026-11-07 | YAML | Two candidates of the D2 sketch can never show to the player: "too hot to touch" (when the player examines, `seen_by(player)` is true, so the fresh-ash text scores higher) and "Mind your step." (the keeper never leaves the kitchen). | Keep them as D2 wrote them. `seen_by` matters only with several perceivers (D6); the winnable and quality checks of phase 4 should report a candidate that no state can show. |
 | 2026-11-07 | YAML | The agenda step "comes in from the lock" in one turn, but `place:` names only where it ends. | D6: a step with a route, or a step that takes several turns. |
-| 2026-11-07 | DSL | Almost every keeper line needs `\"` escapes. That is hard to read and hard to compare with the YAML. | Accept raw strings `r#"…"#` in the grammar, and use them in the examples. |
+| 2026-11-07 | DSL | Almost every keeper line needs `\"` escapes. That is hard to read and hard to compare with the YAML. | Done in the slice (Markus, 2026-11-07; #111): raw strings `r#"…"#` for rendered text in tests, and `says "…"` speech segments in lines. A screenplay form is an extension (#112). |
 | 2026-11-07 | DSL | 6 of the 8 part files start with an `extern` list. Conditions and markup (`not pages.carried`, `{lock == empty ? …}`) cannot use Rust paths, so path ids do not help. | A `uses today;` line that brings the ids of a pack into scope for conditions and markup. |
 | 2026-11-07 | DSL | `today.rs` cannot pass the check alone: `end committed` names an ending of another pack. | Move the accuse and jump rules into the endings part, or keep `end "<text>"` until P1-03 and switch both forms in one PR. |
 | 2026-11-07 | DSL | `in <id>` does not say if the place is a room or a container; the draft uses `inside`. A later `on table` clashes with `on verb(…)`. | Decide the location words in L3: `in` for a room, `inside` and `upon` for things. |
@@ -73,4 +73,6 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | Mixed | The agenda id comes from the file name in YAML, but from `agenda for keeper` in Rust. Parallel file names needed `#[path]` in `mod.rs`. | An explicit id in both forms: `agenda keeper for keeper`, or `id:` in YAML. |
 | 2026-11-07 | DSL | The draft uses `loremaster::prelude::*`, but the crate `loremaster` has no library target yet. | L1 decides which crate exports `world!` and `Pack`. |
 | 2026-11-07 | All | `allow_unwinnable` called the agenda step "unwinnable", but the game can still end (ashes). A dead end (no ending reachable, as in early King's Quest) and a point of no return (a better ending drops out) are different. | Two checks: a dead end is an error; a rank drop is a warning, which `closes: [<endings>]` with a `reason` accepts. Done in the slice. |
+| 2026-11-07 | YAML | A speech segment with a named speaker needs a key with a space: `{ keeper says: "…" }`. | #111 decides: that form, or `{ says: "…", by: keeper }`. |
+| 2026-11-07 | All | `rules/accuse.yaml` is in today's syntax, so its line stays a plain string with quotes, while the DSL form uses a speech segment. The two forms give different models for the same rendered text. | #111: the canonical model of `slice_equivalence` keeps segments, so the YAML file switches to `says` when #111 lands. |
 | 2026-11-07 | YAML | The roadmap wants Markus to write one part in each form and note how it felt. | Open: Markus. |

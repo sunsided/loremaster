@@ -9,15 +9,19 @@ use loremaster::prelude::*;
 world! {
     extern {
         room kitchen;
+        thing keeper;
         var ash_is_fresh;
     }
 
+    // draft: `says "<text>"` is a speech segment (#111); the renderer adds
+    // the quotes. The speaker of a pool line is the keeper: the pool has no
+    // dialogue, so the speech segment names it with `keeper says`.
     texts keeper_remark best {
         "Mind your step.";
-        when here == kitchen => "\"Do not touch the stove,\" the lock-keeper says.";
+        when here == kitchen => keeper says "Do not touch the stove," "the lock-keeper says.";
         sticky when here == kitchen and ash_is_fresh => [
-            "\"I let it go out at midnight,\" he says. He does not look at you.",
-            "\"Cold stove, cold supper,\" he says.",
+            keeper says "I let it go out at midnight," "he says. He does not look at you.",
+            keeper says "Cold stove, cold supper," "he says.",
         ];
     }
 }

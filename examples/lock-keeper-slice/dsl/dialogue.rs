@@ -15,21 +15,25 @@ world! {
         texts keeper_remark;
     }
 
+    // draft: `says "<text>"` is a speech segment (#111). The renderer adds
+    // the quotes, so the line has no escapes. A plain string is narration.
+    // Segments in a row join with a space. An option's speaker is the player;
+    // a node's speaker is the thing of the dialogue.
     dialogue with keeper start [stove] {
         // draft: a node with an id in place of a string says a text pool,
         // as `say keeper_remark;` does in a rule (D2 side note).
         stove: keeper_remark {
             // draft: `when` after the option text, before `=>`.
-            "\"Who fed it?\"" when ash_is_fresh => who_fed_it;
-            "\"What do you burn at night?\"" => what_burns;
-            "\"Good night.\"" => end;
+            says "Who fed it?" when ash_is_fresh => who_fed_it;
+            says "What do you burn at night?" => what_burns;
+            says "Good night." => end;
         }
-        what_burns: "\"Coal, when the company sends it. Driftwood, when it does not.\"" {
-            "\"And paper?\"" => who_fed_it;
-            "\"Good night.\"" => end;
+        what_burns: says "Coal, when the company sends it. Driftwood, when it does not." {
+            says "And paper?" => who_fed_it;
+            says "Good night." => end;
         }
-        who_fed_it: "He turns the poker in his hands. \"Nobody. The stove was cold all night.\"" {
-            "\"Good night.\"" => end;
+        who_fed_it: "He turns the poker in his hands." says "Nobody. The stove was cold all night." {
+            says "Good night." => end;
         }
     }
 }

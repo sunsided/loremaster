@@ -155,7 +155,7 @@ fn slice_undo_after_death() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, P4-02 #79"]
+#[ignore = "pending: phase 4, D6, P4-02 #79, P3-15 #111"]
 fn slice_talk_pauses_agenda() {
     assert_passes("slice_talk_pauses_agenda", &[AGENDA, DIALOGUE, TEXTS]);
 }
@@ -167,7 +167,7 @@ fn slice_stove_text() {
 }
 
 #[test]
-#[ignore = "pending: phase 3, D3, P3-01 #64"]
+#[ignore = "pending: phase 3, D3, P3-01 #64, P3-15 #111"]
 fn slice_keeper_dialogue() {
     assert_passes("slice_keeper_dialogue", &[DIALOGUE, TEXTS]);
 }
