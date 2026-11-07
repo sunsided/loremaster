@@ -3,7 +3,7 @@
 //! nothing.
 
 use super::Session;
-use crate::{Choice, Preview, Scene, Talk, VerbInfo};
+use crate::{Choice, JournalEntry, Preview, Scene, Talk, VerbInfo};
 
 impl Session {
     /// The room, the time, the things here, the inventory and the exits, as
@@ -20,6 +20,12 @@ impl Session {
     /// What a command that is still being typed refers to.
     pub fn preview(&self, text: &str) -> Preview {
         self.game.preview(text)
+    }
+
+    /// The quest journal (HG-3): each quest whose current state has journal
+    /// text, open ones first. It takes no step.
+    pub fn journal(&self) -> Vec<JournalEntry> {
+        self.game.journal()
     }
 
     /// The talk in progress, or `None`.
