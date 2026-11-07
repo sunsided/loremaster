@@ -7,7 +7,7 @@
 //! in his bag, so a save game and the state explorer see it.
 
 use loremaster_model::{Id, Location};
-use loremaster_runtime::{Behavior, Cx, Event, Flow};
+use loremaster_runtime::{Behavior, Cx, Event, EventKind, Flow, Manifest};
 
 #[derive(Debug)]
 pub struct Thief {
@@ -50,6 +50,13 @@ impl Thief {
         }
     }
 
+    /// The places of the thief and the treasures: what it reads and moves.
+    fn places(&self) -> impl Iterator<Item = String> + '_ {
+        std::iter::once(&self.thief)
+            .chain(&self.treasures)
+            .map(|t| format!("{t}.location"))
+    }
+
     /// A dark room next to `from`, picked at random. The thief stays underground.
     fn next_room(&self, cx: &mut Cx<'_>, from: &str) -> Option<Id> {
         let dark: Vec<Id> = cx
@@ -77,6 +84,13 @@ impl Behavior for Thief {
 
     fn description(&self) -> &str {
         "the thief walks the dark rooms and steals treasures that the player carries"
+    }
+
+    fn manifest(&self) -> Manifest {
+        Manifest::new()
+            .events([EventKind::Start, EventKind::Turn])
+            .reads(self.places().chain(["here".to_string()]))
+            .writes(self.places())
     }
 
     fn handle(&self, event: &Event, cx: &mut Cx<'_>) -> Flow {

@@ -443,8 +443,9 @@ Some logic is too large for rules, for example a character that walks the map an
 
 1. Write a type that implements `loremaster_runtime::Behavior`. Its `handle` method gets each event, after the rules of the event.
 2. Change the world only through `Cx`: facts, things, the player, text, events and `roll`. Then the save game, the walkthroughs and the explorer see all changes. Do not keep state in fields of the type.
-3. Register the behavior: `world.register(Thief::zork())`.
-4. Name the behavior in the story: `behaviors: [thief]` in story.yaml, or a file `behaviors/thief.yaml` with notes.
+3. Give a manifest: what the behavior reads, what it writes and which events it handles, for example `Manifest::new().events([EventKind::Start, EventKind::Turn]).writes(["thief.location"])`. Names are facts or `<thing>.location`. The game sends the behavior only those events; a write that the manifest does not name is a note in the log, and the rules view shows the manifest. Without a manifest, a behavior is opaque: it gets every event.
+4. Register the behavior: `world.register(Thief::zork())`.
+5. Name the behavior in the story: `behaviors: [thief]` in story.yaml, or a file `behaviors/thief.yaml` with notes.
 
 A build without the code, such as the editor or `loremaster play`, plays the story without the behavior. The rules view shows the behavior as code, and the terminal commands show a note.
 

@@ -31,8 +31,8 @@ mod threads;
 mod walkthrough;
 mod world;
 
-pub use behavior::{Behavior, Cx, Flow};
-pub use events::{Event, Phase};
+pub use behavior::{Behavior, Cx, Flow, Manifest};
+pub use events::{Event, EventKind, Phase};
 pub use explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant, explore};
 pub use game::{
     AtlasRoom, AuthorCommand, ExitInfo, FragmentView, FrameFragment, FramePart, FrameUse, Game,
