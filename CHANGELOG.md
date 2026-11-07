@@ -39,6 +39,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Changed
 
+- **Breaking (library):** `Cx` is a narrow, stable view for behaviors (XP-1, XP-7). `Cx::state()` and `Cx::world()` are gone; use the new `turns`, `minutes`, `visited` and `room_has_tag`, or the read-only escape hatch `Cx::unstable()`. Random numbers come only from `Cx::roll`.
 - loremaster depends on dramaturge 0.3.0-alpha.2 from crates.io, with an exact version, instead of the git branch `feature/0.3`. CI builds with `--locked`, packages the crates on every branch again, and a job that is not required tests against the newest dramaturge on `feature/0.3`.
 - The turn log of a talk shows what a dialogue really changed, in the order of the changes, with the new values. Removed facts and forgotten memories get a line; a relation change of 0 and a fact outside the world scope do not.
 - The room matrix and the text matrix try the player's relations to things (`blackbeard.trust`) as a dimension.
