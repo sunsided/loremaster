@@ -920,7 +920,7 @@ A game can make parts of its story in Rust, with `world!`. The editor shows thes
 loremaster export-pack story/ --bin mygame
 ```
 
-This runs `cargo run --bin mygame -- export-pack story/`. The game must then call `Loremaster::export_packs("story/")`, which writes `story/packs/<name>.json` with the git commit of `story/`, and then removes the other `.json` files there: `packs/` belongs to the export. Only the top level of `packs/` is read. The story loads these files before its YAML files. Behaviors are not in them.
+This runs `cargo run --bin mygame -- export-pack story/`. The game must then call `Loremaster::export_packs("story/")`, which writes `story/packs/<name>.yaml` with the git commit of `story/`, and then removes the other `.yaml` files there: `packs/` belongs to the export. Only the top level of `packs/` is read. An old `packs/*.json` from an earlier version is an error: export again, and the export removes it. The story loads these files before its YAML files. Behaviors are not in them.
 
 In Atlas › Rust, a writer has two ways to change a Rust part:
 

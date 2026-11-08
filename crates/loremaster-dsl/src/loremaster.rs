@@ -79,11 +79,11 @@ impl Loremaster {
         self
     }
 
-    /// Write each Rust pack to `<dir>/packs/<name>.json`, for the generic
+    /// Write each Rust pack to `<dir>/packs/<name>.yaml`, for the generic
     /// editor (`loremaster export-pack`), with the git commit of `dir` when
     /// there is one. `packs/` belongs to this export: after the new packs are
-    /// written, the other `.json` files there are removed, because the loader
-    /// reads every one. Returns the paths.
+    /// written, the other `.yaml` files there are removed, because the loader
+    /// reads every one, and old `.json` packs too. Returns the paths.
     #[cfg(not(target_family = "wasm"))]
     pub fn export_packs(
         &self,
@@ -106,7 +106,7 @@ impl Loremaster {
             let mut pack = pack.as_ref().clone();
             pack.commit.clone_from(&commit);
             // A world! pack is named after its module path.
-            let path = out.join(format!("{}.json", pack.name.replace("::", "-")));
+            let path = out.join(format!("{}.yaml", pack.name.replace("::", "-")));
             if packs.iter().any(|(p, _)| *p == path) {
                 return Err(std::io::Error::other(format!(
                     "two packs are named `{}`",
@@ -120,14 +120,15 @@ impl Loremaster {
         // so a failed export never leaves a half-written pack.
         let mut paths = Vec::new();
         for (path, mut pack) in packs {
-            let tmp = path.with_extension("json.tmp");
-            std::fs::write(&tmp, pack.to_json())?;
+            let tmp = path.with_extension("yaml.tmp");
+            std::fs::write(&tmp, pack.to_yaml())?;
             std::fs::rename(&tmp, &path)?;
             paths.push(path);
         }
         for entry in std::fs::read_dir(&out)? {
             let path = entry?.path();
-            if path.extension().is_some_and(|e| e == "json") && !paths.contains(&path) {
+            let pack = path.extension().is_some_and(|e| e == "yaml" || e == "json");
+            if pack && !paths.contains(&path) {
                 std::fs::remove_file(&path)?;
             }
         }

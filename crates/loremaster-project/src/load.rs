@@ -158,15 +158,22 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     assemble(packs_of(files)?)
 }
 
-/// The packs of a folder: each exported Rust pack (`packs/*.json`) in path
+/// The packs of a folder: each exported Rust pack (`packs/*.yaml`) in path
 /// order, then the YAML files.
 pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diagnostic>> {
     files.sort_by(|a, b| a.path.cmp(&b.path));
     let mut packs = Vec::new();
     let mut errors = Vec::new();
-    for f in files.iter().filter(|f| is_exported_pack(&f.path)) {
-        // Every export has a name, so `{}` is not one.
-        match serde_json::from_str::<Pack>(&f.text) {
+    for f in files.iter().filter(|f| is_exported_pack(&f.path, ".json")) {
+        errors.push(Diagnostic::error(
+            &f.path,
+            "",
+            "an old JSON pack: packs are YAML now; run `loremaster export-pack` again, which removes this file".to_string(),
+        ));
+    }
+    for f in files.iter().filter(|f| is_exported_pack(&f.path, ".yaml")) {
+        // Every export has a name, so an empty file is not one.
+        match serde_saphyr::from_str::<Pack>(&f.text) {
             Ok(pack) if !pack.name.is_empty() => packs.push(pack),
             found => errors.push(Diagnostic::error(
                 &f.path,
@@ -192,15 +199,15 @@ pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diag
 }
 
 /// Only the top level of `packs/`, which `export_packs` writes and cleans.
-fn is_exported_pack(path: &str) -> bool {
+fn is_exported_pack(path: &str, ext: &str) -> bool {
     path.strip_prefix("packs/")
-        .is_some_and(|name| !name.contains('/') && name.ends_with(".json"))
+        .is_some_and(|name| !name.contains('/') && name.ends_with(ext))
 }
 
 /// The parts of a project that one source gives (DS-1): a YAML folder, and
 /// later a `world!` block or a builder function. [`assemble`] joins packs.
 ///
-/// As JSON it is the file that `loremaster export-pack` writes. The parts
+/// As YAML it is the file that `loremaster export-pack` writes. The parts
 /// that only a running program can have (`files`, `warnings`, `overrides`,
 /// `instances`) are not in it.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -316,11 +323,11 @@ impl Pack {
         }
     }
 
-    /// The pack as the JSON of `loremaster export-pack`, with its hashes.
-    pub fn to_json(&mut self) -> String {
+    /// The pack as the YAML of `loremaster export-pack`, with its hashes.
+    pub fn to_yaml(&mut self) -> String {
         self.stamp_hashes();
         // A pack is plain data with string keys, as in `model_hash`.
-        serde_json::to_string_pretty(self).expect("a pack always serializes to JSON")
+        serde_saphyr::to_string(self).expect("a pack always serializes to YAML")
     }
 
     /// A pack from the files of a YAML folder. Paths use `/` and are relative
@@ -360,6 +367,10 @@ impl Pack {
                 continue;
             };
             let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+            // Exported Rust packs, read by `packs_of`.
+            if dir == "packs" || dir.starts_with("packs/") {
+                continue;
+            }
             if dir.is_empty() && stem != "story" {
                 errors.push(unknown_file(path));
                 continue;
@@ -1314,7 +1325,8 @@ pub(crate) fn safe_asset_path(path: &str) -> bool {
         })
 }
 
-/// Read every YAML file under a project folder.
+/// Read every YAML file under a project folder, and old JSON packs under
+/// `packs/`, so that loading can say to export them again.
 #[cfg(not(target_family = "wasm"))]
 pub fn read_dir(root: &std::path::Path) -> std::io::Result<Vec<SourceFile>> {
     fn walk(

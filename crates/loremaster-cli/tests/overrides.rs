@@ -172,9 +172,9 @@ fn a_yaml_only_load_keeps_the_override_with_a_warning() {
 fn the_exported_pack_gives_the_same_model() {
     let mut pack = world::pack();
     let hash = hash_of(&pack, "room:shore");
-    let exported = pack.to_json();
+    let exported = pack.to_yaml();
     let files = vec![SourceFile {
-        path: "packs/world.json".into(),
+        path: "packs/world.yaml".into(),
         text: exported,
     }];
     let project = load(files).expect("loads");
@@ -250,7 +250,8 @@ fn an_export_removes_stale_packs() {
     let dir = Gone(std::env::temp_dir().join(format!("loremaster-export-{}", std::process::id())));
     let _ = std::fs::remove_dir_all(&dir.0);
     std::fs::create_dir_all(dir.0.join("packs")).unwrap();
-    std::fs::write(dir.0.join("packs/old.json"), "{}").unwrap();
+    std::fs::write(dir.0.join("packs/old.yaml"), "name: old\n").unwrap();
+    std::fs::write(dir.0.join("packs/older.json"), "{}").unwrap();
     let paths = Loremaster::new()
         .pack(world::pack())
         .export_packs(&dir.0)
@@ -291,11 +292,15 @@ fn a_second_file_of_the_overridden_entity_does_not_blame_the_override() {
 }
 
 #[test]
-fn a_nested_json_file_in_packs_is_not_read() {
+fn a_nested_file_in_packs_is_not_read() {
     let files = vec![
         SourceFile {
-            path: "packs/world.json".into(),
-            text: world::pack().to_json(),
+            path: "packs/world.yaml".into(),
+            text: world::pack().to_yaml(),
+        },
+        SourceFile {
+            path: "packs/backup/old.yaml".into(),
+            text: "nonsense: [".into(),
         },
         SourceFile {
             path: "packs/backup/old.json".into(),

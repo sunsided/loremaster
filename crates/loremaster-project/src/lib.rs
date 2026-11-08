@@ -13,8 +13,8 @@
 //!
 //! The other folders are in [`FOLDERS`]. A YAML file in an unknown folder, and
 //! an unknown field in any file, is an error. An entity's `id` defaults to its
-//! file name. `packs/*.json` are Rust packs that a game build exported
-//! ([`Pack::to_json`]); they load before the YAML files. Loading works on in-memory files so the same code runs in the
+//! file name. `packs/*.yaml` are Rust packs that a game build exported
+//! ([`Pack::to_yaml`]); they load before the YAML files. Loading works on in-memory files so the same code runs in the
 //! browser; [`read_dir`] collects them from disk.
 //!
 //! [`check_packs`] is the one function for the schema checks: the YAML loader
