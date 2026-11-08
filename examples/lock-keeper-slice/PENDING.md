@@ -44,7 +44,7 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`, and the ones o
 | `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
 | `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Passes (P4-02). `slice_baseline` and `slice_dsl_walkthroughs` leave it out: it needs the agenda part | P4-02 #79 |
 | `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 4, R9 for the text pool. The pause works since P4-02: `slice_talk_pauses_agenda_without_the_text_pool` passes with the line of the pool in place of the pool | P4-01 #78 |
-| `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Phase 4 | P4-04 #81 |
+| `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Phase 4: the ending checks exist (P4-04 #81), on rules and machine steps; the test waits for the agenda with `closes` (P4-02 #79) and the other new-syntax parts that `NEW_SYNTAX` loads | P4-04 #81, P4-02 #79 |
 | `slice_best`, `slice_ashes` | The two full walkthroughs | All | Phase 4 | P4-07 #84 |
 
 Run the pending tests with `task test:pending`. When a test passes, remove its `#[ignore]` mark and the `pending:` line of its walkthrough in the same pull request.

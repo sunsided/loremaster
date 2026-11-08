@@ -30,6 +30,14 @@ pub struct Rule {
     /// takes at most one step for one event.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub machine: Option<Id>,
+    /// The endings that this rule closes on purpose: after it fires, they can
+    /// no longer be reached (a point of no return). The ending checks accept
+    /// the rank drop when it matches this list. Needs a `reason`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closes: Vec<Id>,
+    /// Why the rule closes the endings in `closes`, for the authors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
     /// Author notes. The player never sees them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<Note>,

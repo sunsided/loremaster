@@ -367,6 +367,13 @@ impl Checker<'_> {
         let emitted = emitted_events(&story);
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
+            self.closes(
+                &file,
+                "",
+                &format!("`{}`", rule.id),
+                &rule.closes,
+                &rule.reason,
+            );
             match &rule.on {
                 EventPattern::Enter(r) | EventPattern::Leave(r) => {
                     self.room_ref(&file, "on", r.as_str())
@@ -629,6 +636,45 @@ impl Checker<'_> {
                     }
                 }
             }
+        }
+    }
+
+    /// `closes` and `reason` of a rule, machine step or agenda step: each id
+    /// is an ending, and a list needs a reason. The ending checks of the
+    /// explorer compare the list with the endings that really drop out.
+    /// `prefix` is the place of the owner in its file (`steps[0].` for an
+    /// agenda step, empty for a rule), `name` how the messages name it.
+    fn closes(
+        &mut self,
+        file: &str,
+        prefix: &str,
+        name: &str,
+        closes: &[loremaster_model::Id],
+        reason: &Option<String>,
+    ) {
+        for (i, ending) in closes.iter().enumerate() {
+            if self.story().ending(ending.as_str()).is_none() {
+                self.error(
+                    file,
+                    &format!("{prefix}closes[{i}]"),
+                    format!("unknown ending `{ending}` in `closes`"),
+                );
+            }
+        }
+        let reason = reason.as_deref().is_some_and(|r| !r.trim().is_empty());
+        if !closes.is_empty() && !reason {
+            self.error(
+                file,
+                &format!("{prefix}closes"),
+                format!("`closes` of {name} needs a `reason`: why the endings close on purpose"),
+            );
+        }
+        if closes.is_empty() && reason {
+            self.warning(
+                file,
+                &format!("{prefix}reason"),
+                format!("`reason` of {name} without `closes`"),
+            );
         }
     }
 
@@ -1097,28 +1143,8 @@ impl Checker<'_> {
                 }
                 self.effects(&file, &format!("{at}.then"), &step.then);
                 self.no_await(&file, &format!("{at}.then"), &step.then);
-                for (j, ending) in step.closes.iter().enumerate() {
-                    if self.story().ending(ending.as_str()).is_none() {
-                        self.error(
-                            &file,
-                            &format!("{at}.closes[{j}]"),
-                            format!("unknown ending `{ending}`"),
-                        );
-                    }
-                }
-                match (step.closes.is_empty(), &step.reason) {
-                    (false, None) => self.warning(
-                        &file,
-                        &format!("{at}.closes"),
-                        "say why the step closes these endings: add a `reason`",
-                    ),
-                    (true, Some(_)) => self.warning(
-                        &file,
-                        &format!("{at}.reason"),
-                        "`reason` explains `closes`, and the step closes no ending",
-                    ),
-                    _ => {}
-                }
+                let name = format!("step `{key}` of agenda `{}`", a.id);
+                self.closes(&file, &format!("{at}."), &name, &step.closes, &step.reason);
                 if step.action.is_none() && step.then.is_empty() && step.place.is_none() {
                     self.warning(
                         &file,

@@ -5,7 +5,9 @@
 //! roadmap phase and the requirement or issue that make it pass. Run them with
 //! `task test:pending`. Read `examples/lock-keeper-slice/PENDING.md`.
 
-use loremaster_project::{Project, Severity, SourceFile, check, load, model_hash, read_dir};
+use loremaster_project::{
+    Diagnostic, Project, Severity, SourceFile, check, load, model_hash, read_dir,
+};
 use loremaster_runtime::authoring;
 use loremaster_runtime::{Input, Session, StepOutcome, Turn, WalkResult, World, run_walkthrough};
 use std::path::{Path, PathBuf};
@@ -282,15 +284,30 @@ fn slice_keeper_agenda() {
     );
 }
 
+/// The schema checks plus the ending checks of the explorer, with files.
+fn ending_checks(project: &Project) -> Vec<Diagnostic> {
+    let world = Arc::new(World::compile(project.story.clone()).unwrap());
+    let explored = authoring::explore(world, authoring::Budget::default());
+    let mut out = check(project);
+    out.extend(
+        explored
+            .ending_checks
+            .diagnostics()
+            .into_iter()
+            .map(|d| project.locate(d)),
+    );
+    out
+}
+
 #[test]
-#[ignore = "pending: phase 4, CK, P4-04 #81"]
+#[ignore = "pending: phase 4, D6, P4-02 #79 (the agenda; the ending checks exist since P4-04 #81)"]
 fn slice_endings_reachable() {
     // Two checks on the endings. A dead end (a state from which no ending can
     // be reached) is an error. A point of no return (a step after which the
     // best reachable ending gets worse) is a warning, unless the step names
     // the endings it closes. The keeper's agenda step closes `committed`; the
     // ashes ending stays reachable, so the slice has no dead end.
-    let marked = check(&project(with("yaml", NEW_SYNTAX)));
+    let marked = ending_checks(&project(with("yaml", NEW_SYNTAX)));
     assert!(
         !marked.iter().any(|d| d.severity == Severity::Error),
         "{marked:#?}"
@@ -314,7 +331,7 @@ fn slice_endings_reachable() {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let unmarked = check(&project(files));
+    let unmarked = ending_checks(&project(files));
     assert!(
         unmarked.iter().any(|d| d.file == "agendas/keeper.yaml"
             && d.severity == Severity::Warning
