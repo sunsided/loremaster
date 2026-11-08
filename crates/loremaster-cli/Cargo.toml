@@ -23,6 +23,7 @@ loremaster-mcp.workspace = true
 loremaster-project.workspace = true
 loremaster-runtime.workspace = true
 loremaster-workbench.workspace = true
+serde_json.workspace = true
 
 [features]
 # `loremaster serve` serves the web editor. The crates.io package contains the editor.

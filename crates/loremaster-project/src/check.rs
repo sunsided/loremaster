@@ -9,6 +9,7 @@ use loremaster_model::{
 };
 use std::collections::BTreeSet;
 
+mod contract;
 mod walkthroughs;
 
 pub use walkthroughs::MAX_HINTS;
@@ -88,6 +89,7 @@ pub fn check(project: &Project) -> Vec<Diagnostic> {
         out: project.assembly.clone(),
         place: None,
         named: None,
+        contract: contract::Seen::default(),
         played: BTreeSet::new(),
     };
     c.run();
@@ -104,6 +106,8 @@ struct Checker<'a> {
     place: Option<(String, u32, u32)>,
     /// The named pools of `texts/` for dramaturge's checks, built once.
     named: Option<Pools<CheckTypes>>,
+    /// What the host contract check needs, gathered during the run (IF-2).
+    contract: contract::Seen,
     /// The assets that `play_sound` names.
     played: BTreeSet<String>,
 }
@@ -170,6 +174,7 @@ impl Checker<'_> {
 
     /// A condition outside a text: `seen_by` has no perceiver there.
     fn condition(&mut self, file: &str, at: &str, source: &str) {
+        self.contract.tests.push(source.to_string());
         match compile_condition(source, &self.scope) {
             Ok(c) if has_seen_by(&c) => self.error(file, at, SEEN_BY_ELSEWHERE),
             Ok(_) => {}
@@ -180,6 +185,7 @@ impl Checker<'_> {
     /// The `when` of a fragment or a candidate: `seen_by` asks for the
     /// perceiver of the text.
     fn text_condition(&mut self, file: &str, at: &str, source: &str) {
+        self.contract.tests.push(source.to_string());
         if let Err(e) = compile_condition(source, &self.scope) {
             self.lang_error(file, at, source, e);
         }
@@ -200,6 +206,7 @@ impl Checker<'_> {
     }
 
     fn markup(&mut self, file: &str, at: &str, source: &str) {
+        self.contract.tests.push(source.to_string());
         if let Err(e) = compile_markup(source, &self.scope) {
             self.lang_error(file, at, source, e);
         }
@@ -668,7 +675,15 @@ impl Checker<'_> {
             .chain(story.verbs.iter())
             .map(|v| v.id.to_string())
             .collect();
-        let emitted = emitted_events(&story);
+        let mut emitted = emitted_events(&story);
+        // The host sends the declared events.
+        emitted.extend(
+            story
+                .interface
+                .iter()
+                .flat_map(|i| &i.events)
+                .map(|e| e.id.to_string()),
+        );
         let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
@@ -752,6 +767,7 @@ impl Checker<'_> {
         }
         self.walkthroughs();
         self.media();
+        self.contract();
     }
 
     /// Slots name assets and their conditions compile; each asset has its
@@ -943,6 +959,9 @@ impl Checker<'_> {
                 }
             }
             for n in &d.nodes {
+                // A dialogue can branch on the result of an action.
+                let whens = std::iter::once(&n.when).chain(n.options.iter().map(|o| &o.when));
+                self.contract.tests.extend(whens.flatten().cloned());
                 let at = format!("nodes.{}", n.key);
                 self.line(&file, &at, &n.say);
                 for (i, l) in n.lines.iter().enumerate() {
@@ -1061,6 +1080,11 @@ impl Checker<'_> {
     fn effects(&mut self, file: &str, at: &str, effects: &[Effect]) {
         for (i, effect) in effects.iter().enumerate() {
             let at = format!("{at}[{i}]");
+            if let Effect::Emit(name) = effect {
+                self.contract
+                    .emits
+                    .push((file.to_string(), at.clone(), name.clone()));
+            }
             match effect {
                 Effect::Say(line) => self.line(file, &at, line),
                 Effect::Await(spec) => self.await_spec(file, &at, spec),
@@ -1789,6 +1813,9 @@ impl Checker<'_> {
             );
             return;
         }
+        self.contract
+            .awaits
+            .push((file.to_string(), at.to_string(), spec.clone()));
         if let Some(room) = &spec.walk_to {
             self.room_ref(file, at, room.as_str());
         }

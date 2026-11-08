@@ -112,6 +112,9 @@ pub struct StoryHeader {
     /// The adventure sheet of the player.
     #[serde(default)]
     pub stats: Vec<loremaster_model::Stat>,
+    /// The contract with the host (IF-1).
+    #[serde(default)]
+    pub interface: Option<loremaster_model::Interface>,
     /// What the episode of this story carries to the next story (TX-12).
     #[serde(default)]
     pub export: loremaster_model::EpisodeItems,
@@ -757,7 +760,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
             rules.push(rule);
         }
     }
-    let story = Story {
+    let mut story = Story {
         title: header.title,
         author: header.author,
         start: header.start,
@@ -796,9 +799,11 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         stats: header.stats,
         notes: header.notes,
         threads,
+        interface: header.interface,
         export: header.export,
         import: header.import,
     };
+    inherit_results(&mut story);
     Ok(Project {
         story,
         files,
@@ -806,6 +811,25 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         walkthroughs,
         assembly,
     })
+}
+
+/// An `await` of a declared action can leave out `results`: it takes the
+/// declared ones (IF-1).
+fn inherit_results(story: &mut Story) {
+    let Some(interface) = story.interface.clone() else {
+        return;
+    };
+    for effect in story.rules.iter_mut().flat_map(|r| &mut r.then) {
+        if let Effect::Await(spec) = effect
+            && spec.results.is_empty()
+            && let Some(action) = spec
+                .action
+                .as_ref()
+                .and_then(|a| interface.action(a.as_str()))
+        {
+            spec.results = action.results.clone();
+        }
+    }
 }
 
 /// Take the entity of `key` (`room:cellar`) out of its list.

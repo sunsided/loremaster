@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/loremaster-build",
     "crates/loremaster-cli",
     "crates/loremaster-dsl",
     "crates/loremaster-lang",

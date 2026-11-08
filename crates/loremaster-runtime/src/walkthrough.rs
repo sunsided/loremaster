@@ -1,6 +1,6 @@
 //! Walkthrough tests: play commands and check what shows and what holds.
 
-use crate::{Effect, Input, Session, State, Step, World};
+use crate::{AwaitRequest, Effect, Input, Session, State, Status, Step, World};
 use loremaster_model::{Expect, Pending, Walkthrough};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -73,9 +73,28 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
             ));
         }
         session.force_rolls(step.rolls());
-        let step_result = session.submit(Input::Text(command.into()));
-        let text = step_result.plain_text();
-        let step_sounds = sounds(&step_result);
+        let host_event = step.plan().and_then(|p| Some((p.event.as_ref()?, &p.args)));
+        // An event step is no answer to an action.
+        if host_event.is_none()
+            && let Some(why) = undeclared_result(&session, command)
+        {
+            failures.push(format!("step {} (`{command}`): {why}", i + 1));
+        }
+        let step_result = match host_event {
+            Some((event, args)) => match session.host_event(event.as_str(), args.clone()) {
+                Ok(step) => Some(step),
+                Err(why) => {
+                    failures.push(format!("step {} (`{command}`): {why}", i + 1));
+                    None
+                }
+            },
+            None => Some(session.submit(Input::Text(command.into()))),
+        };
+        let text = step_result
+            .as_ref()
+            .map(Step::plain_text)
+            .unwrap_or_default();
+        let step_sounds = step_result.as_ref().map(sounds).unwrap_or_default();
         transcript.push_str(&format!("\n\n> {command}\n{text}"));
         for why in session.forced_roll_errors() {
             failures.push(format!("step {} (`{command}`): {why}", i + 1));
@@ -99,6 +118,25 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
         transcript,
         pending: walk.pending.clone(),
     }
+}
+
+/// In a story with an interface, the answer to an action must be one of its
+/// declared results by name (IF-6): a number or a label is not.
+fn undeclared_result(session: &Session, command: &str) -> Option<String> {
+    let interface = session.world().story.interface.as_ref()?;
+    let Status::Await { awaiting } = session.status() else {
+        return None;
+    };
+    let AwaitRequest::Action { name, results, .. } = awaiting.request else {
+        return None;
+    };
+    interface.action(name.as_str())?;
+    let answer = command.trim();
+    (!results.is_empty()
+        && !results
+            .iter()
+            .any(|r| r.as_str().eq_ignore_ascii_case(answer)))
+    .then(|| format!("`{answer}` is not a declared result of the action `{name}`"))
 }
 
 /// The ids of the sounds of a step.
