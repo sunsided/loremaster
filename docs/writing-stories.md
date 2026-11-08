@@ -1061,6 +1061,32 @@ A save game keeps the state of a game, together with the version of its format a
 
 Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
 
+## Episodes
+
+A series of stories can carry facts, relations and memories from one story to the next, as Zork II starts with what the player did in Zork I. The first story lists in `export:` what its episode carries. The next story lists in `import:` what it takes:
+
+```yaml
+# story.yaml of the first story
+relations: [trust]
+export:
+  facts: [gold, lamp.lit]         # story variables and thing properties
+  relations: [keeper.trust]       # thing.axis
+  memories: [keeper.asked]        # thing.key
+
+# story.yaml of the next story
+relations: [trust]
+vars:
+  - { id: gold, type: int, initial: 0, max: 10 }
+import:
+  facts: [gold]
+  relations: [keeper.trust]
+  memories: [keeper.asked]
+```
+
+`loremaster check` examines both lists. A fact must be a story variable or a thing property. A relation needs a thing and an axis in `relations`. A memory needs a thing, and in `export` a dialogue of that thing that remembers the key, or an import of it. An imported memory declares its key, so `remembers(keeper, asked)` works in the next story without a dialogue that gives it.
+
+The host writes the episode with `Session::episode()`, at the end or at any time. It is a small value with a format, a version and the id of the story. `Session::from_episode(world, episode)` starts a new game of the next story with it; call `start` next, as for a new game. The new game takes only what `import` lists. The report says what it took (`applied`), what the story does not import (`skipped`) and what does not fit (`misfits`): a value of another type, or a state that the enum does not have. A number takes the limits of the next story. A relation that no dialogue changed and a memory that the thing does not keep are not in the episode.
+
 ## Write in the game
 
 You can change the story while you play it. The game keeps its state after each change.

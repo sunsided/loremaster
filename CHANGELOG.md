@@ -10,6 +10,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Episodes (TX-12, US-13, dramaturge#81): `export:` and `import:` in story.yaml list the facts, relations (`thing.axis`) and memories (`thing.key`) that one story of a series hands to the next. `loremaster check` examines both lists. `Session::episode()` writes an `Episode` (format `loremaster-episode`, version 1, the story id), and `Session::from_episode` starts a new game of the next story with what it imports; the `Imported` report lists what it took, what the story does not import and what does not fit. An imported memory declares its key for `remembers()`.
+- **Breaking (library):** `Story` and `StoryHeader` have the new fields `export` and `import`.
 - Several player actors (P6-06, #100; WO-5, WO-14, TX-9): `playable: [wick, bilge]` in story.yaml gives the player a list of actors. `switch to bilge` makes one the active actor, whose room, carried things and senses are the player's; `seen_by(actor)` now tests the active actor. `bilge, take spanner then s` gives another actor an order: one step per turn, with a report at the end. The two-robot demo in `examples/two-robots` shows it: a puzzle that needs both robots, text per perceiver, and an explorer that ends.
 - **Breaking (library):** `Story` and `StoryHeader` have the new field `playable`, `State` has the new fields `active` and `orders`, and `Input` now derives `Eq`. A `Command` with an `actor` that is a playable actor is now an order; for any other thing it is still refused.
 

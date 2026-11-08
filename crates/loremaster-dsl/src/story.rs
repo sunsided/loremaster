@@ -37,6 +37,8 @@ impl<'a> StoryBuilder<'a> {
             playable: Vec::new(),
             step_limit: None,
             stats: Vec::new(),
+            export: Default::default(),
+            import: Default::default(),
             notes: Vec::new(),
             timers: Vec::new(),
             machines: Vec::new(),
