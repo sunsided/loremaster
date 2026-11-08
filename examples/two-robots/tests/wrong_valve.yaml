@@ -1,0 +1,8 @@
+name: The wrong main
+steps:
+  - take spanner
+  - switch to bilge
+  - hold lever
+  - switch to wick
+  - s
+  - { do: turn starboard wheel, see: "the river comes up it instead" }

@@ -1,6 +1,6 @@
 use loremaster_model::{Id, Location, Value};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// How far a fragment has got through its variants.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,6 +88,15 @@ pub struct State {
     /// location in `locations`, as for any thing. New in save version 2.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub actors: BTreeMap<Id, ActorState>,
+    /// The playable actor that the player steers now (WO-5). `None` in a
+    /// story without `playable`. `room` and the carried things are its own;
+    /// the things another playable actor carries are `in` it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active: Option<Id>,
+    /// The orders each playable actor has still to run (WO-14): each is the
+    /// step of one turn, as the player gave it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub orders: BTreeMap<Id, VecDeque<crate::Input>>,
 }
 
 /// The state of an actor (D6): the steps of its agenda that are over.

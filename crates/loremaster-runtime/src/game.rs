@@ -3,7 +3,7 @@ use crate::parser::{ParseScope, parse};
 use crate::text::{self, article};
 use crate::world::{CompiledEffect, CompiledText, Within};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
-use crate::{Event, Phase};
+use crate::{Event, Input, Phase};
 use loremaster_model::{Id, Limit, Location, Term, TimeOfDay, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -12,8 +12,10 @@ mod agendas;
 mod awaits;
 mod combat;
 mod machines;
+mod orders;
 pub use awaits::{ARRIVED, REFUSED};
 pub(crate) use combat::{ATTACK_TEXT, LUCK_TEXT};
+pub(crate) use orders::SWITCH;
 mod narrative;
 mod talk;
 pub use talk::{TalkOptionView, TalkView};
@@ -234,6 +236,8 @@ impl Game {
                 .map(|t| (t.id.clone(), t.turns))
                 .collect(),
             actors: Default::default(),
+            active: None,
+            orders: Default::default(),
         };
         for v in &story.vars {
             state.facts.insert(v.id.to_string(), v.initial.clone());
@@ -243,6 +247,26 @@ impl Game {
                 state
                     .facts
                     .insert(format!("{}.{prop}", t.id), value.clone());
+            }
+        }
+        // The first playable actor starts as the active one. The others hold
+        // what they carry as closed containers; see `orders.rs`.
+        if let Some(first) = story.playable.first() {
+            for a in &story.playable {
+                state
+                    .facts
+                    .insert(format!("{a}.active"), Value::Bool(a == first));
+                state.facts.insert(format!("{a}.open"), Value::Bool(false));
+            }
+            state.active = Some(first.clone());
+            if let Some(Location::Room(r)) = state.locations.get(first) {
+                state.room = r.clone();
+            }
+            // What the first actor holds at the start, the player carries.
+            for at in state.locations.values_mut() {
+                if at.holder() == Some(first) {
+                    *at = Location::Carried;
+                }
             }
         }
         Self::restore(world, state)
@@ -354,6 +378,7 @@ impl Game {
             .retain(|key, _| key.split_once('.').is_some_and(|(t, _)| has_thing(t)));
         state.memories.retain(|thing, _| has_thing(thing.as_str()));
         crate::save::keep_known_steps(&world, &mut state.actors);
+        crate::save::keep_known_actors(&world, &mut state);
         Self::restore(world, state)
     }
 
@@ -505,6 +530,13 @@ impl Game {
             turn.say(BlockKind::Response, "The story has ended.");
             return turn;
         }
+        if let Some((actor, steps)) = self.order_in(text) {
+            let minutes = self.world.story.clock.minutes_per_turn;
+            if self.give_order(&mut turn, &actor, steps) {
+                self.advance(&mut turn, minutes);
+            }
+            return self.finish(turn);
+        }
         match parse(&self.world.verbs, &self.parse_scope(), text) {
             Ok(cmd) => self.perform(&mut turn, cmd),
             Err(msg) => turn.say(BlockKind::Response, msg),
@@ -612,13 +644,32 @@ impl Game {
     }
 
     fn perform(&mut self, turn: &mut Turn, cmd: Command) {
+        if let Some(minutes) = self.action(turn, cmd) {
+            self.advance(turn, minutes);
+        }
+    }
+
+    /// Run a command without moving the clock. The minutes it costs, or
+    /// `None` when it took no turn. An order runs through here too, so the
+    /// clock moves once a turn.
+    fn action(&mut self, turn: &mut Turn, cmd: Command) -> Option<u16> {
         // A talk stays open until the player leaves: other commands do not run.
         match (&cmd, self.state.talk.is_some()) {
-            (Command::Choose { index }, true) => return self.choose(turn, *index),
-            (Command::Leave, true) => return self.leave(turn),
-            (_, true) => return self.refuse(turn),
+            (Command::Choose { index }, true) => {
+                self.choose(turn, *index);
+                return None;
+            }
+            (Command::Leave, true) => {
+                self.leave(turn);
+                return None;
+            }
+            (_, true) => {
+                self.refuse(turn);
+                return None;
+            }
             (Command::Choose { .. } | Command::Leave, false) => {
-                return turn.say(BlockKind::Response, "You are not talking to anyone.");
+                turn.say(BlockKind::Response, "You are not talking to anyone.");
+                return None;
             }
             _ => {}
         }
@@ -657,8 +708,22 @@ impl Game {
                 preposition,
                 topic,
             } => {
-                // The player is the active actor; switching it is later (WO-5).
-                if let Some(other) = actor.filter(|a| a.as_str() != crate::PLAYER) {
+                // A command for another actor is an order, if it takes orders.
+                if let Some(other) = actor.filter(|a| {
+                    a.as_str() != crate::PLAYER && Some(a) != self.state.active.as_ref()
+                }) {
+                    if self.is_playable(other.as_str()) {
+                        let step = Input::Command(Command::Verb {
+                            verb,
+                            objects,
+                            actor: None,
+                            preposition,
+                            topic,
+                        });
+                        // Giving an order is a plain turn, as in the text `bilge, ...`.
+                        self.give_order(turn, &other, vec![step]);
+                        return Some(self.world.story.clock.minutes_per_turn);
+                    }
                     turn.say(
                         BlockKind::Response,
                         format!(
@@ -666,14 +731,21 @@ impl Game {
                             self.the(&other, false)
                         ),
                     );
-                    return;
+                    return None;
+                }
+                if verb.as_str() == SWITCH
+                    && let Some(to) = objects.first().filter(|o| self.is_playable(o.as_str()))
+                {
+                    let to = to.clone();
+                    self.switch_actor(turn, &to);
+                    return None;
                 }
                 if let Some(missing) = objects.iter().find(|o| !self.reachable(o.as_str())) {
                     turn.say(
                         BlockKind::Response,
                         format!("You can't see {} here.", self.the(missing, false)),
                     );
-                    return;
+                    return None;
                 }
                 let key = std::iter::once(verb.as_str())
                     .chain(objects.iter().map(Id::as_str))
@@ -713,7 +785,7 @@ impl Game {
             }
         }
         self.state.action = None;
-        self.advance(turn, minutes);
+        Some(minutes)
     }
 
     /// Count an action before it runs, so `action.*` includes this time.
@@ -901,6 +973,8 @@ impl Game {
             })
             .map(|t| t.id.clone())
             .collect();
+        // The active actor is the body of the player, not a thing around it.
+        ids.retain(|id| Some(id) != self.state.active.as_ref());
         for d in self.doors_here() {
             if !ids.contains(&d) && !self.state.is_concealed(d.as_str()) {
                 ids.push(d);
@@ -953,6 +1027,11 @@ impl Game {
                 .iter()
                 .filter_map(|id| self.world.thing(id.as_str()))
                 .map(|t| (t.id.clone(), self.nouns_of(t)))
+                // A playable actor is known from everywhere, for `switch to`.
+                .chain(
+                    self.remote_actors()
+                        .map(|t| (t.id.clone(), self.nouns_of(t))),
+                )
                 .collect(),
             exits: self
                 .visible_exits()
@@ -1141,7 +1220,10 @@ impl Game {
             .things
             .iter()
             .enumerate()
-            .filter(|(_, t)| self.state.is_in_room(t.id.as_str(), room.id.as_str()))
+            .filter(|(_, t)| {
+                self.state.is_in_room(t.id.as_str(), room.id.as_str())
+                    && Some(&t.id) != self.state.active.as_ref()
+            })
             .map(|(ti, t)| {
                 let presence = &self.world.things[ti].presence;
                 let generated = format!("There is {} here.", self.eval().thing_name(t.id.as_str(), loremaster_lang::NameForm::A));
@@ -1246,6 +1328,7 @@ impl Game {
                 };
                 note(&mut turn, format!("go to {}", r.name));
                 self.state.room = r.id.clone();
+                self.place_active();
                 *self
                     .state
                     .visits
@@ -1394,7 +1477,10 @@ impl Game {
                     || self
                         .eval()
                         .is_backdrop_here(thing.id.as_str(), room.id.as_str());
-                if !direct || self.state.is_concealed(thing.id.as_str()) {
+                if !direct
+                    || self.state.is_concealed(thing.id.as_str())
+                    || Some(&thing.id) == self.state.active.as_ref()
+                {
                     continue;
                 }
                 let contents = self.contents_text(thing);
@@ -1507,6 +1593,7 @@ impl Game {
         self.state.previous = Some(from.clone());
         self.fire(turn, &Event::Leave(from), depth);
         self.state.room = to;
+        self.place_active();
         self.enter_room(turn, depth);
     }
 
@@ -1866,6 +1953,7 @@ impl Game {
         // Actors act after the clock: a step at midnight runs in the turn
         // that reaches midnight.
         self.run_agendas(turn);
+        self.run_orders(turn);
     }
 
     /// Each running timer whose `runs_while` holds goes down by one. A timer at
@@ -2180,7 +2268,8 @@ impl Game {
             }
             "open" | "close" => {
                 let opening = verb == "open";
-                if !has(self, "open") {
+                // A playable actor's `open` fact only hides what it carries.
+                if !has(self, "open") || first.is_some_and(|o| self.is_playable(o.as_str())) {
                     say(turn, format!("{the_cap} isn't something you can {verb}."));
                 } else if opening && self.state.flag(&prop("locked")) {
                     say(turn, format!("{the_cap} is locked."));
