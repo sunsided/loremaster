@@ -292,20 +292,56 @@ fn a_second_file_of_the_overridden_entity_does_not_blame_the_override() {
 }
 
 #[test]
-fn a_nested_file_in_packs_is_not_read() {
-    let files = vec![
-        SourceFile {
-            path: "packs/world.yaml".into(),
-            text: world::pack().to_yaml(),
-        },
-        SourceFile {
-            path: "packs/backup/old.yaml".into(),
-            text: "nonsense: [".into(),
-        },
-        SourceFile {
-            path: "packs/backup/old.json".into(),
-            text: "{}".into(),
-        },
-    ];
+fn a_file_in_packs_that_is_not_read_is_an_error() {
+    for path in [
+        "packs/backup/old.yaml",
+        "packs/backup/old.json",
+        "packs/notes.txt",
+    ] {
+        let files = vec![
+            SourceFile {
+                path: "packs/world.yaml".into(),
+                text: world::pack().to_yaml(),
+            },
+            SourceFile {
+                path: path.into(),
+                text: "{}".into(),
+            },
+        ];
+        let found = load(files).expect_err(path);
+        assert!(
+            found
+                .iter()
+                .any(|d| d.file == path && d.message.starts_with("not read")),
+            "{found:?}"
+        );
+    }
+    // A `.yml` export is read like a `.yaml` one.
+    let files = vec![SourceFile {
+        path: "packs/world.yml".into(),
+        text: world::pack().to_yaml(),
+    }];
     load(files).expect("loads");
+}
+
+#[test]
+fn words_that_yaml_1_1_reads_as_booleans_come_back_as_text() {
+    let mut pack = world::pack();
+    pack.rooms[0].name = "on".into();
+    pack.rooms[0].tags = vec!["n".into(), "y".into(), "yes".into(), "off".into()];
+    let walk: loremaster::dsl::model::Walkthrough = serde_json::from_value(serde_json::json!({
+        "steps": ["n", "y", "no", "on"]
+    }))
+    .unwrap();
+    pack.walkthroughs
+        .push(("tests/walk.yaml".into(), walk.clone()));
+    let files = vec![SourceFile {
+        path: "packs/world.yaml".into(),
+        text: pack.to_yaml(),
+    }];
+    let project = load(files).expect("loads");
+    let room = project.story.room("shore").unwrap();
+    assert_eq!(room.name, "on");
+    assert_eq!(room.tags, ["n", "y", "yes", "off"]);
+    assert_eq!(project.walkthroughs[0].1, walk);
 }

@@ -988,6 +988,20 @@
 		return !c || c.error ? null : c.text;
 	}
 
+	/** Why an opened fragment has no writer: it is made in Rust, so there is no file to edit. */
+	const readOnlyNotice = $derived.by<string | null>(() => {
+		const at = writingAt;
+		const p = workspace?.project;
+		if (!at || !p || at.fragment < 0) return null;
+		const where = p.listOf(at.owner);
+		// The story intro is in the header, whose key is `story`.
+		const key = at.owner.startsWith('story:') ? 'story' : at.owner.split('/')[0];
+		if (!where || p.file(where.file) || !p.rustParts[key]) return null;
+		return key === 'story'
+			? `The story header is made in Rust and is read-only (${where.file}).`
+			: `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
+	});
+
 	/** The fragment under edit, from the file; a new empty one for index -1. */
 	const writerFragment = $derived.by<WriterFragment | null>(() => {
 		const at = writingAt;
@@ -1182,10 +1196,7 @@
 		const ws = workspace;
 		const where = ws?.project.listOf(at.owner);
 		const file = where && ws?.project.file(where.file);
-		// The story intro is in the header, whose key is `story`.
-		const key = at.owner.startsWith('story:') ? 'story' : at.owner.split('/')[0];
-		if (where && !file && ws?.project.rustParts[key])
-			return key === 'story' ? `The story header is made in Rust and is read-only (${where.file}).` : `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
+		if (where && !file && ws?.project.rustParts[at.owner.split('/')[0]]) return `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
 		if (!ws || !where || !file) return 'The editor does not know the file of this text.';
 		let text: string;
 		try {
@@ -1538,6 +1549,11 @@
 				{/snippet}
 			</FragmentWriter>
 		{/key}
+	{:else if readOnlyNotice}
+		<div class="read-only" role="status">
+			<p>{readOnlyNotice}</p>
+			<Button size="compact" variant="quiet" onclick={closeWriter}>Close</Button>
+		</div>
 	{/if}
 {/snippet}
 
@@ -1958,7 +1974,7 @@
 			<MapPanel map={shownMap} framed />
 		{/snippet}
 		{#snippet panel()}
-			{#if sideBySide && draft && writingAt && writingAt.fragment >= -1}
+			{#if sideBySide && (draft || readOnlyNotice) && writingAt && writingAt.fragment >= -1}
 				<div class="side-writer">{@render fragmentWriterView()}</div>
 			{:else if sideBySide}
 				{@render sidePanel(false)}
@@ -2127,6 +2143,12 @@
 		padding: 0 var(--space-3);
 		background: var(--color-status-text);
 		color: var(--color-status-bg);
+	}
+	.read-only {
+		padding: var(--space-3);
+		font-family: var(--font-ui);
+		font-size: var(--font-size-sm);
+		color: var(--color-text-muted);
 	}
 	.side-writer {
 		position: relative;

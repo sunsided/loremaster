@@ -164,14 +164,18 @@ pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diag
     files.sort_by(|a, b| a.path.cmp(&b.path));
     let mut packs = Vec::new();
     let mut errors = Vec::new();
-    for f in files.iter().filter(|f| is_exported_pack(&f.path, ".json")) {
-        errors.push(Diagnostic::error(
-            &f.path,
-            "",
-            "an old JSON pack: packs are YAML now; run `loremaster export-pack` again, which removes this file".to_string(),
-        ));
+    // A file in `packs/` that is not read would drop Rust parts without a word.
+    for f in files.iter().filter(|f| f.path.starts_with("packs/")) {
+        let message = if is_exported_pack(&f.path) {
+            continue;
+        } else if is_old_json_pack(&f.path) {
+            "an old JSON pack: packs are YAML now; run `loremaster export-pack` again, which removes this file"
+        } else {
+            "not read: an exported pack is `packs/<name>.yaml`, at the top of `packs/`; move or delete this file"
+        };
+        errors.push(Diagnostic::error(&f.path, "", message.to_string()));
     }
-    for f in files.iter().filter(|f| is_exported_pack(&f.path, ".yaml")) {
+    for f in files.iter().filter(|f| is_exported_pack(&f.path)) {
         // Every export has a name, so an empty file is not one.
         match serde_saphyr::from_str::<Pack>(&f.text) {
             Ok(pack) if !pack.name.is_empty() => packs.push(pack),
@@ -199,9 +203,14 @@ pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diag
 }
 
 /// Only the top level of `packs/`, which `export_packs` writes and cleans.
-fn is_exported_pack(path: &str, ext: &str) -> bool {
+fn is_exported_pack(path: &str) -> bool {
     path.strip_prefix("packs/")
-        .is_some_and(|name| !name.contains('/') && name.ends_with(ext))
+        .is_some_and(|name| !name.contains('/') && yaml_stem(name).is_some())
+}
+
+fn is_old_json_pack(path: &str) -> bool {
+    path.strip_prefix("packs/")
+        .is_some_and(|name| !name.contains('/') && name.ends_with(".json"))
 }
 
 /// The parts of a project that one source gives (DS-1): a YAML folder, and

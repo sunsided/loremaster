@@ -82,8 +82,8 @@ impl Loremaster {
     /// Write each Rust pack to `<dir>/packs/<name>.yaml`, for the generic
     /// editor (`loremaster export-pack`), with the git commit of `dir` when
     /// there is one. `packs/` belongs to this export: after the new packs are
-    /// written, the other `.yaml` files there are removed, because the loader
-    /// reads every one, and old `.json` packs too. Returns the paths.
+    /// written, the other `.yaml` and `.yml` files there are removed, because
+    /// the loader reads every one, and old `.json` packs too. Returns the paths.
     #[cfg(not(target_family = "wasm"))]
     pub fn export_packs(
         &self,
@@ -121,8 +121,9 @@ impl Loremaster {
         let mut paths = Vec::new();
         for (path, mut pack) in packs {
             let tmp = path.with_extension("yaml.tmp");
-            std::fs::write(&tmp, pack.to_yaml())?;
-            if let Err(e) = std::fs::rename(&tmp, &path) {
+            let written =
+                std::fs::write(&tmp, pack.to_yaml()).and_then(|()| std::fs::rename(&tmp, &path));
+            if let Err(e) = written {
                 let _ = std::fs::remove_file(&tmp);
                 return Err(e);
             }
@@ -130,7 +131,9 @@ impl Loremaster {
         }
         for entry in std::fs::read_dir(&out)? {
             let path = entry?.path();
-            let pack = path.extension().is_some_and(|e| e == "yaml" || e == "json");
+            let pack = path
+                .extension()
+                .is_some_and(|e| e == "yaml" || e == "yml" || e == "json");
             if pack && !paths.contains(&path) {
                 std::fs::remove_file(&path)?;
             }

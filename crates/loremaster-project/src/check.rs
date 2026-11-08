@@ -531,6 +531,13 @@ impl Checker<'_> {
         self.room_ref(&header, "start", story.start.as_str());
         self.fragments(&header, "intro", &story.intro);
         self.frames(&header, "frames", &story.frames);
+        let mut seen = BTreeSet::new();
+        for v in &story.verbs {
+            if !seen.insert(v.id.as_str()) {
+                let file = self.file_of(&format!("verb:{}", v.id));
+                self.error(&file, "id", format!("verb `{}` is defined twice", v.id));
+            }
+        }
         let mut verbs: BTreeSet<String> = standard_verbs()
             .iter()
             .chain(story.verbs.iter())
@@ -971,8 +978,16 @@ impl Checker<'_> {
         let story = self.story().clone();
         let mut symbols = self.scope.symbols.clone();
         let mut with = BTreeSet::new();
+        let mut ids = BTreeSet::new();
         for d in &story.dialogues {
             let file = self.file_of(&format!("dialogue:{}", d.id_str()));
+            if !ids.insert(d.id_str()) {
+                self.error(
+                    &file,
+                    "id",
+                    format!("dialogue `{}` is defined twice", d.id_str()),
+                );
+            }
             if self.story().thing(d.with.as_str()).is_some() && !with.insert(d.with.clone()) {
                 self.warning(
                     &file,
