@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Check that Cargo.lock takes the dramaturge crates from crates.io, in the
-# version that Cargo.toml pins.
+# Check that Cargo.lock takes the dramaturge crates from crates.io, in a
+# version that the requirement in Cargo.toml allows.
 #
 # A local .cargo/config.toml can patch dramaturge to a working copy, to work
 # on both repositories at once. Each cargo command then rewrites Cargo.lock
@@ -26,6 +26,25 @@ lock = tomllib.loads(sys.argv[1])
 manifest = tomllib.load(open("Cargo.toml", "rb"))
 deps = manifest["workspace"]["dependencies"]
 registry = "registry+https://github.com/rust-lang/crates.io-index"
+
+
+def allows(req, version):
+    """Cargo's rule for `=x.y.z` (exact) and a plain `x.y` (caret)."""
+    if req.startswith("="):
+        return version == req[1:]
+    if "-" in version:
+        return False  # a plain requirement does not take pre-releases
+    want = [int(x) for x in req.split(".")]
+    have = [int(x) for x in version.split(".")]
+    # The leftmost non-zero part must match: 0.3 takes 0.3.x, 1.2 takes 1.x.
+    first = next((i for i, x in enumerate(want) if x != 0), len(want) - 1)
+    return have[: first + 1] == want[: first + 1] and have[: len(want)] >= want
+
+
+assert allows("0.3", "0.3.1") and allows("0.3", "0.3.0") and not allows("0.3", "0.4.0")
+assert not allows("0.3", "0.3.0-alpha.5") and allows("=0.3.0-alpha.5", "0.3.0-alpha.5")
+assert allows("1.2", "1.9.0") and not allows("1.2", "1.1.9") and not allows("1.2", "2.0.0")
+
 bad = False
 for crate in (
     "dramaturge-model",
@@ -35,7 +54,6 @@ for crate in (
 ):
     want = deps[crate]
     want = want if isinstance(want, str) else want.get("version", "")
-    want = want.removeprefix("=")
     found = [p for p in lock.get("package", []) if p["name"] == crate]
     if not found:
         print(f"error: Cargo.lock has no {crate}")
@@ -45,8 +63,8 @@ for crate in (
         if source != registry:
             print(f"error: Cargo.lock does not take {crate} from crates.io ({source})")
             bad = True
-        elif p["version"] != want:
-            print(f"error: Cargo.lock has {crate} {p['version']}, Cargo.toml pins {want}")
+        elif not allows(want, p["version"]):
+            print(f"error: Cargo.lock has {crate} {p['version']}, Cargo.toml asks for {want}")
             bad = True
 if bad:
     print("Unstage the patched Cargo.lock ('git restore --staged Cargo.lock'), or regenerate it without the local patch.")

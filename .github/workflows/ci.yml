@@ -49,7 +49,7 @@ jobs:
       - run: cargo fmt -- --check
       # Without the embedded web editor: this job does not build web/.
       # --locked: CI builds exactly the committed Cargo.lock, with the
-      # dramaturge alpha from crates.io that it names.
+      # dramaturge release from crates.io that it names.
       - run: scripts/check-lock.sh
       - run: cargo clippy --workspace --all-targets --no-default-features --locked -- -D warnings
       - run: cargo test --workspace --no-default-features --locked
@@ -79,10 +79,10 @@ jobs:
       - run: scripts/pending-tests.sh
 
   # Not a required check: an early warning. It builds and tests loremaster
-  # against the newest dramaturge on feature/0.3, before the next alpha. Red
+  # against the newest dramaturge on main, before its next release. Red
   # means that the next dramaturge bump needs changes in loremaster.
   dramaturge-tip:
-    name: dramaturge feature/0.3 (not required)
+    name: dramaturge main (not required)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -96,25 +96,24 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: dramaturge-tip
-      - name: Patch dramaturge to the tip of feature/0.3
+      - name: Patch dramaturge to the tip of main
         run: |
-          # A patch applies only when its version satisfies the requirement,
-          # and Cargo.toml pins the released alpha exactly. Allow any 0.3
-          # version here, so the patch also applies after feature/0.3 raised
-          # its version.
-          sed -i -E 's/^(dramaturge-(model|runtime|authoring)) = "=[^"]+"$/\1 = ">=0.3.0-alpha.0, <0.4.0"/' Cargo.toml
+          # A patch applies only when its version satisfies the requirement.
+          # Allow any version from 0.3.0 on, so the patch also applies after
+          # main raised the minor version.
+          sed -i -E 's/^(dramaturge-[a-z]+ = (\{ version = )?)"[^"]+"/\1">=0.3.0"/' Cargo.toml
           mkdir -p .cargo
           {
             echo '[patch.crates-io]'
-            for crate in dramaturge-model dramaturge-runtime dramaturge-authoring; do
-              echo "$crate = { git = \"https://github.com/sunsided/dramaturge\", branch = \"feature/0.3\" }"
+            for crate in dramaturge-model dramaturge-runtime dramaturge-authoring dramaturge-syntax; do
+              echo "$crate = { git = \"https://github.com/sunsided/dramaturge\", branch = \"main\" }"
             done
           } > .cargo/config.toml
-          cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring
+          cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring -p dramaturge-syntax
           # The job is worth nothing if cargo fell back to crates.io.
-          for crate in dramaturge-model dramaturge-runtime dramaturge-authoring; do
+          for crate in dramaturge-model dramaturge-runtime dramaturge-authoring dramaturge-syntax; do
             grep -A2 "^name = \"$crate\"$" Cargo.lock | grep -q '^source = "git+https://github.com/sunsided/dramaturge' \
-              || { echo "error: $crate does not come from feature/0.3"; exit 1; }
+              || { echo "error: $crate does not come from dramaturge main"; exit 1; }
           done
       - run: cargo test --workspace --no-default-features
 
