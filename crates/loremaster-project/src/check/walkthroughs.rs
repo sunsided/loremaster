@@ -228,12 +228,17 @@ impl Checker<'_> {
     }
 }
 
-/// Where step `i` starts in the YAML text: each step is looked for after the
-/// one before it, by `id: <id>` or else by its command as a word, so two
-/// steps with the same command get their own lines.
+/// Where step `i` starts in the YAML text: the `i`-th item of the block
+/// list after `steps:`. A flow list (`steps: [..]`) has no lines to count:
+/// there each step is looked for after the one before it, by `id: <id>` or
+/// else by its command as a word.
 fn step_position(project: &crate::Project, key: &str, text: &str, i: usize) -> Option<usize> {
     let (_, walk) = project.walkthroughs.iter().find(|(k, _)| k == key)?;
     let mut from = text.find("steps:")?;
+    let items = list_items(text, from);
+    if items.len() == walk.steps.len() {
+        return items.get(i).copied();
+    }
     let mut at = None;
     for step in walk.steps.iter().take(i + 1) {
         let found = match step.id() {
@@ -249,6 +254,38 @@ fn step_position(project: &crate::Project, key: &str, text: &str, i: usize) -> O
         }
     }
     at
+}
+
+/// The items of the block list on the lines after `from`: the places after
+/// the `- ` of each line at the indentation of the first item. Comments,
+/// blank lines and the deeper lines of an item are skipped.
+fn list_items(text: &str, from: usize) -> Vec<usize> {
+    let mut items = Vec::new();
+    let Some(eol) = text[from..].find('\n') else {
+        return items;
+    };
+    let mut offset = from + eol + 1;
+    let mut indent = None;
+    for line in text[offset..].split_inclusive('\n') {
+        let here = offset;
+        offset += line.len();
+        let trimmed = line.trim_start_matches(' ');
+        let body = trimmed.trim_end();
+        if body.is_empty() || body.starts_with('#') {
+            continue;
+        }
+        let n = line.len() - trimmed.len();
+        let item = body == "-" || body.starts_with("- ");
+        match indent {
+            None if item => indent = Some(n),
+            None => break,
+            Some(i) if n < i || (n == i && !item) => break,
+            Some(i) if n > i => continue,
+            _ => {}
+        }
+        items.push(here + n + body.len().min(2));
+    }
+    items
 }
 
 /// The first place at or after `from` where `text` has `word` as a whole word.
@@ -479,6 +516,19 @@ mod tests {
             .collect();
         check!(d.len() == 1, "{d:?}");
         check!(d[0].at == "steps[1]");
+        check!(d[0].line == Some(3), "{d:?}");
+    }
+
+    #[test]
+    fn the_line_is_the_one_of_the_step_also_after_a_hint_with_its_command() {
+        let d: Vec<_> = check_files(files(
+            "steps:\n  - { id: a, do: open drawer, hints: [\"Then wait.\"] }\n  - { do: wait, at: attic }\n",
+        ))
+        .diagnostics
+        .into_iter()
+        .filter(|d| d.file == "tests/win.yaml")
+        .collect();
+        check!(d.len() == 1, "{d:?}");
         check!(d[0].line == Some(3), "{d:?}");
     }
 
