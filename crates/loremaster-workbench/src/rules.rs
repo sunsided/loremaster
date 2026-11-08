@@ -137,6 +137,13 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),
+                    loremaster_model::Effect::Calc(m) => format!(
+                        "set {}",
+                        m.iter()
+                            .map(|(k, v)| format!("{k} to {v}"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
                     loremaster_model::Effect::Say(t) => match t.as_plain() {
                         Some(text) => format!("say \"{text}\""),
                         // The readable form quotes the speech already.

@@ -341,6 +341,24 @@ impl Session {
         self.game.host_rolls = host_rolls;
     }
 
+    /// The next rolls take these totals, in order, for walkthrough tests.
+    /// A roll after the last one uses the RNG again.
+    pub(crate) fn force_rolls(&mut self, totals: &[i64]) {
+        self.game.forced.totals = totals.iter().copied().collect();
+    }
+
+    /// What went wrong with the forced rolls: totals out of the range of
+    /// their dice, and totals that no roll took. Clears the forced rolls.
+    pub(crate) fn forced_roll_errors(&mut self) -> Vec<String> {
+        let forced = std::mem::take(&mut self.game.forced);
+        let mut out = forced.misfits;
+        if !forced.totals.is_empty() {
+            let left: Vec<_> = forced.totals.iter().map(i64::to_string).collect();
+            out.push(format!("no roll took the forced rolls {}", left.join(", ")));
+        }
+        out
+    }
+
     /// Choose an answer: a short form of `submit(Input::Choice(index))`.
     pub fn choose(&mut self, index: usize) -> Step {
         self.submit(Input::Choice(index))

@@ -16,7 +16,7 @@ error: a bare string after `says` reads like more speech; write `narrate "…"` 
 34 |             stove: says "Nobody." "He turns the poker." {
    |                                   ^^^^^^^^^^^^^^^^^^^^^
 
-error: expected an effect: `line`, `set`, `add`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel` or `call`
+error: expected an effect: `line`, `set`, `add`, `calc`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel` or `call`
   --> tests/ui/fail/dialogue_syntax.rs:47:22
    |
 47 |                 then jump;

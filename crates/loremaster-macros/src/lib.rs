@@ -81,6 +81,11 @@
 //! assert_eq!(p.rooms[0].id.as_str(), "chamber");
 //! ```
 //!
+//! A number variable takes limits, `var stamina = 10 min 0 max stamina_initial;`.
+//! The effect `calc total = r + skill - 1;` sets a number from a sum. A test
+//! takes `seed 42;`, and a step takes `rolls 4, 11` for the totals of its
+//! rolls.
+//!
 //! A `line` is one string, or speech segments (P3-15, #111): bare strings
 //! and `narrate "…"` are narration, `says "…"` and `keeper says "…"` are
 //! speech, and `when <cond> then <segment>` shows the one segment after

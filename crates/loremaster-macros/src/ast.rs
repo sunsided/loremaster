@@ -115,6 +115,9 @@ pub struct Var {
     pub id: Name,
     pub ty: VarType,
     pub initial: Value,
+    /// `min <n|var>` and `max <n|var>`: the number or the variable id as written.
+    pub min: Option<Name>,
+    pub max: Option<Name>,
 }
 
 /// A fragment of text: `[ambient] [cycle] [when <cond> =>] "text"` or a
@@ -297,6 +300,8 @@ pub enum EffectKind {
     Line(Vec<Segment>),
     Set(Vec<(Name, Value)>),
     Add(Vec<(Name, i64)>),
+    /// `calc total = r + skill`: the target and the sum as text.
+    Calc(Name, String),
     /// The thing and the target word: a room, `in:box`, `on:table`,
     /// `carried` or `nowhere`.
     Move(Vec<(Name, String)>),
@@ -371,6 +376,8 @@ pub struct Test {
     pub id: Name,
     pub name: Text,
     pub pending: Option<(u8, Text)>,
+    /// `seed 42;`: the seed of the RNG for this test.
+    pub seed: Option<u64>,
     pub steps: Vec<TestStep>,
     pub expect: Vec<Expectation>,
 }
@@ -380,6 +387,8 @@ pub struct TestStep {
     /// `wait * 16`: the step 16 times.
     pub times: u32,
     pub checks: Vec<Expectation>,
+    /// `rolls 4, 11`: the totals of the rolls in the step.
+    pub rolls: Vec<i64>,
 }
 
 pub enum Expectation {

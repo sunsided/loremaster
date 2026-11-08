@@ -57,6 +57,7 @@ impl<'a> WalkthroughBuilder<'a> {
             Walkthrough {
                 name: Some(name),
                 steps: Vec::new(),
+                seed: None,
                 expect: Expect::default(),
                 pending: None,
             },
@@ -75,7 +76,7 @@ impl<'a> WalkthroughBuilder<'a> {
 
     /// The step added last, as a step with checks and a plan.
     #[track_caller]
-    fn checked(&mut self) -> (&mut Expect, &mut StepPlan) {
+    fn checked(&mut self) -> (&mut Expect, &mut StepPlan, &mut Vec<i64>) {
         let Some(step) = self.walkthrough().steps.last_mut() else {
             panic!("the walkthrough has no step yet: call `step` first");
         };
@@ -84,10 +85,16 @@ impl<'a> WalkthroughBuilder<'a> {
                 command: std::mem::take(command),
                 expect: Expect::default(),
                 plan: Box::default(),
+                rolls: Vec::new(),
             };
         }
         match step {
-            WalkStep::Checked { expect, plan, .. } => (expect, &mut **plan),
+            WalkStep::Checked {
+                expect,
+                plan,
+                rolls,
+                ..
+            } => (expect, &mut **plan, rolls),
             WalkStep::Command(_) => unreachable!("the step was made a checked step"),
         }
     }
@@ -100,6 +107,19 @@ impl<'a> WalkthroughBuilder<'a> {
     #[track_caller]
     fn step_plan(&mut self) -> &mut StepPlan {
         self.checked().1
+    }
+
+    /// The rolls in the last step take these totals, in order (`rolls:`).
+    #[track_caller]
+    pub fn rolls(mut self, totals: impl IntoIterator<Item = i64>) -> Self {
+        self.checked().2.extend(totals);
+        self
+    }
+
+    /// The RNG of this test starts from this seed, not the story's.
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.walkthrough().seed = Some(seed);
+        self
     }
 
     /// The last step has this id, for `needs`, `before` and the chart.
