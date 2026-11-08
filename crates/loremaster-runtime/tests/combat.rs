@@ -2,7 +2,7 @@
 
 use loremaster_model::Value;
 use loremaster_project::{Severity, SourceFile, check, load};
-use loremaster_runtime::authoring::{Budget, explore, force_rolls, forced_roll_errors};
+use loremaster_runtime::authoring::{Budget, carry_over, explore, force_rolls, forced_roll_errors};
 use loremaster_runtime::{AwaitRequest, Session, Status, Step, World, run_walkthrough};
 use std::sync::Arc;
 
@@ -37,6 +37,10 @@ fn files(combat: &str, luck: i64) -> Vec<SourceFile> {
         file("things/warden.yaml", WARDEN),
         file("things/hound.yaml", HOUND),
         file("rules/fight.yaml", &rule),
+        file(
+            "things/dead.yaml",
+            "name: BONES\nlocation: { room: gate }\nprops: { skill: 1, stamina: 0 }\n",
+        ),
     ]
 }
 
@@ -273,4 +277,96 @@ fn the_checks_reject_a_bad_combat() {
         "{errors:?}"
     );
     assert!(errors.iter().any(|m| m.contains("nowhere")), "{errors:?}");
+}
+
+fn compiled(f: Vec<SourceFile>) -> Arc<World> {
+    Arc::new(World::compile(load(f).unwrap().story).unwrap())
+}
+
+#[test]
+fn a_walk_into_a_combat_is_not_an_attack() {
+    let mut f = files(ONE, 0);
+    f[7] = file(
+        "rules/fight.yaml",
+        &format!(
+            "- id: walk\n  on: start\n  then:\n    - await: {{ walk_to: yard }}\n    - say: \"After walk.\"\n- id: ambush\n  on: {{ enter: yard }}\n  then:\n    - combat: {ONE}\n"
+        ),
+    );
+    let mut s = Session::new(compiled(f));
+    let step = s.start();
+    let step = s
+        .resume(&await_id(&step), Value::Text("arrived".into()))
+        .unwrap();
+    assert_eq!(s.combat().unwrap().round, 0, "{}", step.plain_text());
+    assert_eq!(options(&step), ["attack", "escape"]);
+}
+
+#[test]
+fn effects_after_a_combat_do_not_run_when_the_win_room_ends_the_story() {
+    for enemy in ["hound", "dead"] {
+        let combat = format!("{{ enemies: [{enemy}], win: yard, loss: fallen }}");
+        let mut f = files(&combat, 0);
+        f[7].text
+            .push_str("- id: finish\n  on: { enter: yard }\n  then:\n    - end: done\n");
+        f.push(file(
+            "endings/done.yaml",
+            "kind: win\ntitle: Done\ntext: Over.\n",
+        ));
+        let mut s = Session::new(compiled(f));
+        let mut step = s.start();
+        if enemy == "hound" {
+            step = play(&mut s, &step, "attack", &WIN);
+        }
+        assert!(s.state().ended, "{enemy}");
+        assert!(!step.plain_text().contains("After."), "{enemy}");
+    }
+}
+
+#[test]
+fn a_room_that_starts_a_combat_won_at_once_does_not_recurse_for_ever() {
+    let mut f = files(ONE, 0);
+    f[7] = file(
+        "rules/fight.yaml",
+        "- id: begin\n  on: start\n  then:\n    - goto: yard\n- id: again\n  on: { enter: yard }\n  then:\n    - combat: { enemies: [dead], win: yard, loss: fallen }\n",
+    );
+    let mut s = Session::new(compiled(f));
+    assert_eq!(s.start().status, Status::Ready);
+    assert_eq!(s.state().room.as_str(), "yard");
+}
+
+#[test]
+fn no_luck_test_on_a_wound_that_kills_anyway() {
+    let mut f = files(ONE, 8);
+    f[0].text = f[0].text.replace("initial: 12", "initial: 1");
+    let mut s = Session::new(compiled(f));
+    let step = s.start();
+    play(&mut s, &step, "attack", &LOSE);
+    assert_eq!(s.state().room.as_str(), "fallen");
+    assert_eq!(stat(&s, "luck"), 8);
+}
+
+#[test]
+fn a_live_edit_that_removes_an_enemy_ends_the_combat() {
+    let (s, _) = session(ONE, 0);
+    let mut f = files(ONE, 0);
+    f.remove(5);
+    let next = carry_over(&s, compiled(f));
+    assert!(next.combat().is_none());
+    assert_eq!(next.status(), Status::Ready);
+}
+
+#[test]
+fn the_checks_reject_a_repeated_enemy_and_a_stamina_floor() {
+    let mut f = files("{ enemies: [warden, warden], win: yard, loss: fallen }", 0);
+    f[0].text = f[0].text.replace(
+        "{ id: stamina, type: int, initial: 12 }",
+        "{ id: stamina, type: int, initial: 12, min: 1 }",
+    );
+    let diags = check(&load(f).unwrap());
+    let has = |t: &str| {
+        diags
+            .iter()
+            .any(|d| d.severity == Severity::Error && d.message.contains(t))
+    };
+    assert!(has("named twice") && has("`min` of `stamina`"), "{diags:?}");
 }

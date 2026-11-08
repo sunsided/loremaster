@@ -310,9 +310,27 @@ impl Game {
         // A paused rule goes on only when the rule is the same in the new
         // world: its effects may have moved, as in `save::reconcile`.
         let rule_of = |w: &World, id: &Id| w.story.rules.iter().find(|r| r.id == *id).cloned();
+        let int_prop =
+            |t: &loremaster_model::Thing, p: &str| matches!(t.props.get(p), Some(Value::Int(_)));
+        let combat_ok = |c: &crate::CombatState| {
+            c.spec.enemies.iter().all(|e| {
+                world
+                    .story
+                    .thing(e.as_str())
+                    .is_some_and(|t| int_prop(t, "skill") && int_prop(t, "stamina"))
+            }) && [
+                Some(&c.spec.win),
+                Some(&c.spec.loss),
+                c.spec.escape.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            .all(has_room)
+        };
         if let Some(open) = &state.awaiting
             && (rule_of(&world, &open.rule).is_none()
-                || rule_of(&world, &open.rule) != rule_of(&self.world, &open.rule))
+                || rule_of(&world, &open.rule) != rule_of(&self.world, &open.rule)
+                || state.combat.as_ref().is_some_and(|c| !combat_ok(c)))
         {
             state.awaiting = None;
             state.combat = None;

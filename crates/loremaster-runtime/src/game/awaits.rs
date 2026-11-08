@@ -135,6 +135,8 @@ impl Game {
         }
         let mut turn = Turn::default();
         self.state.awaiting = None;
+        // Before the walk below: its room can start a new combat.
+        let combat = self.state.combat.is_some();
         if let Some(into) = &open.into {
             self.set_fact(&mut turn, into, answer.clone());
         }
@@ -143,9 +145,9 @@ impl Game {
         {
             self.move_player(&mut turn, room.clone(), 1);
         }
-        if self.state.combat.is_none()
-            || self.combat_answer(&mut turn, &open.rule, open.next, &answer) == AwaitStep::Answered
-        {
+        let go_on = !combat
+            || self.combat_answer(&mut turn, &open.rule, open.next, &answer) == AwaitStep::Answered;
+        if go_on && !self.state.ended {
             self.continue_rule(&mut turn, &open.rule, open.next);
         }
         Ok(self.finish(turn))
@@ -186,12 +188,12 @@ impl Game {
                 continue;
             }
             if let CEffect::Combat(spec) = effect {
-                if self.begin_combat(turn, rule, k + 1, spec) != AwaitStep::Answered {
+                if self.begin_combat(turn, rule, k + 1, spec, depth) != AwaitStep::Answered {
                     return false;
                 }
-                continue;
+            } else {
+                self.apply(turn, rule, effect, depth);
             }
-            self.apply(turn, rule, effect, depth);
             if self.stopped || self.state.ended {
                 break;
             }

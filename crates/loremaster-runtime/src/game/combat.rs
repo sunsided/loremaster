@@ -38,6 +38,7 @@ impl Game {
         rule: &Id,
         next: usize,
         spec: &CombatSpec,
+        depth: u8,
     ) -> AwaitStep {
         if self.state.awaiting.is_some() {
             turn.log.push(crate::LogEntry {
@@ -53,7 +54,7 @@ impl Game {
             pending: None,
             log: Vec::new(),
         });
-        self.combat_go_on(turn, rule, next)
+        self.combat_go_on(turn, rule, next, depth)
     }
 
     /// Handle the answer to a combat await. `Answered` means the combat is
@@ -69,13 +70,13 @@ impl Game {
             Value::Text(a) if a == ESCAPE => self.combat_escape(turn),
             Value::Text(a) if a == LUCK => {
                 self.combat_luck(turn);
-                self.combat_go_on(turn, rule, next)
+                self.combat_go_on(turn, rule, next, 1)
             }
             Value::Text(a) if a == GO_ON => {
                 if let Some(hit) = self.pending_hit() {
                     self.combat_damage(turn, &hit, HIT);
                 }
-                self.combat_go_on(turn, rule, next)
+                self.combat_go_on(turn, rule, next, 1)
             }
             _ => self.combat_round(turn, rule, next),
         }
@@ -127,15 +128,15 @@ impl Game {
     }
 
     /// The end check, then the next round's choice.
-    fn combat_go_on(&mut self, turn: &mut Turn, rule: &Id, next: usize) -> AwaitStep {
+    fn combat_go_on(&mut self, turn: &mut Turn, rule: &Id, next: usize, depth: u8) -> AwaitStep {
         let Some(spec) = self.state.combat.as_ref().map(|c| c.spec.clone()) else {
             return AwaitStep::Answered;
         };
         if self.int("stamina") <= 0 {
-            return self.combat_leave(turn, spec.loss);
+            return self.combat_leave(turn, spec.loss, depth);
         }
         if self.living(&spec).is_empty() {
-            return self.combat_leave(turn, spec.win);
+            return self.combat_leave(turn, spec.win, depth);
         }
         let mut options = vec![(ATTACK, ATTACK_TEXT)];
         if spec.escape.is_some() {
@@ -160,9 +161,9 @@ impl Game {
         self.open_await(turn, rule, next, AwaitRequest::Choice { options }, None)
     }
 
-    fn combat_leave(&mut self, turn: &mut Turn, room: Id) -> AwaitStep {
+    fn combat_leave(&mut self, turn: &mut Turn, room: Id, depth: u8) -> AwaitStep {
         self.state.combat = None;
-        self.move_player(turn, room, 1);
+        self.move_player(turn, room, depth);
         AwaitStep::Answered
     }
 
@@ -176,7 +177,7 @@ impl Game {
             Some(room) if self.int("stamina") > 0 => room,
             _ => spec.loss,
         };
-        self.combat_leave(turn, room)
+        self.combat_leave(turn, room, 1)
     }
 
     /// One round: the enemies roll, then the player. The player attacks the
@@ -190,14 +191,19 @@ impl Game {
             fighting.truncate(1);
         }
         let Some(target) = fighting.first().cloned() else {
-            return self.combat_go_on(turn, rule, next);
+            return self.combat_go_on(turn, rule, next, 1);
         };
         let mut enemies = BTreeMap::new();
         for e in &fighting {
             let total = self.take_roll(turn, ROLL, "2d6");
-            enemies.insert(e.clone(), total + self.int(&format!("{e}.skill")));
+            enemies.insert(
+                e.clone(),
+                total.saturating_add(self.int(&format!("{e}.skill"))),
+            );
         }
-        let player = self.take_roll(turn, ROLL, "2d6") + self.int("skill");
+        let player = self
+            .take_roll(turn, ROLL, "2d6")
+            .saturating_add(self.int("skill"));
         let mut round = 0;
         if let Some(c) = &mut self.state.combat {
             c.round += 1;
@@ -230,10 +236,15 @@ impl Game {
             }
         }
         let Some(hit) = hit else {
-            return self.combat_go_on(turn, rule, next);
+            return self.combat_go_on(turn, rule, next, 1);
         };
-        // No test where it can not help: a hit that already kills the enemy.
-        let helps = hit.as_str() == PLAYER || self.int(&format!("{hit}.stamina")) > HIT;
+        // No test where it can not help: a hit that already kills the enemy,
+        // or a wound that kills the player even when lucky.
+        let helps = if hit.as_str() == PLAYER {
+            self.int("stamina") > HIT - 1
+        } else {
+            self.int(&format!("{hit}.stamina")) > HIT
+        };
         if helps && self.int("luck") > 0 && self.int("stamina") > 0 {
             if let Some(c) = &mut self.state.combat {
                 c.pending = Some(hit);
@@ -241,7 +252,7 @@ impl Game {
             return self.combat_ask(turn, rule, next, &[(LUCK, LUCK_TEXT), (GO_ON, "Go on")]);
         }
         self.combat_damage(turn, &hit, HIT);
-        self.combat_go_on(turn, rule, next)
+        self.combat_go_on(turn, rule, next, 1)
     }
 
     /// The Luck test on the pending hit: it costs 1 LUCK and changes the damage.
@@ -273,7 +284,11 @@ impl Game {
         } else {
             format!("{target}.stamina")
         };
-        self.set_fact(turn, &fact, Value::Int((self.int(&fact) - damage).max(0)));
+        self.set_fact(
+            turn,
+            &fact,
+            Value::Int(self.int(&fact).saturating_sub(damage).max(0)),
+        );
     }
 
     /// The combat as the panel shows it.

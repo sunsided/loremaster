@@ -431,7 +431,7 @@ The effect `combat` runs a fight by built-in rules. The player needs the number 
 
 In each round, the player selects "Attack" or, if the combat has `escape`, "Escape". The enemy and the player each roll 2d6 and add their `skill`. The enemy rolls first. The higher total hits and takes 2 `stamina`. In an all-at-once combat, each enemy rolls and the player rolls once. The player attacks the first living enemy, and the other enemies only attack.
 
-After a hit, the player can select "Test your Luck" or "Go on", when `luck` is more than 0. The roll is 2d6 against `luck`, and the test costs 1 `luck`. A lucky result on a hit: the enemy loses 2 more. An unlucky one: the enemy loses 1 less. A lucky result on a wound: the player loses 1 less. An unlucky one: the player loses 1 more. If more than one hit happens in a round, the test changes the last one. A test is not offered for a hit that already kills the enemy.
+After a hit, the player can select "Test your Luck" or "Go on", when `luck` is more than 0. The roll is 2d6 against `luck`, and the test costs 1 `luck`. A lucky result on a hit: the enemy loses 2 more. An unlucky one: the enemy loses 1 less. A lucky result on a wound: the player loses 1 less. An unlucky one: the player loses 1 more. If more than one hit happens in a round, the test changes the last one. A test is not offered for a hit that already kills the enemy, or for a wound when the player has 1 `stamina`.
 
 Escape costs 2 `stamina`. If that is the last `stamina`, the combat ends in `loss`.
 
@@ -442,7 +442,7 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: "Test your Luck", rolls: [4] }
 ```
 
-`combat` works only in rules. The explorer tries the win and the loss of a round and the escape; it does not try Luck tests.
+`combat` works only in rules. The `min` of `stamina` must be 0 or less, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, or rounds of an all-at-once combat in which the player hits and an enemy hits too.
 
 ### Number limits and sums
 
@@ -731,7 +731,7 @@ steps:
 - A machine takes one step for one event only.
 - A step with `on: next` needs no event. It runs by itself right after a step brings the machine to one of its `from` states, in the same turn, and when the game starts in that state. A change of the machine's variable with `set` does not run it. Of several such steps of one state, the first whose `when` holds runs, in file order. These steps chain, and they can go back to an earlier state, so they make a loop.
 - An `await` in such a step waits as in a rule. After the answer, the chain goes on. A save in the middle restores.
-- A `stop` in such a step ends the chain of that machine. The chains of other machines still run.
+- A `stop` in such a step ends the chain of that machine. At the start of the game, the chains of other machines still run. When an event started the chain, the `stop` also ends the other rules of that event, as any `stop` does.
 - `step_limit: 100` in story.yaml is the most `on: next` steps in one turn, counted anew after each answer to an `await` (100 by default). At the limit, the chain of steps stops with a note; the rest of the turn goes on. A loop that steps can reach from the start state, where no step has `when`, `await`, `end` or `stop`, is an error of the checks: it can never stop. A loop that only a `set` of the machine's variable can enter is not checked; the step limit stops it. `on: next` is an error in a rule outside a machine.
 - The id of the machine is a variable with its state. Conditions read it: `exorcism == lit`.
 - Each step is a rule with the id `<machine>#<number>`. The rules view, the checks and the explorer show them.

@@ -1513,7 +1513,10 @@ impl Checker<'_> {
         if spec.enemies.is_empty() {
             self.error(file, at, "a `combat` needs at least one enemy");
         }
-        for e in &spec.enemies {
+        for (i, e) in spec.enemies.iter().enumerate() {
+            if spec.enemies[..i].contains(e) {
+                self.error(file, at, format!("the enemy `{e}` is named twice"));
+            }
             self.thing_ref(file, at, e.as_str());
             for stat in ["skill", "stamina"] {
                 if !matches!(self.ty_of(&format!("{e}.{stat}")), Some(Ty::Int)) {
@@ -1535,6 +1538,11 @@ impl Checker<'_> {
                     format!("`combat` needs a number variable `{stat}`"),
                 );
             }
+        }
+        // With a higher floor, `stamina` never reaches 0 and the combat has no loss.
+        let floor = self.story().var("stamina").and_then(|v| v.min.clone());
+        if !matches!(floor, None | Some(loremaster_model::Limit::Value(..=0))) {
+            self.error(file, at, "`combat` needs a `min` of `stamina` of 0 or less");
         }
         if self.ty_of("luck").is_some_and(|t| t != Ty::Int) {
             self.error(file, at, "`luck` is not a number variable");

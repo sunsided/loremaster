@@ -122,7 +122,7 @@ fn fingerprint(game: &Game, counters: bool) -> String {
             .as_ref()
             .map(|a| (&a.rule, a.next, &a.request, &a.into, &a.locals)),
         // Only the hit that waits for its Luck test; round and log are history.
-        s.combat.as_ref().map(|c| &c.pending),
+        s.combat.as_ref().map(|c| (true, &c.pending)),
         &s.actors,
         game.agenda_waits(),
     ))
@@ -304,6 +304,10 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
 /// the walk sees both outcomes. The extreme rolls keep impossible outcomes
 /// out: with a big gap in SKILL, a forced "win" still loses.
 fn force_round(game: &mut Game, label: &str) {
+    // Other labels hold text of the author, which can end in the same words.
+    if game.state().combat.is_none() {
+        return;
+    }
     let (enemy, player) = if label.ends_with(WIN_ROUND) {
         (2, 12)
     } else if label.ends_with(LOSE_ROUND) {
