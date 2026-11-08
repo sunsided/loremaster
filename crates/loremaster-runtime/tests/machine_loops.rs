@@ -233,8 +233,36 @@ fn nested_machines_share_the_step_limit() {
     let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
     let mut s = Session::new(world);
     s.start();
+    // `n` starts in `spin`, so its chain already used the limit of the first turn.
+    assert_eq!(state(&s, "total"), Value::Int(7));
     let step = s.submit(Input::Text("pull lever".into()));
     assert_eq!(step.status, Status::Ready);
     let notes = step.plain_text().matches("step_limit").count();
     assert_eq!(notes, 1, "{}", step.plain_text());
+    // Each automatic step adds 1: with a limit per machine, it would be more.
+    assert_eq!(state(&s, "total"), Value::Int(14));
+}
+
+#[test]
+fn an_await_at_the_start_does_not_hold_back_other_machines() {
+    let waits = "start: a\nsteps:\n  - { from: a, on: next, to: b, then: [{ await: { choice: [left, right] } }] }\n";
+    let mut f = files("", waits);
+    f.push(file(
+        "machines/n.yaml",
+        "start: a\nsteps:\n  - { from: a, on: next, to: b }\n",
+    ));
+    let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    assert_eq!(state(&s, "n"), Value::Text("b".into()));
+}
+
+#[test]
+fn a_loop_no_step_can_reach_is_no_error() {
+    let m = "start: a\nstates: [a, g, h]\nsteps:\n  - { from: g, on: next, to: h }\n  - { from: h, on: next, to: g }\n";
+    let found = errors(files("", m));
+    assert!(
+        !found.iter().any(|m| m.contains("loop forever")),
+        "{found:?}"
+    );
 }

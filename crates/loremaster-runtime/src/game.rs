@@ -407,10 +407,16 @@ impl Game {
         self.fire(&mut turn, &Event::Start, 0);
         for machine in &world.story.machines {
             // A paused chain goes on after its answer, not here.
-            if self.state.awaiting.is_none() {
+            let paused = self.state.awaiting.as_ref().and_then(|a| {
+                let rule = world.story.rules.iter().find(|r| r.id == a.rule)?;
+                rule.machine.as_ref()
+            });
+            if paused != Some(&machine.id) {
                 self.run_next(&mut turn, &machine.id, 0);
             }
         }
+        // A `stop` in a chain ends only that chain.
+        self.stopped = false;
         self.finish(turn)
     }
 

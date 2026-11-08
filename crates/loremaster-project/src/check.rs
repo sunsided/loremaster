@@ -1722,7 +1722,18 @@ fn endless_loop(m: &loremaster_model::Machine) -> Option<String> {
                 .any(|e| matches!(e, Effect::Await(_) | Effect::End(_) | Effect::Stop));
         (!stops).then_some(step.to.as_str())
     };
-    for start in m.all_states() {
+    // A state that no step reaches can not loop; the checks warn about it.
+    let mut reached = vec![m.start.clone()];
+    let mut i = 0;
+    while i < reached.len() {
+        for step in &m.steps {
+            if step.from.list().contains(&reached[i].as_str()) && !reached.contains(&step.to) {
+                reached.push(step.to.clone());
+            }
+        }
+        i += 1;
+    }
+    for start in &reached {
         let mut seen = vec![start.as_str()];
         let mut at = start.as_str();
         while let Some(to) = always(at) {
