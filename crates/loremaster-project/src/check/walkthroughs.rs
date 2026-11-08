@@ -22,29 +22,55 @@ impl Checker<'_> {
 
     /// The hint ladder has one step per id across the walkthroughs that are
     /// not pending, the first in file order. A later step with the same id
-    /// and another command or room would never get its own hints.
+    /// and another command, room, hints or `needs` would never get its own.
+    /// The needs are the chart's, as the ladder reads them: with the
+    /// `before` of earlier steps, in any order. A step without `at` gets its
+    /// room from the replay, which the checks do not run, so a room is
+    /// compared only when both steps give one.
     fn shared_ids(&mut self, walks: &[(String, Walkthrough)]) {
-        let mut first: BTreeMap<&Id, (&str, &str, Option<&Id>)> = BTreeMap::new();
+        type First<'a> = (
+            &'a str,
+            &'a str,
+            &'a loremaster_model::StepPlan,
+            BTreeSet<Id>,
+        );
+        let mut first: BTreeMap<&Id, First> = BTreeMap::new();
         let mut found = Vec::new();
         for (key, walk) in walks.iter().filter(|(_, w)| w.pending.is_none()) {
+            let chart = step_chart(key, walk);
             for (i, step) in walk.steps.iter().enumerate() {
                 let (Some(id), Some(plan)) = (step.id(), step.plan()) else {
                     continue;
                 };
-                let this = (key.as_str(), step.command(), plan.at.as_ref());
-                match first.get(id) {
-                    None => {
-                        first.insert(id, this);
-                    }
-                    Some(&(other, command, at))
-                        if other != key && (command != this.1 || at != this.2) =>
-                    {
-                        found.push((key.clone(), i, format!(
-                            "the step id `{id}` is also in {other} with `{command}`: the hint ladder keeps only the first, so give this step another id"
-                        )));
-                    }
-                    Some(_) => {}
+                let needs: BTreeSet<Id> = chart
+                    .as_ref()
+                    .and_then(|c| c.steps.iter().find(|s| s.index == i))
+                    .map_or_else(
+                        || plan.needs.iter().cloned().collect(),
+                        |s| s.needs.iter().cloned().collect(),
+                    );
+                let Some((other, command, was, was_needs)) = first.get(id) else {
+                    first.insert(id, (key.as_str(), step.command(), plan, needs));
+                    continue;
+                };
+                let (other, command, was) = (*other, *command, *was);
+                if other == key {
+                    continue;
                 }
+                let differs = if command != step.command() {
+                    format!("with `{command}`")
+                } else if was.at.is_some() && plan.at.is_some() && was.at != plan.at {
+                    "in another room".to_string()
+                } else if was.hints != plan.hints {
+                    "with other hints".to_string()
+                } else if *was_needs != needs {
+                    "with other `needs`".to_string()
+                } else {
+                    continue;
+                };
+                found.push((key.clone(), i, format!(
+                    "the step id `{id}` is also in {other} {differs}: the hint ladder keeps only the first, so give this step another id"
+                )));
             }
         }
         for (key, i, message) in found {
@@ -219,12 +245,17 @@ impl Checker<'_> {
     }
 }
 
-/// Where step `i` starts in the YAML text: each step is looked for after the
-/// one before it, by `id: <id>` or else by its command as a word, so two
-/// steps with the same command get their own lines.
+/// Where step `i` starts in the YAML text: the `i`-th item of the block
+/// list after `steps:`. A flow list (`steps: [..]`) has no lines to count:
+/// there each step is looked for after the one before it, by `id: <id>` or
+/// else by its command as a word.
 fn step_position(project: &crate::Project, key: &str, text: &str, i: usize) -> Option<usize> {
     let (_, walk) = project.walkthroughs.iter().find(|(k, _)| k == key)?;
     let mut from = text.find("steps:")?;
+    let items = list_items(text, from);
+    if items.len() == walk.steps.len() {
+        return items.get(i).copied();
+    }
     let mut at = None;
     for step in walk.steps.iter().take(i + 1) {
         let found = match step.id() {
@@ -240,6 +271,42 @@ fn step_position(project: &crate::Project, key: &str, text: &str, i: usize) -> O
         }
     }
     at
+}
+
+/// The items of the block list on the lines after `from`: the places after
+/// the `- ` of each line at the indentation of the first item. Comments,
+/// blank lines and the deeper lines of an item are skipped.
+fn list_items(text: &str, from: usize) -> Vec<usize> {
+    let mut items = Vec::new();
+    let Some(eol) = text[from..].find('\n') else {
+        return items;
+    };
+    let mut offset = from + eol + 1;
+    let mut indent = None;
+    for line in text[offset..].split_inclusive('\n') {
+        let here = offset;
+        offset += line.len();
+        let trimmed = line.trim_start_matches(' ');
+        let body = trimmed.trim_end();
+        if body.is_empty() || body.starts_with('#') {
+            continue;
+        }
+        let n = line.len() - trimmed.len();
+        // YAML separates the `-` from its item with a space or a tab.
+        let item = body == "-"
+            || body
+                .strip_prefix('-')
+                .is_some_and(|r| r.starts_with([' ', '\t']));
+        match indent {
+            None if item => indent = Some(n),
+            None => break,
+            Some(i) if n < i || (n == i && !item) => break,
+            Some(i) if n > i => continue,
+            _ => {}
+        }
+        items.push(here + n + body.len().min(2));
+    }
+    items
 }
 
 /// The first place at or after `from` where `text` has `word` as a whole word.
@@ -474,6 +541,25 @@ mod tests {
     }
 
     #[test]
+    fn the_line_is_the_one_of_the_step_also_after_a_hint_with_its_command() {
+        let d: Vec<_> = check_files(files(
+            "steps:\n  - { id: a, do: open drawer, hints: [\"Then wait.\"] }\n  - { do: wait, at: attic }\n",
+        ))
+        .diagnostics
+        .into_iter()
+        .filter(|d| d.file == "tests/win.yaml")
+        .collect();
+        check!(d.len() == 1, "{d:?}");
+        check!(d[0].line == Some(3), "{d:?}");
+    }
+
+    #[test]
+    fn a_tab_after_the_dash_starts_an_item_too() {
+        let text = "steps:\n  -\t{ do: wait }\n  - look\n";
+        check!(list_items(text, 0) == vec![11, 28]);
+    }
+
+    #[test]
     fn a_thing_of_the_start_room_is_no_later_step() {
         // The drawer is in the start room, so a hint may name it.
         let m = messages(
@@ -499,6 +585,60 @@ mod tests {
             .collect();
         check!(m.len() == 1, "{m:?}");
         check!(m[0].contains("is also in tests/win.yaml"), "{m:?}");
+    }
+
+    /// The diagnostics of tests/zz.yaml, next to tests/win.yaml.
+    fn shared(win: &str, zz: &str) -> Vec<String> {
+        let mut f = files(win);
+        f.push(SourceFile {
+            path: "tests/zz.yaml".into(),
+            text: zz.into(),
+        });
+        check_files(f)
+            .diagnostics
+            .into_iter()
+            .filter(|d| d.file == "tests/zz.yaml")
+            .map(|d| d.message)
+            .collect()
+    }
+
+    #[test]
+    fn a_shared_step_id_with_other_hints_or_needs_is_a_warning() {
+        let m = shared(
+            "steps:\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: d, do: open drawer, hints: [\"Look.\"] }\n",
+        );
+        check!(m.len() == 1, "{m:?}");
+        check!(m[0].contains("other hints"), "{m:?}");
+        let m = shared(
+            "steps:\n  - { id: s, do: s }\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: s, do: s }\n  - { id: d, do: open drawer, needs: s }\n",
+        );
+        check!(m.len() == 1, "{m:?}");
+        check!(m[0].contains("other `needs`"), "{m:?}");
+        // The ladder reads the chart: `before` of an earlier step is a need.
+        let m = shared(
+            "steps:\n  - { id: s, do: s }\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: s, do: s, before: [d] }\n  - { id: d, do: open drawer }\n",
+        );
+        check!(m.len() == 1, "{m:?}");
+        check!(m[0].contains("other `needs`"), "{m:?}");
+        // The order of `needs` does not matter.
+        let m = shared(
+            "steps:\n  - { id: s, do: s }\n  - { id: n, do: n }\n  - { id: d, do: open drawer, needs: [s, n] }\n",
+            "steps:\n  - { id: s, do: s }\n  - { id: n, do: n }\n  - { id: d, do: open drawer, needs: [n, s] }\n",
+        );
+        check!(m.is_empty(), "{m:?}");
+    }
+
+    #[test]
+    fn a_shared_step_id_with_one_room_given_is_no_warning() {
+        // The replay finds the room of the step without `at`.
+        let m = shared(
+            "steps:\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: d, do: open drawer, at: cottage }\n",
+        );
+        check!(m.is_empty(), "{m:?}");
     }
 
     #[test]

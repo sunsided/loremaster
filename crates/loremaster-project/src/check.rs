@@ -1,6 +1,8 @@
 use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
 use dramaturge_model::{Candidate, Condition, Entry, FragmentMode, Pick, Pool, Pools, TextTypes};
-use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
+use loremaster_lang::{
+    LangError, SEEN_BY_ELSEWHERE, Scope, compile_condition, compile_markup, has_seen_by,
+};
 use loremaster_model::{
     DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
     ThreadStatus, standard_verbs,
@@ -11,16 +13,6 @@ mod walkthroughs;
 
 pub use walkthroughs::MAX_HINTS;
 pub(crate) use walkthroughs::mentions;
-
-/// The condition tests the perceiver of a text somewhere.
-fn has_seen_by(c: &Condition) -> bool {
-    match c {
-        Condition::SeenBy(_) => true,
-        Condition::All(cs) | Condition::Any(cs) => cs.iter().any(has_seen_by),
-        Condition::Not(inner) => has_seen_by(inner),
-        _ => false,
-    }
-}
 
 /// The host types of a pool in the checks: only what dramaturge's checks
 /// read (conditions for the score, the tuple keys, the named pools).
@@ -176,11 +168,7 @@ impl Checker<'_> {
     /// A condition outside a text: `seen_by` has no perceiver there.
     fn condition(&mut self, file: &str, at: &str, source: &str) {
         match compile_condition(source, &self.scope) {
-            Ok(c) if has_seen_by(&c) => self.error(
-                file,
-                at,
-                "`seen_by` works only in the `when` of a fragment or of a candidate in `one_of`: elsewhere nobody perceives",
-            ),
+            Ok(c) if has_seen_by(&c) => self.error(file, at, SEEN_BY_ELSEWHERE),
             Ok(_) => {}
             Err(e) => self.lang_error(file, at, source, e),
         }
@@ -264,15 +252,16 @@ impl Checker<'_> {
     }
 
     fn fragments(&mut self, file: &str, at: &str, fragments: &[Fragment]) {
-        let mut ids = BTreeSet::new();
+        // A fragment without an id is keyed by its index.
+        let mut keys = BTreeSet::new();
         for (i, f) in fragments.iter().enumerate() {
-            if let Some(id) = &f.id
-                && !ids.insert(id.as_str())
-            {
+            let key = f.id.as_ref().map_or(i.to_string(), |id| id.to_string());
+            if !keys.insert(key.clone()) {
+                let place = if f.id.is_some() { ".id" } else { "" };
                 self.error(
                     file,
-                    &format!("{at}[{i}].id"),
-                    format!("two fragments of this text have the id `{id}`; they would share their progress"),
+                    &format!("{at}[{i}]{place}"),
+                    format!("two fragments of this text have the key `{key}` (an `id`, or the index of a fragment without one); they would share their progress"),
                 );
             }
             if let Some(when) = &f.when {
@@ -333,16 +322,17 @@ impl Checker<'_> {
         text: &mut dyn FnMut(&mut Self, &str, &T),
     ) {
         use dramaturge_syntax::Variant;
+        // A candidate without a key is keyed by its index.
         let mut keys = BTreeSet::new();
         for (i, c) in one_of.iter().enumerate() {
             let at = format!("{at}.one_of[{i}]");
-            if let Some(key) = &c.key
-                && !keys.insert(key.as_str())
-            {
+            let key = c.key.clone().unwrap_or_else(|| i.to_string());
+            if !keys.insert(key.clone()) {
+                let place = if c.key.is_some() { ".key" } else { "" };
                 self.error(
                     file,
-                    &format!("{at}.key"),
-                    format!("two candidates of this `one_of` have the key `{key}`; they would share their progress"),
+                    &format!("{at}{place}"),
+                    format!("two candidates of this `one_of` have the key `{key}` (a `key`, or the index of a candidate without one); they would share their progress"),
                 );
             }
             if let Some(when) = &c.when {
@@ -469,9 +459,14 @@ impl Checker<'_> {
     /// checks of all of them.
     fn texts(&mut self) {
         let story = self.story().clone();
+        let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         for p in &story.texts {
             let id = p.id.clone().unwrap_or_default();
             let file = self.file_of(&format!("text:{id}"));
+            // One error per id: its origin is the last file of the id.
+            if !seen.insert(id.clone()) && reported.insert(id.clone()) {
+                self.error(&file, "id", format!("text pool `{id}` is defined twice"));
+            }
             self.candidates(&file, "", &p.one_of, &mut |c, at, line| {
                 c.line(&file, at.trim_start_matches('.'), line)
             });
@@ -667,8 +662,13 @@ impl Checker<'_> {
             .map(|v| v.id.to_string())
             .collect();
         let emitted = emitted_events(&story);
+        let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
+            // One error per id: its origin is the last file of the id.
+            if !seen.insert(rule.id.as_str()) && reported.insert(rule.id.as_str()) {
+                self.error(&file, "id", format!("rule `{}` is defined twice", rule.id));
+            }
             self.closes(
                 &file,
                 "",

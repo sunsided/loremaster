@@ -69,3 +69,9 @@ error: unknown thing `keeper`; for an id of another pack, write `extern { thing 
    |
 93 |         dialogue with keeper start [stove] {
    |                       ^^^^^^
+
+error: unknown relation `trust`; add it to `relations: [..]` in the story header
+   --> tests/ui/fail/dialogue_checks.rs:109:13
+    |
+109 |             stove: "He nods." {
+    |             ^^^^^

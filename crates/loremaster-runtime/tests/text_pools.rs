@@ -64,3 +64,31 @@ fn the_room_text_of_a_group_mentions_its_things() {
         Some("not listed: the room text mentions it")
     );
 }
+
+#[test]
+fn a_group_text_whose_condition_fails_mentions_nothing() {
+    let project = load(vec![
+        file(
+            "story.yaml",
+            "title: T\nstart: a\nvars:\n  - { id: rung, type: bool, initial: false }\n",
+        ),
+        file(
+            "rooms/a.yaml",
+            "name: A\ndescription:\n  - one_of:\n      - { when: rung, text: \"A brass bell hangs here.\" }\n      - \"A quiet room.\"\n",
+        ),
+        file(
+            "things/bell.yaml",
+            "name: bell\nlocation: { room: a }\nlisted: false\n",
+        ),
+    ])
+    .unwrap();
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    let parts = authoring::Inspector::of(&game).room_parts();
+    let bell = parts.objects.iter().find(|p| p.id == "bell").unwrap();
+    assert_eq!(
+        bell.why.as_deref(),
+        Some("not listed, and the room text does not mention it: the player cannot find it")
+    );
+}

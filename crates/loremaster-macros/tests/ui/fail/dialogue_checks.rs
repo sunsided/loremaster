@@ -98,4 +98,20 @@ mod unknown_thing {
     }
 }
 
+// With a story header, the relations live there: no `extern` hint.
+mod unknown_relation_with_story {
+    use loremaster::prelude::*;
+    world! {
+        story "Tiny" { start: hall }
+        room hall "Hall" {}
+        thing keeper "keeper" in hall {}
+        dialogue with keeper start [stove] {
+            stove: "He nods." {
+                relation trust += 1;
+                says "Good night." => end;
+            }
+        }
+    }
+}
+
 fn main() {}

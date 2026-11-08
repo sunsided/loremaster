@@ -83,6 +83,11 @@ impl LoreJudge<'_, '_> {
     }
 }
 
+/// Does a condition of a text hold for the player, `seen_by` too?
+pub(crate) fn holds_for_player(ev: &Eval, c: &Condition) -> bool {
+    LoreJudge(ev).holds(c, &seen_by_player())
+}
+
 /// The query of a text that the player sees: the player is the perceiver
 /// until actors come (D6).
 pub(crate) fn seen_by_player() -> Query<Lore> {

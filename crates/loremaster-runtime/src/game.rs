@@ -1068,10 +1068,21 @@ impl Game {
         let dark = self.is_dark();
 
         // The room text as it reads now, to check which things it mentions.
+        // A group's text counts while the conditions of its candidates hold.
         let fragments = &self.world.rooms[ri].description;
         let room_text = text::visible(&ev, fragments)
             .iter()
-            .flat_map(|&i| fragments[i].variants.iter().map(|v| text::render(&ev, v)))
+            .flat_map(|&i| {
+                let f = &fragments[i];
+                f.variants
+                    .iter()
+                    .zip(&f.gates)
+                    .filter(|(_, gate)| {
+                        gate.iter()
+                            .all(|&w| text::holds_for_player(&ev, &f.inner_when[w]))
+                    })
+                    .map(|(v, _)| text::render(&ev, v))
+            })
             .collect::<Vec<_>>()
             .join(" ")
             .to_lowercase();

@@ -2,6 +2,19 @@ use crate::{CmpOp, Derived, Expr, LangError, NameForm, Operand, Scope, Span, Ty,
 use dramaturge_model::{Condition, FactId, FactScope, FactValue, MemoryQuery, RelationshipAxisId};
 use loremaster_model::Id;
 
+/// The error for `seen_by` where no text is perceived.
+pub const SEEN_BY_ELSEWHERE: &str = "`seen_by` works only in the `when` of a fragment or of a candidate in `one_of`: elsewhere nobody perceives";
+
+/// The condition tests the perceiver of a text somewhere.
+pub fn has_seen_by(c: &Condition) -> bool {
+    match c {
+        Condition::SeenBy(_) => true,
+        Condition::All(cs) | Condition::Any(cs) => cs.iter().any(has_seen_by),
+        Condition::Not(inner) => has_seen_by(inner),
+        _ => false,
+    }
+}
+
 /// Parse, type-check and lower a condition to a dramaturge condition tree.
 pub fn compile_condition(src: &str, scope: &Scope) -> Result<Condition, LangError> {
     let expr = parse_expr(src)?;

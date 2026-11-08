@@ -105,7 +105,8 @@ impl Event {
                     _ => return false,
                 };
                 // The verb first: most rules differ there, without a clone.
-                wanted.verb == *verb && self.command().is_some_and(|c| c.matches(wanted))
+                CommandRecord::verb_matches(wanted, verb)
+                    && self.command().is_some_and(|c| c.matches(wanted))
             }
             (Event::Timer(a), EventPattern::Timer(b))
             | (Event::Custom(a), EventPattern::Event(b)) => a == b,

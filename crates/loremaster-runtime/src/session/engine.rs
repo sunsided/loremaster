@@ -102,8 +102,11 @@ impl Session {
     /// room as it is now.
     pub(crate) fn undo_turn(&mut self) -> Turn {
         match self.history.pop_back() {
-            Some(state) => {
+            Some((state, revealed)) => {
                 self.game.set_state(state);
+                if let Some(revealed) = revealed {
+                    self.revealed = revealed;
+                }
                 self.here_turn("Undone.")
             }
             None => Self::note_turn("There is nothing to undo.".into()),
@@ -120,10 +123,11 @@ impl Session {
         game.host_rolls = host_rolls;
         self.game = game;
         self.started = true;
-        // A new game: the hint ladders start from their first level again.
-        self.revealed.clear();
+        // A new game: the hint ladders start from their first level again,
+        // until an undo goes back before the restart.
+        let revealed = std::mem::take(&mut self.revealed);
         let turn = self.game.start();
-        self.remember(before);
+        self.remember_with(before, Some(revealed));
         turn
     }
 }

@@ -67,6 +67,12 @@ impl CommandRecord {
             .collect()
     }
 
+    /// Does the pattern listen for this verb? The one verb test of
+    /// [`Self::matches`], also for the events' fast path without a record.
+    pub(crate) fn verb_matches(pattern: &loremaster_model::CommandPattern, verb: &Id) -> bool {
+        pattern.verb == *verb
+    }
+
     /// Does an event pattern of a rule match this command? A slot of the
     /// pattern that is not set matches anything, except the actor: a pattern
     /// without one matches only the player's commands.
@@ -77,7 +83,7 @@ impl CommandRecord {
             want.as_ref()
                 .is_none_or(|w| have.as_ref().is_some_and(|h| h.eq_ignore_ascii_case(w)))
         };
-        pattern.verb == self.verb
+        Self::verb_matches(pattern, &self.verb)
             && actor == self.actor.as_str()
             && slot(&pattern.direct, &self.direct)
             && slot(&pattern.indirect, &self.indirect)

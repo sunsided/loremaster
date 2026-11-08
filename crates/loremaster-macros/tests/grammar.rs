@@ -438,6 +438,72 @@ fn a_condition_can_start_with_an_id_says() {
     );
 }
 
+/// A room `then` is an operand of a segment condition: the marker is the
+/// `then` that a segment follows.
+mod then_room {
+    use loremaster::prelude::*;
+
+    world! {
+        story "Then" { start: then }
+        var mood: [calm, then] = calm;
+        room then "Then" {}
+        thing mara "Mara" in then {}
+        rule dark on turn {
+            line when in then then "Dark." when mood == then then says "Hm.";
+        }
+        dialogue with mara start [hi] {
+            hi: "Hi." {
+                says "Bye." when in then => end;
+            }
+        }
+    }
+}
+
+#[test]
+fn a_then_operand_is_not_the_marker() {
+    use loremaster::dsl::model::{Line, LineSegment};
+    let p = then_room::pack();
+    assert_eq!(
+        p.rules[0].then[0],
+        Effect::Say(Line::new(vec![
+            LineSegment::narrate("Dark.").when("in(then)"),
+            LineSegment::says("Hm.").when("mood == then"),
+        ]))
+    );
+    assert_eq!(
+        p.dialogues[0].nodes[0].options[0].when.as_deref(),
+        Some("in(then)")
+    );
+}
+
+/// A speaker `then` after a condition that ends in a word: the first
+/// `then` is the marker there.
+mod then_speaker {
+    use loremaster::prelude::*;
+
+    world! {
+        story "Then" { start: hall }
+        var calm: bool = false;
+        room hall "Hall" {}
+        thing then "Then" in hall {}
+        rule hm on turn {
+            line when calm then then says "Hm.";
+        }
+    }
+}
+
+#[test]
+fn a_speaker_then_follows_the_marker() {
+    use loremaster::dsl::model::{Line, LineSegment};
+    let p = then_speaker::pack();
+    assert_eq!(
+        p.rules[0].then[0],
+        Effect::Say(Line::new(vec![
+            LineSegment::says("Hm.").by("then").when("calm"),
+        ]))
+    );
+}
+
 /// Dialogues (DSL step L4): dramaturge's token form, with the conditions,
 /// lines and effects of `world!`. Two blocks share a module with `pack`.
 mod talks {
