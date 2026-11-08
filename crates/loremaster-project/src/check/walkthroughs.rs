@@ -23,20 +23,37 @@ impl Checker<'_> {
     /// The hint ladder has one step per id across the walkthroughs that are
     /// not pending, the first in file order. A later step with the same id
     /// and another command, room, hints or `needs` would never get its own.
-    /// A step without `at` gets its room from the replay, which the checks
-    /// do not run, so a room is compared only when both steps give one.
+    /// The needs are the chart's, as the ladder reads them: with the
+    /// `before` of earlier steps, in any order. A step without `at` gets its
+    /// room from the replay, which the checks do not run, so a room is
+    /// compared only when both steps give one.
     fn shared_ids(&mut self, walks: &[(String, Walkthrough)]) {
-        let mut first: BTreeMap<&Id, (&str, &str, &loremaster_model::StepPlan)> = BTreeMap::new();
+        type First<'a> = (
+            &'a str,
+            &'a str,
+            &'a loremaster_model::StepPlan,
+            BTreeSet<Id>,
+        );
+        let mut first: BTreeMap<&Id, First> = BTreeMap::new();
         let mut found = Vec::new();
         for (key, walk) in walks.iter().filter(|(_, w)| w.pending.is_none()) {
+            let chart = step_chart(key, walk);
             for (i, step) in walk.steps.iter().enumerate() {
                 let (Some(id), Some(plan)) = (step.id(), step.plan()) else {
                     continue;
                 };
-                let Some(&(other, command, was)) = first.get(id) else {
-                    first.insert(id, (key.as_str(), step.command(), plan));
+                let needs: BTreeSet<Id> = chart
+                    .as_ref()
+                    .and_then(|c| c.steps.iter().find(|s| s.index == i))
+                    .map_or_else(
+                        || plan.needs.iter().cloned().collect(),
+                        |s| s.needs.iter().cloned().collect(),
+                    );
+                let Some((other, command, was, was_needs)) = first.get(id) else {
+                    first.insert(id, (key.as_str(), step.command(), plan, needs));
                     continue;
                 };
+                let (other, command, was) = (*other, *command, *was);
                 if other == key {
                     continue;
                 }
@@ -46,7 +63,7 @@ impl Checker<'_> {
                     "in another room".to_string()
                 } else if was.hints != plan.hints {
                     "with other hints".to_string()
-                } else if was.needs != plan.needs {
+                } else if *was_needs != needs {
                     "with other `needs`".to_string()
                 } else {
                     continue;
@@ -589,6 +606,19 @@ mod tests {
         );
         check!(m.len() == 1, "{m:?}");
         check!(m[0].contains("other `needs`"), "{m:?}");
+        // The ladder reads the chart: `before` of an earlier step is a need.
+        let m = shared(
+            "steps:\n  - { id: s, do: s }\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: s, do: s, before: [d] }\n  - { id: d, do: open drawer }\n",
+        );
+        check!(m.len() == 1, "{m:?}");
+        check!(m[0].contains("other `needs`"), "{m:?}");
+        // The order of `needs` does not matter.
+        let m = shared(
+            "steps:\n  - { id: s, do: s }\n  - { id: n, do: n }\n  - { id: d, do: open drawer, needs: [s, n] }\n",
+            "steps:\n  - { id: s, do: s }\n  - { id: n, do: n }\n  - { id: d, do: open drawer, needs: [n, s] }\n",
+        );
+        check!(m.is_empty(), "{m:?}");
     }
 
     #[test]
