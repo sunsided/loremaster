@@ -265,6 +265,21 @@ fn story(st: &Story, vars: &[&Var]) -> TokenStream {
                 quote_spanned!(span=> .var(#id, #initial))
             }
         });
+        for (method, limit) in [("var_min", &v.min), ("var_max", &v.max)] {
+            let Some(limit) = limit else { continue };
+            let method = Ident::new(method, span);
+            let limit = match limit.value.parse::<i64>() {
+                Ok(n) => {
+                    let n = lit(Literal::i64_suffixed(n), span);
+                    quote_spanned!(span=> #n)
+                }
+                Err(_) => {
+                    let var = name(limit);
+                    quote_spanned!(span=> #var)
+                }
+            };
+            chain.extend(quote_spanned!(span=> .#method(#id, #limit)));
+        }
     }
     quote_spanned!(span=> #p.story(#title, #start) #chain;)
 }
@@ -555,6 +570,10 @@ fn effects(list: &[Effect], span: Span) -> TokenStream {
                     quote_spanned!(span=> .add(#n, #v))
                 })
                 .collect(),
+            EffectKind::Calc(target, sum) => {
+                let (target, sum) = (name(target), s(sum, span));
+                quote_spanned!(span=> .calc(#target, #sum))
+            }
             EffectKind::Move(pairs) => pairs
                 .iter()
                 .map(|(n, to)| {
@@ -765,10 +784,22 @@ fn test(t: &Test) -> TokenStream {
         let needs = text(needs);
         chain.extend(quote_spanned!(span=> .pending(#phase, #needs)));
     }
+    if let Some(seed) = t.seed {
+        let seed = lit(Literal::u64_suffixed(seed), span);
+        chain.extend(quote_spanned!(span=> .seed(#seed)));
+    }
     for step in &t.steps {
         let command = text(&step.command);
         for _ in 0..step.times {
             chain.extend(quote_spanned!(span=> .step(#command)));
+        }
+        if !step.rolls.is_empty() {
+            let rolls: Vec<_> = step
+                .rolls
+                .iter()
+                .map(|n| lit(Literal::i64_suffixed(*n), span))
+                .collect();
+            chain.extend(quote_spanned!(span=> .rolls([#(#rolls),*])));
         }
         for check in &step.checks {
             chain.extend(expectation(check, span, false));

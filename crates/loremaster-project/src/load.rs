@@ -697,6 +697,8 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
             id: score.var.clone(),
             ty: loremaster_model::VarType::Int,
             initial: loremaster_model::Value::Int(0),
+            min: None,
+            max: None,
         });
     }
     for m in &machines {
@@ -704,6 +706,8 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
             id: m.id.clone(),
             ty: loremaster_model::VarType::Enum(m.all_states()),
             initial: loremaster_model::Value::Text(m.start.clone()),
+            min: None,
+            max: None,
         });
         let file = origins
             .get(&format!("machine:{}", m.id))

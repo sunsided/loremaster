@@ -4,7 +4,7 @@ use crate::text::{self, article};
 use crate::world::{CEffect, CText, Within};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
 use crate::{Event, Phase};
-use loremaster_model::{Id, Location, TimeOfDay, Value, VerbSlots};
+use loremaster_model::{Id, Limit, Location, Term, TimeOfDay, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -34,6 +34,16 @@ pub(crate) struct Game {
     stopped: bool,
     /// The host answers rolls itself (SE-7). Without it, the session rolls.
     pub(crate) host_rolls: bool,
+    /// The totals that the next rolls take, for tests. Not in the save.
+    pub(crate) forced: ForcedRolls,
+}
+
+/// Forced rolls of a walkthrough step, and the totals that did not fit
+/// their dice.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ForcedRolls {
+    pub(crate) totals: std::collections::VecDeque<i64>,
+    pub(crate) misfits: Vec<String>,
 }
 
 /// What a run of rules did.
@@ -333,6 +343,7 @@ impl Game {
             last_frame: None,
             stopped: false,
             host_rolls: false,
+            forced: ForcedRolls::default(),
         }
     }
 
@@ -1410,11 +1421,31 @@ impl Game {
     // ---- state changes --------------------------------------------------
 
     pub(crate) fn set_fact(&mut self, turn: &mut Turn, name: &str, value: Value) {
+        let value = self.clamped(name, value);
         turn.log.push(LogEntry {
             kind: "set".into(),
             text: format!("{name} = {value}"),
         });
         self.state.facts.insert(name.to_string(), value);
+    }
+
+    /// The value within the `min` and `max` of its variable. A limit that
+    /// names a variable reads its value now. If the limits cross, `min` wins.
+    pub(crate) fn clamped(&self, name: &str, value: Value) -> Value {
+        let (&Value::Int(mut n), Some(var)) = (&value, self.world.story.var(name)) else {
+            return value;
+        };
+        let limit = |l: &Option<Limit>| match l.as_ref()? {
+            Limit::Value(n) => Some(*n),
+            Limit::Var(v) => self.state.facts.get(v.as_str())?.as_int(),
+        };
+        if let Some(max) = limit(&var.max) {
+            n = n.min(max);
+        }
+        if let Some(min) = limit(&var.min) {
+            n = n.max(min);
+        }
+        Value::Int(n)
     }
 
     pub(crate) fn move_thing(&mut self, id: &Id, to: Location) {
@@ -1691,6 +1722,26 @@ impl Game {
                 for (k, n) in values {
                     let cur = self.state.facts.get(k).and_then(Value::as_int).unwrap_or(0);
                     self.set_fact(turn, k, Value::Int(cur + n));
+                }
+            }
+            CEffect::Calc(sums) => {
+                // Each sum reads the values from before the effect.
+                let int = |name: &str| self.state.facts.get(name).and_then(Value::as_int);
+                let totals: Vec<_> = sums
+                    .iter()
+                    .map(|(name, terms)| {
+                        let total = terms.iter().fold(0i64, |sum, (sign, term)| {
+                            let n = match term {
+                                Term::Int(n) => *n,
+                                Term::Name(v) => int(v).unwrap_or(0),
+                            };
+                            sum.saturating_add(n.saturating_mul(*sign))
+                        });
+                        (name.clone(), total)
+                    })
+                    .collect();
+                for (name, total) in totals {
+                    self.set_fact(turn, &name, Value::Int(total));
                 }
             }
             CEffect::Say(line) => {

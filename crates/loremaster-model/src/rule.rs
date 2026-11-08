@@ -83,6 +83,10 @@ pub enum Effect {
     Set(BTreeMap<String, Value>),
     /// Add to integer variables.
     Add(BTreeMap<String, i64>),
+    /// Set integer variables or properties to a sum of whole numbers and
+    /// integer variables or properties: `{ total: "r + skill - 1" }`. Each
+    /// sum reads the values from before the effect.
+    Calc(BTreeMap<String, String>),
     /// Show a line: a text in inline markup, or a list of narration and
     /// speech segments. `line:` is the same key.
     #[serde(alias = "line")]
@@ -110,6 +114,84 @@ pub enum Effect {
     Cancel(Id),
 }
 
+/// A term of a `calc` sum: a whole number, or the name of an integer
+/// variable or property.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Term {
+    Int(i64),
+    Name(String),
+}
+
+/// A term of a sum with its sign, `1` or `-1`.
+pub type SumTerm = (i64, Term);
+
+/// What is wrong with a sum, and the byte range of the bad part.
+pub type SumError = (String, std::ops::Range<usize>);
+
+/// Read a `calc` sum such as `r + skill - 2`: terms with `+` or `-` between
+/// them. Each term has its sign, `1` or `-1`. An error has the message and
+/// the byte range of the bad part.
+pub fn parse_sum(expr: &str) -> Result<Vec<SumTerm>, SumError> {
+    let mut out = Vec::new();
+    let (mut sign, mut from) = (1, 0);
+    if let Some(rest) = expr.strip_prefix('-') {
+        (sign, from) = (-1, expr.len() - rest.len());
+    }
+    loop {
+        let end = expr[from..]
+            .find(['+', '-'])
+            .map_or(expr.len(), |i| from + i);
+        let raw = &expr[from..end];
+        let term = raw.trim();
+        let start = from + (raw.len() - raw.trim_start().len());
+        let range = start..start + term.len();
+        let is_name = term.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+            && term
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.');
+        let term = if let Ok(n) = term.parse::<i64>() {
+            Term::Int(n)
+        } else if is_name {
+            Term::Name(term.to_string())
+        } else if term.is_empty() {
+            return Err(("a number or a name expected".into(), from..end));
+        } else {
+            return Err((format!("`{term}` is not a number or a name"), range));
+        };
+        out.push((sign, term));
+        if end == expr.len() {
+            return Ok(out);
+        }
+        sign = if expr[end..].starts_with('-') { -1 } else { 1 };
+        from = end + 1;
+    }
+}
+
 fn is_zero(n: &i32) -> bool {
     *n == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_sum_reads_numbers_and_names_with_signs() {
+        assert_eq!(
+            parse_sum("r + skill - 2"),
+            Ok(vec![
+                (1, Term::Name("r".into())),
+                (1, Term::Name("skill".into())),
+                (-1, Term::Int(2)),
+            ])
+        );
+        assert_eq!(
+            parse_sum("lamp.oil"),
+            Ok(vec![(1, Term::Name("lamp.oil".into()))])
+        );
+        assert_eq!(parse_sum("-3"), Ok(vec![(-1, Term::Int(3))]));
+        assert_eq!(parse_sum("r + 2x").unwrap_err().1, 4..6);
+        assert!(parse_sum("r +").is_err());
+        assert!(parse_sum("").is_err());
+    }
 }

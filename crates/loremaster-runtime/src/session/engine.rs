@@ -121,6 +121,7 @@ impl Session {
         let mut game = Game::new(self.game.world_arc());
         game.state_mut().rng = self.seed;
         game.host_rolls = host_rolls;
+        game.forced = std::mem::take(&mut self.game.forced);
         self.game = game;
         self.started = true;
         // A new game: the hint ladders start from their first level again,
