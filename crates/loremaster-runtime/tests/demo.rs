@@ -101,7 +101,10 @@ fn demo_endings_are_reachable() {
     // All five endings are reached.
     for ending in &project.story.endings {
         assert!(
-            explored.endings.iter().any(|e| e.text.starts_with(&ending.title)),
+            explored
+                .endings
+                .iter()
+                .any(|e| e.text.starts_with(&ending.title)),
             "no explored path ends in {}",
             ending.id
         );
@@ -118,8 +121,15 @@ fn demo_hints_and_chart_come_from_the_walkthroughs() {
         .unwrap();
     let chart = step_chart(key, best).expect("best has step ids");
     let ids: Vec<_> = chart.steps.iter().map(|s| s.id.as_str()).collect();
-    assert_eq!(ids, ["boots", "crane", "drain", "pages", "weapon", "accuse"]);
-    let accuse = chart.steps.iter().find(|s| s.id.as_str() == "accuse").unwrap();
+    assert_eq!(
+        ids,
+        ["boots", "crane", "drain", "pages", "weapon", "accuse"]
+    );
+    let accuse = chart
+        .steps
+        .iter()
+        .find(|s| s.id.as_str() == "accuse")
+        .unwrap();
     assert_eq!(accuse.depth, 3, "{chart:#?}");
 
     // In the kitchen at the start, the ladder offers the boots.
