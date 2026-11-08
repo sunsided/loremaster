@@ -367,6 +367,7 @@ fn origins_point_at_the_ids_in_the_block() {
             line,
             column,
             pack,
+            ..
         } = &p.origins[key]
         else {
             panic!("{key}: {:?}", p.origins[key]);

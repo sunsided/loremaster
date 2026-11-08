@@ -1,4 +1,7 @@
-use crate::merge::{Extension, MergeMode, extend_entity, merge_mode};
+use crate::hash::value_hash;
+use crate::merge::{
+    Extension, MergeMode, Override, extend_entity, merge_mode, take_override, three_way,
+};
 use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
     Agenda, Asset, ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note,
@@ -26,6 +29,33 @@ pub struct Project {
     /// Warnings from joining the packs, for example a replaced entity.
     /// `check` reports them first.
     pub assembly: Vec<Diagnostic>,
+    /// The entities that Rust makes, as Rust makes them: before any YAML
+    /// `extend`, `replace` or override. The editor shows, ejects and
+    /// overrides these.
+    pub rust_parts: BTreeMap<String, RustPart>,
+}
+
+/// An entity from Rust, for the editor (DS-10, DS-12).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RustPart {
+    /// Always an [`Origin::Rust`], with the content hash.
+    pub origin: Origin,
+    /// The canonical model value.
+    pub value: serde_json::Value,
+    /// The commit that the pack was exported from, when it is known.
+    pub commit: Option<String>,
+    /// The YAML file that overrides this part, and how it stands.
+    pub overridden_by: Option<(String, OverrideState)>,
+}
+
+/// How an override stands against its Rust part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OverrideState {
+    /// Rust did not change since the override was made.
+    Active,
+    /// Rust now equals the override, so the file can go.
+    NoLongerNeeded,
 }
 
 impl Project {
@@ -67,7 +97,7 @@ fn yes() -> bool {
 
 /// The story header (`story.yaml` in a YAML folder): everything that is not a
 /// room, thing or rule. Exactly one pack of a project gives it.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryHeader {
     pub title: String,
@@ -125,12 +155,54 @@ pub struct StoryHeader {
 /// Load a project from its files: one YAML pack, assembled. Paths use `/` and
 /// are relative to the project folder.
 pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
-    assemble(vec![Pack::from_files(files)?])
+    assemble(packs_of(files)?)
+}
+
+/// The packs of a folder: each exported Rust pack (`packs/*.json`) in path
+/// order, then the YAML files.
+pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diagnostic>> {
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    let mut packs = Vec::new();
+    let mut errors = Vec::new();
+    for f in files.iter().filter(|f| is_exported_pack(&f.path)) {
+        // Every export has a name, so `{}` is not one.
+        match serde_json::from_str::<Pack>(&f.text) {
+            Ok(pack) if !pack.name.is_empty() => packs.push(pack),
+            found => errors.push(Diagnostic::error(
+                &f.path,
+                "",
+                format!(
+                    "not an exported pack: {}",
+                    found
+                        .err()
+                        .map_or("no `name`".to_string(), |e| e.to_string())
+                ),
+            )),
+        }
+    }
+    match Pack::from_files(files) {
+        Ok(pack) if errors.is_empty() => packs.push(pack),
+        Ok(_) => return Err(errors),
+        Err(mut found) => {
+            errors.append(&mut found);
+            return Err(errors);
+        }
+    }
+    Ok(packs)
+}
+
+fn is_exported_pack(path: &str) -> bool {
+    path.starts_with("packs/") && path.ends_with(".json")
 }
 
 /// The parts of a project that one source gives (DS-1): a YAML folder, and
 /// later a `world!` block or a builder function. [`assemble`] joins packs.
-#[derive(Debug, Clone, Default)]
+///
+/// As JSON it is the file that `loremaster export-pack` writes. The parts
+/// that only a running program can have (`files`, `warnings`, `overrides`,
+/// `instances`) are not in it.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Pack {
     /// The name in diagnostics, for example `yaml` or a Rust module.
     pub name: String,
@@ -155,6 +227,7 @@ pub struct Pack {
     /// What actors do on their own (D6).
     pub agendas: Vec<Agenda>,
     /// The source files, for diagnostics with lines.
+    #[serde(skip)]
     pub files: Vec<SourceFile>,
     /// Entity key such as `room:cellar` to where it is defined. The key
     /// `story` is the origin of the header.
@@ -163,8 +236,14 @@ pub struct Pack {
     pub replaces: BTreeSet<String>,
     /// Fields that this pack adds to entities of earlier packs (`extend: true`).
     pub extensions: Vec<Extension>,
+    /// The YAML files of this pack that override a Rust part (`override:`).
+    #[serde(skip)]
+    pub overrides: Vec<Override>,
+    /// The commit of an exported pack, when it is known.
+    pub commit: Option<String>,
     /// Warnings from reading the pack, for example a folder that the loader
     /// does not read yet. `assemble` passes them on.
+    #[serde(skip)]
     pub warnings: Vec<Diagnostic>,
     /// Rust values that the pack hands to the runtime: loremaster-dsl keeps
     /// the instance of each Rust behavior here: an
@@ -173,6 +252,7 @@ pub struct Pack {
     /// `BuildPack::register` or `register_block`; `Loremaster::build`
     /// ignores any other value.
     /// The project does not read them.
+    #[serde(skip)]
     pub instances: Vec<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
 }
 
@@ -182,6 +262,63 @@ impl Pack {
             name: name.into(),
             ..Pack::default()
         }
+    }
+
+    /// The value of the entity `key` (`room:cellar`) in canonical form.
+    pub fn entity_value(&self, key: &str) -> Option<serde_json::Value> {
+        fn find<T: Serialize>(
+            list: &[T],
+            id: &str,
+            id_of: fn(&T) -> &str,
+        ) -> Option<serde_json::Value> {
+            let e = list.iter().find(|e| id_of(e) == id)?;
+            serde_json::to_value(e).ok()
+        }
+        if key == "story" {
+            return serde_json::to_value(self.header.as_ref()?).ok();
+        }
+        let (kind, id) = key.split_once(':')?;
+        match kind {
+            "room" => find(&self.rooms, id, |e| e.id.as_str()),
+            "thing" => find(&self.things, id, |e| e.id.as_str()),
+            "rule" => find(&self.rules, id, |e| e.id.as_str()),
+            "thread" => find(&self.threads, id, |e| e.id.as_str()),
+            "dialogue" => find(&self.dialogues, id, |e| e.id_str()),
+            "ending" => find(&self.endings, id, |e| e.id.as_str()),
+            "timer" => find(&self.timers, id, |e| e.id.as_str()),
+            "verb" => find(&self.verbs, id, |e| e.id.as_str()),
+            "machine" => find(&self.machines, id, |e| e.id.as_str()),
+            "agenda" => find(&self.agendas, id, |e| e.id.as_str()),
+            "text" => find(&self.texts, id, |e| e.id.as_deref().unwrap_or_default()),
+            "behavior" => self
+                .behaviors
+                .iter()
+                .any(|b| b.as_str() == id)
+                .then(|| serde_json::Value::String(id.to_string())),
+            _ => None,
+        }
+    }
+
+    /// Fill in the content hash of each entity from Rust (DS-11).
+    pub fn stamp_hashes(&mut self) {
+        let stamped: Vec<(String, String)> = self
+            .origins
+            .iter()
+            .filter(|(_, o)| matches!(o, Origin::Rust { .. }))
+            .filter_map(|(k, _)| Some((k.clone(), value_hash(&self.entity_value(k)?))))
+            .collect();
+        for (key, new) in stamped {
+            if let Some(Origin::Rust { hash, .. }) = self.origins.get_mut(&key) {
+                *hash = new;
+            }
+        }
+    }
+
+    /// The pack as the JSON of `loremaster export-pack`, with its hashes.
+    pub fn to_json(&mut self) -> String {
+        self.stamp_hashes();
+        // A pack is plain data with string keys, as in `model_hash`.
+        serde_json::to_string_pretty(self).expect("a pack always serializes to JSON")
     }
 
     /// A pack from the files of a YAML folder. Paths use `/` and are relative
@@ -208,6 +345,7 @@ impl Pack {
         let mut agendas: Vec<Agenda> = Vec::new();
         let mut replaces = BTreeSet::new();
         let mut extensions = Vec::new();
+        let mut overrides = Vec::new();
 
         let mut sorted: Vec<&SourceFile> = files.iter().collect();
         sorted.sort_by(|a, b| a.path.cmp(&b.path));
@@ -239,6 +377,40 @@ impl Pack {
                     continue;
                 }
             };
+            let (over, file_text) = match take_override(&file_text) {
+                Ok(found) => found,
+                Err(message) => {
+                    errors.push(parse_diagnostic(path, &message));
+                    continue;
+                }
+            };
+            if let Some(base) = over {
+                let kind = if dir == "rules" {
+                    Some("rule")
+                } else {
+                    entity_kind(dir)
+                };
+                let matches_folder = kind.is_some_and(|k| {
+                    base.entity
+                        .split_once(':')
+                        .is_some_and(|(have, id)| have == k && id == stem)
+                });
+                if mode.is_some() || !matches_folder {
+                    errors.push(parse_diagnostic(
+                        path,
+                        &format!(
+                            "an `override:` of `{}` needs its own file in the folder of its kind, named after its id, without `extend` or `replace`",
+                            base.entity
+                        ),
+                    ));
+                    continue;
+                }
+                replaces.insert(base.entity.clone());
+                overrides.push(Override {
+                    base,
+                    path: path.to_string(),
+                });
+            }
             if let Some(mode) = mode {
                 let Some(kind) = entity_kind(dir) else {
                     errors.push(parse_diagnostic(
@@ -433,6 +605,20 @@ impl Pack {
                 _ => {}
             }
         }
+        // An `id:` in the body that is not the overridden one would leave the
+        // Rust part in place.
+        for o in &overrides {
+            let defined = origins.get(&o.base.entity).and_then(Origin::yaml_path);
+            if defined != Some(o.path.as_str()) && !errors.iter().any(|d| d.file == o.path) {
+                errors.push(parse_diagnostic(
+                    &o.path,
+                    &format!(
+                        "this file overrides `{}`, but does not define it",
+                        o.base.entity
+                    ),
+                ));
+            }
+        }
 
         if !errors.is_empty() {
             if header.is_none() {
@@ -465,6 +651,8 @@ impl Pack {
             origins,
             replaces,
             extensions,
+            overrides,
+            commit: None,
             warnings,
             instances: Vec::new(),
         })
@@ -589,8 +777,85 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut endings: Vec<Ending> = Vec::new();
     let mut texts: Vec<TextPool> = Vec::new();
     let mut agendas: Vec<Agenda> = Vec::new();
+    let any_rust = packs
+        .iter()
+        .any(|p| p.origins.values().any(|o| matches!(o, Origin::Rust { .. })));
+    let mut rust_parts: BTreeMap<String, RustPart> = BTreeMap::new();
     for (i, mut pack) in packs.into_iter().enumerate() {
         assembly.append(&mut pack.warnings);
+        pack.stamp_hashes();
+        // First the overrides of earlier packs' Rust parts: this pack's own
+        // Rust parts cannot be their base.
+        let mut overridden = BTreeSet::new();
+        for over in std::mem::take(&mut pack.overrides) {
+            let key = over.base.entity.clone();
+            let value = pack.entity_value(&key);
+            let Some(part) = rust_parts.get_mut(&key) else {
+                if any_rust {
+                    errors.push(Diagnostic::error(
+                        &over.path,
+                        "",
+                        format!("`{key}` is overridden, but no Rust part has this id any more; delete the file or give the Rust part back"),
+                    ));
+                } else {
+                    // A YAML-only load: the entity stands alone.
+                    assembly.push(Diagnostic::warning(
+                        &over.path,
+                        "",
+                        format!("`{key}` is an override, but its Rust pack is not loaded, so it is not compared"),
+                    ));
+                }
+                pack.replaces.remove(&key);
+                continue;
+            };
+            let Origin::Rust { hash, .. } = &part.origin else {
+                continue;
+            };
+            overridden.insert(key.clone());
+            if value.as_ref() == Some(&part.value) {
+                assembly.push(Diagnostic::info(
+                    &over.path,
+                    "",
+                    format!(
+                        "override no longer needed: `{key}` in Rust now equals this file; delete it"
+                    ),
+                ));
+                part.overridden_by = Some((over.path, OverrideState::NoLongerNeeded));
+            } else if *hash == over.base.base_hash {
+                assembly.push(Diagnostic::warning(
+                    &over.path,
+                    "",
+                    format!("override active, port it to the DSL: `{key}` (`loremaster codegen` prints it)"),
+                ));
+                part.overridden_by = Some((over.path, OverrideState::Active));
+            } else {
+                let diff = three_way(
+                    &over.base.base,
+                    &part.value,
+                    value.as_ref().unwrap_or(&serde_json::Value::Null),
+                );
+                errors.push(Diagnostic::error(
+                    &over.path,
+                    "",
+                    format!("both sides changed: `{key}` changed in Rust and in this override. Merge them, then set `base_hash: {hash}` and `base` to the Rust value.{diff}"),
+                ));
+            }
+        }
+        for (key, origin) in &pack.origins {
+            if matches!(origin, Origin::Rust { .. })
+                && let Some(value) = pack.entity_value(key)
+            {
+                rust_parts.insert(
+                    key.clone(),
+                    RustPart {
+                        origin: origin.clone(),
+                        value,
+                        commit: pack.commit.clone(),
+                        overridden_by: None,
+                    },
+                );
+            }
+        }
         // A replaced room or thing takes its nested rules with it: they come
         // from the replaced file and run `within` the entity.
         for key in &pack.replaces {
@@ -622,13 +887,16 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
                 && pack.replaces.contains(&key)
             {
                 let first = &origins[&key];
-                assembly.push(Diagnostic::warning(
-                    origin.file(),
-                    "",
-                    format!("`{key}` replaces the one in {first}"),
-                ));
+                if !overridden.contains(&key) {
+                    assembly.push(Diagnostic::warning(
+                        origin.file(),
+                        "",
+                        format!("`{key}` replaces the one in {first}"),
+                    ));
+                }
                 remove_entity(
                     &key,
+                    &mut rules,
                     &mut rooms,
                     &mut things,
                     &mut threads,
@@ -810,6 +1078,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         origins,
         walkthroughs,
         assembly,
+        rust_parts,
     })
 }
 
@@ -836,6 +1105,7 @@ fn inherit_results(story: &mut Story) {
 #[allow(clippy::too_many_arguments)]
 fn remove_entity(
     key: &str,
+    rules: &mut Vec<Rule>,
     rooms: &mut Vec<Room>,
     things: &mut Vec<Thing>,
     threads: &mut Vec<Thread>,
@@ -850,6 +1120,7 @@ fn remove_entity(
         return;
     };
     match kind {
+        "rule" => rules.retain(|e| e.id.as_str() != id),
         "room" => rooms.retain(|e| e.id.as_str() != id),
         "thing" => things.retain(|e| e.id.as_str() != id),
         "thread" => threads.retain(|e| e.id.as_str() != id),
@@ -1052,7 +1323,14 @@ pub fn read_dir(root: &std::path::Path) -> std::io::Result<Vec<SourceFile>> {
             let path = entry?.path();
             if path.is_dir() {
                 walk(root, &path, out)?;
-            } else if path.extension().is_some_and(|e| e == "yaml" || e == "yml") {
+            } else if path.extension().is_some_and(|e| {
+                e == "yaml"
+                    || e == "yml"
+                    || (e == "json"
+                        && path
+                            .strip_prefix(root)
+                            .is_ok_and(|rel| rel.starts_with("packs")))
+            }) {
                 let rel = path
                     .strip_prefix(root)
                     .unwrap_or(&path)

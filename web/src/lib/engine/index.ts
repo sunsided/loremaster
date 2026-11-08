@@ -45,6 +45,7 @@ import type {
 	Preview,
 	RoomParts,
 	RuleView,
+	RustPart,
 	MachineView,
 	Scene,
 	SourceFile,
@@ -292,6 +293,11 @@ export class Workbench {
 	/** The file of each entity, for example `room:shore` to `rooms/shore.yaml`. */
 	origins(): Record<string, string> {
 		return this.#bench.origins();
+	}
+
+	/** The parts of the story made in Rust, by entity key. */
+	rustParts(): Record<string, RustPart> {
+		return this.#bench.rustParts();
 	}
 
 	// ---- play, as whole turns ----

@@ -18,6 +18,12 @@ pub enum Origin {
         column: u32,
         /// The name of the pack.
         pack: String,
+        /// The content hash of the entity (DS-11): SHA-256 of its model
+        /// value as JSON, not of the source text. So `rustfmt` and comments
+        /// do not change it. `assemble` fills it in, when the entity is
+        /// complete; a builder cannot, because it still changes the entity.
+        #[serde(default)]
+        hash: String,
     },
 }
 
@@ -53,6 +59,7 @@ impl fmt::Display for Origin {
                 line,
                 column,
                 pack,
+                ..
             } => write!(f, "{file}:{line}:{column} (pack {pack})"),
         }
     }

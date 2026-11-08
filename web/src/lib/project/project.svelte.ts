@@ -1,6 +1,6 @@
 // The story files that the author edits, and where they are kept.
 
-import type { SourceFile } from '#lib/engine/types.ts';
+import type { RustPart, SourceFile } from '#lib/engine/types.ts';
 import { listOf, type FragmentList } from './source-map.ts';
 import * as store from './store.ts';
 import { readFragment, type FragmentData } from './yaml-edit.ts';
@@ -22,6 +22,8 @@ export class Project {
 	files = $state<SourceFile[]>([]);
 	/** The file of each entity, from the last good build of the game. */
 	origins = $state<Record<string, string>>({});
+	/** The parts made in Rust (from `packs/*.json`), from the last good build. */
+	rustParts = $state.raw<Record<string, RustPart>>({});
 	storage = $state<Storage>('memory');
 	/** The name of the linked folder. */
 	folderName = $state<string | null>(null);
@@ -111,7 +113,7 @@ export class Project {
 	async linkFolder(): Promise<SourceFile[]> {
 		const folder = await store.pickFolder();
 		const there = await store.readFolder(folder);
-		if (there.some((f) => f.path === 'story.yaml')) this.files = there;
+		if (there.some((f) => f.path === 'story.yaml' || f.path.startsWith('packs/'))) this.files = there;
 		else for (const f of this.files) await store.writeFile(folder, f.path, f.text);
 		this.#folder = folder;
 		this.folderName = folder.name;

@@ -70,8 +70,8 @@ pub fn check_packs(packs: Vec<Pack>) -> Checked {
 /// [`check_packs`] for the files of one YAML folder: a file that does not
 /// read (an unknown field, an unknown folder) is an error too.
 pub fn check_files(files: Vec<SourceFile>) -> Checked {
-    match Pack::from_files(files) {
-        Ok(pack) => check_packs(vec![pack]),
+    match crate::load::packs_of(files) {
+        Ok(packs) => check_packs(packs),
         Err(diagnostics) => Checked {
             project: None,
             diagnostics,

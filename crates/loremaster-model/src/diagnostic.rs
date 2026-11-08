@@ -6,6 +6,8 @@ use std::fmt;
 pub enum Severity {
     Error,
     Warning,
+    /// A note that asks for no fix, for example an override that is no longer needed.
+    Info,
 }
 
 /// A problem in a project, pointing at a file and, where possible, a line.
@@ -45,6 +47,15 @@ impl Diagnostic {
         Self::new(Severity::Warning, file, at, message)
     }
 
+    /// A note in `file`, without a line yet.
+    pub fn info(
+        file: impl Into<String>,
+        at: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self::new(Severity::Info, file, at, message)
+    }
+
     fn new(
         severity: Severity,
         file: impl Into<String>,
@@ -71,6 +82,7 @@ impl fmt::Display for Diagnostic {
         let level = match self.severity {
             Severity::Error => "error",
             Severity::Warning => "warning",
+            Severity::Info => "info",
         };
         write!(f, "{level}: {}", self.file)?;
         if let (Some(l), Some(c)) = (self.line, self.column) {

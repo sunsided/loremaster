@@ -13,6 +13,8 @@
 		room: string;
 		/** The file of the room, for example "rooms/shore.yaml". */
 		file?: string | null;
+		/** The Rust source of the room, when it is made in Rust and has no YAML file yet. Then it is read-only. */
+		rust?: { file: string; line: number } | null;
 		/** The level of the room. Leave it out for a story on one level. */
 		level?: number | null;
 		/** What the last explorer run found about this room. Null: the explorer did not run yet. */
@@ -53,6 +55,7 @@
 	let {
 		room,
 		file = null,
+		rust = null,
 		level = null,
 		reach = null,
 		onexplore,
@@ -113,7 +116,9 @@
 <div class="desk" aria-label="Room desk: {room}" role="region">
 	<div class="head">
 		<p class="room">{room}</p>
-		<p class="where">{file ?? 'no file yet'}{level !== null ? ` · level ${level}` : ''}</p>
+		<p class="where">
+			{#if rust && file === rust.file}<svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16"><path fill="currentColor" d="M5 7V5a3 3 0 1 1 6 0v2h1v7H4V7zm1.5 0h3V5a1.5 1.5 0 1 0-3 0z" /></svg> Rust, read-only · {rust.file}:{rust.line}{:else}{file ?? 'no file yet'}{/if}{level !== null ? ` · level ${level}` : ''}
+		</p>
 		<p class="reach">
 			{#if !reach}
 				<span class="muted">Not explored yet.</span>
