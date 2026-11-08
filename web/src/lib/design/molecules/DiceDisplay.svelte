@@ -10,7 +10,7 @@
 		reduceMotion?: boolean;
 	}
 
-	let { rolls, reduceMotion = false }: Props = $props();
+	let { rolls, reduceMotion = true }: Props = $props();
 
 	/** The frame of the roll animation, or null when the dice rest. */
 	let frame = $state<number | null>(null);
@@ -60,6 +60,10 @@
 		flex-wrap: wrap;
 		gap: var(--space-5);
 		font-family: var(--font-ui);
+	}
+	/* Without dice the live region stays in the page, but out of the flow: it adds no gap to the player column. */
+	.dice:not(:has(.roll)) {
+		position: absolute;
 	}
 	.roll {
 		display: flex;

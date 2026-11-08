@@ -24,8 +24,8 @@ The phosphor theme rolls the ASCII dice for a short time. With reduced motion, t
 	];
 </script>
 
-<Story name="Test with a target"><DiceDisplay rolls={luck} /></Story>
-<Story name="A combat round"><DiceDisplay rolls={round} /></Story>
+<Story name="Test with a target"><DiceDisplay rolls={luck} reduceMotion={false} /></Story>
+<Story name="A combat round"><DiceDisplay rolls={round} reduceMotion={false} /></Story>
 <Story name="Reduced motion"><DiceDisplay rolls={luck} reduceMotion /></Story>
 <Story name="Total only"><DiceDisplay rolls={[{ dice: '2d6', total: 8 }]} /></Story>
 <Story name="No dice"><DiceDisplay rolls={[]} /></Story>

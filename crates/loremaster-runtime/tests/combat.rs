@@ -446,6 +446,10 @@ fn check_refuses_a_bad_stat() {
     for (stats, wanted) in [
         ("stats:\n  - { var: nope, label: X }\n", "`nope`"),
         (
+            "stats:\n  - { var: skill, label: A }\n  - { var: skill, label: B }\n",
+            "twice",
+        ),
+        (
             "  - { id: w, type: { enum: [a] }, initial: a }\nstats:\n  - { var: w, label: X }\n",
             "`w`",
         ),

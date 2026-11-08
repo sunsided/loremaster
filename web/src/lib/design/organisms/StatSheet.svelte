@@ -21,7 +21,8 @@
 			.map((s) => `${s.short} ${s.value}${s.max !== undefined && s.value !== s.max ? `/${s.max}` : ''}`)
 			.join('  ')
 	);
-	const spoken = (s: StatView) => `${s.label} ${s.value}${s.max !== undefined ? ` of ${s.max}` : ''}`;
+	const amount = (s: StatView) => `${s.value}${s.max !== undefined ? ` of ${s.max}` : ''}`;
+	const spoken = (s: StatView) => `${s.label} ${amount(s)}`;
 
 	let open = $state(false);
 	/** The direction of each recent change, by the name of the variable. */
@@ -29,21 +30,23 @@
 	let announcement = $state('');
 
 	// The values of the last check. They only compare and do not show.
-	let previous: Map<string, StatView['value']> | undefined;
+	let previous: Map<string, StatView> | undefined;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
 	$effect(() => {
 		const last = previous;
-		previous = new Map(stats.map((s) => [s.var, s.value]));
+		previous = new Map(stats.map((s) => [s.var, s]));
 		if (!last) return;
 		const marks: Record<string, 'up' | 'down'> = {};
 		const said: string[] = [];
 		for (const s of stats) {
 			const before = last.get(s.var);
-			if (before === undefined || before === s.value) continue;
-			if (typeof s.value === 'number' && typeof before === 'number') {
-				marks[s.var] = s.value > before ? 'up' : 'down';
-				said.push(`${spoken(s)}.`);
+			if (!before || (before.value === s.value && before.max === s.max)) continue;
+			if (typeof s.value === 'number' && typeof before.value === 'number') {
+				const same = s.value === before.value;
+				const up = same ? (s.max ?? 0) > (before.max ?? 0) : s.value > before.value;
+				marks[s.var] = up ? 'up' : 'down';
+				said.push(same ? `${spoken(s)}.` : `${s.label} ${up ? 'up' : 'down'} to ${amount(s)}.`);
 			} else if (typeof s.value === 'boolean') {
 				if (s.value) marks[s.var] = 'up';
 				said.push(s.value ? `Codeword ${s.label}.` : `Codeword ${s.label} removed.`);
@@ -115,7 +118,7 @@
 		background: var(--color-surface-control);
 		color: inherit;
 		font: inherit;
-		white-space: pre;
+		white-space: pre-wrap;
 		text-align: left;
 		cursor: pointer;
 	}
@@ -165,8 +168,10 @@
 			top: 0;
 			z-index: var(--z-status);
 		}
+		/* Stays in view when it opens; a tall sheet scrolls by itself. */
 		.sheet.open {
-			position: relative;
+			max-height: 100dvh;
+			overflow-y: auto;
 		}
 		.line {
 			display: block;

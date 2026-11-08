@@ -1171,16 +1171,20 @@ impl Checker<'_> {
         }
     }
 
-    /// The score: a number variable, a positive maximum, and ranks in reach.
     /// A stat names a number or a flag. Only a number has a `max`, and a
-    /// `max` that is a variable is a number variable.
+    /// `max` that is a variable is a number variable. A variable shows once.
     fn stats(&mut self) {
         use loremaster_lang::Ty;
         use loremaster_model::Limit;
         let stats = self.story().stats.clone();
         let file = &self.file_of("story");
+        let mut seen = BTreeSet::new();
         for (i, stat) in stats.iter().enumerate() {
             let at = format!("stats[{i}]");
+            if !seen.insert(stat.var.as_str()) {
+                let var = &stat.var;
+                self.error(file, &at, format!("`{var}` is in `stats` twice"));
+            }
             let ty = self.ty_of(&stat.var);
             if !matches!(ty, Some(Ty::Int | Ty::Bool)) {
                 let var = &stat.var;
@@ -1202,6 +1206,7 @@ impl Checker<'_> {
         }
     }
 
+    /// The score: a number variable, a positive maximum, and ranks in reach.
     fn score(&mut self) {
         let Some(score) = self.story().score.clone() else {
             return;

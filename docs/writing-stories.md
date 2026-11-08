@@ -455,7 +455,7 @@ stats:
   - { var: hearth, label: HEARTH }
 ```
 
-`var` is a number or a true/false variable, or a property of a thing. A number shows as its value, with "/ max" when the stat has `max` (a number or a number variable). A true/false value shows as a codeword when it is true. The stat with `short` also shows in the one-line sheet on a phone. The equipment on the sheet is the inventory of the player.
+`var` is a number or a true/false variable, or a number or true/false property of a thing. Each variable can show one time only. A number shows as its value, with "/ max" when the stat has `max` (a number or a number variable). A true/false value shows as a codeword when it is true. A number with `short` also shows in the one-line sheet on a phone. The equipment on the sheet is the inventory of the player.
 
 ### Number limits and sums
 
