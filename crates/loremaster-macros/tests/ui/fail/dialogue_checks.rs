@@ -35,12 +35,52 @@ mod schema {
             stove: "He nods." {
                 when ash_is_cold;
                 set ash_is_fresh = 3;
-                relation trust += 1;
-                says "Who fed it?" when keeper.angry => end {
+                // The first error of a condition or a relation hides the
+                // next ones: unknown_relation and extern_property test them.
+                says "Who fed it?" => end {
                     then goto cellar;
                 }
                 says "{bad" => end;
                 stranger says "Hm." => end;
+            }
+        }
+    }
+}
+
+mod unknown_relation {
+    use loremaster::prelude::*;
+    world! {
+        extern { thing keeper; }
+        dialogue with keeper start [stove] {
+            stove: "He nods." {
+                relation trust += 1;
+                says "Good night." => end;
+            }
+        }
+    }
+}
+
+mod extern_property {
+    use loremaster::prelude::*;
+    world! {
+        extern { thing keeper [calm: bool]; }
+        dialogue with keeper start [stove] {
+            stove: "He nods." {
+                says "Who fed it?" when keeper.angry => end;
+            }
+        }
+    }
+}
+
+// A node whose key starts with `then` keeps its own span.
+mod then_node {
+    use loremaster::prelude::*;
+    world! {
+        extern { thing keeper; var ash_is_fresh; }
+        dialogue with keeper start [then_what] {
+            then_what: "He nods." {
+                set ash_is_fresh = 3;
+                says "Good night." => end;
             }
         }
     }

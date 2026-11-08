@@ -37,6 +37,29 @@ mod thread_status {
     }
 }
 
+mod pack_keyword {
+    use loremaster::prelude::*;
+    world! {
+        pack loop;
+    }
+}
+
+mod duplicate_property {
+    use loremaster::prelude::*;
+    world! {
+        extern { thing stove [hot: bool, hot: int]; }
+    }
+}
+
+mod extern_relation_with_story {
+    use loremaster::prelude::*;
+    world! {
+        extern { relation trust; }
+        story "Tiny" { start: hall }
+        room hall "Hall" {}
+    }
+}
+
 mod checks {
     use loremaster::prelude::*;
     world! {

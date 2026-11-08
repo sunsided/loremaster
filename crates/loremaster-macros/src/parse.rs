@@ -30,6 +30,16 @@ impl Parse for World {
         if peek_kw(input, "pack") {
             name(input)?;
             let n = name(input)?;
+            // A keyword (`loop`, also `r#loop`) can not be the name of a function here.
+            if syn::parse_str::<Ident>(&n.value).is_err() {
+                return Err(Error::new(
+                    n.span,
+                    format!(
+                        "`{}` is a Rust keyword; give the pack another name",
+                        n.value
+                    ),
+                ));
+            }
             semi(input)?;
             name_ = Some(n);
         }
@@ -329,7 +339,7 @@ fn externs(input: ParseStream) -> Result<Vec<Extern>> {
         let kind = match kind.value.as_str() {
             "room" => ExternKind::Room,
             "thing" => {
-                let mut props = Vec::new();
+                let mut props: Vec<(Name, PropType)> = Vec::new();
                 if input.peek(syn::token::Bracket) {
                     let content;
                     bracketed!(content in input);
@@ -350,6 +360,15 @@ fn externs(input: ParseStream) -> Result<Vec<Extern>> {
                                 ));
                             }
                         };
+                        if let Some((first, _)) = props.iter().find(|(p, _)| p.value == prop.value)
+                        {
+                            let mut e = Error::new(
+                                prop.span,
+                                format!("the property `{}` is declared twice", prop.value),
+                            );
+                            e.combine(Error::new(first.span, "first declared here"));
+                            return Err(e);
+                        }
                         props.push((prop, ty));
                         if !content.is_empty() {
                             content.parse::<Token![,]>()?;
@@ -709,13 +728,10 @@ fn speech(input: ParseStream) -> Error {
 /// A bare string right after speech reads like more speech, so it is an
 /// error that suggests `narrate` (the lint of #111; YAML loads it with a
 /// warning).
-fn line(input: ParseStream) -> Result<Vec<Segment>> {
-    line_until(input, false)
-}
-
-/// The segments of a line, up to `;`. In a dialogue (`dialogue`), also up
-/// to `{`, `=>` and a `when` without `then`: the node's body, the option's
-/// target and the option's condition.
+///
+/// In a dialogue (`dialogue`), the line also ends at `{`, `=>`, `,` and a
+/// `when` without `then`: the node's body, the
+/// option's target, the next effect of `then` and the option's condition.
 fn line_until(input: ParseStream, dialogue: bool) -> Result<Vec<Segment>> {
     let mut segments: Vec<Segment> = Vec::new();
     let end = |input: ParseStream| {
@@ -724,6 +740,7 @@ fn line_until(input: ParseStream, dialogue: bool) -> Result<Vec<Segment>> {
             || (dialogue
                 && (input.peek(syn::token::Brace)
                     || input.peek(Token![=>])
+                    || input.peek(Token![,])
                     || (peek_kw(input, "when") && !when_then(input))))
     };
     while !end(input) {
@@ -768,10 +785,13 @@ fn when_then(input: ParseStream) -> bool {
     if fork.call(Ident::parse_any).is_err() {
         return false;
     }
+    let mut after_dot = false;
     while !fork.is_empty() {
-        if peek_kw(&fork, "then") {
+        // `x.then` is a property, not the marker.
+        if peek_kw(&fork, "then") && !after_dot {
             return true;
         }
+        after_dot = fork.peek(Token![.]);
         if fork.peek(Token![;]) || fork.peek(Token![=>]) || fork.peek(syn::token::Brace) {
             return false;
         }
@@ -807,7 +827,12 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
     }
     if peek_kw(input, "when") {
         keyword(input, "when")?;
-        let cond = parse_until(input, |i| peek_kw(i, "then") || i.peek(Token![;]))?;
+        // `x.then` is a property, not the marker: `stop` runs once per token.
+        let after_dot = std::cell::Cell::new(false);
+        let cond = parse_until(input, |i| {
+            let dot = after_dot.replace(i.peek(Token![.]));
+            (!dot && peek_kw(i, "then")) || i.peek(Token![;])
+        })?;
         keyword(input, "then").map_err(|e| {
             Error::new(
                 e.span(),
@@ -1247,7 +1272,7 @@ fn effects(input: ParseStream) -> Result<Vec<Effect>> {
 
 fn effect(input: ParseStream) -> Result<Effect> {
     let start = input.cursor();
-    let kind = effect_body(input)?.kind;
+    let kind = effect_body(input, false)?.kind;
     semi(input)?;
     Ok(Effect {
         kind,
@@ -1255,22 +1280,40 @@ fn effect(input: ParseStream) -> Result<Effect> {
     })
 }
 
-/// An effect without its `;`.
-fn effect_body(input: ParseStream) -> Result<Effect> {
+/// Read `,` and go on with a list of `set`, `add` or `move` only when the
+/// next entry starts with `entry`; else the comma belongs to the next effect
+/// (`then set a = true, goto hall` in a dialogue).
+fn more(input: ParseStream, entry: impl Fn(ParseStream) -> bool) -> Result<bool> {
+    if !input.peek(Token![,]) {
+        return Ok(false);
+    }
+    let fork = input.fork();
+    fork.parse::<Token![,]>()?;
+    if !entry(&fork) {
+        return Ok(false);
+    }
+    input.parse::<Token![,]>()?;
+    Ok(true)
+}
+
+/// An effect without its `;`. In a dialogue's `then`, a `line` ends at a
+/// comma too.
+fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
     let start = input.cursor();
     let word = name(input)?;
     let kind = match word.value.as_str() {
-        "line" => EffectKind::Line(line(input)?),
+        "line" => EffectKind::Line(line_until(input, dialogue)?),
         "set" => {
             let mut list = Vec::new();
             loop {
                 let target = path(input)?;
                 input.parse::<Token![=]>()?;
                 list.push((target, value(input)?));
-                if !input.peek(Token![,]) {
+                if !more(input, |f| {
+                    path(f).is_ok() && f.peek(Token![=]) && !f.peek(Token![==])
+                })? {
                     break;
                 }
-                input.parse::<Token![,]>()?;
             }
             EffectKind::Set(list)
         }
@@ -1292,10 +1335,11 @@ fn effect_body(input: ParseStream) -> Result<Effect> {
                     .checked_mul(sign)
                     .ok_or_else(|| Error::new(at, "the amount is out of range"))?;
                 list.push((target, amount));
-                if !input.peek(Token![,]) {
+                if !more(input, |f| {
+                    path(f).is_ok() && (f.peek(Token![+=]) || f.peek(Token![-=]))
+                })? {
                     break;
                 }
-                input.parse::<Token![,]>()?;
             }
             EffectKind::Add(list)
         }
@@ -1311,10 +1355,9 @@ fn effect_body(input: ParseStream) -> Result<Effect> {
                     _ => target.value,
                 };
                 list.push((thing, to));
-                if !input.peek(Token![,]) {
+                if !more(input, |f| name(f).is_ok() && f.peek(Token![->]))? {
                     break;
                 }
-                input.parse::<Token![,]>()?;
             }
             EffectKind::Move(list)
         }
@@ -1855,7 +1898,7 @@ impl ParseHost for Host {
         if peek_kw(input, "then") {
             name(input)?;
         }
-        effect_body(input)
+        effect_body(input, true)
     }
 }
 

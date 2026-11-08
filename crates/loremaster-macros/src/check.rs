@@ -10,7 +10,7 @@
 
 use crate::ast::*;
 use crate::emit::camel;
-use dramaturge_syntax::{Outcomes, Place};
+use dramaturge_syntax::{OutcomePlace, Outcomes, Place};
 use loremaster_dsl::{
     BuildPack, DialogueBuilder, Effects, EndingBuilder, FragmentExt, HasFrames, HasNotes,
     RoomBuilder, ThingBuilder, frag, on, variants,
@@ -109,6 +109,15 @@ pub fn validate(world: &World) -> Result<(), Error> {
             Item::Extern(list) => {
                 for e in list {
                     let kind = extern_kind(&e.kind);
+                    if story_seen && matches!(e.kind, ExternKind::Relation) {
+                        errors.push(Error::new(
+                            e.id.span,
+                            format!(
+                                "the relations live in the story header, and this block has it, so no other pack can define `{}`; write `relations: [{}]` in the story header",
+                                e.id.value, e.id.value
+                            ),
+                        ));
+                    }
                     if story_seen && matches!(e.kind, ExternKind::Var(_)) {
                         errors.push(Error::new(
                             e.id.span,
@@ -258,6 +267,13 @@ pub fn check(world: &World) -> Result<(), Error> {
 /// pack.
 fn rust_hint(message: &str) -> String {
     let message = message.split(": add it as ").next().unwrap_or(message);
+    if let Some(rest) = message.strip_prefix("unknown relation `")
+        && let Some((axis, _)) = rest.split_once('`')
+    {
+        return format!(
+            "unknown relation `{axis}`; add it to `relations: [..]` in the story header, or write `extern {{ relation {axis}; }}` for one of another pack"
+        );
+    }
     for kind in ["room", "thing", "timer", "ending", "verb"] {
         if let Some(rest) = message.strip_prefix(&format!("unknown {kind} `"))
             && let Some(id) = rest.strip_suffix('`')
@@ -1128,7 +1144,13 @@ fn dialogue(p: &mut Pack, d: &Dialogue, spans: &mut Spans) {
         let path = place.path(tree);
         // The effects of `then` get their spans from `effects`, which
         // knows the index of each effect in the model.
-        if path.contains(".then") || matches!(place, Place::NodeWhen(_) | Place::OptionWhen(..)) {
+        if matches!(
+            place,
+            Place::NodeWhen(_)
+                | Place::OptionWhen(..)
+                | Place::NodeOutcome(_, OutcomePlace::Then(_))
+                | Place::OptionOutcome(_, _, OutcomePlace::Then(_))
+        ) {
             continue;
         }
         spans.add(

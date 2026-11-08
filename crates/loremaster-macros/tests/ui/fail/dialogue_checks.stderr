@@ -29,21 +29,21 @@ error: cannot set `ash_is_fresh` to `3`
    |             ^^^^^
 
 error: unknown room `cellar`; for an id of another pack, write `extern { room cellar; }`
-  --> tests/ui/fail/dialogue_checks.rs:40:26
+  --> tests/ui/fail/dialogue_checks.rs:41:26
    |
-40 |                     then goto cellar;
+41 |                     then goto cellar;
    |                          ^^^^^^^^^^^
 
 error: `{` is never closed
-  --> tests/ui/fail/dialogue_checks.rs:42:17
+  --> tests/ui/fail/dialogue_checks.rs:43:17
    |
-42 |                 says "{bad" => end;
+43 |                 says "{bad" => end;
    |                 ^^^^^^^^^^^
 
 error: unknown speaker `stranger`: `by` names a thing or `player`
-  --> tests/ui/fail/dialogue_checks.rs:43:17
+  --> tests/ui/fail/dialogue_checks.rs:44:17
    |
-43 |                 stranger says "Hm." => end;
+44 |                 stranger says "Hm." => end;
    |                 ^^^^^^^^
 
 error: unknown name `ash_is_cold`
@@ -52,8 +52,26 @@ error: unknown name `ash_is_cold`
 36 |                 when ash_is_cold;
    |                      ^^^^^^^^^^^
 
-error: unknown thing `keeper`; for an id of another pack, write `extern { thing keeper; }`
-  --> tests/ui/fail/dialogue_checks.rs:52:23
+error: unknown relation `trust`; add it to `relations: [..]` in the story header, or write `extern { relation trust; }` for one of another pack
+  --> tests/ui/fail/dialogue_checks.rs:55:13
    |
-52 |         dialogue with keeper start [stove] {
+55 |             stove: "He nods." {
+   |             ^^^^^
+
+error: `keeper` has no property `angry`
+  --> tests/ui/fail/dialogue_checks.rs:69:41
+   |
+69 |                 says "Who fed it?" when keeper.angry => end;
+   |                                         ^^^^^^^^^^^^
+
+error: cannot set `ash_is_fresh` to `3`
+  --> tests/ui/fail/dialogue_checks.rs:81:13
+   |
+81 |             then_what: "He nods." {
+   |             ^^^^^^^^^
+
+error: unknown thing `keeper`; for an id of another pack, write `extern { thing keeper; }`
+  --> tests/ui/fail/dialogue_checks.rs:92:23
+   |
+92 |         dialogue with keeper start [stove] {
    |                       ^^^^^^

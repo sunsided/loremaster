@@ -28,20 +28,44 @@ error: expected `open`, `resolved` or `dropped`
 36 |         thread t "T" { status closed; }
    |                               ^^^^^^
 
-error: unknown verb `juggle`; for an id of another pack, write `extern { verb juggle; }`
-  --> tests/ui/fail/l4_items.rs:47:20
+error: `loop` is a Rust keyword; give the pack another name
+  --> tests/ui/fail/l4_items.rs:43:14
    |
-47 |             before juggle "You lean closer.";
+43 |         pack loop;
+   |              ^^^^
+
+error: the property `hot` is declared twice
+  --> tests/ui/fail/l4_items.rs:50:42
+   |
+50 |         extern { thing stove [hot: bool, hot: int]; }
+   |                                          ^^^
+
+error: first declared here
+  --> tests/ui/fail/l4_items.rs:50:31
+   |
+50 |         extern { thing stove [hot: bool, hot: int]; }
+   |                               ^^^
+
+error: the relations live in the story header, and this block has it, so no other pack can define `trust`; write `relations: [trust]` in the story header
+  --> tests/ui/fail/l4_items.rs:57:27
+   |
+57 |         extern { relation trust; }
+   |                           ^^^^^
+
+error: unknown verb `juggle`; for an id of another pack, write `extern { verb juggle; }`
+  --> tests/ui/fail/l4_items.rs:70:20
+   |
+70 |             before juggle "You lean closer.";
    |                    ^^^^^^
 
 error: `poker` has no property `bent`
-  --> tests/ui/fail/l4_items.rs:48:26
+  --> tests/ui/fail/l4_items.rs:71:26
    |
-48 |             instead take when stove.hot and poker.bent => "It is too hot.";
+71 |             instead take when stove.hot and poker.bent => "It is too hot.";
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: `stove` has no property `cold`
-  --> tests/ui/fail/l4_items.rs:46:23
+  --> tests/ui/fail/l4_items.rs:69:23
    |
-46 |             name when stove.cold => "hot poker";
+69 |             name when stove.cold => "hot poker";
    |                       ^^^^^^^^^^

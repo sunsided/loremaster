@@ -565,7 +565,7 @@ mod more {
         }
 
         thread stove_secret "Who fed the stove?" {
-            status open;
+            status resolved;
             summary "The stove is warm at dawn.";
             tracks ash_seen;
             note "Pays off in the keeper's room.";
@@ -619,7 +619,9 @@ fn threads_frames_names_and_the_score() {
     let p = more::pack();
     let t = &p.threads[0];
     assert_eq!(t.id.as_str(), "stove_secret");
-    assert_eq!(t.status, ThreadStatus::Open);
+    assert_eq!(t.status, ThreadStatus::Resolved);
+    assert_eq!(t.summary.as_deref(), Some("The stove is warm at dawn."));
+    assert_eq!(t.notes.len(), 1);
     assert_eq!(t.tracks, ["ash_seen"]);
     assert_eq!(p.behaviors[0].as_str(), "thief");
     assert!(p.replaces.contains("thing:poker"));
@@ -657,4 +659,57 @@ fn threads_frames_names_and_the_score() {
     assert_eq!(s.rooms[0].frames.len(), 1);
     assert_eq!(s.timers[0].notes.len(), 1);
     assert!(s.machines[0].notes[0].todo);
+}
+
+/// A `then` list in a dialogue: an effect that takes a list (`set`) ends
+/// where the next effect starts, and `x.then` in a condition is a
+/// property, not the marker of a segment condition.
+mod then_lists {
+    use loremaster::prelude::*;
+
+    world! {
+        story "Then" { start: deck }
+        var flag: bool = false;
+        room deck "Deck" {}
+        thing mara "Mara" in deck { prop then = 0; }
+
+        dialogue with mara start [hi] {
+            hi: "Hi." when mara.then == 1 then "She smiles." {
+                says "Bye." when mara.then == 0 => end {
+                    then set flag = true, mara.then = 2, goto deck, line "You go.", stop;
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn then_lists_and_then_properties() {
+    use loremaster::dsl::model::{Line, LineSegment};
+    let p = then_lists::pack();
+    let node = &p.dialogues[0].nodes[0];
+    assert_eq!(
+        node.say,
+        Line::new(vec![
+            LineSegment::plain("Hi."),
+            LineSegment::narrate("She smiles.").when("mara.then == 1"),
+        ])
+    );
+    let option = &node.options[0];
+    assert_eq!(option.when.as_deref(), Some("mara.then == 0"));
+    assert_eq!(
+        option.outcomes.then,
+        [
+            Effect::Set(
+                [
+                    ("flag".to_string(), Value::Bool(true)),
+                    ("mara.then".to_string(), Value::Int(2)),
+                ]
+                .into()
+            ),
+            Effect::Goto(loremaster::dsl::model::Id::new("deck")),
+            Effect::Say(Line::from("You go.")),
+            Effect::Stop,
+        ]
+    );
 }
