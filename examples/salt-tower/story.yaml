@@ -7,7 +7,7 @@ intro:
   - "You are a courier. In your satchel is a sealed letter for the keeper of the Salt Tower, far out on the white flats."
 
 # The dice in section 1 replace the values of the stats. The start values are
-# not 0, so that a stat that is 0 always means that the character is spent.
+# not 0, so that a STAMINA of 0 always means that the character is spent.
 vars:
   - { id: r, type: int, initial: 0 }
   - { id: margin, type: int, initial: 0 }

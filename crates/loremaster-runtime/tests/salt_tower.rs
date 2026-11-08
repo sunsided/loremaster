@@ -1,8 +1,9 @@
 //! The Salt Tower (P5-06, #93) in `examples/salt-tower`: its walkthroughs and
 //! the reachability of its sections.
 
+use loremaster_model::Value;
 use loremaster_project::{Project, check, load, read_dir};
-use loremaster_runtime::{World, authoring, run_walkthrough};
+use loremaster_runtime::{Input, Session, Status, World, authoring, run_walkthrough};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -69,5 +70,30 @@ fn all_sections_are_reachable_and_no_state_is_stuck() {
             ending.id
         );
     }
-    assert_eq!(project.story.endings.len(), 3);
+    let mut ids: Vec<_> = project
+        .story
+        .endings
+        .iter()
+        .map(|e| e.id.as_str())
+        .collect();
+    ids.sort();
+    assert_eq!(ids, ["delivered", "fallen", "sent_away"]);
+}
+
+#[test]
+fn with_host_rolls_the_exit_waits_for_the_dice() {
+    let (_, world) = tower();
+    let mut s = Session::new(world);
+    s.set_host_rolls(true);
+    s.start();
+    let mut step = s.submit(Input::Text("roll your character".into()));
+    for total in [4, 7, 3] {
+        assert_eq!(s.state().room.as_str(), "section_1");
+        let Status::Await { awaiting } = &step.status else {
+            panic!("no await: {}", step.plain_text());
+        };
+        step = s.resume(&awaiting.id.clone(), Value::Int(total)).unwrap();
+    }
+    assert_eq!(s.state().room.as_str(), "section_2");
+    assert_eq!(step.plain_text().matches("2. The Door").count(), 1);
 }

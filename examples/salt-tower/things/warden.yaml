@@ -1,3 +1,4 @@
 name: GATE WARDEN
+listed: false
 location: { room: section_5 }
 props: { skill: 7, stamina: 8 }

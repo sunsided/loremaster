@@ -2,7 +2,7 @@
 
 A small gamebook in 9 numbered sections. You are a courier with a sealed letter for the keeper of a tower on the salt flats. The text is original.
 
-Each section is a room, and each choice is an exit with a label. Two more rooms carry the ends: `lamp_room` (the win) and `fallen` (0 STAMINA).
+Each section is a room, and each choice is an exit with a label. Two more rooms carry the ends: `lamp_room` (the win) and `fallen` (0 STAMINA). The third ending, "Sent away", comes from section 9: you reach the keeper with neither the word nor the lantern.
 
 ## Play
 

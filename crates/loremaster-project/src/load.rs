@@ -151,8 +151,9 @@ pub struct Pack {
     /// does not read yet. `assemble` passes them on.
     pub warnings: Vec<Diagnostic>,
     /// Rust values that the pack hands to the runtime: loremaster-dsl keeps
-    /// the instance of each Rust behavior here, as an
-    /// `Arc<Arc<dyn loremaster_runtime::Behavior>>`. Add them with its
+    /// the instance of each Rust behavior here: an
+    /// `Arc<dyn loremaster_runtime::Behavior>`, behind the type-erasing
+    /// `Arc<dyn Any + Send + Sync>` of this field. Add them with its
     /// `BuildPack::register` or `register_block`; `Loremaster::build`
     /// ignores any other value.
     /// The project does not read them.

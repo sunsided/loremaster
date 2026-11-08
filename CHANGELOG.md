@@ -10,6 +10,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- A `check` rule that waits for the host now holds the action. Before, the move or the verb ran while the rule waited.
 - The Salt Tower (P5-06, #93) in `examples/salt-tower`: a gamebook of 9 sections as rooms, with labelled exits, stats with limits, Skill and Luck tests as machines, the built-in combat and a codeword. Its walkthroughs (pay, fight, grate, spent) and the reachability of all sections run as a test.
 - Combat (P5-03, #90): the effect `combat: { enemies: [warden], win: yard, loss: fallen, escape: road, together: false }` runs a fight by built-in rules, also in the web player and `loremaster test`, without Rust. Enemies are things with the number properties `skill` and `stamina`. Each round is a choice ("Attack", "Test your Luck" after a hit, "Escape" when allowed); the rolls are visible roll notices and a walkthrough can force them with `rolls:`. A save in the middle of a combat restores. `Session::combat()` gives the enemies, the attack strengths of the last round and a short log. The explorer sees win, loss and escape.
 - The id of an await is now unique for each await, also in a loop, so that a repeated answer can not answer the next one.
