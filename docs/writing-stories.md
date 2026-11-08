@@ -518,11 +518,11 @@ The fields of a step:
 | --- | --- |
 | `at` | The time of day from which the step is due. The first step is due the first time the clock reaches it; each later step the first time the clock reaches it after the step before was due. A step without `at` is due as soon as the step before it is over. |
 | `place` | The room where the step happens. The actor walks there along the exits, one room per turn. Doors and conditions on exits do not stop it. When no exits lead there, it goes there in one turn. |
-| `when` | A condition. A step with `at` whose condition does not hold when it is due is skipped. A step without `at` waits until its condition holds. |
+| `when` | A condition. The actor tests it in each turn while the step is due, also while it walks to the `place`. A step with `at` is skipped in the first turn in which its condition does not hold, also when that is on the way. A step without `at` waits until its condition holds. |
 | `do` | A command of the actor: `{ verb: open, direct: stove }` or `[open, stove]`. Its `check` and verb rules fire with the actor in the [Command record](#the-command-record). The default responses of the standard verbs are the player's and do not run, so a rule with `actor:` makes the command do something. A `check` rule with `stop` refuses it; then the step is skipped and its `then` does not run. The refused try takes the actor's turn. |
 | `then` | Effects, as in a rule. `await` does not work here. |
 | `closes` | The endings that the step closes on purpose: after it, the story can no longer reach them. Read below. |
-| `reason` | Why the step closes them. `loremaster check` warns about `closes` without a `reason`. |
+| `reason` | Why the step closes them. `closes` without a `reason` is an error of `loremaster check`. |
 | `id` | The step's name in the save game. Without it, the step's place in the list, from 1. |
 
 How a turn goes for an actor, after the clock moved and the timers and time rules ran:

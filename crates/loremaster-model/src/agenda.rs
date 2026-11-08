@@ -39,8 +39,9 @@ pub struct AgendaStep {
     /// one room per turn, before the step runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub place: Option<Id>,
-    /// A condition. A step with `at` that is due while the condition does not
-    /// hold is skipped; a step without `at` waits until it holds.
+    /// A condition, tested in each turn while the step is due (also on the
+    /// walk to `place`). A step with `at` is skipped in the first such turn
+    /// in which it does not hold; a step without `at` waits until it holds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
     /// A command that the actor runs, such as `{ verb: open, direct: stove }`.

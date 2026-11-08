@@ -150,6 +150,12 @@ pub mod on {
         EventPattern::Verb(pattern)
     }
 
+    /// `{ check: …, direct: …, actor: … }`: before a verb, with any slot of
+    /// the Command record.
+    pub fn check_command(pattern: CommandPattern) -> EventPattern {
+        EventPattern::Check(pattern)
+    }
+
     /// `timer: id`: a timer runs out.
     pub fn timer(timer: impl AsRef<str>) -> EventPattern {
         EventPattern::Timer(id(timer))

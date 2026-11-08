@@ -111,7 +111,7 @@ pub(crate) fn inspect_thing(ins: Inspector<'_>, id: &str) -> Option<Inspect> {
         .rules
         .iter()
         .filter(|r| {
-            matches!(&r.on, EventPattern::Verb(p) if p.objects().any(|x| x.as_str() == id))
+            matches!(&r.on, EventPattern::Verb(p) if p.objects().chain(&p.actor).any(|x| x.as_str() == id))
                 || r.when.as_deref().is_some_and(mentions)
                 || r.then.iter().any(|e| mentions(&format!("{e:?}")))
         })

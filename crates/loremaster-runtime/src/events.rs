@@ -97,14 +97,15 @@ impl Event {
             (Event::Time { before, after }, EventPattern::Time(t)) => {
                 crate::game::crossed(*before, *after, *t)
             }
-            (Event::Verb { phase, .. }, pattern) => {
+            (Event::Verb { phase, verb, .. }, pattern) => {
                 let wanted = match (phase, pattern) {
                     (Phase::Check, EventPattern::Check(p)) => p,
                     (Phase::Instead, EventPattern::Verb(p)) if rule.instead => p,
                     (Phase::After, EventPattern::Verb(p)) if !rule.instead => p,
                     _ => return false,
                 };
-                self.command().is_some_and(|c| c.matches(wanted))
+                // The verb first: most rules differ there, without a clone.
+                wanted.verb == *verb && self.command().is_some_and(|c| c.matches(wanted))
             }
             (Event::Timer(a), EventPattern::Timer(b))
             | (Event::Custom(a), EventPattern::Event(b)) => a == b,

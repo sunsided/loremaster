@@ -59,7 +59,9 @@ impl CommandPattern {
     }
 
     /// The list form `[verb, direct, indirect]`. An empty list gives an empty
-    /// verb, which the checks report; parts after the third are dropped.
+    /// verb, which the checks report. A command has no slot for a fourth
+    /// part, so parts after the third are dropped; YAML rejects them when it
+    /// reads the list, and a builder that takes more should report it.
     pub fn from_parts(parts: impl IntoIterator<Item = Id>) -> Self {
         let mut parts = parts.into_iter();
         let mut p = Self::new(parts.next().unwrap_or_else(|| Id::new("")));
@@ -91,6 +93,9 @@ impl CommandPattern {
             || self.preposition.is_some()
             || self.topic.is_some()
             || (self.indirect.is_some() && self.direct.is_none())
+            // `[]` is the empty verb; with an object, the list would re-read
+            // the object as the verb.
+            || (self.verb.as_str().is_empty() && self.direct.is_some())
         {
             return None;
         }
@@ -472,6 +477,14 @@ mod tests {
         check!(e.contains("one kind"), "{e}");
         let e = read(r#"{ "actor": "keeper" }"#).unwrap_err();
         check!(e.contains("names no kind"), "{e}");
+    }
+
+    #[test]
+    fn an_empty_verb_with_an_object_keeps_the_record_form() {
+        let p = EventPattern::Verb(CommandPattern::new("").with_direct("stove"));
+        let json = serde_json::to_string(&p).unwrap();
+        check!(json == r#"{"verb":"","direct":"stove"}"#);
+        check!(serde_json::from_str::<EventPattern>(&json).unwrap() == p);
     }
 
     #[test]
