@@ -25,8 +25,7 @@ impl Game {
             let Some(i) = next else { return };
             if turn.machine_steps >= limit {
                 // One note per turn, also when more machines hit the limit.
-                if turn.machine_steps == limit {
-                    turn.machine_steps += 1;
+                if !std::mem::replace(&mut turn.step_limit_noted, true) {
                     let text = format!(
                         "the machine `{machine}` stopped after {limit} automatic steps in this turn (`step_limit`)"
                     );

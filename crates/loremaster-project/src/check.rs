@@ -1284,7 +1284,7 @@ impl Checker<'_> {
                 self.error(
                     &file,
                     &at,
-                    format!("the `on: next` steps from the state `{state}` loop forever: give a step `when:` or an `await`"),
+                    format!("the `on: next` steps from the state `{state}` loop forever: give a step `when:`, or an `await`, `end` or `stop`"),
                 );
             }
             for s in &states {

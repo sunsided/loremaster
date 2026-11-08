@@ -17,6 +17,9 @@ pub struct Turn {
     /// `on: next` steps taken in this turn, for the step limit.
     #[serde(skip)]
     pub(crate) machine_steps: u32,
+    /// The note about the step limit is in this turn.
+    #[serde(skip)]
+    pub(crate) step_limit_noted: bool,
 }
 
 /// Who the player is talking to.
