@@ -39,7 +39,7 @@ So the demo is a big test of loremaster (agendas, the ending checks, quests, hin
 | Text selection | `select`, `select_named`, `commit` (R9) | All texts: room, thing, presence, frame and intro texts are `Pick::All` pools; a `one_of` is an inline pool; `texts/*.yaml` are named pools (`crates/loremaster-runtime/src/text.rs:176`, `:197`, `:253`) | `text.rs` 323, `text/pool.rs` 138 |
 | Host types | `TextTypes`, `Judge`, `ProgressStore`, `TextRng` | `Lore`, `LoreJudge`, `impl ProgressStore for State`, `Rng` (`text/pool.rs:19`, `:59`, `:99`, `:130`) | in `text/pool.rs` |
 | A node that says a pool | `DialogText::Pool` | `say: { text: <id> }` lowers in 4 lines (`crates/loremaster-lang/src/dialogue.rs:173`); the talk shows it with `say_pool` (`talk.rs:268`) | small |
-| Pool checks | `validate_pools`, `validate_pool` (`PickTie`, `UnkeyedProgress`, `UnknownPool`) | `crates/loremaster-project/src/check.rs:419`, `:470` | `check.rs` about 270 lines |
+| Pool checks | `validate_pools`, `validate_pool` (`PickTie`, `UnkeyedProgress`, `UnknownPool`) | `crates/loremaster-project/src/check.rs:480`, `:424` | `check.rs` about 270 lines |
 | Lines and auto-continue | `DialogueNode::all_lines`, `next`, `DialogCursor::follow`, `ADVANCE_LIMIT` | `talk.rs:167` (`enter`), `:243` (`show`) | `talk.rs` 339 |
 | Dialogue token form | `dramaturge_syntax::tokens::parse_dialogue` with a `ParseHost` | `world!` dialogues (`crates/loremaster-macros/src/parse.rs:1876`) | about 260 lines in `loremaster-macros` |
 | Dialogue lowering | `Lower` (from phase 3) | `crates/loremaster-lang/src/dialogue.rs` | 240 |
@@ -115,7 +115,7 @@ Both map `Pick` and `FragmentMode` by hand: 9 `match` sites (`world.rs:375`, `:3
 
 dramaturge's `advance` applies the outcomes of every node in the chain, then returns the list of nodes; the host shows the lines after that (`dramaturge-runtime/src/runtime.rs:67`). loremaster shows each node's lines before its outcomes. It also stops the chain when an outcome ends the story or takes the player away. So `talk.rs:167` has its own loop with `enter_node`, `DialogCursor::follow` and `ADVANCE_LIMIT` (about 45 lines).
 
-The own loop had a bug: `next: back` entered the earlier node again, checked its `when` and applied its outcomes a second time. `go: back` does not do that. The review found it (#164, kilo thread on `talk.rs:186`, fixed in 1102d08).
+The own loop had a bug: `next: back` entered the earlier node again, checked its `when` and applied its outcomes a second time. `go: back` does not do that. The review found it (#164, kilo thread on `talk.rs:186`, fixed in b77e985).
 
 #### 4.3 A named pool inside a pool has no YAML key
 
@@ -123,7 +123,7 @@ In dramaturge's own YAML, a candidate says a named pool with `text: { text: <id>
 
 #### 4.4 The `dialogue!` token form cannot name a pool
 
-dramaturge's token form has no pool reference (`dramaturge-syntax/src/tokens.rs` has none; #96: "Not added: … a `dialogue!` token form for pools"). The slice's `dsl/dialogue.rs` says `keeper_remark` in its first node, so it stays behind `cfg(any())` (`examples/lock-keeper-slice/dsl.rs:30`). `the_dsl_dialogue_equals_the_yaml_dialogue` holds an inline copy instead.
+dramaturge's token form has no pool reference (`dramaturge-syntax/src/tokens.rs` has none; #96: "Not added: … a `dialogue!` token form for pools"). The slice's `dsl/dialogue.rs` says `keeper_remark` in its first node, so it stays behind `cfg(any())` (`examples/lock-keeper-slice/dsl.rs:33`). `the_dsl_dialogue_equals_the_yaml_dialogue` holds an inline copy instead.
 
 #### 4.5 `world!` has no `texts`, `one_of` or agendas
 
