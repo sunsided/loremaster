@@ -13,6 +13,7 @@ A story is a folder of YAML files. Each entity has its own file.
 | `things/*.yaml` | One thing or character in each file. A thing file can also have rules. |
 | `rules/*.yaml` | One rule, or a list of rules, in each file. Read [Rules](#rules). |
 | `timers/*.yaml` | One timer in each file. Read [Timers](#timers). |
+| `agendas/*.yaml` | One agenda of a character in each file. Read [Actors and agendas](#actors-and-agendas). |
 | `endings/*.yaml` | One ending in each file. Read [Endings](#endings). |
 | `machines/*.yaml` | One puzzle machine in each file. Read [Puzzle machines](#puzzle-machines). |
 | `verbs/*.yaml` | One custom verb in each file, as an item of `verbs:` in story.yaml. |
@@ -24,7 +25,7 @@ A story is a folder of YAML files. Each entity has its own file.
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
-The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folder `agendas/` is for a planned part: the loader skips it with a warning.
+The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read.
 
 To examine a story for problems, run `task check:story` or `cargo run -p loremaster --no-default-features -- check <folder>`.
 
@@ -215,6 +216,8 @@ nodes:
 - `with` is the id of the thing.
 - `start` is a list of node keys. The talk starts at the first node whose `when` holds.
 - A node is one line of the thing (`say`). Its `options` are the answers of the player.
+- More `lines` after `say` play in order, each with its `speaker`: a thing id, or `player` for a line of the player (it shows like an answer). A segment with `when` shows only while it holds, as in any line.
+- `next` is where the talk goes on when the node has no answer that shows: a node key, `end` or `back`. The talk goes on in the same turn, and each node on the way shows its lines and applies its outcomes. `next: back` returns like `go: back`: the node before shows its lines again, without a check and without its outcomes. A node without answers and without `next` ends the talk. A loop of `next` without an answer in it is a check error; should one play anyway, the talk ends after 1024 nodes.
 - A node with a `when` can only be entered while its `when` holds. When a `go` leads to a node whose `when` does not hold, the talk ends. `go: back` is no new entry: it returns to the node before and shows its line again, without a check and without its outcomes.
 - An option has a `say` (the line of the player, and the text of the choice), an optional `when`, and `go`. `go` is a node key, `end` or `back` (the node before). Without `go`, the option ends the talk.
 - A node or an option can change the state when it applies:
@@ -236,9 +239,9 @@ During a talk:
 - In the terminal, the answers show as a numbered list after the text. Type a number, or the first word of an answer.
 - Each answer takes one turn.
 - Other commands do not run. To leave the talk, type `bye` or `leave`, or push Escape.
-- A talk ends when the player chooses an answer that ends it, when a node has no answer that shows, or when an effect takes the player away.
+- A talk ends when the player chooses an answer that ends it, when a node has no answer that shows and no `next`, or when an effect takes the player away.
 
-The shape of a dialogue is the one of dramaturge's `dramaturge-syntax` (decision D3). Options can have an `id` (the key of the option), and the dialogue, nodes and options can have `notes`. The shape also has `lines`, `next`, and the option fields `hint`, `tags` and `intentions`; loremaster's talks do not play them yet, and `loremaster check` reports them as errors.
+The shape of a dialogue is the one of dramaturge's `dramaturge-syntax` (decision D3). Options can have an `id` (the key of the option), and the dialogue, nodes and options can have `notes`. The shape also has the option fields `hint`, `tags` and `intentions`; loremaster's talks do not play them yet, and `loremaster check` reports them as errors.
 
 `loremaster check` examines each dialogue: keys, `start`, targets of `go`, conditions, markup, speakers, and nodes that no start node leads to.
 
@@ -339,6 +342,7 @@ The events:
 | `{ time: "21:00" }` | The clock reaches the time. |
 | `{ check: [verb, thing] }` | Before the verb. Read [Action phases](#action-phases). `{ check: [go, north] }` checks a move. |
 | `{ verb: [verb, thing, other] }` | After the default response of the verb, or instead of it with `instead: true`. Fewer parts match more commands. |
+| `{ verb: examine, direct: stove }` | The same with named slots of the command. Read [The Command record](#the-command-record). `check` takes the same form. |
 | `{ timer: fuse }` | The timer runs out. |
 | `{ event: blast }` | An `emit: blast` effect sends the event. |
 | `{ talk: [dialogue, node] }` | A dialogue reaches the node. `[dialogue]` matches all nodes. |
@@ -360,7 +364,31 @@ The effects:
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
-More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response.
+More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
+
+### The Command record
+
+Each command has these slots: who acts (`actor`), the `verb`, the first object (`direct`), the second object (`indirect`), the word between the objects (`preposition`) and what the command is about (`topic`). In `unlock door with key`, the verb is `unlock`, `door` is direct, `key` is indirect and `with` is the preposition. In `go north`, the direction is direct.
+
+A `verb` or `check` event can name the slots:
+
+```yaml
+- id: keeper_comments
+  on: { verb: examine, direct: stove }
+  when: present(keeper)
+  then:
+    - say: "The keeper looks up."
+
+- id: keeper_feeds_the_stove
+  on: { verb: open, direct: stove, actor: keeper }
+  then:
+    - set: { stove.hot: true }
+```
+
+- A slot that the event does not name matches any command.
+- `actor` is different: an event without `actor` matches only the player's commands. Then the rules for the player do not fire when a character acts. `actor: player` says the same, and `actor: keeper` matches the commands of the keeper's agenda. Read [Actors and agendas](#actors-and-agendas).
+- The list form `verb: [unlock, door, key]` is the same as `{ verb: unlock, direct: door, indirect: key }`. Both forms load into one model.
+- The parser fills `preposition` with the word that you typed. Nothing fills `topic` yet; it is for a later `ask … about …`.
 
 ### Wait for the host
 
@@ -459,6 +487,32 @@ text: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, a
 - A walkthrough checks the ending with `ending:`, for example `expect: { ending: beacon_lit }`.
 - An ending of kind `death` asks the player to undo the last input, restart or restore a save (the death prompt). A walkthrough step `undo` goes back one input. `death_prompt: false` in story.yaml turns the prompt off.
 
+### Dead ends and points of no return
+
+The state explorer (`loremaster explore`, or Atlas › Checks › "Whole game") checks the endings. It walks back from the endings over the states it explored:
+
+- A **dead end** is a state from which no ending can be reached, the softlock of early King's Quest. This is an error. The explorer gives the shortest command list into it, the room and the rule that fired on the last turn.
+- A **point of no return** is a turn after which the best ending that can still be reached gets worse, by `rank`. This is a warning. Endings without a rank are worse than every ranked ending. A reached ending, also a bad one, resolves the game: the turn into an ending is neither a dead end nor a point of no return.
+
+Some points of no return are on purpose. Name the endings that a rule or a machine step closes in `closes`, and say why in `reason`:
+
+```yaml
+# rules/burn.yaml
+- id: keeper_burns_the_pages
+  on: { time: "00:00" }
+  when: in(pages, gear_housing)
+  then:
+    - move: { pages: nowhere }
+  closes: [committed]
+  reason: "The keeper burns the pages at midnight. A late player gets the ashes ending."
+```
+
+- The check compares the list with the endings that really drop out. It accepts a point of no return when each ranked ending that drops out is in the `closes` of a rule that fires on the turn, or that can still fire after it. The second case covers the turns before a timed step, after which the player is too late.
+- A ranked ending that drops out and that no `closes` names is a warning at the rule. A `closes` that names an ending that never drops out at the rule is a warning too.
+- `loremaster check` gives an error for an unknown ending in `closes`, and for `closes` without a `reason`.
+- Agenda steps (`agendas/`, P4-02) take the same `closes` and `reason`.
+- When the budget stopped the walk, the checks are **not proven**: the explorer reports only dead ends and points of no return that it proved, and says that the rest is not proven. "No dead end" holds only for a walk that finished.
+
 ## Timers
 
 A timer counts down by one each turn. Put it in `timers/*.yaml`, or in a `timers:` list in story.yaml.
@@ -482,6 +536,55 @@ at:
 | `repeat` | `true`: the timer starts again when it runs out. |
 
 The turns left are part of the save game. In the Atlas, "State" shows them as `timer.<id>`, and you can set them.
+
+## Actors and agendas
+
+An actor is someone who acts: the player, and each thing with an agenda, such as a character. A thing that acts has a place, its location, as any thing has. Its agenda is a list of steps: at a time of day, or when a condition holds, it goes to a room and does something. Put each agenda in `agendas/<id>.yaml`.
+
+```yaml
+# agendas/keeper.yaml
+actor: keeper
+steps:
+  - at: "00:00"
+    place: kitchen
+    when: in(pages, gear_housing)
+    then:
+      - move: { pages: nowhere }
+      - set: { stove.hot: true, pages_burned: true }
+      - say: "{in(kitchen) ? The lock-keeper feeds the stove. | You smell smoke from the kitchen.}"
+    closes: [committed]
+    reason: "The keeper burns the pages at midnight. A late player gets the ashes ending."
+```
+
+| Field | Meaning |
+| --- | --- |
+| `actor` | The thing that acts. An actor has one agenda. |
+| `steps` | The steps, in order. |
+| `id` | The id of the agenda. Without it, the file name. |
+
+The fields of a step:
+
+| Field | Meaning |
+| --- | --- |
+| `at` | The time of day from which the step is due. The first step is due the first time the clock reaches it; each later step the first time the clock reaches it after the step before was due. A step without `at` is due as soon as the step before it is over. |
+| `place` | The room where the step happens. The actor walks there along the exits, one room per turn. Doors and conditions on exits do not stop it. When no exits lead there, it goes there in one turn. |
+| `when` | A condition. The actor tests it in each turn while the step is due, also while it walks to the `place`. A step with `at` is skipped in the first turn in which its condition does not hold, also when that is on the way. A step without `at` waits until its condition holds. |
+| `do` | A command of the actor: `{ verb: open, direct: stove }` or `[open, stove]`. Its `check` and verb rules fire with the actor in the [Command record](#the-command-record). The default responses of the standard verbs are the player's and do not run, so a rule with `actor:` makes the command do something. A `check` rule with `stop` refuses it; then the step is skipped and its `then` does not run. The refused try takes the actor's turn. |
+| `then` | Effects, as in a rule. `await` does not work here. |
+| `closes` | The endings that the step closes on purpose: after it, the story can no longer reach them. Read below. |
+| `reason` | Why the step closes them. `closes` without a `reason` is an error of `loremaster check`. |
+| `id` | The step's name in the save game. Without it, the step's place in the list, from 1. |
+
+How a turn goes for an actor, after the clock moved and the timers and time rules ran:
+
+- An actor does one thing per turn: it walks one room, runs one step, or tries a `do` that a `check` rule refuses. A step skipped for its `when` takes no time.
+- While the player talks with the actor, the actor waits. Its step runs late, in the turn that ends the talk.
+- The player sees an actor come into the room and leave it ("The lock-keeper comes in.").
+- A step runs once. A save game keeps which steps ran and which were skipped.
+
+`closes` marks a point of no return, for the ending checks. It is not a dead end: after the keeper burns the pages, the best ending (`committed`) is gone, but the game can still end (`ashes`). A drop in the best reachable ending is a warning, unless the step names the ending in `closes`; a dead end, where no ending can be reached at all, is an error. `loremaster check` checks today that `closes` names known endings.
+
+The explorer (`loremaster explore`) waits in a story with agendas, as it does for timers. It tells states apart by the minutes until each agenda's next step, so it reaches a step also in the middle of a phase. The ending checks treat a step's `closes` as they treat a rule's; their findings name the step as `agenda:<id>/steps[<i>]`.
 
 ## Containers and scenery
 
@@ -547,11 +650,36 @@ steps:
 - The id of the machine is a variable with its state. Conditions read it: `exorcism == lit`.
 - Each step is a rule with the id `<machine>#<number>`. The rules view, the checks and the explorer show them.
 - Without `states`, the states are the start state and all states that the steps name.
+- A step can name the endings that it closes on purpose, with `closes: [<ending ids>]` and a `reason`, as a rule can. Read [Dead ends and points of no return](#dead-ends-and-points-of-no-return).
 - A state in the list can be a map with a description for the authors: `{ name: rung, description: The spirits are stunned. }`. The player does not see it.
 
 In the editor, Atlas › Machines shows each machine: the states in a row, and the steps as numbered arrows. Forward steps are above, steps back are below. The current state is filled. A step that the next event can take is marked. Point at a state or a step to light its connections. Select a state to see its description and its steps in and out on the right. There you can also change the description, rename the state, or delete a state that no step uses. "+ State" under the drawing adds a state. A rename changes the start and the steps of the machine, but not conditions in other files, such as `exorcism == lit`. The checks show these.
 
 The checker finds unknown states and states that no step goes to.
+
+### Quests
+
+A quest is a machine with `quest: true`. Its states give the player's journal: a state with `journal:` text shows the quest in the journal, and `done: true` marks the quest as finished in that state. A state without `journal:` keeps the quest out of the journal, for example before the player hears of it.
+
+```yaml
+# machines/pages.yaml
+quest: true
+title: The missing pages
+start: unknown
+states:
+  - unknown
+  - { name: searching, journal: "Find the pages of the lock log." }
+  - { name: found, journal: "You found the pages.", done: true }
+steps:
+  - { from: unknown, on: { verb: [ask, keeper] }, to: searching }
+  - { from: searching, on: { verb: [take, pages] }, to: found }
+```
+
+- `title` is the name in the journal. Without it, the journal shows the id.
+- The journal text is a line: markup and speech segments work.
+- The steps move the quest, and so does `set: { pages: found }` in a rule or in a dialogue's `then`.
+- The player types `journal` to read it. It takes no turn. Hosts read it with `Session::journal()`, open quests first.
+- The checker warns about a quest without journal text, and about `journal`, `done` or `title` on a machine without `quest: true`.
 
 ## Behaviors in Rust
 
@@ -719,6 +847,9 @@ The explorer shows:
 - Fragments that never show and rules that never fire.
 - Endings, with the shortest command list to each.
 - Stuck states: states from which the player can not reach an ending.
+- The ending checks: dead ends and points of no return. Read [Dead ends and points of no return](#dead-ends-and-points-of-no-return).
+
+When the walk stops at the budget (2000 states or 40 commands), the results are incomplete, and the ending checks say "not proven".
 
 The explorer tries the actions that move the story forward: exits, verbs that rules listen to, take, open, turn on, unlock with a key in reach, and wait when the story reacts to time. It does not try drop, close, turn off or lock.
 
@@ -741,10 +872,39 @@ expect:
   ended: true
 ```
 
-- A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room`, `ended` and `ending`.
+- A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room`, `ended` and `ending`, and `id`, `at`, `needs`, `before` and `hints` (see below).
 - `expect` says what must be true after the last step. `see` there looks at the whole transcript.
 
 Run `cargo run -p loremaster --no-default-features -- test <folder>`, or `task walkthroughs` for all examples. The command names each step that failed. The Rust tests run the walkthroughs of all examples, so CI runs them too.
+
+### Hints and the dependency chart
+
+One walkthrough can also give the hint ladder of the player and the dependency chart of the Atlas. Give a step an `id`, and the steps that must come first in `needs`:
+
+```yaml
+steps:
+  - n
+  - id: drawer
+    do: open drawer
+    at: cottage
+    hints:
+      - "Hal kept his few things in the cottage. Look at the furniture."
+      - "The dresser has a deep drawer."
+  - { id: key, do: take key, needs: drawer, hints: ["What lay under the oilcloth may be useful."] }
+  - { id: lamp, do: take lamp, before: [lit] }
+  - { id: lit, do: light lamp }
+```
+
+- `id` names the step. `needs` lists earlier steps that must be done first. `before` lists later steps that need this one: it is `needs`, written on the other side.
+- `at` is the room where the player does the step. The walkthrough fails when the player is in another room there. Without `at`, the hint ladder takes the room that the walkthrough is in before the step.
+- `hints` has up to three hints, from a nudge to almost the command. After the last hint, the ladder shows the command.
+- A player gets hints with the word `hint`, or in the Hints section of the Here panel. The ladder shows only the steps of the current room that the player has not done and whose `needs` are done, one level at a time. A step is done when the player gives its command in its room (in any words that mean the same command) and its `facts` hold after it, or when its `facts` come to hold. A walkthrough with a `pending:` mark gives no hints.
+- `loremaster check` warns when a hint names a later step: its id, its command, or a thing that only a later step brings up. It also warns when five steps or more in a row have width 1.
+- Atlas › Steps draws the chart: one column for each depth of `needs`, and bars for the puzzle width, that is how many steps the player can work on when each step comes up.
+
+### The quality report
+
+`loremaster quality <folder>` lists design findings that players trip over: exits with no way back, rooms with the same text, things that can be carried but that nothing uses (mark a decoy `red_herring: true`), long runs of steps in series only, and verbs of the story that no walkthrough uses. It also gives the puzzle width of each walkthrough with step ids, and names the checks that do not run yet. Findings are not errors.
 
 A walkthrough for a feature that the engine does not have yet is pending. Mark it with the roadmap phase and the requirement or issue that it waits for:
 
@@ -767,6 +927,7 @@ A save game keeps the state of a game, together with the version of its format a
 - Values that the story still has keep their saved value. New variables, things and timers start as at the start of a game.
 - Values that the story no longer has are dropped. The restore lists them, for example `fact:lamp.lit` or `thing:key`.
 - A save of another story, or of a newer loremaster, does not load. The message says why.
+- The save keeps what each actor has done of its agenda. A step that the story no longer has is dropped, for example `agenda:keeper#1`. A save from before agendas (version 1) starts each agenda at its first step.
 
 Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
 

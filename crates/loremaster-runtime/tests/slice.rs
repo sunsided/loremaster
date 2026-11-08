@@ -5,9 +5,11 @@
 //! roadmap phase and the requirement or issue that make it pass. Run them with
 //! `task test:pending`. Read `examples/lock-keeper-slice/PENDING.md`.
 
-use loremaster_project::{Project, Severity, SourceFile, check, load, model_hash, read_dir};
+use loremaster_project::{
+    Diagnostic, Project, Severity, SourceFile, check, load, model_hash, read_dir,
+};
 use loremaster_runtime::authoring;
-use loremaster_runtime::{Input, Session, Turn, WalkResult, World, run_walkthrough};
+use loremaster_runtime::{Input, Session, StepOutcome, Turn, WalkResult, World, run_walkthrough};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -27,10 +29,17 @@ const STOVE: &str = "things/stove.yaml";
 const KEEPER_RULE: &str = "rules/keeper.yaml";
 const NEW_SYNTAX: &[&str] = &[AGENDA, DIALOGUE, TEXTS, STOVE, KEEPER_RULE];
 
-/// Walkthroughs without a pending mark that need new-syntax parts.
-const NEEDS_PARTS: &[&str] = &[
+/// Walkthroughs without a pending mark that need a part, and run in their
+/// own test with it. The agenda loads since D6 (P4-02 #79), but it stays a
+/// part: `slice_model_hash` and `slice_equivalence` compare today's syntax,
+/// and world! has no agendas yet.
+const WITH_PARTS: &[&str] = &[
+    "tests/slice_keeper_agenda.yaml",
     "tests/slice_keeper_dialogue.yaml",
     "tests/slice_stove_text.yaml",
+    "tests/slice_talk_pauses_agenda.yaml",
+    "tests/slice_best.yaml",
+    "tests/slice_ashes.yaml",
 ];
 
 fn form(name: &str) -> PathBuf {
@@ -99,7 +108,7 @@ fn slice_baseline() {
     for (path, walk) in project
         .walkthroughs
         .iter()
-        .filter(|(p, w)| w.pending.is_none() && !NEEDS_PARTS.contains(&p.as_str()))
+        .filter(|(p, w)| w.pending.is_none() && !WITH_PARTS.contains(&p.as_str()))
     {
         let result = run_walkthrough(world.clone(), walk, path);
         assert!(
@@ -205,45 +214,13 @@ fn slice_undo_after_death() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, R9 (text pools), P4-02 #79, P4-01 #78"]
 fn slice_talk_pauses_agenda() {
     assert_passes("slice_talk_pauses_agenda", &[AGENDA, DIALOGUE, TEXTS]);
 }
 
-/// The keeper's agenda step at midnight as a rule: agendas wait for D6
-/// (P4-02 #79), and the stove text needs only what the step changes.
-const AGENDA_STAND_IN: &str = r#"
-- id: keeper_feeds_the_stove
-  on: { time: "00:00" }
-  when: in(pages, gear_housing)
-  then:
-    - move: { pages: nowhere }
-    - set: { stove.hot: true, pages_burned: true }
-"#;
-
 #[test]
 fn slice_stove_text() {
-    // TODO(P4-02 #79): load AGENDA in place of the stand-in once agendas play.
-    let mut files = with("yaml", &[STOVE]);
-    files.push(SourceFile {
-        path: "rules/agenda_stand_in.yaml".into(),
-        text: AGENDA_STAND_IN.into(),
-    });
-    let project = project(files);
-    let walk = project
-        .walkthroughs
-        .iter()
-        .find(|(p, _)| p == "tests/slice_stove_text.yaml")
-        .map(|(_, w)| w.clone())
-        .expect("no walkthrough tests/slice_stove_text.yaml");
-    let world = Arc::new(World::compile(project.story).unwrap());
-    let result = run_walkthrough(world, &walk, "slice_stove_text");
-    assert!(
-        result.passed(),
-        "{:#?}\n\n{}",
-        result.failures,
-        result.transcript
-    );
+    assert_passes("slice_stove_text", &[STOVE, AGENDA]);
 }
 
 #[test]
@@ -252,20 +229,62 @@ fn slice_keeper_dialogue() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, P4-02 #79"]
 fn slice_keeper_agenda() {
     assert_passes("slice_keeper_agenda", &[AGENDA]);
+
+    // The step is over in the state, and its `closes` mark is in the model
+    // for the ending checks (P4-04).
+    let project = project(with("yaml", &[AGENDA]));
+    let agenda = project
+        .story
+        .agenda_of("keeper")
+        .expect("the keeper's agenda");
+    assert_eq!(agenda.steps[0].closes, ["committed".into()]);
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    for _ in 0..17 {
+        input(&mut game, "wait");
+    }
+    assert_eq!(game.state().step_outcome("keeper", "1"), None);
+    let turn = input(&mut game, "wait");
+    assert_eq!(
+        game.state().step_outcome("keeper", "1"),
+        Some(StepOutcome::Ran),
+        "{}",
+        turn.plain_text()
+    );
+}
+
+/// The schema checks plus the ending checks of the explorer, with files.
+fn ending_checks(project: &Project) -> Vec<Diagnostic> {
+    let world = Arc::new(World::compile(project.story.clone()).unwrap());
+    // The whole slice (the talk, the stove, the keeper rule) has more states
+    // than the default budget of 2000 walks; the checks need the walk done.
+    let budget = authoring::Budget {
+        max_states: 5000,
+        ..Default::default()
+    };
+    let explored = authoring::explore(world, budget);
+    let mut out = check(project);
+    out.extend(
+        explored
+            .ending_checks
+            .diagnostics()
+            .into_iter()
+            .map(|d| project.locate(d)),
+    );
+    out
 }
 
 #[test]
-#[ignore = "pending: phase 4, CK, P4-04 #81"]
 fn slice_endings_reachable() {
     // Two checks on the endings. A dead end (a state from which no ending can
     // be reached) is an error. A point of no return (a step after which the
     // best reachable ending gets worse) is a warning, unless the step names
     // the endings it closes. The keeper's agenda step closes `committed`; the
     // ashes ending stays reachable, so the slice has no dead end.
-    let marked = check(&project(with("yaml", NEW_SYNTAX)));
+    let marked = ending_checks(&project(with("yaml", NEW_SYNTAX)));
     assert!(
         !marked.iter().any(|d| d.severity == Severity::Error),
         "{marked:#?}"
@@ -289,7 +308,7 @@ fn slice_endings_reachable() {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    let unmarked = check(&project(files));
+    let unmarked = ending_checks(&project(files));
     assert!(
         unmarked.iter().any(|d| d.file == "agendas/keeper.yaml"
             && d.severity == Severity::Warning
@@ -299,13 +318,11 @@ fn slice_endings_reachable() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, P4-07 #84"]
 fn slice_best() {
     assert_passes("slice_best", NEW_SYNTAX);
 }
 
 #[test]
-#[ignore = "pending: phase 4, P4-07 #84"]
 fn slice_ashes() {
     assert_passes("slice_ashes", NEW_SYNTAX);
 }

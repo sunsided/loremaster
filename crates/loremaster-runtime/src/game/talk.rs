@@ -5,7 +5,8 @@
 //! game's `NarrativeState` (see `narrative.rs`). The runtime keeps everything
 //! else: it renders the lines (they are loremaster markup), runs the world
 //! effects in `then`, logs what changed, and keeps the talk open until the
-//! player leaves.
+//! player leaves. A node without an option to choose goes on to its `next`
+//! node in the same turn (auto-continue, dramaturge R2).
 //!
 //! Next to this module: `turned` (the game as dramaturge's state during a
 //! turn, with the log of each change), `view` (the talk for the inspector)
@@ -21,12 +22,12 @@ use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
 use crate::text;
-use crate::world::{CDialogue, CEffect, COption};
+use crate::world::{CEffect, COption, CompiledDialogue};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
-use dramaturge_model::{DialogTarget, DialogText, DialogueNodeId};
+use dramaturge_model::{DialogTarget, DialogText, DialogueNodeId, SymbolTable};
 use dramaturge_runtime::{
-    AvailableOptionsIter, DefaultConditionEvaluator, DefaultOutcomeApplier, DefaultRuntime,
-    DialogCursor, DialogueRuntime, select_entry,
+    ADVANCE_LIMIT, AvailableOptionsIter, DefaultConditionEvaluator, DefaultOutcomeApplier,
+    DefaultRuntime, DialogCursor, DialogueRuntime, select_entry,
 };
 use loremaster_lang::CompiledLine;
 use loremaster_model::{Id, Layer};
@@ -44,7 +45,7 @@ type Runtime =
 type Then = Arc<[CEffect]>;
 
 /// dramaturge for a turn of a talk, with the world effects of the dialogue.
-fn runtime(d: &CDialogue) -> Runtime {
+fn runtime(d: &CompiledDialogue) -> Runtime {
     DefaultRuntime::with_parts(
         evaluator(),
         DefaultOutcomeApplier::with_custom(WorldEffects {
@@ -55,7 +56,7 @@ fn runtime(d: &CDialogue) -> Runtime {
 
 /// The talk as a dramaturge cursor. The save keeps node keys, which stay
 /// valid when a story changes (see `save.rs`); the cursor uses node ids.
-fn cursor(d: &CDialogue, talk: &Talk) -> Option<DialogCursor> {
+fn cursor(d: &CompiledDialogue, talk: &Talk) -> Option<DialogCursor> {
     let id = |key: &str| d.node_by_key(key).map(|n| n.id);
     let mut cursor = DialogCursor::new(id(&talk.node)?);
     cursor.back = talk.back.iter().filter_map(|k| id(k)).collect();
@@ -64,7 +65,7 @@ fn cursor(d: &CDialogue, talk: &Talk) -> Option<DialogCursor> {
 
 /// Store the cursor in the talk, as node keys. An id without a node is
 /// not stored: the talk keeps its node, and the return stack skips it.
-fn keep(d: &CDialogue, cursor: &DialogCursor, talk: &mut Talk) {
+fn keep(d: &CompiledDialogue, cursor: &DialogCursor, talk: &mut Talk) {
     let key = |id| d.key_of(id).map(str::to_string);
     let Some(node) = key(cursor.current) else {
         return;
@@ -79,7 +80,7 @@ impl Game {
         self.state.talk.as_ref()
     }
 
-    fn current(&self) -> Option<Arc<CDialogue>> {
+    fn current(&self) -> Option<Arc<CompiledDialogue>> {
         let talk = self.state.talk.as_ref()?;
         self.world.dialogue(talk.dialogue.as_str()).cloned()
     }
@@ -158,10 +159,63 @@ impl Game {
         entered
     }
 
-    /// Enter a node through dramaturge: show its line, apply its outcomes
+    /// Enter a node, then the nodes that `next` leads to while a node has no
+    /// option to choose (auto-continue). Like dramaturge's `advance`, but each
+    /// node shows its lines before its outcomes apply, and a loop of `next`
+    /// stops after [`ADVANCE_LIMIT`] nodes and ends the talk. True when the
+    /// first node was entered.
+    fn enter(&mut self, turn: &mut Turn, d: &Arc<CompiledDialogue>, id: DialogueNodeId) -> bool {
+        let mut cursor = (self.state.talk.as_ref())
+            .and_then(|t| cursor(d, t))
+            .unwrap_or_else(|| DialogCursor::new(id));
+        cursor.current = id;
+        for entered in 0..ADVANCE_LIMIT {
+            if !self.enter_node(turn, d, cursor.current) {
+                return entered > 0;
+            }
+            // A world effect can end the story or take the player away from
+            // the thing: then the talk ends, also at a node with options.
+            if self.state.ended || !self.eval().present(d.with.as_str()) {
+                self.end_talk();
+                return true;
+            }
+            let go_on = self.state.talk.is_some() && self.available().is_empty();
+            let next = (d.node(cursor.current))
+                .and_then(|n| n.next.as_ref())
+                .filter(|_| go_on);
+            let Some(next) = next.filter(|t| cursor.follow(t).is_some()) else {
+                self.end_without_options();
+                return true;
+            };
+            if let Some(talk) = &mut self.state.talk {
+                keep(d, &cursor, talk);
+            }
+            if *next == DialogTarget::Return {
+                self.back_to(turn, d, cursor.current);
+                return true;
+            }
+        }
+        turn.log.push(LogEntry {
+            kind: "author".into(),
+            text: format!(
+                "{}: {ADVANCE_LIMIT} nodes in a row go on by `next` without a choice \
+                 (a loop?); the talk ends",
+                d.id
+            ),
+        });
+        self.end_talk();
+        true
+    }
+
+    /// Enter one node through dramaturge: show its lines, apply its outcomes
     /// and let world rules hear about it. A node whose `when` does not hold
     /// can not be entered, and the talk ends. True when the node was entered.
-    fn enter(&mut self, turn: &mut Turn, d: &Arc<CDialogue>, id: DialogueNodeId) -> bool {
+    fn enter_node(
+        &mut self,
+        turn: &mut Turn,
+        d: &Arc<CompiledDialogue>,
+        id: DialogueNodeId,
+    ) -> bool {
         let Some(node) = d.node(id) else {
             self.end_talk();
             return false;
@@ -181,12 +235,12 @@ impl Game {
             node: d.key_of(id).unwrap_or_default().to_string(),
         };
         self.fire(turn, &event, 1);
-        self.end_without_options();
         true
     }
 
-    /// Show a node's line.
-    fn show(&mut self, turn: &mut Turn, d: &CDialogue, id: DialogueNodeId) {
+    /// Show a node's lines, in order: its `say`, then its `lines`. A line
+    /// of the player is said (like an answer), the others are speech.
+    fn show(&mut self, turn: &mut Turn, d: &CompiledDialogue, id: DialogueNodeId) {
         let Some(node) = d.node(id) else { return };
         let key = d.key_of(id).unwrap_or_default();
         let base = Run {
@@ -202,12 +256,28 @@ impl Game {
             link: None,
             speaker: None,
         };
-        // `say: { text: <id> }`: the core chooses the line of the pool.
-        let runs = match &node.text {
-            DialogText::Pool(id) => self.say_pool(turn, id, &base),
-            text => self.line(text, &base),
-        };
-        turn.push(BlockKind::Speech, runs);
+        for (speaker, text) in node.all_lines() {
+            let player = self.world.symbols.entity_key(speaker.0) == Some(SymbolTable::PLAYER_KEY);
+            let kind = if player {
+                BlockKind::Said
+            } else {
+                BlockKind::Speech
+            };
+            // `say: { text: <id> }`: the core chooses the line of the pool.
+            let runs = match text {
+                DialogText::Pool(id) => self.say_pool(turn, id, &base),
+                text => self.line(text, &base),
+            };
+            turn.push(kind, runs);
+        }
+    }
+
+    /// Back to a node the talk was at (`go: back`, `next: back`): its lines
+    /// show again, its `when` is not checked and its outcomes do not apply
+    /// again. Without an option to choose, the talk ends there.
+    fn back_to(&mut self, turn: &mut Turn, d: &CompiledDialogue, id: DialogueNodeId) {
+        self.show(turn, d, id);
+        self.end_without_options();
     }
 
     /// A node with no option to choose ends the talk.
@@ -257,10 +327,7 @@ impl Game {
                     keep(&d, &cursor, talk);
                 }
                 if target == DialogTarget::Return {
-                    // Back to a node the talk was at: its line shows again,
-                    // its outcomes do not apply again.
-                    self.show(turn, &d, next);
-                    self.end_without_options();
+                    self.back_to(turn, &d, next);
                 } else {
                     self.enter(turn, &d, next);
                 }

@@ -8,6 +8,7 @@ use loremaster_model::{Id, Location, TimeOfDay, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod agendas;
 mod awaits;
 pub use awaits::{ARRIVED, REFUSED};
 mod narrative;
@@ -210,12 +211,14 @@ impl Game {
             talk: None,
             relations: Default::default(),
             memories: Default::default(),
+            steps_done: Default::default(),
             timers: story
                 .timers
                 .iter()
                 .filter(|t| t.running)
                 .map(|t| (t.id.clone(), t.turns))
                 .collect(),
+            actors: Default::default(),
         };
         for v in &story.vars {
             state.facts.insert(v.id.to_string(), v.initial.clone());
@@ -316,6 +319,7 @@ impl Game {
             .relations
             .retain(|key, _| key.split_once('.').is_some_and(|(t, _)| has_thing(t)));
         state.memories.retain(|thing, _| has_thing(thing.as_str()));
+        crate::save::keep_known_steps(&world, &mut state.actors);
         Self::restore(world, state)
     }
 
@@ -342,6 +346,35 @@ impl Game {
 
     pub(crate) fn world_arc(&self) -> Arc<World> {
         self.world.clone()
+    }
+
+    /// The quests whose current state has non-empty journal text, in story order:
+    /// the open ones first, then the finished ones.
+    pub(crate) fn journal(&self) -> Vec<crate::JournalEntry> {
+        let ev = self.eval();
+        let mut out: Vec<crate::JournalEntry> = (self.world.quests.iter())
+            .filter_map(|q| {
+                let state = match self.state.facts.get(q.machine.as_str()) {
+                    Some(Value::Text(s)) => s.clone(),
+                    _ => return None,
+                };
+                let (line, done) = q.states.get(&state)?;
+                // A line whose segments are all gated out shows no entry.
+                let text = crate::text::line_text(&ev, line);
+                if text.trim().is_empty() {
+                    return None;
+                }
+                Some(crate::JournalEntry {
+                    quest: q.machine.to_string(),
+                    title: q.title.clone(),
+                    state,
+                    text,
+                    done: *done,
+                })
+            })
+            .collect();
+        out.sort_by_key(|e| e.done);
+        out
     }
 
     pub(crate) fn eval(&self) -> Eval<'_> {
@@ -483,7 +516,7 @@ impl Game {
             Command::Go { direction } => format!("go {direction}"),
             Command::Choose { index } => (index + 1).to_string(),
             Command::Leave => "leave".into(),
-            Command::Verb { verb, objects } => {
+            Command::Verb { verb, objects, .. } => {
                 let def = self.world.verb(verb.as_str());
                 let word = def.map_or(verb.to_string(), |v| v.label.to_lowercase());
                 let names: Vec<String> = objects.iter().map(|o| self.name_of(o)).collect();
@@ -553,13 +586,33 @@ impl Game {
                     phase: Phase::Check,
                     verb: verb.clone(),
                     objects: vec![Id::new(direction.as_str())],
+                    actor: Id::new(crate::PLAYER),
+                    preposition: None,
+                    topic: None,
                 };
                 if !self.fire(turn, &check, 0).stopped {
                     self.go(turn, &direction);
                     self.frame_text(turn, frame.as_ref().map(|f| &f.after));
                 }
             }
-            Command::Verb { verb, objects } => {
+            Command::Verb {
+                verb,
+                objects,
+                actor,
+                preposition,
+                topic,
+            } => {
+                // The player is the active actor; switching it is later (WO-5).
+                if let Some(other) = actor.filter(|a| a.as_str() != crate::PLAYER) {
+                    turn.say(
+                        BlockKind::Response,
+                        format!(
+                            "Only the player takes commands; {} acts on its own.",
+                            self.the(&other, false)
+                        ),
+                    );
+                    return;
+                }
                 if let Some(missing) = objects.iter().find(|o| !self.reachable(o.as_str())) {
                     turn.say(
                         BlockKind::Response,
@@ -577,6 +630,9 @@ impl Game {
                     phase,
                     verb: verb.clone(),
                     objects: objects.clone(),
+                    actor: Id::new(crate::PLAYER),
+                    preposition: preposition.clone(),
+                    topic: topic.clone(),
                 };
                 self.frame_text(turn, frame.as_ref().map(|f| &f.before));
                 // `check` rules can refuse the action with `stop`.
@@ -809,6 +865,12 @@ impl Game {
             .enumerate()
             .filter(|(i, _)| ev.holds_opt(&self.world.rooms[ri].exits[*i].visible))
             .collect()
+    }
+
+    /// The command record of typed text in the state now, without running
+    /// it. `None` when the parser does not understand the text.
+    pub(crate) fn parse_text(&self, text: &str) -> Option<Command> {
+        parse(&self.world.verbs, &self.parse_scope(), text).ok()
     }
 
     fn parse_scope(&self) -> ParseScope {
@@ -1426,8 +1488,24 @@ impl Game {
                 Some(objects) => objects.contains(t),
                 None => self.present(t.as_str()),
             },
-            Some(Within::Room(r)) => self.state.room == *r,
-            Some(Within::Region(g)) => self.room_def().and_then(|r| r.region.as_ref()) == Some(g),
+            // A command of another actor happens where that actor is.
+            Some(Within::Room(r)) => self.room_of_event(event).as_ref() == Some(r),
+            Some(Within::Region(g)) => {
+                let room = self.room_of_event(event);
+                let def = room.and_then(|r| self.world.room(r.as_str()));
+                def.and_then(|r| r.region.as_ref()) == Some(g)
+            }
+        }
+    }
+
+    /// The room where an event happens: the room of the actor of a command,
+    /// else the player's room.
+    fn room_of_event(&self, event: &Event) -> Option<Id> {
+        match event {
+            Event::Verb { actor, .. } if actor.as_str() != crate::PLAYER => {
+                self.actor_room(actor.as_str())
+            }
+            _ => Some(self.state.room.clone()),
         }
     }
 
@@ -1664,6 +1742,9 @@ impl Game {
         self.fire(turn, &Event::Turn, 0);
         self.tick_timers(turn);
         self.fire(turn, &Event::Time { before, after }, 0);
+        // Actors act after the clock: a step at midnight runs in the turn
+        // that reaches midnight.
+        self.run_agendas(turn);
     }
 
     /// Each running timer whose `runs_while` holds goes down by one. A timer at

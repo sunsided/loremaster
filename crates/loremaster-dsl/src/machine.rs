@@ -1,7 +1,7 @@
 //! Puzzle machines: named states and the steps between them.
 
 use crate::Effects;
-use crate::convert::IntoStates;
+use crate::convert::{IntoStates, ids};
 use crate::pack::{register, replaceable, with_notes};
 use loremaster_model::{Effect, EventPattern, Id, Line, Machine, StateDef, Step};
 use loremaster_project::Pack;
@@ -41,6 +41,8 @@ impl<'a> MachineBuilder<'a> {
             start,
             states: Vec::new(),
             steps: Vec::new(),
+            quest: false,
+            title: None,
             notes: Vec::new(),
         });
         let i = pack.machines.len() - 1;
@@ -75,6 +77,27 @@ impl<'a> MachineBuilder<'a> {
         self.machine().states.push(StateDef::Described {
             name: name.into(),
             description: Some(description.into()),
+            journal: None,
+            done: false,
+        });
+        self
+    }
+
+    /// Make the machine a quest with this title in the journal (D8).
+    pub fn quest(mut self, title: impl Into<String>) -> Self {
+        let m = self.machine();
+        m.quest = true;
+        m.title = Some(title.into());
+        self
+    }
+
+    /// A quest state with its journal text; `done` marks a finished quest.
+    pub fn journal(mut self, state: impl Into<String>, text: impl Into<Line>, done: bool) -> Self {
+        self.machine().states.push(StateDef::Described {
+            name: state.into(),
+            description: None,
+            journal: Some(text.into()),
+            done,
         });
         self
     }
@@ -89,6 +112,8 @@ impl<'a> MachineBuilder<'a> {
             say: None,
             then: Vec::new(),
             instead: false,
+            closes: Vec::new(),
+            reason: None,
         });
         self
     }
@@ -113,6 +138,20 @@ impl<'a> MachineBuilder<'a> {
     #[track_caller]
     pub fn instead(mut self) -> Self {
         self.last_step().instead = true;
+        self
+    }
+
+    /// `closes:` and `reason:` of the last step: the endings that it closes
+    /// on purpose, and why.
+    #[track_caller]
+    pub fn closes(
+        mut self,
+        endings: impl IntoIterator<Item = impl AsRef<str>>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let step = self.last_step();
+        step.closes = ids(endings);
+        step.reason = Some(reason.into());
         self
     }
 }

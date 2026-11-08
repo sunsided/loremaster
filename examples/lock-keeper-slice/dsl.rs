@@ -24,9 +24,9 @@ pub mod today;
 
 // Pending parts. `cfg(any())` is never true, so the compiler does not read
 // these files. Each one names what it waits for in its first lines, and the
-// world! macro names it too: text pools and `one_of` (R9, P4-01 #78),
-// dialogues (dramaturge R12's `dialogue!`, DSL step L4, P4-08 #85), named
-// slots of the command record and agendas (D6, P4-02 #79).
+// world! macro names it too: text pools and `one_of` (R9, P4-01 #78; the
+// keeper dialogue says a pool, the rest of it compiles since DSL step L4,
+// P4-08 #85), named slots of the command record and agendas (D6, P4-02 #79).
 #[cfg(any())]
 #[path = "dsl/agenda.rs"]
 pub mod agenda;

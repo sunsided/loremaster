@@ -1,7 +1,7 @@
 //! The loader rejects unknown fields in every entity file and unknown folders
 //! of a project, with the nearest known name when there is one.
 
-use loremaster_project::{Diagnostic, Pack, Severity, SourceFile, assemble, check, load, read_dir};
+use loremaster_project::{Diagnostic, Pack, Severity, SourceFile, assemble, load, read_dir};
 use std::path::Path;
 
 fn lighthouse() -> Vec<SourceFile> {
@@ -239,24 +239,6 @@ fn an_unknown_file_at_the_top_is_an_error() {
 }
 
 #[test]
-fn the_folders_of_planned_parts_are_skipped_with_a_warning() {
-    // The golden slice keeps drafts in `agendas/`.
-    let project = load(lighthouse_with(
-        "agendas/keeper.yaml",
-        "actor: keeper\nsteps: []\n",
-    ))
-    .unwrap();
-    let found = check(&project);
-    assert!(
-        found.iter().any(|d| d.severity == Severity::Warning
-            && d.file == "agendas/keeper.yaml"
-            && d.message.contains("`agendas/` is not read yet")),
-        "{found:#?}"
-    );
-    assert!(!found.iter().any(|d| d.severity == Severity::Error));
-}
-
-#[test]
 fn other_files_than_yaml_are_not_read() {
     // `behaviors/` may hold any text; a Rust file next to the YAML is not read.
     let mut files = lighthouse();
@@ -273,7 +255,9 @@ fn other_files_than_yaml_are_not_read() {
 
 #[test]
 fn the_warnings_stay_when_the_project_has_errors() {
-    let mut files = lighthouse_with("agendas/keeper.yaml", "actor: keeper\nsteps: []\n");
+    // No folder is skipped with a warning any more (agendas/ since D6, texts/
+    // since P4-01); the read errors still come back.
+    let mut files = lighthouse();
     files.push(SourceFile {
         path: "ending/lost.yaml".into(),
         text: "kind: loss\ntitle: Lost\n".into(),
@@ -288,10 +272,6 @@ fn the_warnings_stay_when_the_project_has_errors() {
     };
     assert!(
         has(Severity::Error, "unknown folder `ending/`"),
-        "{checked:#?}"
-    );
-    assert!(
-        has(Severity::Warning, "`agendas/` is not read yet"),
         "{checked:#?}"
     );
 

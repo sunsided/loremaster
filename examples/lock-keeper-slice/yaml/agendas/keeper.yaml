@@ -1,9 +1,11 @@
-# New syntax (phase 4, D6 actors and agendas). One step: at midnight the
+# The keeper's agenda (D6, loads since P4-02 #79). One step: at midnight the
 # keeper feeds the stove with the pages, if they are still in the gear housing.
 actor: keeper
 steps:
-  # `place` is where the step ends. The step stands for a walk to the lock and
-  # back in one turn; D6 decides if a step can take several turns.
+  # `place` is where the step happens: the actor walks there along the exits,
+  # one room per turn, before the step runs. The keeper is in the kitchen
+  # already, so the step runs in the turn that reaches midnight. The text
+  # still tells of a walk to the lock and back; a step with a route is open.
   - at: "00:00"
     place: kitchen
     when: in(pages, gear_housing)
@@ -13,7 +15,7 @@ steps:
       - say: "{in(kitchen) ? The lock-keeper comes in from the lock with something wrapped in oilcloth. He opens the stove and feeds it in. | You smell smoke from the kitchen.}"
     # A point of no return, not a dead end: after this step the best ending
     # (committed) cannot be reached, but the ashes ending still can. The
-    # ending check (phase 4, CK) reports such a rank drop as a warning;
+    # ending check (P4-04, #81) reports such a rank drop as a warning;
     # `closes` names the endings that the step closes on purpose, and the
     # check compares the list with what really drops out.
     closes: [committed]

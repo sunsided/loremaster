@@ -145,5 +145,5 @@ Not all of the drop in `talk.rs` is removed code. The logging `NarrativeState` w
 
 ### Still open
 
-- Auto-continue nodes and lines with their own speaker (R2) are in dramaturge 0.3, but loremaster does not play them yet. loremaster shows each line before the node's outcomes and sends a talk event per node, so `advance` needs its own design in loremaster. `check` reports `lines` and `next` as errors until then.
+- Auto-continue nodes and lines with their own speaker (R2): played since #155 (phase 4). loremaster does not call `advance`: it shows each node's lines before the node's outcomes and sends a talk event per node, so `talk.rs` has its own loop over `next` with `enter_node`, `DialogCursor::follow` and dramaturge's `ADVANCE_LIMIT`. dramaturge's validator reports a loop of `next` without a choice, and `check` shows it.
 - Text pools with selection (R9) are the next dramaturge item (phase 4). The keeper's remark in the golden slice waits for it (`slice_keeper_dialogue`).

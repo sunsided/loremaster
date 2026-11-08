@@ -535,3 +535,39 @@ fn the_text_matrix_tries_relations_on_both_sides_of_a_limit() {
         "{texts:?}"
     );
 }
+
+/// The dependency chart of the lighthouse walkthrough (CK-7), and the hints
+/// of the session from the same file (CK-6).
+#[test]
+fn the_walkthrough_gives_the_chart_and_the_hints() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse");
+    let project = load(read_dir(&dir).unwrap()).unwrap();
+    let mut game = Workbench::new(Arc::new(World::compile(project.story).unwrap()));
+    game.set_walkthroughs(project.walkthroughs);
+    game.start();
+    let charts = game.charts();
+    assert_eq!(charts.len(), 1);
+    let chart = &charts[0];
+    let ids: Vec<&str> = chart.steps.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["drawer", "key", "lamp", "matches", "lit", "door", "beacon"]
+    );
+    let beacon = &chart.steps[6];
+    assert_eq!(beacon.depth, 3);
+    assert_eq!(beacon.needs.len(), 2);
+    assert_eq!(chart.max_width, 3);
+    game.input("n");
+    let turn = game.hint(None);
+    assert!(turn.blocks[0].plain_text().starts_with("Hint 1 of 3:"));
+    assert_eq!(game.session().hints()[0].shown.len(), 1);
+    // The game goes on in a changed world with its hints.
+    let next = game.carried_to(Arc::new(game.world().clone()));
+    assert_eq!(next.session().hints()[0].shown.len(), 1);
+    assert_eq!(next.charts().len(), 1);
+    assert!(next.session().has_hints());
+    // A reload builds the hint book again in the new world, and keeps what the player saw.
+    game.reload(Arc::new(game.world().clone()));
+    assert!(game.session().has_hints());
+    assert_eq!(game.session().hints()[0].shown.len(), 1);
+}

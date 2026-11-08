@@ -19,7 +19,10 @@ use loremaster_lang::{NameForm, Scope, Segment};
 use loremaster_model::Id;
 use std::sync::Arc;
 
-pub use crate::explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant};
+pub use crate::explore::{
+    Budget, DeadEnd, EndingCheck, EndingFound, Exploration, NoReturn, RoomCoverage, StaleCloses,
+    TextVariant,
+};
 pub use crate::game::{
     AuthorCommand, FragmentView, FrameFragment, FramePart, FrameUse, PartView, RoomParts,
     TalkOptionView, TalkView,
@@ -220,6 +223,12 @@ pub fn resume(
 /// [`Session::undo`] as a whole turn, for an editor transcript.
 pub fn undo(session: &mut Session) -> Turn {
     session.undo_turn()
+}
+
+/// The next level of the hint ladder, as a turn with a note. Read
+/// [`Session::hint`].
+pub fn hint(session: &mut Session, step: Option<&str>) -> Turn {
+    session.hint_turn(step)
 }
 
 /// [`Session::restart`] as a whole turn, with the rule log of the opening.

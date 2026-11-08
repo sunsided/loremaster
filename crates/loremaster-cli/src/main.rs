@@ -3,7 +3,8 @@
 
 use loremaster_project::{Diagnostic, Project, check_files, open_todos, read_dir};
 use loremaster_runtime::{
-    AwaitRequest, BlockKind, Effect, Input, RESTORE, Session, Status, Step, Verdict, World,
+    AwaitRequest, BlockKind, Effect, HintBook, Input, RESTORE, Session, Status, Step, Verdict,
+    World,
 };
 use loremaster_workbench::Budget;
 use std::io::{BufRead, IsTerminal, Write};
@@ -11,7 +12,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: loremaster <play|check|explore|test|mcp> <project-folder>\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
+const USAGE: &str = "usage: loremaster <play|check|quality|explore|test|mcp> <project-folder>\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -122,6 +123,7 @@ fn main() -> ExitCode {
             );
             ExitCode::SUCCESS
         }
+        "quality" => quality(&project),
         "play" => play(project),
         "explore" => explore(project),
         "test" => walkthroughs(project),
@@ -211,6 +213,40 @@ fn open(dir: &Path) -> Option<Project> {
     checked.project
 }
 
+/// The quality report (CK-8): design findings, the puzzle width of each
+/// walkthrough with step ids, the verbs the walkthroughs use, and the checks
+/// that do not run yet. Findings are not errors: the exit code is 0.
+fn quality(project: &Project) -> ExitCode {
+    let report = loremaster_project::quality(project);
+    for f in &report.findings {
+        println!("{}", f.diagnostic);
+    }
+    for w in &report.widths {
+        println!(
+            "Puzzle width of \"{}\": at most {}, {:.1} on average over {} steps.",
+            w.name, w.max, w.mean, w.steps
+        );
+    }
+    println!(
+        "Verbs in walkthroughs: story verbs {} (unused: {}), standard verbs {}.",
+        id_list(&report.verbs.story_used),
+        id_list(&report.verbs.story_unused),
+        id_list(&report.verbs.standard_used)
+    );
+    for d in &report.deferred {
+        println!("Not checked yet: {} ({}).", d.check.name(), d.reason);
+    }
+    println!("{} finding(s).", report.findings.len());
+    ExitCode::SUCCESS
+}
+
+fn id_list<T: AsRef<str>>(ids: &[T]) -> String {
+    if ids.is_empty() {
+        return "none".into();
+    }
+    ids.iter().map(AsRef::as_ref).collect::<Vec<_>>().join(", ")
+}
+
 fn play(project: Project) -> ExitCode {
     let world = match World::compile(project.story.clone()) {
         Ok(w) => Arc::new(note_behaviors(w)),
@@ -221,6 +257,8 @@ fn play(project: Project) -> ExitCode {
     };
     let style = std::io::stdout().is_terminal();
     let mut session = Session::new(world.clone());
+    // `hint` shows the hint ladder of the walkthroughs (CK-6).
+    session.set_hints(HintBook::new(world.clone(), &project.walkthroughs));
     println!("{}\n", bold(&world.story.title, style));
     if show_status(&session.start(), style) {
         return ExitCode::SUCCESS;
@@ -397,6 +435,33 @@ fn explore(project: Project) -> ExitCode {
             result.stuck,
             result.stuck_path.join(", ")
         );
+    }
+    // The ending checks: dead ends, points of no return, `closes`.
+    let checks = &result.ending_checks;
+    if checks.ran {
+        for p in checks.no_return.iter().filter(|p| p.accepted()) {
+            println!(
+                "Point of no return after {} (accepted by `closes` of {}: {}).",
+                p.path.join(", "),
+                p.accepted_by.join(", "),
+                p.reasons.join("; ")
+            );
+        }
+        for d in checks.diagnostics() {
+            println!("{}", project.locate(d));
+        }
+        if checks.proven {
+            println!(
+                "Ending checks: proven over all states: {} dead ends, {} points of no return.",
+                checks.dead_ends.len(),
+                checks.no_return.iter().filter(|p| !p.accepted()).count()
+            );
+        } else {
+            println!(
+                "Ending checks: not proven (the budget stopped the walk; {} states not finished).",
+                checks.unproven
+            );
+        }
     }
     for f in &result.never_shown {
         println!("Never shown: {f}");

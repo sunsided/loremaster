@@ -1,6 +1,8 @@
 # The keeper's agenda: at midnight he feeds the stove with the pages.
 name: The keeper at midnight
-pending: { phase: 4, needs: "D6, P4-02 #79" }
+# The YAML walkthrough passes since D6 (P4-02 #79); this copy waits for
+# the agenda in world! (mixed/agendas/keeper.rs).
+pending: { phase: 4, needs: "agendas in world!, after P4-02 #79" }
 steps:
   - wait
   - wait

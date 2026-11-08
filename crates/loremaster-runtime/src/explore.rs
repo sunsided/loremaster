@@ -7,6 +7,10 @@ use loremaster_model::{EventPattern, Id, Location, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
+mod endings;
+
+pub use endings::{DeadEnd, EndingCheck, NoReturn, StaleCloses};
+
 /// Limits for one exploration.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Budget {
@@ -67,18 +71,24 @@ pub struct Exploration {
     /// Rules that never fired.
     pub never_fired: Vec<String>,
     pub endings: Vec<EndingFound>,
-    /// States from which no explored path reaches an ending. Empty when the story has no ending.
+    /// Dead ends: states from which no ending can be reached. 0 when the story
+    /// has no ending. When the budget stopped the walk, only the proven ones
+    /// count: states whose future the walk did not finish are left out.
     pub stuck: usize,
     /// The shortest path into a stuck state, if there is one.
     pub stuck_path: Vec<String>,
+    /// The ending checks: dead ends and points of no return (CK, P4-04).
+    #[serde(default)]
+    pub ending_checks: EndingCheck,
     /// For each open or resolved thread with a payoff: whether a payoff showed, and in which order.
     #[serde(default)]
     pub threads: Vec<crate::threads::ThreadReach>,
 }
 
 /// A state as the explorer compares it: the parts that change what can happen.
-/// The clock counts only by phase. Counters count only up to 3, and only when
-/// the story reads them.
+/// The clock counts only by phase, and by the minutes until each agenda's
+/// next step is due. Counters count only up to 3, and only when the story
+/// reads them.
 fn fingerprint(game: &Game, counters: bool) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
@@ -104,6 +114,8 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         &s.relations,
         &s.memories,
         &s.awaiting,
+        &s.actors,
+        game.agenda_waits(),
     ))
     .unwrap_or_default()
 }
@@ -147,10 +159,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         out.push(("leave".into(), Command::Leave));
         return out;
     }
-    let verb = |v: &str, objects: Vec<Id>| Command::Verb {
-        verb: Id::new(v),
-        objects,
-    };
+    let verb = |v: &str, objects: Vec<Id>| Command::verb(v, objects);
     let label = |v: &str, objects: &[Id]| {
         std::iter::once(v.to_string())
             .chain(objects.iter().map(Id::to_string))
@@ -163,14 +172,34 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         out.push((format!("go {dir}"), Command::Go { direction: dir }));
     }
     // Verbs that rules listen to, with exactly the things the rules name.
+    // A rule for another actor's commands (`actor: keeper`) is not a command
+    // of the player, and an indirect object needs a direct one.
     for rule in &story.rules {
-        if let EventPattern::Verb(parts) = &rule.on
-            && let Some((v, objects)) = parts.split_first()
-            && objects.iter().all(|o| scope.contains(o))
+        if let EventPattern::Verb(p) = &rule.on
+            && p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
+            && (p.direct.is_some() || p.indirect.is_none())
         {
+            let objects: Vec<Id> = p.objects().cloned().collect();
+            if !objects.iter().all(|o| scope.contains(o)) {
+                continue;
+            }
+            // The label is the dedup key: keep the slots that tell rules apart.
+            let mut text = label(p.verb.as_str(), &objects);
+            if let Some(prep) = &p.preposition {
+                text.push_str(&format!(" ({prep})"));
+            }
+            if let Some(topic) = &p.topic {
+                text.push_str(&format!(" about {topic}"));
+            }
             out.push((
-                label(v.as_str(), objects),
-                verb(v.as_str(), objects.to_vec()),
+                text,
+                Command::Verb {
+                    verb: p.verb.clone(),
+                    objects,
+                    actor: None,
+                    preposition: p.preposition.clone(),
+                    topic: p.topic.clone(),
+                },
             ));
         }
     }
@@ -210,7 +239,9 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     }
     // Waiting, when the story reacts to time.
     // Waiting matters when the story reacts to time: rules on time and turns, and timers.
+    // An agenda step is time-driven too: it is due at a time of day.
     if !story.timers.is_empty()
+        || !story.agendas.is_empty()
         || world.behaviors_watch_time()
         || story
             .rules
@@ -269,7 +300,16 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
 
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut nodes: Vec<(Game, Vec<String>)> = Vec::new();
-    let mut edges: Vec<Vec<usize>> = Vec::new();
+    // The graph for the ending checks: for each state, one edge per command
+    // (the next state, and the index of the command in `commands` of the
+    // state), so that two commands into one state stay two turns.
+    let mut edges: Vec<Vec<(u32, u32)>> = Vec::new();
+    // States whose future the walk did not finish: the depth cut them, or the
+    // budget dropped a state after them.
+    let mut open: Vec<bool> = Vec::new();
+    // The rules with `closes`, and the turns on which they fired: (state, command, rule).
+    let closers = endings::closers(&start.world().story);
+    let mut closed: Vec<(u32, u32, u32)> = Vec::new();
     let mut shown: BTreeSet<(String, usize)> = BTreeSet::new();
     let mut fired: BTreeSet<String> = BTreeSet::new();
     let mut variants: BTreeMap<String, BTreeMap<String, TextVariant>> = BTreeMap::new();
@@ -348,17 +388,32 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     ));
     nodes.push((game, Vec::new()));
     edges.push(Vec::new());
+    open.push(false);
     queue.push_back(0);
 
     while let Some(i) = queue.pop_front() {
         let (game, path) = nodes[i].clone();
-        if game.state().ended || path.len() >= budget.max_depth {
+        if game.state().ended {
             continue;
         }
-        for (label, cmd) in commands(&game) {
+        if path.len() >= budget.max_depth {
+            // The depth stops the walk here: what comes after is not known,
+            // unless nothing can come after it.
+            if commands(&game).is_empty() {
+                continue;
+            }
+            open[i] = true;
+            truncated = true;
+            continue;
+        }
+        for (c, (label, cmd)) in commands(&game).into_iter().enumerate() {
             let mut next = game.clone();
             let turn = next.act(cmd);
             sources(&turn, &mut shown);
+            let closing: Vec<u32> = endings::fired(&start.world().story, &turn)
+                .iter()
+                .filter_map(|id| closers.get(id.as_str()).copied())
+                .collect();
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
                 fired.insert(entry.text.clone());
             }
@@ -377,6 +432,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                 None => {
                     if nodes.len() >= budget.max_states {
                         truncated = true;
+                        open[i] = true;
                         continue;
                     }
                     if next.state().ended {
@@ -398,47 +454,28 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                     seen.insert(key, j);
                     nodes.push((next, next_path));
                     edges.push(Vec::new());
+                    open.push(false);
                     queue.push_back(j);
                     j
                 }
             };
-            if !edges[i].contains(&j) {
-                edges[i].push(j);
-            }
+            let (from, c) = (i as u32, c as u32);
+            edges[i].push((j as u32, c));
+            closed.extend(closing.into_iter().map(|r| (from, c, r)));
         }
     }
 
-    // Stuck states: no path to an ending, when the story has endings at all.
-    let has_endings = start.world().story.rules.iter().any(|r| {
-        r.then
-            .iter()
-            .any(|e| matches!(e, loremaster_model::Effect::End(_)))
-    });
-    let (stuck, stuck_path) = if has_endings && !truncated {
-        let mut good: Vec<bool> = nodes.iter().map(|(g, _)| g.state().ended).collect();
-        loop {
-            let mut changed = false;
-            for i in 0..nodes.len() {
-                if !good[i] && edges[i].iter().any(|&j| good[j]) {
-                    good[i] = true;
-                    changed = true;
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
-        let bad: Vec<usize> = (0..nodes.len()).filter(|&i| !good[i]).collect();
-        let path = bad
-            .iter()
-            .map(|&i| &nodes[i].1)
-            .min_by_key(|p| p.len())
-            .cloned()
-            .unwrap_or_default();
-        (bad.len(), path)
-    } else {
-        (0, Vec::new())
-    };
+    let ending_checks = endings::check(
+        start.world(),
+        &endings::Graph {
+            nodes: &nodes,
+            edges: &edges,
+            open: &open,
+            closers: &closers,
+            closed: &closed,
+        },
+    );
+    let (stuck, stuck_path) = (ending_checks.stuck, ending_checks.stuck_path.clone());
 
     let world = start.world();
     let rooms = world
@@ -502,6 +539,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         endings: endings.into_values().collect(),
         stuck,
         stuck_path,
+        ending_checks: ending_checks.report,
         threads: thread_ids
             .iter()
             .enumerate()

@@ -2,7 +2,7 @@
 # end, then runs late.
 # Midnight is after command 18 (22:30 + 18 × 5 minutes): the talk starts then.
 name: Talk through midnight
-pending: { phase: 4, needs: "D6, R9 (text pools), P4-02 #79, P4-01 #78" }
+pending: { phase: 4, needs: "agendas in world!, after P4-02 #79" }
 steps:
   - wait
   - wait

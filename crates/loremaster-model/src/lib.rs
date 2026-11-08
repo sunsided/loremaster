@@ -6,8 +6,10 @@
 //! evaluates the parsed form. Keeping source text in the model means the
 //! bundle stays readable and survives changes to the expression language.
 
+mod agenda;
 mod awaits;
 mod clock;
+mod command;
 mod de;
 mod diagnostic;
 mod dialogue;
@@ -18,6 +20,7 @@ mod id;
 mod line;
 mod machine;
 mod note;
+mod plan;
 mod room;
 mod rule;
 mod story;
@@ -27,8 +30,10 @@ mod value;
 mod verb;
 mod walkthrough;
 
+pub use agenda::{Agenda, AgendaStep};
 pub use awaits::{AwaitOption, AwaitSpec, Dice};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
+pub use command::CommandPattern;
 pub use diagnostic::{Diagnostic, Severity};
 pub use dialogue::{Dialogue, DialogueId, DialogueNode, DialogueOption, DialogueTarget, Outcomes};
 /// The dialogue AST of dramaturge (decision D3).
@@ -40,6 +45,7 @@ pub use id::Id;
 pub use line::{Line, LineSegment, PLAYER_SPEAKER, Voice};
 pub use machine::{Machine, StateDef, States, Step};
 pub use note::{Note, NoteRole, Thread, ThreadStatus};
+pub use plan::{ChartStep, SERIAL_RUN, StepChart, step_chart};
 pub use room::{Direction, Exit, Room};
 pub use rule::{Effect, EventPattern, Rule};
 pub use story::{Rank, Score, Story, VarDef, VarType};
@@ -47,4 +53,4 @@ pub use thing::{Location, NameStage, Thing};
 pub use timer::{StartTimers, Timer};
 pub use value::Value;
 pub use verb::{VerbDef, VerbSlots, standard_verbs};
-pub use walkthrough::{Expect, Pending, WalkStep, Walkthrough};
+pub use walkthrough::{Expect, Pending, StepPlan, WalkStep, Walkthrough};

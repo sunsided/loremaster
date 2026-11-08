@@ -31,7 +31,7 @@ mod checks;
 mod inspect;
 mod rules;
 
-use loremaster_model::Value;
+use loremaster_model::{Value, Walkthrough, step_chart};
 use loremaster_runtime::authoring::{self, Inspector};
 use loremaster_runtime::{Input, Session, State, Turn, World};
 use std::sync::Arc;
@@ -39,10 +39,11 @@ use std::sync::Arc;
 pub use atlas::{AtlasRoom, MapEnd, MapLink, MapRoom, MapView};
 pub use checks::{MarkupCheck, Symbol, TextError};
 pub use inspect::{Inspect, PhaseView, VarView};
+pub use loremaster_model::{ChartStep, StepChart};
 pub use loremaster_runtime::authoring::{
-    AuthorCommand, Budget, Dimension, EndingFound, Exploration, FragmentView, FrameFragment,
-    FramePart, FrameUse, MAX_CELLS, MatrixCell, PartView, RoomCoverage, RoomMatrix, RoomParts,
-    TalkOptionView, TalkView, TextVariant, ThreadReach,
+    AuthorCommand, Budget, DeadEnd, Dimension, EndingCheck, EndingFound, Exploration, FragmentView,
+    FrameFragment, FramePart, FrameUse, MAX_CELLS, MatrixCell, NoReturn, PartView, RoomCoverage,
+    RoomMatrix, RoomParts, StaleCloses, TalkOptionView, TalkView, TextVariant, ThreadReach,
 };
 pub use loremaster_runtime::{
     DialogueOutline, ExitInfo, OutlineNode, OutlineOption, Scene, ThingInfo, VerbInfo,
@@ -52,6 +53,8 @@ pub use rules::{MachineStepView, MachineView, RuleView};
 /// A running game with the authoring views.
 pub struct Workbench {
     session: Session,
+    /// The walkthroughs of the project, for the dependency charts.
+    walkthroughs: Vec<(String, Walkthrough)>,
 }
 
 impl Workbench {
@@ -64,7 +67,17 @@ impl Workbench {
     /// The views over a session that a host already has, for example one
     /// restored from a save.
     pub fn from_session(session: Session) -> Self {
-        Self { session }
+        Self {
+            session,
+            walkthroughs: Vec::new(),
+        }
+    }
+
+    /// The walkthroughs of the project: they give the hint ladder of the
+    /// session (CK-6) and the dependency charts (CK-7).
+    pub fn set_walkthroughs(&mut self, walks: Vec<(String, Walkthrough)>) {
+        self.session.set_hints_from(&walks);
+        self.walkthroughs = walks;
     }
 
     /// The session, for play and the read-only queries of the Session API.
@@ -118,6 +131,12 @@ impl Workbench {
         authoring::undo(&mut self.session)
     }
 
+    /// The next level of the hint ladder, as a turn with a note. It changes
+    /// nothing in the game. Read [`Session::hint`].
+    pub fn hint(&mut self, step: Option<&str>) -> Turn {
+        authoring::hint(&mut self.session, step)
+    }
+
     /// Start the story again, as the opening turn with the rule log. `undo`
     /// can go back to the state before it. Read [`Session::restart`].
     pub fn restart(&mut self) -> Turn {
@@ -139,12 +158,22 @@ impl Workbench {
     /// history of the session does not carry over.
     pub fn reload(&mut self, world: Arc<World>) {
         self.session = authoring::carry_over(&self.session, world);
+        // The hint book plays the walkthroughs in its world: build it again.
+        self.session.set_hints_from(&self.walkthroughs);
     }
 
     /// A new workbench with the game of this one in a changed world. This one
     /// does not change. Read [`Workbench::reload`].
     pub fn carried_to(&self, world: Arc<World>) -> Self {
-        Self::from_session(authoring::carry_over(&self.session, world))
+        self.carried_to_with(world, self.walkthroughs.clone())
+    }
+
+    /// [`Workbench::carried_to`] with the walkthroughs of the changed story,
+    /// so the hint book is built once, in the new world.
+    pub fn carried_to_with(&self, world: Arc<World>, walks: Vec<(String, Walkthrough)>) -> Self {
+        let mut next = Self::from_session(authoring::carry_over(&self.session, world));
+        next.set_walkthroughs(walks);
+        next
     }
 
     // ---- views ---------------------------------------------------------
@@ -152,6 +181,15 @@ impl Workbench {
     /// All rooms with what is in them now, for the Atlas.
     pub fn atlas(&self) -> Vec<AtlasRoom> {
         atlas::atlas(self.ins())
+    }
+
+    /// The dependency chart of each walkthrough with step ids, for the
+    /// Atlas (CK-7): the steps, what each one needs, and the puzzle width.
+    pub fn charts(&self) -> Vec<StepChart> {
+        self.walkthroughs
+            .iter()
+            .filter_map(|(key, walk)| step_chart(key, walk))
+            .collect()
     }
 
     /// All rooms and exits with the player's position and visits.
@@ -269,8 +307,10 @@ impl Workbench {
     }
 
     /// Walk the reachable states from the start of the story, and report the
-    /// rooms, texts, endings and threads it reached. It does not change the
-    /// running game.
+    /// rooms, texts, endings and threads it reached, and the ending checks
+    /// (`ending_checks`: dead ends and points of no return;
+    /// [`EndingCheck::diagnostics`] gives them as diagnostics). It does not
+    /// change the running game.
     pub fn explore(&self, budget: Budget) -> Exploration {
         self.ins().explore(budget)
     }

@@ -51,7 +51,10 @@ fn step_checks_go_to_the_step_and_expect_checks_to_the_end() {
         .ending("beacon_lit")
         .expect_ended(true);
     let walk = &p.walkthroughs[0].1;
-    let WalkStep::Checked { command, expect } = &walk.steps[0] else {
+    let WalkStep::Checked {
+        command, expect, ..
+    } = &walk.steps[0]
+    else {
         panic!("not a checked step");
     };
     assert_eq!(command, "open drawer");

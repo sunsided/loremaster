@@ -30,20 +30,55 @@ pub fn expand(world: &World) -> TokenStream {
             Item::Ending(e) => ending(e),
             Item::Verb(v) => verb(v),
             Item::Test(t) => test(t),
+            Item::Dialogue(d) => dialogue(d),
+            Item::Thread(t) => thread(t),
+            Item::Behavior(b) => {
+                let span = b.span;
+                let p = pack_ident(span);
+                let b = name(b);
+                quote_spanned!(span=> #p.behavior(#b);)
+            }
         });
     }
     let pack = pack_ident(Span::call_site());
+    // `pack <name>;` names the function, and the pack after the module
+    // and the function, so that two blocks of one module differ.
+    let (function, pack_name, doc) = match &world.name {
+        Some(n) => {
+            let f = Ident::new(&n.value, n.span);
+            let suffix = s(&format!("::{}", n.value), n.span);
+            (
+                f,
+                quote!(::core::concat!(::core::module_path!(), #suffix)),
+                format!("The pack `{}` of this `world!` block.", n.value),
+            )
+        }
+        None => (
+            Ident::new("pack", Span::call_site()),
+            quote!(::core::module_path!()),
+            "The pack of this `world!` block.".to_string(),
+        ),
+    };
     quote! {
-        /// The pack of this `world!` block.
-        pub fn pack() -> ::loremaster::dsl::Pack {
+        #[doc = #doc]
+        pub fn #function() -> ::loremaster::dsl::Pack {
             #[allow(unused_imports)]
             use ::loremaster::dsl::{
-                BuildPack as _, Effects as _, FragmentExt as _, HasNotes as _,
+                BuildPack as _, Effects as _, FragmentExt as _, HasFrames as _, HasNotes as _,
             };
-            let mut #pack = ::loremaster::dsl::Pack::new(::core::module_path!());
+            let mut #pack = ::loremaster::dsl::Pack::new(#pack_name);
             #body
             #pack
         }
+    }
+}
+
+/// `.replace()` for an entity with `replace` before it.
+fn replace(on: bool, span: Span) -> TokenStream {
+    if on {
+        quote_spanned!(span=> .replace())
+    } else {
+        TokenStream::new()
     }
 }
 
@@ -109,7 +144,33 @@ pub fn frag(f: &Frag, span: Span) -> TokenStream {
         let c = s(&when.source, span);
         out.extend(quote_spanned!(span=> .when(#c)));
     }
+    if let Some(id) = &f.id {
+        let id = name(id);
+        out.extend(quote_spanned!(span=> .id(#id)));
+    }
+    if f.replaces {
+        out.extend(quote_spanned!(span=> .replaces()));
+    }
+    for n in &f.notes {
+        let n = text(n);
+        out.extend(quote_spanned!(span=> .note(#n)));
+    }
     out
+}
+
+/// `.frame_before(verb, frag)` and the like.
+fn frame(f: &Frame, span: Span) -> TokenStream {
+    let verb = name(&f.verb);
+    let fr = frag(&f.frag, span);
+    let m = Ident::new(
+        match f.when {
+            FrameWhen::Before => "frame_before",
+            FrameWhen::Instead => "frame_instead",
+            FrameWhen::After => "frame_after",
+        },
+        span,
+    );
+    quote_spanned!(span=> .#m(#verb, #fr))
 }
 
 /// `first_visit` is `FirstVisit`.
@@ -174,6 +235,23 @@ fn story(st: &Story, vars: &[&Var]) -> TokenStream {
         });
         chain.extend(quote_spanned!(span=> .phases([#(#list),*])));
     }
+    for r in &st.relations {
+        let r = name(r);
+        chain.extend(quote_spanned!(span=> .relation(#r)));
+    }
+    if let Some(max) = st.score {
+        let l = lit(Literal::i64_suffixed(max), span);
+        chain.extend(quote_spanned!(span=> .score(#l)));
+        if let Some(v) = &st.score_var {
+            let v = name(v);
+            chain.extend(quote_spanned!(span=> .score_var(#v)));
+        }
+        for (from, rank) in &st.ranks {
+            let from = lit(Literal::i64_suffixed(*from), span);
+            let rank = text(rank);
+            chain.extend(quote_spanned!(span=> .rank(#from, #rank)));
+        }
+    }
     for v in vars {
         let id = name(&v.id);
         chain.extend(match (&v.ty, &v.initial) {
@@ -228,10 +306,12 @@ fn room(r: &Room) -> TokenStream {
                 note_list.push(n);
                 TokenStream::new()
             }
+            RoomPart::Frame(f) => frame(f, span),
         });
     }
     let notes = notes(&note_list, span);
-    quote_spanned!(span=> #p.room(#id, #room_name) #chain #notes;)
+    let replace = replace(r.replace, span);
+    quote_spanned!(span=> #p.room(#id, #room_name) #chain #notes #replace;)
 }
 
 fn exit(e: &Exit, span: Span) -> TokenStream {
@@ -338,10 +418,30 @@ fn thing(t: &Thing) -> TokenStream {
                 note_list.push(n);
                 TokenStream::new()
             }
+            ThingPart::Frame(f) => frame(f, span),
+            ThingPart::Name(n) => {
+                let t = text(&n.text);
+                let aliases = n.aliases.iter().map(text);
+                let when = match &n.when {
+                    Some(w) => {
+                        let w = s(&w.source, span);
+                        quote_spanned!(span=> ::core::option::Option::Some(::std::string::String::from(#w)))
+                    }
+                    None => quote_spanned!(span=> ::core::option::Option::None),
+                };
+                let proper = n.proper;
+                quote_spanned!(span=> .name_stage(::loremaster::dsl::model::NameStage {
+                    text: ::std::string::String::from(#t),
+                    aliases: ::std::vec![#(::std::string::String::from(#aliases)),*],
+                    when: #when,
+                    proper: #proper,
+                }))
+            }
         });
     }
     let notes = notes(&note_list, span);
-    quote_spanned!(span=> #p.thing(#id, #thing_name) #chain #notes;)
+    let replace = replace(t.replace, span);
+    quote_spanned!(span=> #p.thing(#id, #thing_name) #chain #notes #replace;)
 }
 
 fn event(e: &Event, span: Span) -> TokenStream {
@@ -568,6 +668,9 @@ fn machine(m: &Machine) -> TokenStream {
         }
         chain.extend(effects(&step.effects, span));
     }
+    let note_list: Vec<&Note> = m.notes.iter().collect();
+    chain.extend(notes(&note_list, span));
+    chain.extend(replace(m.replace, span));
     quote_spanned!(span=> #p.machine(#id, #start) #chain;)
 }
 
@@ -592,6 +695,9 @@ fn timer(t: &Timer) -> TokenStream {
         chain.extend(quote_spanned!(span=> .at(#n)));
         chain.extend(effects(list, span));
     }
+    let note_list: Vec<&Note> = t.notes.iter().collect();
+    chain.extend(notes(&note_list, span));
+    chain.extend(replace(t.replace, span));
     quote_spanned!(span=> #p.timer(#id, #turns) #chain;)
 }
 
@@ -612,6 +718,7 @@ fn ending(e: &Ending) -> TokenStream {
     }
     let note_list: Vec<&Note> = e.notes.iter().collect();
     chain.extend(notes(&note_list, span));
+    chain.extend(replace(e.replace, span));
     quote_spanned!(span=>
         #p.ending(#id, ::loremaster::dsl::model::EndingKind::#kind, #title) #chain;
     )
@@ -643,6 +750,7 @@ fn verb(v: &Verb) -> TokenStream {
         let d = text(d);
         chain.extend(quote_spanned!(span=> .default_response(#d)));
     }
+    chain.extend(replace(v.replace, span));
     quote_spanned!(span=> #p.verb(#id, #label) #chain;)
 }
 
@@ -713,4 +821,130 @@ fn expectation(e: &Expectation, span: Span, end: bool) -> TokenStream {
             quote_spanned!(span=> .#method(#b))
         }
     }
+}
+
+fn thread(t: &Thread) -> TokenStream {
+    let span = t.id.span;
+    let p = pack_ident(span);
+    let id = name(&t.id);
+    let thread_name = text(&t.name);
+    let mut chain = TokenStream::new();
+    if let Some(st) = &t.status {
+        let v = Ident::new(&camel(&st.value), st.span);
+        chain.extend(quote_spanned!(span=> .status(::loremaster::dsl::model::ThreadStatus::#v)));
+    }
+    if let Some(summary) = &t.summary {
+        let summary = text(summary);
+        chain.extend(quote_spanned!(span=> .summary(#summary)));
+    }
+    for f in &t.tracks {
+        let f = name(f);
+        chain.extend(quote_spanned!(span=> .tracks(#f)));
+    }
+    let note_list: Vec<&Note> = t.notes.iter().collect();
+    chain.extend(notes(&note_list, span));
+    chain.extend(replace(t.replace, span));
+    quote_spanned!(span=> #p.thread(#id, #thread_name) #chain;)
+}
+
+/// A dialogue: the builder, node by node, each node's `when` and outcomes
+/// before its options, as in `check::dialogue`.
+fn dialogue(d: &Dialogue) -> TokenStream {
+    let span = d.id.span;
+    let p = pack_ident(span);
+    let id = name(&d.id);
+    let tree = &d.tree.dialogue;
+    let with = s(&tree.with, span);
+    let start: Vec<LitStr> = tree.start.iter().map(|k| s(k, span)).collect();
+    let start = str_array(&start, span);
+    let mut chain = TokenStream::new();
+    let when = |w: &Option<Cond>| match w {
+        Some(w) => {
+            let c = s(&w.source, span);
+            quote_spanned!(span=> .when(#c))
+        }
+        None => TokenStream::new(),
+    };
+    for node in &tree.nodes {
+        let key = s(&node.key, span);
+        let say = line(&node.say.segments, span);
+        chain.extend(quote_spanned!(span=> .node(#key, #say)));
+        if let Some(sp) = &node.speaker {
+            let sp = s(sp, span);
+            chain.extend(quote_spanned!(span=> .speaker(#sp)));
+        }
+        for l in &node.lines {
+            let sp = s(&l.speaker, span);
+            let say = line(&l.say.segments, span);
+            chain.extend(quote_spanned!(span=> .line(#sp, #say)));
+        }
+        if let Some(next) = &node.next {
+            let next = s(next.as_key(), span);
+            chain.extend(quote_spanned!(span=> .next(#next)));
+        }
+        chain.extend(when(&node.when));
+        chain.extend(outcomes(&node.outcomes, span));
+        for option in &node.options {
+            let say = line(
+                option
+                    .say
+                    .as_ref()
+                    .map(|s| s.segments.as_slice())
+                    .unwrap_or(&[]),
+                span,
+            );
+            let go = s(option.go.as_key(), span);
+            chain.extend(quote_spanned!(span=> .option(#say, #go)));
+            if let Some(oid) = &option.id {
+                let oid = s(oid, span);
+                chain.extend(quote_spanned!(span=> .option_id(#oid)));
+            }
+            chain.extend(when(&option.when));
+            chain.extend(outcomes(&option.outcomes, span));
+        }
+    }
+    chain.extend(replace(d.replace, span));
+    quote_spanned!(span=> #p.dialogue(#id, #with).start(#start) #chain;)
+}
+
+fn outcomes(o: &dramaturge_syntax::Outcomes<Effect>, span: Span) -> TokenStream {
+    let mut out = TokenStream::new();
+    for (k, v) in &o.set {
+        let k = s(k, span);
+        let v = match v {
+            dramaturge_syntax::Value::Bool(b) => quote_spanned!(span=> #b),
+            dramaturge_syntax::Value::Int(i) => {
+                let l = lit(Literal::i64_suffixed(*i), span);
+                quote_spanned!(span=> #l)
+            }
+            dramaturge_syntax::Value::Text(t) => {
+                let l = s(t, span);
+                quote_spanned!(span=> #l)
+            }
+            // A kind of value that a later dramaturge adds.
+            _ => quote_spanned!(span=> ::core::compile_error!("this value is not in `world!` yet")),
+        };
+        out.extend(quote_spanned!(span=> .set(#k, #v)));
+    }
+    for (k, n) in &o.add {
+        let k = s(k, span);
+        let n = lit(Literal::i64_suffixed(*n), span);
+        out.extend(quote_spanned!(span=> .add(#k, #n)));
+    }
+    for (k, n) in &o.relation {
+        let k = s(k, span);
+        let n = lit(Literal::i32_suffixed(*n), span);
+        out.extend(quote_spanned!(span=> .relation(#k, #n)));
+    }
+    for m in &o.remember {
+        let m = s(m, span);
+        out.extend(quote_spanned!(span=> .remember(#m)));
+    }
+    if !o.then.is_empty() {
+        let list = effects(&o.then, span);
+        out.extend(quote_spanned!(span=> .then_effects(
+            ::std::vec::Vec::<::loremaster::dsl::model::Effect>::new() #list
+        )));
+    }
+    out
 }

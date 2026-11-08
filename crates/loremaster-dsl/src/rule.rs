@@ -1,7 +1,7 @@
 //! Rules, the events they listen for ([`on`](crate::on)) and their effects
 //! ([`Effects`]).
 
-use crate::convert::{IntoValue, id};
+use crate::convert::{IntoValue, id, ids};
 use crate::pack::{register, with_notes};
 use loremaster_model::{Effect, EventPattern, Id, Rule, StartTimers};
 use loremaster_project::Pack;
@@ -38,6 +38,8 @@ impl<'a> RuleBuilder<'a> {
             within: None,
             priority: 0,
             machine: None,
+            closes: Vec::new(),
+            reason: None,
             notes: Vec::new(),
         });
         let i = pack.rules.len() - 1;
@@ -77,6 +79,19 @@ impl<'a> RuleBuilder<'a> {
         self.rule().priority = priority;
         self
     }
+
+    /// `closes:` and `reason:`: the endings that the rule closes on purpose
+    /// (a point of no return that the ending checks accept), and why.
+    pub fn closes(
+        mut self,
+        endings: impl IntoIterator<Item = impl AsRef<str>>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let rule = self.rule();
+        rule.closes = ids(endings);
+        rule.reason = Some(reason.into());
+        self
+    }
 }
 
 impl Effects for RuleBuilder<'_> {
@@ -90,7 +105,7 @@ with_notes!(RuleBuilder, rules);
 /// The events of a rule or a machine step, as in `on:` in YAML.
 pub mod on {
     use crate::convert::{IntoTime, id, ids};
-    use loremaster_model::EventPattern;
+    use loremaster_model::{CommandPattern, EventPattern};
 
     /// `start`: the game begins.
     pub fn start() -> EventPattern {
@@ -120,12 +135,25 @@ pub mod on {
 
     /// `verb: [verb, thing, other]`: after a verb, or instead of it.
     pub fn verb(pattern: impl IntoIterator<Item = impl AsRef<str>>) -> EventPattern {
-        EventPattern::Verb(ids(pattern))
+        EventPattern::Verb(CommandPattern::from_parts(ids(pattern)))
     }
 
     /// `check: [verb, thing, other]`: before a verb.
     pub fn check(pattern: impl IntoIterator<Item = impl AsRef<str>>) -> EventPattern {
-        EventPattern::Check(ids(pattern))
+        EventPattern::Check(CommandPattern::from_parts(ids(pattern)))
+    }
+
+    /// `{ verb: …, direct: …, actor: … }`: after a verb, with any slot of
+    /// the Command record (D6). Build the pattern with
+    /// `CommandPattern::new("examine").with_direct("stove")`.
+    pub fn command(pattern: CommandPattern) -> EventPattern {
+        EventPattern::Verb(pattern)
+    }
+
+    /// `{ check: …, direct: …, actor: … }`: before a verb, with any slot of
+    /// the Command record.
+    pub fn check_command(pattern: CommandPattern) -> EventPattern {
+        EventPattern::Check(pattern)
     }
 
     /// `timer: id`: a timer runs out.
@@ -252,5 +280,13 @@ pub trait Effects: Sized {
     /// `cancel:` a timer.
     fn cancel(self, timer: impl AsRef<str>) -> Self {
         self.effect(Effect::Cancel(id(timer)))
+    }
+}
+
+/// A plain list of effects, for a dialogue's `then:`
+/// ([`DialogueBuilder::then_effects`](crate::DialogueBuilder::then_effects)).
+impl Effects for Vec<Effect> {
+    fn effects_mut(&mut self) -> &mut Vec<Effect> {
+        self
     }
 }

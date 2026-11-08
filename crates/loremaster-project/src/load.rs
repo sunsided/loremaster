@@ -1,8 +1,8 @@
 use crate::merge::{Extension, MergeMode, extend_entity, merge_mode};
 use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
-    ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule,
-    Story, TextPool, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
+    Agenda, ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note, Room,
+    Rule, Story, TextPool, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -38,7 +38,14 @@ impl Project {
     /// which is how a compile error names its place.
     pub fn locate(&self, mut diagnostic: Diagnostic) -> Diagnostic {
         if diagnostic.file.is_empty() {
-            let key = diagnostic.at.split(['/', '#']).next().unwrap_or_default();
+            // A whole rule key first: the rule of a machine step is
+            // `rule:lock#1`. Other keys keep `#` for a fragment: `room:vault#2`.
+            let whole = diagnostic.at.split('/').next().unwrap_or_default();
+            let key = if whole.starts_with("rule:") && self.origins.contains_key(whole) {
+                whole
+            } else {
+                diagnostic.at.split(['/', '#']).next().unwrap_or_default()
+            };
             let key = if key.starts_with("story:") {
                 "story"
             } else {
@@ -123,6 +130,8 @@ pub struct Pack {
     pub endings: Vec<Ending>,
     /// Named text pools, from `texts/`.
     pub texts: Vec<TextPool>,
+    /// What actors do on their own (D6).
+    pub agendas: Vec<Agenda>,
     /// The source files, for diagnostics with lines.
     pub files: Vec<SourceFile>,
     /// Entity key such as `room:cellar` to where it is defined. The key
@@ -165,6 +174,7 @@ impl Pack {
         let mut timers: Vec<Timer> = Vec::new();
         let mut endings: Vec<Ending> = Vec::new();
         let mut texts: Vec<TextPool> = Vec::new();
+        let mut agendas: Vec<Agenda> = Vec::new();
         let mut replaces = BTreeSet::new();
         let mut extensions = Vec::new();
 
@@ -186,14 +196,7 @@ impl Pack {
             if !dir.is_empty() && !FOLDERS.contains(&dir) {
                 // One message for each folder, at its first file.
                 if unknown_folders.insert(dir) {
-                    match PLANNED_FOLDERS.iter().find(|(f, _)| *f == dir) {
-                        Some((_, what)) => warnings.push(Diagnostic::warning(
-                            path,
-                            "",
-                            format!("the folder `{dir}/` is not read yet: {what}"),
-                        )),
-                        None => errors.push(unknown_folder(path, dir)),
-                    }
+                    errors.push(unknown_folder(path, dir));
                 }
                 continue;
             }
@@ -209,7 +212,7 @@ impl Pack {
                 let Some(kind) = entity_kind(dir) else {
                     errors.push(parse_diagnostic(
                         path,
-                        "`extend` and `replace` work only in rooms/, things/, threads/, dialogues/, endings/, timers/, verbs/ and machines/",
+                        "`extend` and `replace` work only in rooms/, things/, threads/, dialogues/, endings/, timers/, verbs/, machines/ and agendas/",
                     ));
                     continue;
                 };
@@ -346,6 +349,15 @@ impl Pack {
                         Err(e) => errors.push(parse_err(e)),
                     }
                 }
+                "agendas" => {
+                    match serde_saphyr::from_str::<Agenda>(&with_default_id(&file_text, stem)) {
+                        Ok(a) => {
+                            origins.insert(format!("agenda:{}", a.id), Origin::yaml(path));
+                            agendas.push(a);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
                 "machines" => {
                     match serde_saphyr::from_str::<Machine>(&with_default_id(&file_text, stem)) {
                         Ok(m) => {
@@ -406,6 +418,7 @@ impl Pack {
             timers,
             endings,
             texts,
+            agendas,
             files,
             origins,
             replaces,
@@ -430,14 +443,10 @@ pub const FOLDERS: &[&str] = &[
     "verbs",
     "machines",
     "texts",
+    "agendas",
     "behaviors",
     "tests",
 ];
-
-/// Folders of planned features. The golden slice (`examples/lock-keeper-slice`)
-/// has drafts in them. The loader skips them with a warning instead of an
-/// error, so that their drafts can wait in a project.
-const PLANNED_FOLDERS: &[(&str, &str)] = &[("agendas", "agendas of characters are planned")];
 
 fn unknown_folder(path: &str, dir: &str) -> Diagnostic {
     let hint = match loremaster_lang::closest(dir, FOLDERS.iter().copied()) {
@@ -494,6 +503,7 @@ fn entity_kind(dir: &str) -> Option<&'static str> {
         "timers" => "timer",
         "verbs" => "verb",
         "machines" => "machine",
+        "agendas" => "agenda",
         _ => return None,
     })
 }
@@ -533,6 +543,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut timers: Vec<Timer> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
     let mut texts: Vec<TextPool> = Vec::new();
+    let mut agendas: Vec<Agenda> = Vec::new();
     for (i, mut pack) in packs.into_iter().enumerate() {
         assembly.append(&mut pack.warnings);
         // A replaced room or thing takes its nested rules with it: they come
@@ -581,6 +592,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
                     &mut timers,
                     &mut verbs,
                     &mut machines,
+                    &mut agendas,
                 );
                 owner.insert(key.clone(), i);
                 origins.insert(key, origin);
@@ -630,6 +642,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         timers.extend(pack.timers);
         endings.extend(pack.endings);
         texts.extend(pack.texts);
+        agendas.extend(pack.agendas);
         files.extend(pack.files);
         for ext in pack.extensions {
             let found = extend_with(
@@ -642,6 +655,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
                 &mut timers,
                 &mut verbs,
                 &mut machines,
+                &mut agendas,
             );
             let message = match found {
                 Ok(true) => continue,
@@ -711,6 +725,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         rules,
         endings,
         timers: header.timers.into_iter().chain(timers).collect(),
+        agendas,
         behaviors: header
             .behaviors
             .into_iter()
@@ -751,6 +766,7 @@ fn remove_entity(
     timers: &mut Vec<Timer>,
     verbs: &mut Vec<VerbDef>,
     machines: &mut Vec<Machine>,
+    agendas: &mut Vec<Agenda>,
 ) {
     let Some((kind, id)) = key.split_once(':') else {
         return;
@@ -764,6 +780,7 @@ fn remove_entity(
         "timer" => timers.retain(|e| e.id.as_str() != id),
         "verb" => verbs.retain(|e| e.id.as_str() != id),
         "machine" => machines.retain(|e| e.id.as_str() != id),
+        "agenda" => agendas.retain(|e| e.id.as_str() != id),
         _ => {}
     }
 }
@@ -781,6 +798,7 @@ fn extend_with(
     timers: &mut [Timer],
     verbs: &mut [VerbDef],
     machines: &mut [Machine],
+    agendas: &mut [Agenda],
 ) -> Result<bool, String> {
     fn one<T: serde::Serialize + serde::de::DeserializeOwned>(
         list: &mut [T],
@@ -809,6 +827,7 @@ fn extend_with(
         "timer" => one(timers, id, |e| e.id.as_str(), f),
         "verb" => one(verbs, id, |e| e.id.as_str(), f),
         "machine" => one(machines, id, |e| e.id.as_str(), f),
+        "agenda" => one(agendas, id, |e| e.id.as_str(), f),
         _ => Ok(false),
     }
 }
@@ -855,6 +874,8 @@ fn machine_rules(m: &Machine) -> Vec<Rule> {
                 within: None,
                 priority: 0,
                 machine: Some(m.id.clone()),
+                closes: step.closes.clone(),
+                reason: step.reason.clone(),
                 notes: Vec::new(),
             }
         })

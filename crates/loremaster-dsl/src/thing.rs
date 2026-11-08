@@ -33,6 +33,7 @@ impl<'a> ThingBuilder<'a> {
             presence: Vec::new(),
             listed: true,
             proper: false,
+            red_herring: false,
             names: Vec::new(),
             frames: Frames::default(),
             rules: Vec::new(),
@@ -145,6 +146,12 @@ impl<'a> ThingBuilder<'a> {
     /// `proper: true`: a proper name, without an article.
     pub fn proper(mut self) -> Self {
         self.thing().proper = true;
+        self
+    }
+
+    /// `red_herring: true`: no puzzle needs the thing, on purpose.
+    pub fn red_herring(mut self) -> Self {
+        self.thing().red_herring = true;
         self
     }
 

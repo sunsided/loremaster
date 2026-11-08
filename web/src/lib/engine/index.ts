@@ -7,12 +7,14 @@ import init, {
 	markupTokens as wasmMarkupTokens,
 	newStory as wasmNewStory,
 	projectNotes,
-	projectThreads
+	projectThreads,
+	qualityReport
 } from './pkg/loremaster-wasm.js';
 import type {
 	AuthorCommand,
 	Choice,
 	Input,
+	JournalEntry,
 	Loaded,
 	Snapshot,
 	Status,
@@ -33,6 +35,9 @@ import type {
 	VarView,
 	Diagnostic,
 	FragmentView,
+	Hint,
+	QualityReport,
+	StepChart,
 	MapView,
 	Preview,
 	RoomParts,
@@ -75,6 +80,12 @@ export async function notesOf(files: SourceFile[]): Promise<NoteRef[]> {
 export async function threadsOf(files: SourceFile[]): Promise<ThreadView[]> {
 	await loadEngine();
 	return projectThreads(files) as ThreadView[];
+}
+
+/** The quality report of the files (CK-8). Null when the files do not load. */
+export async function qualityOf(files: SourceFile[]): Promise<QualityReport | null> {
+	await loadEngine();
+	return qualityReport(files) as QualityReport | null;
 }
 
 /** Thrown when a project has errors; carries the diagnostics. */
@@ -200,6 +211,11 @@ export class Session {
 		return this.#session.scene();
 	}
 
+	/** The quest journal: open quests first, then finished ones. */
+	journal(): JournalEntry[] {
+		return this.#session.journal();
+	}
+
 	verbs(): VerbInfo[] {
 		return this.#session.verbs();
 	}
@@ -217,6 +233,16 @@ export class Session {
 	/** The answers the player can choose now. Empty outside a talk. */
 	choices(): Choice[] {
 		return this.#session.choices();
+	}
+
+	/** The hint ladder of the current room: the steps not done yet whose needs are done. */
+	hints(): Hint[] {
+		return this.#session.hints();
+	}
+
+	/** Show the next hint level, of `step` or of the first step with a level left. It is no turn. */
+	hint(step?: string): Step {
+		return this.#session.hint(step);
 	}
 }
 
@@ -296,6 +322,11 @@ export class Workbench {
 		return this.#bench.scene();
 	}
 
+	/** The quest journal of the session. */
+	journal(): JournalEntry[] {
+		return this.#bench.journal();
+	}
+
 	verbs(): VerbInfo[] {
 		return this.#bench.verbs();
 	}
@@ -307,6 +338,21 @@ export class Workbench {
 	/** The answers the player can choose now. Empty outside a talk. */
 	choices(): Choice[] {
 		return this.#bench.choices();
+	}
+
+	/** The hint ladder of the current room: the steps not done yet whose needs are done. */
+	hints(): Hint[] {
+		return this.#bench.hints();
+	}
+
+	/** The story has hints, also when none is open in this room now. */
+	hasHints(): boolean {
+		return this.#bench.hasHints();
+	}
+
+	/** Show the next hint level, of `step` or of the first step with a level left, as a turn with a note. It is no turn of the game. */
+	hint(step?: string): Turn {
+		return this.#bench.hint(step);
 	}
 
 	/** The save state, as JSON-compatible data. */
@@ -373,6 +419,11 @@ export class Workbench {
 	/** All rooms with what is in them now, for the Atlas. */
 	atlas(): AtlasRoom[] {
 		return this.#bench.atlas();
+	}
+
+	/** The dependency chart of each walkthrough with step ids, from `needs` (CK-7). */
+	charts(): StepChart[] {
+		return this.#bench.charts();
 	}
 
 	rules(): RuleView[] {

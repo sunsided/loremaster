@@ -121,10 +121,22 @@ export interface OutlineNode {
 	start?: number;
 	when?: string;
 	say: string;
+	/** The lines after `say`, each with its speaker. */
+	lines?: OutlineLine[];
+	/** Where the talk goes on without a choice: a node key, `end` or `back`. */
+	next?: string;
+	/** `next` names a node that does not exist. */
+	next_missing?: boolean;
 	outcomes: string[];
 	options: OutlineOption[];
 	/** No start node leads here. */
 	unreachable: boolean;
+}
+
+export interface OutlineLine {
+	/** A thing id or `player`. */
+	speaker: string;
+	say: string;
 }
 
 export interface OutlineOption {
@@ -146,6 +158,15 @@ export interface ExitInfo {
 	direction: string;
 	to: string;
 	to_name: string;
+}
+
+/** A quest in the player's journal (a machine with `quest: true`). */
+export interface JournalEntry {
+	quest: string;
+	title: string;
+	state: string;
+	text: string;
+	done: boolean;
 }
 
 export interface Scene {
@@ -195,7 +216,16 @@ export interface FragmentView {
 }
 
 export type Command =
-	| { type: 'verb'; verb: string; objects: string[] }
+	| {
+			type: 'verb';
+			verb: string;
+			/** The direct object, then the indirect one. */
+			objects: string[];
+			/** Command record slots (D6), all optional. Without `actor`, the player acts. */
+			actor?: string;
+			preposition?: string;
+			topic?: string;
+	  }
 	| { type: 'go'; direction: string }
 	| { type: 'choose'; index: number }
 	| { type: 'leave' };
@@ -479,10 +509,62 @@ export interface Exploration {
 	never_shown: string[];
 	never_fired: string[];
 	endings: { text: string; path: string[] }[];
+	/** Dead ends: states from which no ending can be reached. When the walk stopped early, only the proven ones. */
 	stuck: number;
 	stuck_path: string[];
 	/** For each open or resolved thread with a payoff: whether a payoff showed, and in which order. */
 	threads: ThreadReach[];
+	/** The ending checks: dead ends and points of no return. Missing from engines before P4-04. */
+	ending_checks?: EndingCheck;
+}
+
+/** The ending checks of the explorer: dead ends (errors) and points of no return (warnings). */
+export interface EndingCheck {
+	/** False when the story has no ending. */
+	ran: boolean;
+	/** True when the walk finished every state. False: no finding does not mean "no dead end". */
+	proven: boolean;
+	/** States whose future the walk did not finish; the checks say nothing about them. */
+	unproven: number;
+	dead_ends: DeadEnd[];
+	no_return: NoReturn[];
+	/** `closes` lists that name an ending which never drops out at the rule. */
+	stale: { rule: string; endings: string[] }[];
+}
+
+/** A turn into a state from which no ending can be reached. */
+export interface DeadEnd {
+	/** The shortest command list into the dead end; empty when the start is one. */
+	path: string[];
+	/** The room of the last command. */
+	room: string;
+	/** The rule that the turn blames, or null when only the command's own action ran. */
+	rule: string | null;
+	fired: string[];
+	/** How many explored turns have this cause. */
+	turns: number;
+}
+
+/** A turn after which the best reachable ending gets worse. */
+export interface NoReturn {
+	path: string[];
+	room: string;
+	rule: string | null;
+	fired: string[];
+	best_before: string | null;
+	rank_before: number | null;
+	/** Null when only endings without a rank are left. */
+	best_after: string | null;
+	rank_after: number | null;
+	/** The endings that drop out. */
+	lost: string[];
+	/** The ranked endings in `lost` that no `closes` names; empty when accepted. */
+	unaccepted: string[];
+	/** The rules whose `closes` accept the drop. */
+	accepted_by: string[];
+	/** The `reason` of each rule in `accepted_by`, in the same order. */
+	reasons: string[];
+	turns: number;
 }
 
 /** What the explorer found for one thread. */
@@ -604,3 +686,65 @@ export interface Loaded {
 
 /** The state of a running game, to put back with `restore`. Opaque to the host. */
 export type Snapshot = { readonly story: string; readonly state: unknown };
+
+/**
+ * A step of the hint ladder in the current room (CK-6): a walkthrough step that the player has not done and
+ * whose needs are done, with the levels shown so far.
+ */
+export interface Hint {
+	/** The key of the step: its id, or `<walkthrough>#<n>`. */
+	step: string;
+	/** The hints shown so far, the first one first. */
+	shown: string[];
+	/** The command, once all hints are shown and the player asked once more. */
+	command?: string;
+	/** How many levels the ladder has: the hints and the command. */
+	levels: number;
+}
+
+/** A step of a dependency chart (CK-7). */
+export interface ChartStep {
+	id: string;
+	command: string;
+	/** The index of the step in the walkthrough, from 0. */
+	index: number;
+	/** The room of the step, when the step names it with `at`. */
+	at?: string;
+	/** The steps that this one needs. */
+	needs: string[];
+	/** The longest chain of needs before this step: 0 for a step that needs nothing. */
+	depth: number;
+	/** How many steps the player can work on when this step comes up. */
+	width: number;
+	/** How many hints the step has. */
+	hints: number;
+}
+
+/** The dependency chart of one walkthrough with step ids. */
+export interface StepChart {
+	/** The key of the walkthrough: its file, or its Rust place. */
+	walkthrough: string;
+	name: string;
+	steps: ChartStep[];
+	max_width: number;
+}
+
+/** A check of the quality report (CK-8). */
+export type QualityCheck =
+	| 'one_way_exit'
+	| 'same_room_text'
+	| 'unused_thing'
+	| 'puzzle_width'
+	| 'verb_coverage'
+	| 'no_warning_before_death'
+	| 'death_off_winning_path'
+	| 'far_change_without_signal'
+	| 'gift_coverage';
+
+/** The quality report of a project: findings, puzzle widths, verb coverage and the checks that do not run yet. */
+export interface QualityReport {
+	findings: { check: QualityCheck; diagnostic: Diagnostic }[];
+	widths: { walkthrough: string; name: string; steps: number; max: number; mean: number }[];
+	verbs: { story_used: string[]; story_unused: string[]; standard_used: string[] };
+	deferred: { check: QualityCheck; reason: string }[];
+}

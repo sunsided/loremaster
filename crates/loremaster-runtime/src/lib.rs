@@ -38,16 +38,20 @@ pub use events::{Event, EventKind, Phase};
 pub(crate) use game::Game;
 pub use game::{ARRIVED, REFUSED};
 pub use game::{ExitInfo, Scene, ThingInfo, VerbInfo};
-pub use outline::{DialogueOutline, OutlineNode, OutlineOption};
-pub use output::{Block, BlockKind, Choice, Link, LinkKind, LogEntry, Run, Source, TalkInfo, Turn};
-pub use parser::{Command, Preview};
+pub use outline::{DialogueOutline, OutlineLine, OutlineNode, OutlineOption};
+pub use output::{
+    Block, BlockKind, Choice, JournalEntry, Link, LinkKind, LogEntry, Run, Source, TalkInfo, Turn,
+};
+pub use parser::{Command, CommandRecord, PLAYER, Preview};
 pub(crate) use save::Restored;
 pub use save::{SAVE_FORMAT, SAVE_VERSION, Save, SaveError, StoryStamp};
 pub use session::{
-    DEFAULT_UNDO_DEPTH, Effect, EndingInfo, Input, Loaded, RESTART, RESTORE, Session, Snapshot,
-    Status, Step, UNDO,
+    DEFAULT_UNDO_DEPTH, Effect, EndingInfo, HINT, Hint, HintBook, Input, JOURNAL, Loaded, RESTART,
+    RESTORE, Session, Snapshot, Status, Step, UNDO,
 };
-pub use state::{AwaitOptionInfo, AwaitRequest, Awaiting, FragmentProgress, State, Talk};
+pub use state::{
+    ActorState, AwaitOptionInfo, AwaitRequest, Awaiting, FragmentProgress, State, StepOutcome, Talk,
+};
 pub use text::{SourcePiece, SourceRole};
 pub use walkthrough::{Verdict, WalkResult, run_walkthrough};
 pub use world::{CompileError, World};

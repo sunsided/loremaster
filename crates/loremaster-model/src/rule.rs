@@ -1,4 +1,4 @@
-use crate::{AwaitSpec, Id, Line, Note, StartTimers, TimeOfDay, Value};
+use crate::{AwaitSpec, CommandPattern, Id, Line, Note, StartTimers, TimeOfDay, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -30,14 +30,25 @@ pub struct Rule {
     /// takes at most one step for one event.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub machine: Option<Id>,
+    /// The endings that this rule closes on purpose: after it fires, they can
+    /// no longer be reached (a point of no return). The ending checks accept
+    /// the rank drop when it matches this list. Needs a `reason`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub closes: Vec<Id>,
+    /// Why the rule closes the endings in `closes`, for the authors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
     /// Author notes. The player never sees them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<Note>,
 }
 
 /// What a rule listens for.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+///
+/// In YAML, `on:` is `start`, `turn`, or a map with one event kind. Its serde
+/// form is written by hand (in `command.rs`), so that `verb` and `check`
+/// take the slots of the Command record next to the verb.
+#[derive(Debug, Clone, PartialEq)]
 pub enum EventPattern {
     /// The game begins.
     Start,
@@ -47,13 +58,15 @@ pub enum EventPattern {
     Leave(Id),
     /// The clock reaches a time of day.
     Time(TimeOfDay),
-    /// A verb was used, optionally on given things: `[verb, thing, other]`.
-    /// These rules run after the default action, or instead of it with `instead`.
-    Verb(Vec<Id>),
+    /// A verb was used. The list form `[verb, thing, other]` names the verb
+    /// and its objects; the record form `{ verb: examine, direct: stove,
+    /// actor: keeper }` names any slot of the command (D6). These rules run
+    /// after the default action, or instead of it with `instead`.
+    Verb(CommandPattern),
     /// Before a verb runs, with the same pattern as `verb`. A rule with `stop`
     /// refuses the action: the default action and the `verb` rules do not run.
     /// `[go]` and `[go, north]` check a move.
-    Check(Vec<Id>),
+    Check(CommandPattern),
     /// A timer runs out.
     Timer(Id),
     /// An `emit` effect sends this event.

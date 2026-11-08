@@ -17,8 +17,9 @@ use std::sync::Arc;
 pub const SAVE_FORMAT: &str = "loremaster-save";
 
 /// The newest save version. Version 0 is the bare [`State`] of loremaster
-/// 0.1, before the envelope.
-pub const SAVE_VERSION: u32 = 1;
+/// 0.1, before the envelope. Version 1 is the envelope (P1-04). Version 2
+/// adds the state of the actors and their agendas (`state.actors`, D6).
+pub const SAVE_VERSION: u32 = 2;
 
 /// A save game: the state, and the story it was made with.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -180,22 +181,76 @@ fn migrate(save: Value) -> Result<(Migrated, u32), SaveError> {
             supported: SAVE_VERSION,
         });
     }
-    let migrated = match version {
-        0 => Migrated {
-            story: None,
-            state: serde_json::from_value(save).map_err(invalid)?,
-        },
+    // One step at a time: 0 is a bare state, the steps from 1 on change the
+    // state inside the envelope.
+    let (story, mut state) = match version {
+        0 => (None, save),
         _ => {
-            let save: Save = serde_json::from_value(save).map_err(invalid)?;
-            Migrated {
-                story: Some(save.story),
-                state: save.state,
-            }
+            let Value::Object(mut envelope) = save else {
+                unreachable!("checked above")
+            };
+            let story: StoryStamp = serde_json::from_value(
+                envelope
+                    .remove("story")
+                    .ok_or_else(|| SaveError::Invalid("no `story`".into()))?,
+            )
+            .map_err(invalid)?;
+            let state = envelope
+                .remove("state")
+                .ok_or_else(|| SaveError::Invalid("no `state`".into()))?;
+            (Some(story), state)
         }
     };
-    let mut migrated = migrated;
-    progress_keys(&mut migrated.state);
-    Ok((migrated, version))
+    for from in version.max(1)..SAVE_VERSION {
+        match from {
+            1 => v1_to_v2(&mut state)?,
+            _ => unreachable!("a step for each version below SAVE_VERSION"),
+        }
+    }
+    let mut state = serde_json::from_value(state).map_err(invalid)?;
+    progress_keys(&mut state);
+    Ok((Migrated { story, state }, version))
+}
+
+/// Version 1 to 2: the state gets `actors`, the progress of the agendas.
+/// A save of version 1 comes from a loremaster without agendas, so no actor
+/// has done anything: each agenda starts from its first step. A step whose
+/// time passed before the save is due and runs in the next turn.
+fn v1_to_v2(state: &mut Value) -> Result<(), SaveError> {
+    let Some(state) = state.as_object_mut() else {
+        return Err(SaveError::Invalid("the state is not an object".into()));
+    };
+    state
+        .entry("actors")
+        .or_insert_with(|| Value::Object(Default::default()));
+    Ok(())
+}
+
+/// Keep the progress of the agendas that the story still has: an actor
+/// without an agenda, and a step that its agenda no longer has, are dropped.
+/// Returns what it dropped, as `agenda:<actor>#<step>` (or `agenda:<actor>`).
+pub(crate) fn keep_known_steps(
+    world: &World,
+    actors: &mut std::collections::BTreeMap<Id, crate::ActorState>,
+) -> Vec<String> {
+    let mut dropped = Vec::new();
+    actors.retain(|actor, progress| {
+        let Some(agenda) = world.story.agenda_of(actor.as_str()) else {
+            dropped.push(format!("agenda:{actor}"));
+            return false;
+        };
+        let keys: std::collections::BTreeSet<String> =
+            agenda.keyed_steps().map(|(k, _)| k).collect();
+        progress.steps.retain(|key, _| {
+            let keep = keys.contains(key);
+            if !keep {
+                dropped.push(format!("agenda:{actor}#{key}"));
+            }
+            keep
+        });
+        true
+    });
+    dropped
 }
 
 /// Text progress before the text core was keyed `room:shore#2`; the core
@@ -358,6 +413,7 @@ fn reconcile(
         }
         keep
     });
+    dropped.extend(keep_known_steps(world, &mut state.actors));
 
     dropped.sort();
     dropped.dedup();

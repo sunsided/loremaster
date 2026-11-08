@@ -1,0 +1,71 @@
+error: no node `nowhere`
+ --> tests/ui/fail/dialogue_checks.rs:7:44
+  |
+7 |         dialogue with keeper start [stove, nowhere] {
+  |                                            ^^^^^^^
+
+error: no node `who_fed_it`
+ --> tests/ui/fail/dialogue_checks.rs:9:39
+  |
+9 |                 says "Who fed it?" => who_fed_it;
+  |                                       ^^^^^^^^^^
+
+error: unknown thing `stranger`; for an id of another pack, write `extern { thing stranger; }`
+  --> tests/ui/fail/dialogue_checks.rs:24:17
+   |
+24 |                 stranger: "Hm.";
+   |                 ^^^^^^^^
+
+error: cannot set `ash_is_fresh` to `3`
+  --> tests/ui/fail/dialogue_checks.rs:36:13
+   |
+36 |             stove: "He nods." {
+   |             ^^^^^
+
+error: unknown room `cellar`; for an id of another pack, write `extern { room cellar; }`
+  --> tests/ui/fail/dialogue_checks.rs:42:26
+   |
+42 |                     then goto cellar;
+   |                          ^^^^^^^^^^^
+
+error: `{` is never closed
+  --> tests/ui/fail/dialogue_checks.rs:44:17
+   |
+44 |                 says "{bad" => end;
+   |                 ^^^^^^^^^^^
+
+error: unknown speaker `stranger`: `by` names a thing or `player`
+  --> tests/ui/fail/dialogue_checks.rs:45:17
+   |
+45 |                 stranger says "Hm." => end;
+   |                 ^^^^^^^^
+
+error: unknown name `ash_is_cold`
+  --> tests/ui/fail/dialogue_checks.rs:37:22
+   |
+37 |                 when ash_is_cold;
+   |                      ^^^^^^^^^^^
+
+error: unknown relation `trust`; add it to `relations: [..]` in the story header, or write `extern { relation trust; }` for one of another pack
+  --> tests/ui/fail/dialogue_checks.rs:56:13
+   |
+56 |             stove: "He nods." {
+   |             ^^^^^
+
+error: `keeper` has no property `angry`
+  --> tests/ui/fail/dialogue_checks.rs:70:41
+   |
+70 |                 says "Who fed it?" when keeper.angry => end;
+   |                                         ^^^^^^^^^^^^
+
+error: cannot set `ash_is_fresh` to `3`
+  --> tests/ui/fail/dialogue_checks.rs:82:13
+   |
+82 |             then_what: "He nods." {
+   |             ^^^^^^^^^
+
+error: unknown thing `keeper`; for an id of another pack, write `extern { thing keeper; }`
+  --> tests/ui/fail/dialogue_checks.rs:93:23
+   |
+93 |         dialogue with keeper start [stove] {
+   |                       ^^^^^^

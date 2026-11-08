@@ -92,6 +92,42 @@ impl<'a> DialogueBuilder<'a> {
         self
     }
 
+    /// `speaker:` of the node added last: the thing that speaks its speech
+    /// in place of the dialogue's thing.
+    #[track_caller]
+    pub fn speaker(mut self, speaker: impl Into<String>) -> Self {
+        self.last_node().speaker = Some(speaker.into());
+        self
+    }
+
+    /// One of `lines:` of the node added last: a line after its `say`,
+    /// spoken by `speaker` (a thing id or `player`).
+    #[track_caller]
+    pub fn line(mut self, speaker: impl Into<String>, say: impl Into<Line>) -> Self {
+        let line = loremaster_model::dramaturge_syntax::Line::new(speaker, say.into());
+        self.last_node().lines.push(line);
+        self
+    }
+
+    /// `next:` of the node added last: where the talk goes on when the node
+    /// has no answer to choose (a node key, `end` or `back`).
+    #[track_caller]
+    pub fn next(mut self, target: impl Into<String>) -> Self {
+        self.last_node().next = Some(DialogueTarget::parse(&target.into()));
+        self
+    }
+
+    /// `id:` of the option added last: its key, in place of
+    /// `<node>#<index>`.
+    #[track_caller]
+    pub fn option_id(mut self, key: impl Into<String>) -> Self {
+        match self.last_node().options.last_mut() {
+            Some(option) => option.id = Some(key.into()),
+            None => panic!("the node has no option yet: call `option` first"),
+        }
+        self
+    }
+
     /// `when:` of the option added last, or of the node when it has no option yet.
     #[track_caller]
     pub fn when(mut self, condition: impl Into<String>) -> Self {
@@ -137,6 +173,15 @@ impl<'a> DialogueBuilder<'a> {
     #[track_caller]
     pub fn then(mut self, effect: Effect) -> Self {
         self.outcomes().then.push(effect);
+        self
+    }
+
+    /// The world effects of `then:`, in order. Build the list with
+    /// [`Effects`](crate::Effects) on a `Vec<Effect>`:
+    /// `.then_effects(Vec::new().goto("hall").end("free"))`.
+    #[track_caller]
+    pub fn then_effects(mut self, effects: impl IntoIterator<Item = Effect>) -> Self {
+        self.outcomes().then.extend(effects);
         self
     }
 

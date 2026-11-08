@@ -162,3 +162,18 @@ pub struct LogEntry {
     pub kind: String,
     pub text: String,
 }
+
+/// A quest in the player's journal (HG-3, HG-5): a machine with `quest: true`
+/// whose current state has journal text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JournalEntry {
+    /// The machine id.
+    pub quest: String,
+    pub title: String,
+    /// The current state.
+    pub state: String,
+    /// The journal text of the state, rendered.
+    pub text: String,
+    /// The quest is finished in this state.
+    pub done: bool,
+}

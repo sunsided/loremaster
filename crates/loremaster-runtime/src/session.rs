@@ -15,7 +15,10 @@ use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 
 mod engine;
+mod hints;
 mod queries;
+
+pub use hints::{HINT, Hint, HintBook};
 
 /// How many inputs `undo` can go back, until the host sets another depth.
 pub const DEFAULT_UNDO_DEPTH: usize = 20;
@@ -24,6 +27,8 @@ pub const DEFAULT_UNDO_DEPTH: usize = 20;
 pub const UNDO: &str = "undo";
 pub const RESTART: &str = "restart";
 pub const RESTORE: &str = "restore";
+/// The text command that shows the quest journal.
+pub const JOURNAL: &str = "journal";
 
 /// Input from the host (SE-2).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -142,6 +147,10 @@ pub struct Session {
     undo_depth: usize,
     /// `start` ran, or the game came from a save.
     started: bool,
+    /// The hint ladder, from the walkthroughs (CK-6).
+    hints: Arc<hints::HintBook>,
+    /// How many levels of each step's hint ladder the player has seen.
+    revealed: BTreeMap<String, usize>,
 }
 
 /// The kinds of log entries that are changes of state, which hosts get as
@@ -171,6 +180,8 @@ impl Session {
             history: VecDeque::new(),
             undo_depth: DEFAULT_UNDO_DEPTH,
             started: false,
+            hints: Arc::default(),
+            revealed: BTreeMap::new(),
         }
     }
 
@@ -207,7 +218,8 @@ impl Session {
         self.step(turn)
     }
 
-    /// Handle one input (SE-2). The text `undo` undoes the last input, unless
+    /// Handle one input (SE-2). The text `undo` undoes the last input, and
+    /// the text `hint` shows the next hint (see [`Session::hint`]), unless
     /// the story has a verb with that word. While the death prompt waits, the
     /// text `undo` or `restart` answers it.
     pub fn submit(&mut self, input: Input) -> Step {
@@ -228,11 +240,14 @@ impl Session {
         if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
             return Some(self.death_turn(&word).unwrap_or_else(Self::note_turn));
         }
-        (word == UNDO
-            && self.game.awaiting().is_none()
-            && self.game.talk().is_none()
-            && !self.parser_knows(UNDO))
-        .then(|| self.undo_turn())
+        if self.is_hint_word(&word) {
+            return Some(self.hint_turn(None));
+        }
+        let free = self.game.awaiting().is_none() && self.game.talk().is_none();
+        if word == JOURNAL && free && !self.parser_knows(JOURNAL) {
+            return Some(self.journal_turn());
+        }
+        (word == UNDO && free && !self.parser_knows(UNDO)).then(|| self.undo_turn())
     }
 
     /// Answer the request of a rule that waits, and run the rest of the rule
@@ -423,6 +438,31 @@ impl Session {
             },
         );
         turn
+    }
+
+    /// The journal for the `journal` command: one block per quest.
+    fn journal_turn(&self) -> Turn {
+        let entries = self.game.journal();
+        let lines = if entries.is_empty() {
+            vec!["Your journal is empty.".to_string()]
+        } else {
+            (entries.iter())
+                .map(|e| {
+                    let mark = if e.done { " (done)" } else { "" };
+                    format!("{}{mark}: {}", e.title, e.text)
+                })
+                .collect()
+        };
+        let blocks = (lines.into_iter())
+            .map(|line| Block {
+                kind: BlockKind::Response,
+                runs: vec![crate::output::Run::plain(line)],
+            })
+            .collect();
+        Turn {
+            blocks,
+            ..Turn::default()
+        }
     }
 
     /// A note for the player, without a change.

@@ -27,6 +27,8 @@ pub struct World {
     /// higher priority, then file order.
     pub(crate) rule_order: Vec<usize>,
     pub(crate) timers: Vec<CTimer>,
+    /// The agendas, in the order of the story's agendas.
+    pub(crate) agendas: Vec<CAgenda>,
     /// Registered behaviors that the story names, in story order.
     pub(crate) behaviors: Vec<std::sync::Arc<dyn crate::Behavior>>,
     /// The manifests of `behaviors`, in the same order.
@@ -34,7 +36,9 @@ pub struct World {
     /// Every registered behavior, also the ones that the story does not name.
     registered: Vec<std::sync::Arc<dyn crate::Behavior>>,
     pub(crate) frames: BTreeMap<Id, CFrame>,
-    pub(crate) dialogues: Vec<std::sync::Arc<CDialogue>>,
+    pub(crate) dialogues: Vec<std::sync::Arc<CompiledDialogue>>,
+    /// The machines with `quest: true`, with the journal text of their states.
+    pub(crate) quests: Vec<CQuest>,
     /// The named text pools of `texts/`.
     pub(crate) pools: Pools<Lore>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
@@ -152,9 +156,43 @@ pub(crate) struct CTimer {
     pub at: BTreeMap<u32, Vec<CEffect>>,
 }
 
+/// A compiled agenda (D6).
+#[derive(Debug, Clone)]
+pub(crate) struct CAgenda {
+    pub id: Id,
+    pub actor: Id,
+    pub steps: Vec<CStep>,
+}
+
+/// A compiled agenda step.
+#[derive(Debug, Clone)]
+pub(crate) struct CStep {
+    /// The key in the save: the step's id, or its place from 1.
+    pub key: String,
+    /// The step has a time `at`; else it is due when the step before it is over.
+    pub timed: bool,
+    /// The minute (since midnight of day one) from which the step is due:
+    /// the first time the clock reaches `at` at or after the time the step
+    /// before it was due, or the story's start.
+    pub due: u32,
+    pub place: Option<Id>,
+    pub when: Option<Condition>,
+    pub action: Option<loremaster_model::CommandPattern>,
+    pub then: Vec<CEffect>,
+}
+
+/// A quest machine, compiled: its title and the journal text per state, with
+/// `done` for a finished state.
+#[derive(Debug, Clone)]
+pub(crate) struct CQuest {
+    pub machine: Id,
+    pub title: String,
+    pub states: BTreeMap<String, (CompiledLine, bool)>,
+}
+
 /// A dialogue lowered to a dramaturge graph, with its world effects compiled.
 #[derive(Debug, Clone)]
-pub(crate) struct CDialogue {
+pub(crate) struct CompiledDialogue {
     pub id: Id,
     pub with: Id,
     /// The graph; a `then` list is a host outcome with the compiled effects,
@@ -164,7 +202,7 @@ pub(crate) struct CDialogue {
     pub keys: Vec<String>,
 }
 
-impl CDialogue {
+impl CompiledDialogue {
     pub fn node(&self, id: DialogueNodeId) -> Option<&CNode> {
         self.graph.node(id)
     }
@@ -638,6 +676,41 @@ impl World {
                 })
             })
             .collect::<Result<Vec<_>, CompileError>>()?;
+        let agendas = story
+            .agendas
+            .iter()
+            .map(|a| {
+                let at = format!("agenda:{}", a.id);
+                let mut due = u32::from(story.clock.start.0);
+                let steps = a
+                    .keyed_steps()
+                    .map(|(key, step)| {
+                        if let Some(t) = step.at {
+                            due = next_at(due, t);
+                        }
+                        let at = format!("{at}/steps/{key}");
+                        Ok(CStep {
+                            key,
+                            timed: step.at.is_some(),
+                            due,
+                            place: step.place.clone(),
+                            when: c.cond(&at, &step.when)?,
+                            action: step.action.clone(),
+                            then: step
+                                .then
+                                .iter()
+                                .map(|e| c.effect(&at, e))
+                                .collect::<Result<_, CompileError>>()?,
+                        })
+                    })
+                    .collect::<Result<_, CompileError>>()?;
+                Ok(CAgenda {
+                    id: a.id.clone(),
+                    actor: a.actor.clone(),
+                    steps,
+                })
+            })
+            .collect::<Result<Vec<_>, CompileError>>()?;
         let frames = c.frames("story", &story.frames)?;
         let pools = c.pools(&story)?;
         let mut symbols = c.scope.symbols.clone();
@@ -665,7 +738,7 @@ impl World {
                 if let Some(e) = failed {
                     return Err(e);
                 }
-                Ok(Arc::new(CDialogue {
+                Ok(Arc::new(CompiledDialogue {
                     id,
                     with: Id::new(d.with.as_str()),
                     graph,
@@ -699,6 +772,25 @@ impl World {
             .enumerate()
             .map(|(i, t)| (t.id.clone(), i))
             .collect();
+        let quests = story
+            .machines
+            .iter()
+            .filter(|m| m.quest)
+            .map(|m| {
+                let states = (m.states.iter())
+                    .filter_map(|s| Some((s.name(), s.journal()?, s.done())))
+                    .map(|(name, line, done)| {
+                        let at = format!("machine:{}/states/{name}/journal", m.id);
+                        Ok((name.to_string(), (c.line(&at, line)?, done)))
+                    })
+                    .collect::<Result<_, CompileError>>()?;
+                Ok(CQuest {
+                    machine: m.id.clone(),
+                    title: m.title.clone().unwrap_or_else(|| m.id.to_string()),
+                    states,
+                })
+            })
+            .collect::<Result<_, CompileError>>()?;
         let levels = levels(&story);
         Ok(Self {
             levels,
@@ -711,12 +803,14 @@ impl World {
             rules,
             rule_order,
             timers,
+            agendas,
             behaviors: Vec::new(),
             manifests: Vec::new(),
             registered: Vec::new(),
             frames,
             dialogues,
             pools,
+            quests,
             symbols,
             room_index,
             thing_index,
@@ -800,16 +894,66 @@ impl World {
     }
 
     /// The dialogue of a thing.
-    pub(crate) fn dialogue_with(&self, thing: &str) -> Option<&std::sync::Arc<CDialogue>> {
+    pub(crate) fn dialogue_with(&self, thing: &str) -> Option<&std::sync::Arc<CompiledDialogue>> {
         self.dialogues.iter().find(|d| d.with.as_str() == thing)
     }
 
-    pub(crate) fn dialogue(&self, id: &str) -> Option<&std::sync::Arc<CDialogue>> {
+    pub(crate) fn dialogue(&self, id: &str) -> Option<&std::sync::Arc<CompiledDialogue>> {
         self.dialogues.iter().find(|d| d.id.as_str() == id)
     }
 
     pub fn verb(&self, id: &str) -> Option<&VerbDef> {
         self.verbs.iter().find(|v| v.id.as_str() == id)
+    }
+}
+
+/// The first minute at or after `from` whose time of day is `at`.
+fn next_at(from: u32, at: loremaster_model::TimeOfDay) -> u32 {
+    let day = loremaster_model::TimeOfDay::MINUTES_PER_DAY;
+    let today = from - from % day + u32::from(at.0);
+    if today >= from { today } else { today + day }
+}
+
+impl World {
+    /// The first move on the shortest way from one room to another, along
+    /// exits that lead somewhere: the direction and the next room. Doors and
+    /// conditions on exits do not stop an actor. None when there is no way,
+    /// or the rooms are the same.
+    pub(crate) fn route(&self, from: &str, to: &str) -> Option<(String, Id)> {
+        let start = self.room_idx(from)?;
+        let goal = self.room_idx(to)?;
+        if start == goal {
+            return None;
+        }
+        // For each room reached, the first move from `start` towards it.
+        let mut first: Vec<Option<(String, Id)>> = vec![None; self.story.rooms.len()];
+        let mut seen = vec![false; self.story.rooms.len()];
+        seen[start] = true;
+        let mut queue = std::collections::VecDeque::from([start]);
+        while let Some(i) = queue.pop_front() {
+            for exit in &self.story.rooms[i].exits {
+                let Some(j) = exit.to.as_ref().and_then(|t| self.room_idx(t.as_str())) else {
+                    continue;
+                };
+                if seen[j] {
+                    continue;
+                }
+                seen[j] = true;
+                first[j] = if i == start {
+                    Some((
+                        exit.direction.name().to_string(),
+                        self.story.rooms[j].id.clone(),
+                    ))
+                } else {
+                    first[i].clone()
+                };
+                if j == goal {
+                    return first[j].clone();
+                }
+                queue.push_back(j);
+            }
+        }
+        None
     }
 }
 
