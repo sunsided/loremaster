@@ -657,6 +657,7 @@ impl Checker<'_> {
         self.machines();
         self.score();
         self.stats();
+        self.episodes();
 
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
@@ -1202,6 +1203,54 @@ impl Checker<'_> {
                     self.error(file, &at, format!("`{max}` is not a number variable"));
                 }
                 _ => {}
+            }
+        }
+    }
+
+    /// `export:` and `import:` (TX-12): each fact is a variable or a thing
+    /// property, each relation a thing and a declared axis, and each memory
+    /// a thing and a key. An exported memory needs a dialogue that gives it,
+    /// or an import; an imported one declares its key.
+    fn episodes(&mut self) {
+        let story = self.story().clone();
+        let file = &self.file_of("story");
+        for (list, items) in [("export", &story.export), ("import", &story.import)] {
+            for (i, name) in items.facts.iter().enumerate() {
+                use loremaster_lang::Ty;
+                if !matches!(
+                    self.ty_of(name),
+                    Some(Ty::Bool | Ty::Int | Ty::Text | Ty::Enum(_))
+                ) {
+                    self.error(
+                        file,
+                        &format!("{list}.facts[{i}]"),
+                        format!("`{name}` is not a story variable or a thing property"),
+                    );
+                }
+            }
+            for (i, name) in items.relations.iter().enumerate() {
+                let at = format!("{list}.relations[{i}]");
+                match name.split_once('.') {
+                    Some((thing, axis)) if story.thing(thing).is_some() => {
+                        if !self.scope.relations.contains(axis) {
+                            self.error(file, &at, format!("unknown relation axis `{axis}`"));
+                        }
+                    }
+                    Some((thing, _)) => self.error(file, &at, format!("unknown thing `{thing}`")),
+                    None => self.error(file, &at, format!("`{name}` is not `thing.axis`")),
+                }
+            }
+            for (i, name) in items.memories.iter().enumerate() {
+                let at = format!("{list}.memories[{i}]");
+                match name.split_once('.') {
+                    Some((thing, key)) if story.thing(thing).is_some() => {
+                        if !self.scope.memories.contains(key) {
+                            self.error(file, &at, format!("no dialogue remembers `{key}`"));
+                        }
+                    }
+                    Some((thing, _)) => self.error(file, &at, format!("unknown thing `{thing}`")),
+                    None => self.error(file, &at, format!("`{name}` is not `thing.key`")),
+                }
             }
         }
     }

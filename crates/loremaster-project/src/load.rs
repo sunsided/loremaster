@@ -110,6 +110,12 @@ pub struct StoryHeader {
     /// The adventure sheet of the player.
     #[serde(default)]
     pub stats: Vec<loremaster_model::Stat>,
+    /// What the episode of this story carries to the next story (TX-12).
+    #[serde(default)]
+    pub export: loremaster_model::EpisodeItems,
+    /// What this story takes from the episode of the story before (TX-12).
+    #[serde(default)]
+    pub import: loremaster_model::EpisodeItems,
 }
 /// Load a project from its files: one YAML pack, assembled. Paths use `/` and
 /// are relative to the project folder.
@@ -770,6 +776,8 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         stats: header.stats,
         notes: header.notes,
         threads,
+        export: header.export,
+        import: header.import,
     };
     Ok(Project {
         story,

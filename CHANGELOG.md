@@ -10,6 +10,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Episodes (TX-12, US-13, dramaturge#81): `export:` and `import:` in story.yaml list the facts, relations (`thing.axis`) and memories (`thing.key`) that one story of a series hands to the next. `loremaster check` examines both lists. `Session::episode()` writes an `Episode` (format `loremaster-episode`, version 1, the story id), and `Session::from_episode` starts a new game of the next story with what it imports; the `Imported` report lists what it took, what the story does not import and what does not fit. An imported memory declares its key for `remembers()`.
+- **Breaking (library):** `Story` and `StoryHeader` have the new fields `export` and `import`.
 - The stat sheet, the dice display and the combat panel of the web player (P5-04, #91). `stats:` in story.yaml declares the sheet: `{ var, label, short, max }` for a number or a codeword. `Session::stats()` and `Session::combat()` are in the WASM binding. `Effect::Roll` and `Turn::rolls` give the dice of a turn, with the faces, the target and the result of a Luck test in a combat. `against: <var>` on a roll names its target for the display. The dice are ASCII art with a short roll animation in the phosphor theme and drawn dice in the other themes; with reduced motion the result shows at once.
 - **Breaking (library):** `Story` and `StoryHeader` have the new field `stats`, `AwaitSpec` has the new field `against`, `Turn` has the new field `rolls`, and `Effect` (of the session) has the variant `Roll`.
 - A `check` rule that waits for the host now holds the action. Before, the move or the verb ran while the rule waited.
