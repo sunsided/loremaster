@@ -29,6 +29,7 @@ fn the_walkthroughs_pass() {
         );
         names.push(path.as_str());
     }
+    names.sort_unstable();
     assert_eq!(
         names,
         [
