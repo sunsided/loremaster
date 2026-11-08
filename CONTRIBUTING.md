@@ -125,10 +125,10 @@ Run these commands before you open a pull request:
 
 ### dramaturge
 
-loremaster takes the dramaturge crates from crates.io, with an exact version (`=0.3.0-alpha.N` in `Cargo.toml`). CI builds with `--locked`, so it tests exactly the version in `Cargo.lock`.
+loremaster takes the dramaturge crates from crates.io (`"0.3"` in `Cargo.toml`). CI builds with `--locked`, so it tests exactly the version in `Cargo.lock`.
 
-- When loremaster needs a change in dramaturge, make the change in dramaturge first and release a dramaturge alpha. Then change the version in `Cargo.toml` and run `cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring -p dramaturge-syntax` in the same pull request.
-- The CI job "dramaturge feature/0.3 (not required)" tests loremaster against the newest dramaturge on `feature/0.3`. When it is red, the next bump needs changes in loremaster.
+- When loremaster needs a change in dramaturge, make the change in dramaturge first and release a new dramaturge version. Then raise the version in `Cargo.toml` if needed and run `cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring -p dramaturge-syntax` in the same pull request.
+- The CI job "dramaturge main (not required)" tests loremaster against the newest dramaturge on `main`. When it is red, the next bump needs changes in loremaster.
 - To work on both repositories at once, put a patch into `.cargo/config.toml` (git does not track it):
 
   ```toml
@@ -139,7 +139,7 @@ loremaster takes the dramaturge crates from crates.io, with an exact version (`=
   dramaturge-syntax = { path = "../dramaturge/crates/dramaturge-syntax" }
   ```
 
-  Cargo uses a patch only when its version satisfies the requirement in `Cargo.toml`, which pins the released alpha exactly. Between releases, dramaturge keeps the released version on `feature/0.3` (cargo-release sets the version at the release), so the patch applies. If `../dramaturge` has another version, cargo prints "Patch ... was not used" and builds the crates.io alpha: then relax the pin in `Cargo.toml` locally, and do not commit that change.
+  Cargo uses a patch only when its version satisfies the requirement in `Cargo.toml`. Between releases, dramaturge keeps the released version on `main` (cargo-release sets the version at the release), so the patch applies. If `../dramaturge` has a version outside `0.3`, or a pre-release such as `0.3.2-alpha.1` (a requirement without a pre-release never takes one), cargo prints "Patch ... was not used" and builds the crates.io release: then relax the requirement in `Cargo.toml` locally, and do not commit that change.
 
   With the patch, each cargo command rewrites `Cargo.lock` with path sources. Do not commit that file: `task lock:check` (part of `task verify`, and the first step in CI) fails on a staged `Cargo.lock` without the crates.io source.
 
