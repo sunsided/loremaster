@@ -138,9 +138,9 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                             .join(", ")
                     ),
                     loremaster_model::Effect::Calc(m) => format!(
-                        "set {}",
+                        "calc {}",
                         m.iter()
-                            .map(|(k, v)| format!("{k} to {v}"))
+                            .map(|(k, v)| format!("{k} = {v}"))
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),

@@ -1430,7 +1430,7 @@ impl Game {
     }
 
     /// The value within the `min` and `max` of its variable. A limit that
-    /// names a variable reads its value now.
+    /// names a variable reads its value now. If the limits cross, `min` wins.
     pub(crate) fn clamped(&self, name: &str, value: Value) -> Value {
         let (&Value::Int(mut n), Some(var)) = (&value, self.world.story.var(name)) else {
             return value;
