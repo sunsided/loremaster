@@ -94,10 +94,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - Text pools on dramaturge's text selection core (P4-01, #78; R9 of dramaturge 0.3): a fragment with `one_of` is a group that shows the candidates its `pick` chooses (`first`, the default; `best`, the candidate with the most tests; `all`), and `texts/<id>.yaml` holds a named pool that a rule or a dialogue node shows with `say: { text: <id> }`. A candidate has `key`, `when`, `mode`, `text` or `variants`, `learn`, `speaker` and `topic`. `learn: [var]` sets story variables to true when the text shows in play, and `seen_by(x)` in a condition is true when `x` sees the text (the player, until actors come). Descriptions, presence texts, frames, the intro, rules and dialogue lines all go through the core; previews and the Atlas choose without a change to the game. `first_time` is an alias of `first_visit`. `loremaster check` reports dramaturge's pool checks at the file of the pool: a tie of two `best` candidates (warning), a candidate with progress and no key (warning) and an unknown pool (error), and checks `learn`, `speaker` and the pool of `say: { text: … }`.
 - **Breaking (library):** `loremaster_model::Fragment` has the new fields `learn`, `pick` and `one_of`, `Line` the new field `pool`, `Story` the new field `texts`, and `Pack` the new field `texts`.
 
-### Removed
-
-- **Breaking (library):** `Awaiting` no longer has the field `locals`. It was never filled; a rule keeps values between await and resume in story variables (`into:`). Saves do not change, because the empty field was never written.
-
 ### Changed
 
 - The `when` of a host event sees the reported arguments; a refused event keeps the values before. An event cannot have the id of a room, a keyword or a built-in path (`time`, `action`, `timer`). An event step of a walkthrough is done when the session accepts a report of its event with its `args` and its `facts` hold; a later step that `needs` it can then open in the hint ladder.
@@ -128,6 +124,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - `Session::status()` tells what the session waits for now. `Workbench` has `resume`, `undo` and `restart` as whole turns with the rule log, and `dialogues`.
 - `carried(x)` is also true for a thing in a carried container.
 - The ZIL importer writes containers, surfaces and local-global scenery, and reads `machines/` and `timers/` for the flags that they use.
+
+### Removed
+
+- **Breaking (library):** `Awaiting` no longer has the field `locals`. It was never filled; a rule keeps values between await and resume in story variables (`into:`). Saves do not change, because the empty field was never written.
 
 ## [0.1.0] - 2026-10-31
 
