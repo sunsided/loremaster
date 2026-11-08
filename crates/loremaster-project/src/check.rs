@@ -252,15 +252,16 @@ impl Checker<'_> {
     }
 
     fn fragments(&mut self, file: &str, at: &str, fragments: &[Fragment]) {
-        let mut ids = BTreeSet::new();
+        // A fragment without an id is keyed by its index.
+        let mut keys = BTreeSet::new();
         for (i, f) in fragments.iter().enumerate() {
-            if let Some(id) = &f.id
-                && !ids.insert(id.as_str())
-            {
+            let key = f.id.as_ref().map_or(i.to_string(), |id| id.to_string());
+            if !keys.insert(key.clone()) {
+                let place = if f.id.is_some() { ".id" } else { "" };
                 self.error(
                     file,
-                    &format!("{at}[{i}].id"),
-                    format!("two fragments of this text have the id `{id}`; they would share their progress"),
+                    &format!("{at}[{i}]{place}"),
+                    format!("two fragments of this text have the key `{key}` (an `id`, or the index of a fragment without one); they would share their progress"),
                 );
             }
             if let Some(when) = &f.when {
@@ -321,16 +322,17 @@ impl Checker<'_> {
         text: &mut dyn FnMut(&mut Self, &str, &T),
     ) {
         use dramaturge_syntax::Variant;
+        // A candidate without a key is keyed by its index.
         let mut keys = BTreeSet::new();
         for (i, c) in one_of.iter().enumerate() {
             let at = format!("{at}.one_of[{i}]");
-            if let Some(key) = &c.key
-                && !keys.insert(key.as_str())
-            {
+            let key = c.key.clone().unwrap_or_else(|| i.to_string());
+            if !keys.insert(key.clone()) {
+                let place = if c.key.is_some() { ".key" } else { "" };
                 self.error(
                     file,
-                    &format!("{at}.key"),
-                    format!("two candidates of this `one_of` have the key `{key}`; they would share their progress"),
+                    &format!("{at}{place}"),
+                    format!("two candidates of this `one_of` have the key `{key}` (a `key`, or the index of a candidate without one); they would share their progress"),
                 );
             }
             if let Some(when) = &c.when {

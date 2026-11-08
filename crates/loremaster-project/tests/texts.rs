@@ -98,7 +98,7 @@ fn texts_that_cannot_show_where_they_are_written_are_errors() {
         error("rules/remark.yaml", "`seen_by` works only"),
         "{found:#?}"
     );
-    assert!(error("things/note.yaml", "the id `a`"), "{found:#?}");
+    assert!(error("things/note.yaml", "the key `a`"), "{found:#?}");
     assert!(error("things/note.yaml", "the key `k`"), "{found:#?}");
 }
 
@@ -137,6 +137,30 @@ fn two_pools_with_one_id_are_an_error() {
     assert!(
         found.iter().any(|d| d.severity == Severity::Error
             && d.message.contains("text pool `remark` is defined twice")),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn an_id_that_is_the_index_of_another_fragment_is_an_error() {
+    // A fragment or candidate without an id is keyed by its index.
+    let found = lighthouse_with(&[(
+        "things/note.yaml",
+        "name: note\nlocation: { room: shore }\ndescription:\n  - { text: \"A note.\", mode: once }\n  - { id: \"0\", text: \"B.\", mode: once }\n  - one_of:\n      - { mode: once, text: \"C.\" }\n      - { key: \"0\", mode: once, text: \"D.\" }\n",
+    )]);
+    let error = |what: &str| {
+        found.iter().any(|d| {
+            d.file == "things/note.yaml"
+                && d.severity == Severity::Error
+                && d.message.contains(what)
+        })
+    };
+    assert!(
+        error("two fragments of this text have the key `0`"),
+        "{found:#?}"
+    );
+    assert!(
+        error("two candidates of this `one_of` have the key `0`"),
         "{found:#?}"
     );
 }

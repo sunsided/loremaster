@@ -94,7 +94,7 @@ one_of:
       - [{ says: "Cold stove, cold supper,", by: keeper }, { narrate: "he says." }]
 ```
 
-A pool's texts are lines with speech segments. `say: { text: keeper_remark }` in a rule or in the lines of a dialogue node shows the pool; an option's `say` and a quest's `journal` cannot show one. A `sticky` line stays the same in every rule and dialogue that shows the pool. In a pool, `first_time` means the first visit of the current room. `loremaster check` warns about two `best` candidates with the same score that can both hold, and about a candidate with progress (`once`, `cycle`, `shuffle`, `sticky`) in a group or a pool that has no `key`; a pool that names an unknown pool is an error, as are two fragments of one text with the same `id` and two candidates of one `one_of` with the same `key`: they would share their progress.
+A pool's texts are lines with speech segments. `say: { text: keeper_remark }` in a rule or in the lines of a dialogue node shows the pool; an option's `say` and a quest's `journal` cannot show one. A `sticky` line stays the same in every rule and dialogue that shows the pool. In a pool, `first_time` means the first visit of the current room. `loremaster check` warns about two `best` candidates with the same score that can both hold, and about a candidate with progress (`once`, `cycle`, `shuffle`, `sticky`) in a group or a pool that has no `key`; a pool that names an unknown pool is an error, as are two fragments of one text with the same `id` and two candidates of one `one_of` with the same `key`: they would share their progress. A fragment without an `id` and a candidate without a `key` are keyed by their index, so an `id: "0"` collides with the first one.
 
 ## Inline markup
 
