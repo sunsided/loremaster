@@ -125,6 +125,7 @@ impl Game {
             request,
             into,
             locals: BTreeMap::new(),
+            command: None,
         });
         AwaitStep::Paused
     }
@@ -158,7 +159,14 @@ impl Game {
         if let Some(into) = &open.into {
             self.set_fact(&mut turn, into, answer.clone());
         }
-        if let AwaitRequest::WalkTo { room } = &open.request
+        // A walk before a command: the command runs after `arrived`.
+        if let Some(cmd) = open.command {
+            if answer == Value::Text(ARRIVED.into()) {
+                self.perform_now(&mut turn, *cmd);
+            }
+            return Ok(self.finish(turn));
+        }
+        if let AwaitRequest::WalkTo { room, .. } = &open.request
             && answer == Value::Text(ARRIVED.into())
         {
             self.move_player(&mut turn, room.clone(), 1);

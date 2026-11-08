@@ -17,11 +17,12 @@ impl Session {
     }
 
     /// This game in a changed world (SE-14). The seed, the undo depth and
-    /// whether the host answers rolls stay. The undo history does not: its
+    /// whether the host answers rolls and walks stay. The undo history does not: its
     /// states belong to the old world.
     pub(crate) fn carried_over(&self, world: Arc<World>) -> Self {
         let mut game = self.game.carry_over(world);
         game.host_rolls = self.game.host_rolls;
+        game.host_walks = self.game.host_walks;
         let mut next = Self::of(game, self.seed);
         next.undo_depth = self.undo_depth;
         next.started = self.started;
@@ -121,6 +122,7 @@ impl Session {
         let mut game = Game::new(self.game.world_arc());
         game.state_mut().rng = self.seed;
         game.host_rolls = host_rolls;
+        game.host_walks = self.game.host_walks;
         game.forced = std::mem::take(&mut self.game.forced);
         self.game = game;
         self.started = true;

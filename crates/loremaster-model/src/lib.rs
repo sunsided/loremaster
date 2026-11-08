@@ -45,7 +45,7 @@ pub use frame::{Frame, Frames};
 pub use id::Id;
 pub use line::{Line, LineSegment, PLAYER_SPEAKER, Voice};
 pub use machine::{Machine, StateDef, States, Step};
-pub use media::{Asset, Licence, Media, MediaVariant};
+pub use media::{Asset, Licence, Media, MediaVariant, Region};
 pub use note::{Note, NoteRole, Thread, ThreadStatus};
 pub use plan::{ChartStep, SERIAL_RUN, StepChart, step_chart};
 pub use room::{Direction, Exit, Room};

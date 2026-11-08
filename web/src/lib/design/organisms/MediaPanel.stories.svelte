@@ -9,7 +9,7 @@
 		parameters: {
 			docs: {
 				description: {
-					component: 'The active illustration and portrait of the story. Without a file for an image, its text shows.'
+					component: 'The active illustration and portrait of the story. Without a file for an image, its text shows. The hotspots of a scene are buttons over the illustration: Tab reaches each one, and its name shows on hover and focus.'
 				}
 			}
 		}
@@ -23,4 +23,14 @@
 
 <Story name="Illustration" args={{ illustration }} />
 <Story name="With portrait" args={{ illustration, portrait }} />
+<Story
+	name="Scene with hotspots"
+	args={{
+		illustration,
+		hotspots: [
+			{ label: 'iron gate', rect: [31, 33, 38, 67], inspect: 'thing:iron_gate' },
+			{ label: 'Go north to The Yard', rect: [80, 10, 15, 40], inspect: 'exit:north' }
+		]
+	}}
+/>
 <Story name="No file" args={{ illustration: { src: null, alt: 'A stone wall at dusk.' } }} />

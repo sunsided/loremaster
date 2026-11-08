@@ -1,4 +1,4 @@
-use crate::Id;
+use crate::{Direction, Id};
 use serde::{Deserialize, Serialize};
 
 /// A media file of the project, from `assets/`. Content names assets by id;
@@ -87,6 +87,24 @@ pub struct MediaVariant {
     pub asset: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
+    /// The hotspots of a room's illustration (ME-4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<Region>,
+}
+
+/// A hotspot on an illustration (ME-4). It points to a thing or to an exit
+/// of the room; a click on it selects that part. The rectangle is in percent
+/// of the image, so the story holds no pixels.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Region {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thing: Option<Id>,
+    /// The direction of an exit of the room.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit: Option<Direction>,
+    /// Left, top, width and height, in percent of the image.
+    pub rect: [u8; 4],
 }
 
 #[derive(Deserialize)]
@@ -95,6 +113,8 @@ struct VariantMap {
     asset: Id,
     #[serde(default)]
     when: Option<String>,
+    #[serde(default)]
+    regions: Vec<Region>,
 }
 
 impl<'de> Deserialize<'de> for MediaVariant {
@@ -105,10 +125,12 @@ impl<'de> Deserialize<'de> for MediaVariant {
             |asset| MediaVariant {
                 asset: Id::new(asset),
                 when: None,
+                regions: Vec::new(),
             },
             |v: VariantMap| MediaVariant {
                 asset: v.asset,
                 when: v.when,
+                regions: v.regions,
             },
         )
     }
@@ -136,11 +158,16 @@ mod tests {
     #[test]
     fn a_slot_reads_one_id_or_a_list_of_variants() {
         let media: Media = serde_json::from_value(json!({
-            "illustration": "gate",
+            "illustration": { "asset": "gate", "regions": [
+                { "thing": "door", "rect": [10, 20, 30, 40] },
+                { "exit": "north", "rect": [0, 0, 5, 5] },
+            ] },
             "music": [{ "asset": "alarm", "when": "alarm" }, "calm"],
         }))
         .unwrap();
         check!(media.illustration[0].asset == Id::new("gate"));
+        check!(media.illustration[0].regions[0].thing == Some(Id::new("door")));
+        check!(media.illustration[0].regions[1].exit == Some(Direction::North));
         check!(media.music[0].when.as_deref() == Some("alarm"));
         check!(media.music[1].when == None);
         let back: Media = serde_json::from_value(serde_json::to_value(&media).unwrap()).unwrap();

@@ -40,6 +40,8 @@ pub(crate) struct Game {
     stopped: bool,
     /// The host answers rolls itself (SE-7). Without it, the session rolls.
     pub(crate) host_rolls: bool,
+    /// The host walks the player to a thing or an exit before a command.
+    pub(crate) host_walks: bool,
     /// The totals that the next rolls take, for tests. Not in the save.
     pub(crate) forced: ForcedRolls,
 }
@@ -393,6 +395,7 @@ impl Game {
             last_frame: None,
             stopped: false,
             host_rolls: false,
+            host_walks: false,
             forced: ForcedRolls::default(),
         }
     }
@@ -644,7 +647,52 @@ impl Game {
         }
     }
 
+    /// Run a command, or first wait for the host to walk there.
     fn perform(&mut self, turn: &mut Turn, cmd: Command) {
+        if self.host_walks
+            && self.state.talk.is_none()
+            && let Some(request) = self.walk_for(&cmd)
+        {
+            self.open_await(turn, &Id::new("walk_to"), 1, request, None);
+            if let Some(open) = &mut self.state.awaiting {
+                open.command = Some(Box::new(cmd));
+            }
+            return;
+        }
+        self.perform_now(turn, cmd);
+    }
+
+    /// The walk before a command: to the first object that is in the room
+    /// and not carried, or to the exit of a move.
+    fn walk_for(&self, cmd: &Command) -> Option<crate::state::AwaitRequest> {
+        let room = self.state.room.clone();
+        let (thing, exit) = match cmd {
+            Command::Go { direction } => {
+                let exits = self.visible_exits();
+                exits
+                    .iter()
+                    .find(|(_, e)| e.direction.name() == direction)?;
+                (None, Some(direction.clone()))
+            }
+            Command::Verb { objects, actor, .. } => {
+                // An unknown object or another actor: the command says why.
+                if actor.as_ref().is_some_and(|a| a.as_str() != crate::PLAYER)
+                    || objects.iter().any(|o| !self.reachable(o.as_str()))
+                {
+                    return None;
+                }
+                let thing = objects
+                    .iter()
+                    .find(|o| !self.state.is_carried(o.as_str()))?;
+                (Some(thing.clone()), None)
+            }
+            _ => return None,
+        };
+        Some(crate::state::AwaitRequest::WalkTo { room, thing, exit })
+    }
+
+    /// Run a command and move the clock by what it costs.
+    fn perform_now(&mut self, turn: &mut Turn, cmd: Command) {
         if let Some(minutes) = self.action(turn, cmd) {
             self.advance(turn, minutes);
         }

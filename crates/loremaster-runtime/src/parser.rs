@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// A resolved player action. The parser produces these from typed text; the
 /// verb bar produces them from clicks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Command {
     /// A verb with its objects: the direct one first, then the indirect one.

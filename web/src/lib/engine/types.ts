@@ -112,6 +112,18 @@ export interface MediaView {
 	portrait?: MediaCue;
 	music?: MediaCue;
 	ambience?: MediaCue;
+	/** The hotspots of the illustration that the player can see now. */
+	regions?: SceneRegion[];
+}
+
+/** A hotspot on the illustration: a thing, or an exit by its direction. */
+export interface SceneRegion {
+	thing?: string;
+	exit?: string;
+	/** The thing's name now, or the room behind the exit. */
+	name: string;
+	/** Left, top, width and height, in percent of the image. */
+	rect: [number, number, number, number];
 }
 
 export interface Turn {
@@ -701,7 +713,8 @@ export type AwaitRequest =
 	| { kind: 'choice'; options: AwaitOptionInfo[] }
 	| { kind: 'action'; name: string; args?: Record<string, Value>; results?: string[] }
 	| { kind: 'roll'; dice: string; min: number; max: number }
-	| { kind: 'walk_to'; room: string }
+	/** With `thing` or `exit`, a walk in this room before a command (a stage host). */
+	| { kind: 'walk_to'; room: string; thing?: string; exit?: string }
 	/** The player died: answer `undo`, `restart` or `restore`. */
 	| { kind: 'death_prompt'; ending: string; options: string[] };
 
@@ -713,6 +726,8 @@ export interface Awaiting {
 	request: AwaitRequest;
 	into?: string;
 	locals?: Record<string, Value>;
+	/** The command that waits for a walk. */
+	command?: Command;
 }
 
 /** What the session waits for after a step. */

@@ -3,8 +3,8 @@
 
 use super::Game;
 use crate::world::CompiledMedia;
-use crate::{MediaCue, MediaView};
-use loremaster_model::Value;
+use crate::{MediaView, SceneRegion};
+use loremaster_model::{Region, Value};
 
 impl Game {
     pub(crate) fn media(&self) -> MediaView {
@@ -36,17 +36,48 @@ impl Game {
             layers.push(&world.rooms[i].media);
         }
         let eval = self.eval();
-        let pick = |slot: usize| -> Option<MediaCue> {
+        let pick = |slot: usize| {
             layers.iter().find_map(|m| {
-                let (_, cue) = m.slots[slot].iter().find(|(w, _)| eval.holds_opt(w))?;
-                Some(cue.clone())
+                let (_, cue, regions) = m.slots[slot].iter().find(|(w, ..)| eval.holds_opt(w))?;
+                Some((cue.clone(), regions))
             })
         };
+        let illustration = pick(0);
+        let regions = illustration.as_ref().map_or_else(Vec::new, |(_, r)| {
+            r.iter().filter_map(|r| self.region(r)).collect()
+        });
+        let cue = |slot| pick(slot).map(|(c, _)| c);
         MediaView {
-            illustration: pick(0),
-            portrait: pick(1),
-            music: pick(2),
-            ambience: pick(3),
+            illustration: illustration.map(|(c, _)| c),
+            portrait: cue(1),
+            music: cue(2),
+            ambience: cue(3),
+            regions,
         }
+    }
+
+    /// The hotspot as the host sees it, while the player sees its thing on
+    /// the ground or its exit.
+    fn region(&self, region: &Region) -> Option<SceneRegion> {
+        let name = if let Some(thing) = &region.thing {
+            let id = thing.as_str();
+            if !self.reachable(id) || self.state.is_carried(id) {
+                return None;
+            }
+            self.name_of(thing)
+        } else {
+            let dir = region.exit.as_ref()?.name();
+            let exits = self.visible_exits();
+            let (_, exit) = exits.iter().find(|(_, e)| e.direction.name() == dir)?;
+            (exit.to.as_ref())
+                .and_then(|to| self.world.room(to.as_str()))
+                .map_or_else(|| dir.to_string(), |r| r.name.clone())
+        };
+        Some(SceneRegion {
+            thing: region.thing.as_ref().map(ToString::to_string),
+            exit: region.exit.as_ref().map(|d| d.name().to_string()),
+            name,
+            rect: region.rect,
+        })
     }
 }

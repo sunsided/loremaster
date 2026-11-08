@@ -89,3 +89,32 @@ fn a_missing_file_is_reported_with_the_disk() {
     assert_eq!(missing_asset_files(&project, &dir), vec![]);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn a_region_must_point_to_a_part_of_the_room() {
+    let room = "name: A\nexits: [{ direction: north, to: a }]\nmedia:\n  illustration:\n    asset: pic\n    regions:\n      - { thing: ghost, rect: [0, 0, 10, 10] }\n      - { exit: south, rect: [0, 0, 10, 10] }\n      - { exit: north, rect: [95, 0, 10, 10] }\n      - { rect: [0, 0, 10, 10] }\n";
+    let thing = "name: B\nlocation: { room: a }\nmedia: { portrait: { asset: pic, regions: [{ thing: b, rect: [0, 0, 1, 1] }] } }\n";
+    let checked = check_files(vec![
+        file("story.yaml", "title: T\nstart: a\n"),
+        file("rooms/a.yaml", room),
+        file("things/b.yaml", thing),
+        file(
+            "assets/pic.yaml",
+            "file: assets/pic.png\ndecorative: true\n",
+        ),
+    ]);
+    let at = |needle: &str, key: &str| {
+        (checked.diagnostics.iter()).any(|d| {
+            d.severity == Severity::Error && d.message.contains(needle) && d.at.contains(key)
+        })
+    };
+    assert!(
+        at("unknown thing `ghost`", "regions/0"),
+        "{:#?}",
+        checked.diagnostics
+    );
+    assert!(at("no exit `south`", "regions/1"));
+    assert!(at("inside the image", "regions/2"));
+    assert!(at("exactly one", "regions/3"));
+    assert!(at("illustration of a room", "thing:b/media/portrait"));
+}

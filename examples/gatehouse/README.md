@@ -2,7 +2,8 @@
 
 The fixture for media slots: an illustration that changes with the state, a
 portrait with variants, music from a room and from a machine state, ambience,
-and a sound effect with a caption.
+a sound effect with a caption, and hotspots on the illustrations: the gate and
+the bell rope on the road, the gate back south and the keeper in the yard.
 
 ```sh
 loremaster check examples/gatehouse
