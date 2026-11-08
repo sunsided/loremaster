@@ -1362,7 +1362,7 @@ impl Checker<'_> {
                             self.error(
                                 file,
                                 &at,
-                                format!("no dialogue of `{thing}` remembers `{key}`"),
+                                format!("the first dialogue of `{thing}`, which the talk uses, does not remember `{key}`"),
                             );
                         }
                     }
