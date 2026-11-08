@@ -7,6 +7,7 @@ use crate::ast::*;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::LitStr;
+use syn::spanned::Spanned;
 
 pub fn expand(world: &World) -> TokenStream {
     let mut body = TokenStream::new();
@@ -37,6 +38,11 @@ pub fn expand(world: &World) -> TokenStream {
                 let p = pack_ident(span);
                 let b = name(b);
                 quote_spanned!(span=> #p.behavior(#b);)
+            }
+            Item::Register(expr) => {
+                let span = expr.span();
+                let p = pack_ident(span);
+                quote_spanned!(span=> #p.register(#expr);)
             }
         });
     }
@@ -614,6 +620,12 @@ fn effects(list: &[Effect], span: Span) -> TokenStream {
                     ::loremaster::dsl::model::Id::new(#b)
                 )))
             }
+            EffectKind::Rust(r) => {
+                let b = s(&r.id(), span);
+                quote_spanned!(span=> .effect(::loremaster::dsl::model::Effect::Call(
+                    ::loremaster::dsl::model::Id::new(#b)
+                )))
+            }
         });
     }
     out
@@ -644,7 +656,31 @@ fn rule(r: &Rule) -> TokenStream {
         chain.extend(quote_spanned!(span=> .priority(#n)));
     }
     chain.extend(effects(&r.effects, span));
-    quote_spanned!(span=> #p.rule(#id, #on) #chain;)
+    let blocks = rust_blocks(&r.effects);
+    quote_spanned!(span=> #p.rule(#id, #on) #chain; #blocks)
+}
+
+/// The behavior of each `rust` block, kept by the pack.
+fn rust_blocks(list: &[Effect]) -> TokenStream {
+    let mut out = TokenStream::new();
+    for e in list {
+        let EffectKind::Rust(r) = &e.kind else {
+            continue;
+        };
+        let span = r.cx.span();
+        let p = pack_ident(span);
+        let owner = s(&r.owner, span);
+        let (cx, body) = (&r.cx, &r.body);
+        out.extend(quote_spanned!(span=>
+            #p.register_block(::loremaster::dsl::RustBlock::new(
+                #owner,
+                |#cx: &mut ::loremaster::dsl::runtime::Cx<'_>| -> ::loremaster::dsl::runtime::Flow {
+                    ::loremaster::dsl::IntoFlow::into_flow(#body)
+                },
+            ));
+        ));
+    }
+    out
 }
 
 fn machine(m: &Machine) -> TokenStream {
@@ -691,7 +727,8 @@ fn machine(m: &Machine) -> TokenStream {
     let note_list: Vec<&Note> = m.notes.iter().collect();
     chain.extend(notes(&note_list, span));
     chain.extend(replace(m.replace, span));
-    quote_spanned!(span=> #p.machine(#id, #start) #chain;)
+    let blocks: TokenStream = m.steps.iter().map(|s| rust_blocks(&s.effects)).collect();
+    quote_spanned!(span=> #p.machine(#id, #start) #chain; #blocks)
 }
 
 fn timer(t: &Timer) -> TokenStream {

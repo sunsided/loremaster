@@ -879,7 +879,13 @@ impl World {
 
     /// Add a behavior. It runs only if story.yaml names its id under `behaviors:`.
     pub fn register(&mut self, behavior: impl crate::Behavior + 'static) -> &mut Self {
-        self.registered.push(std::sync::Arc::new(behavior));
+        self.register_shared(std::sync::Arc::new(behavior))
+    }
+
+    /// [`register`](Self::register) for a behavior that is shared already,
+    /// for example one that a Rust pack keeps.
+    pub fn register_shared(&mut self, behavior: std::sync::Arc<dyn crate::Behavior>) -> &mut Self {
+        self.registered.push(behavior);
         self.behaviors = self
             .story
             .behaviors

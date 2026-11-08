@@ -16,7 +16,7 @@
 pub use loremaster_dsl as dsl;
 
 #[cfg(feature = "dsl")]
-pub use loremaster_macros::world;
+pub use loremaster_macros::{behavior, world};
 
 /// Everything a story module needs: `use loremaster::prelude::*;`.
 ///
@@ -47,5 +47,5 @@ pub use loremaster_macros::world;
 #[cfg(feature = "dsl")]
 pub mod prelude {
     pub use loremaster_dsl::prelude::*;
-    pub use loremaster_macros::world;
+    pub use loremaster_macros::{behavior, world};
 }

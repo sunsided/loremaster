@@ -39,6 +39,7 @@
 //! The order of the entities in a pack is the order of the calls. For rules
 //! this order matters: equal rules run in file order.
 
+mod behavior;
 mod convert;
 mod dialogue;
 mod ending;
@@ -55,6 +56,7 @@ mod timer;
 mod verb;
 mod walkthrough;
 
+pub use behavior::{IntoFlow, RustBlock};
 pub use convert::{IntoDirection, IntoStates, IntoTime, IntoValue, IntoVarValue};
 pub use dialogue::DialogueBuilder;
 pub use ending::EndingBuilder;
@@ -74,6 +76,7 @@ pub use walkthrough::WalkthroughBuilder;
 pub use loremaster_model as model;
 pub use loremaster_project as project;
 pub use loremaster_project::{Origin, Pack};
+pub use loremaster_runtime as runtime;
 
 /// Everything a story module needs: `use loremaster_dsl::prelude::*;`.
 pub mod prelude {
@@ -86,4 +89,5 @@ pub mod prelude {
         CommandPattern, Direction, Effect, EndingKind, EventPattern, Fragment, FragmentMode, Layer,
         NameStage, Note, NoteRole, States, ThreadStatus, TimeOfDay, Value, VerbSlots,
     };
+    pub use loremaster_runtime::{Behavior, Cx, Event, Flow, Manifest};
 }

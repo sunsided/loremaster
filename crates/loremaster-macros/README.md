@@ -37,6 +37,7 @@ let world = Loremaster::new().pack(pack()).yaml("endings/").build()?;
 - At compile time, the macro runs the schema checks (`check_packs`) on the pack: unknown ids, reserved names, conditions and markup. An error is a compile error at the tokens it names. Ids of other packs go into `extern { .. }`.
 - The grammar has the story header (with relations and the score), vars, rooms, things, rules, machines, timers, endings, verbs, dialogues, threads, behaviors and walkthrough tests, plus frames, name stages, `replace` and extern properties. A `line` takes speech segments: `line "He shrugs." keeper says "Prove it," narrate "he says.";` and `line when in(chamber) then "Water drips.";`.
 - A dialogue is dramaturge's token form with these lines: `dialogue with keeper start [stove] { stove: "He nods." { says "Good night." => end; } }`.
+- Rust behaviors: `behavior Thief::zork();` names and registers an instance, `#[behavior(on = turn)]` makes a behavior of a function, and `rust |cx| { .. }` is Rust at its place in a rule or a machine step (the behavior `<rule>#rust`). Each one is a normal `Behavior`: change the world only through `Cx`, take random numbers from `Cx::roll`, and use no clock and no host state. `examples/parrot-cove` shows all three.
 - Text pools, `one_of`, agendas, `extend`, the sealed mode `world!(yaml = "..")` and `uses <pack>;` come later; the macro names the step or issue that brings each one it knows.
 - The tests in `tests/ui/` (trybuild) hold the compile errors, and `tests/grammar.rs` the model values and origins.
 

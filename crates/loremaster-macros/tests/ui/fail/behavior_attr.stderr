@@ -1,0 +1,35 @@
+error: expected an event kind: start, turn, enter, leave, time, verb, timer, custom, call, talk
+ --> tests/ui/fail/behavior_attr.rs:3:17
+  |
+3 | #[behavior(on = nope)]
+  |                 ^^^^
+
+error: expected `on = <event kind>`
+ --> tests/ui/fail/behavior_attr.rs:6:12
+  |
+6 | #[behavior(when = turn)]
+  |            ^^^^
+
+error: a behavior function takes one argument: `cx: &mut Cx<'_>`
+  --> tests/ui/fail/behavior_attr.rs:10:13
+   |
+10 | fn two_args(a: u32, cx: &mut Cx<'_>) {}
+   |             ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: name at least one event kind, or leave out `on` for every event
+  --> tests/ui/fail/behavior_attr.rs:12:12
+   |
+12 | #[behavior(on = [])]
+   |            ^^
+
+error: a behavior is a plain function: `fn name(cx: &mut Cx<'_>) -> Flow`
+  --> tests/ui/fail/behavior_attr.rs:16:1
+   |
+16 | async fn not_plain(cx: &mut Cx<'_>) {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: this function name gives no valid struct name; start a word with a letter
+  --> tests/ui/fail/behavior_attr.rs:19:4
+   |
+19 | fn __(cx: &mut Cx<'_>) {}
+   |    ^^

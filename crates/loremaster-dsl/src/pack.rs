@@ -3,11 +3,13 @@
 
 use crate::convert::id;
 use crate::{
-    DialogueBuilder, EndingBuilder, MachineBuilder, RoomBuilder, RuleBuilder, StoryBuilder,
-    ThingBuilder, ThreadBuilder, TimerBuilder, VerbBuilder, WalkthroughBuilder,
+    DialogueBuilder, EndingBuilder, MachineBuilder, RoomBuilder, RuleBuilder, RustBlock,
+    StoryBuilder, ThingBuilder, ThreadBuilder, TimerBuilder, VerbBuilder, WalkthroughBuilder,
 };
 use loremaster_model::{EndingKind, EventPattern, Fragment, Frames, Note};
 use loremaster_project::{Origin, Pack};
+use loremaster_runtime::{Behavior, Cx, Flow};
+use std::sync::Arc;
 
 /// The builder methods of a [`Pack`]. Each method adds one entity to the pack
 /// and returns a builder for its fields. The entity gets an
@@ -69,6 +71,17 @@ pub trait BuildPack {
     /// A behavior in Rust, by id (`behaviors/<id>.yaml`).
     #[track_caller]
     fn behavior(&mut self, id: impl AsRef<str>) -> &mut Self;
+    /// A behavior in Rust, with its instance: the pack names its id, as
+    /// [`behavior`](Self::behavior) does, and [`Loremaster::build`](crate::Loremaster::build)
+    /// registers it in the world.
+    #[track_caller]
+    fn register(&mut self, behavior: impl Behavior + 'static) -> &mut Self;
+    /// The behavior of a `rust` block. It belongs to its rule, which a later
+    /// pack may replace, so it has no origin and `assemble` does not call it
+    /// a duplicate. The later pack's block runs.
+    fn register_block<F>(&mut self, block: RustBlock<F>) -> &mut Self
+    where
+        F: Fn(&mut Cx<'_>) -> Flow + Send + Sync + 'static;
 }
 
 impl BuildPack for Pack {
@@ -138,6 +151,24 @@ impl BuildPack for Pack {
         let origin = here(self);
         self.origins.insert(format!("behavior:{behavior}"), origin);
         self.behaviors.push(behavior);
+        self
+    }
+
+    #[track_caller]
+    fn register(&mut self, behavior: impl Behavior + 'static) -> &mut Self {
+        let shared: Arc<dyn Behavior> = Arc::new(behavior);
+        self.behavior(shared.id());
+        self.instances.push(Arc::new(shared));
+        self
+    }
+
+    fn register_block<F>(&mut self, block: RustBlock<F>) -> &mut Self
+    where
+        F: Fn(&mut Cx<'_>) -> Flow + Send + Sync + 'static,
+    {
+        self.behaviors.push(id(block.id()));
+        let shared: Arc<dyn Behavior> = Arc::new(block);
+        self.instances.push(Arc::new(shared));
         self
     }
 }
