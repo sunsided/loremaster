@@ -484,7 +484,7 @@ Then a later rule tests `total >= 9`.
 
 A verb goes through these phases:
 
-1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes. A check rule that waits for the host (`await`) also holds the action: the later phases do not run, also after the answer. Such a rule must do the move or the action itself.
+1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes. A check rule that waits for the host (`await`) also holds the action: the later phases do not run, also after the answer. For an actor's command, the step of its agenda still counts as done, and its `then` runs at once, before the answer. Such a rule must do the move or the action itself.
 2. `instead` rules (verb rules with `instead: true`). If one fires, it replaces the default response.
 3. The default response of the verb, or an `instead` frame.
 4. The other verb rules. They can read the result of the default response, for example `lamp.lit`.
