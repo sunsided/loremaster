@@ -3,6 +3,12 @@
 // actors and agendas (phase 4, D6), the winnable check (phase 4, CK) and the
 // world! core (DSL step L3).
 //
+// The YAML form (../yaml/agendas/keeper.yaml) loads since P4-02 (#79);
+// ADR 0004 and docs/writing-stories.md give the model. world! has no agenda
+// syntax yet: this block is still a draft, and its keywords should give the
+// same `Agenda` values (`actor`, `steps`, `at`, `place`, `when`, `do`,
+// `then`, `closes`, `reason`).
+//
 // Draft syntax. It does not compile. Read ../PENDING.md.
 
 use loremaster::prelude::*;

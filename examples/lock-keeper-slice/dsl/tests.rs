@@ -99,7 +99,6 @@ world! {
 
     // The keeper's agenda: at midnight he feeds the stove with the pages.
     test slice_keeper_agenda "The keeper at midnight" {
-        pending phase 4, needs "D6, P4-02 #79";
         wait * 17;
         wait sees "He opens the stove and feeds it in.";
         expect pages_burned == true, stove.hot == true, room == kitchen;
@@ -132,7 +131,7 @@ world! {
     // Midnight is after command 18 (22:30 + 18 × 5 minutes): the talk starts
     // then.
     test slice_talk_pauses_agenda "Talk through midnight" {
-        pending phase 4, needs "D6, R9 (text pools), P4-02 #79, P4-01 #78";
+        pending phase 4, needs "R9 (text pools), P4-01 #78";
         wait * 17;
         "talk to keeper" sees r#""Do not touch the stove," the lock-keeper says."#;
         "1" sees "Coal, when the company sends it." not_sees "feeds it in";

@@ -9,7 +9,7 @@ use loremaster_project::{
     Diagnostic, Project, Severity, SourceFile, check, load, model_hash, read_dir,
 };
 use loremaster_runtime::authoring;
-use loremaster_runtime::{Input, Session, Turn, WalkResult, World, run_walkthrough};
+use loremaster_runtime::{Input, Session, StepOutcome, Turn, WalkResult, World, run_walkthrough};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -28,6 +28,12 @@ const TEXTS: &str = "texts/";
 const STOVE: &str = "things/stove.yaml";
 const KEEPER_RULE: &str = "rules/keeper.yaml";
 const NEW_SYNTAX: &[&str] = &[AGENDA, DIALOGUE, TEXTS, STOVE, KEEPER_RULE];
+
+/// Walkthroughs without a pending mark that need a part, and run in their
+/// own test with it. The agenda loads since D6 (P4-02 #79), but it stays a
+/// part: `slice_model_hash` and `slice_equivalence` compare today's syntax,
+/// and world! has no agendas yet.
+const WITH_PARTS: &[&str] = &["tests/slice_keeper_agenda.yaml"];
 
 fn form(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -94,7 +100,7 @@ fn slice_baseline() {
     for (path, walk) in project
         .walkthroughs
         .iter()
-        .filter(|(_, w)| w.pending.is_none())
+        .filter(|(p, w)| w.pending.is_none() && !WITH_PARTS.contains(&p.as_str()))
     {
         let result = run_walkthrough(world.clone(), walk, path);
         assert!(
@@ -200,9 +206,42 @@ fn slice_undo_after_death() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, R9 (text pools), P4-02 #79, P4-01 #78"]
+#[ignore = "pending: phase 4, R9 (text pools), P4-01 #78"]
 fn slice_talk_pauses_agenda() {
     assert_passes("slice_talk_pauses_agenda", &[AGENDA, DIALOGUE, TEXTS]);
+}
+
+/// `slice_talk_pauses_agenda` without the text pool (R9): the first node of
+/// the dialogue says the line of the pool that shows in the kitchen. The
+/// rest is the slice as it is: the talk holds the agenda step back, and the
+/// step runs late, in the turn that ends the talk.
+#[test]
+fn slice_talk_pauses_agenda_without_the_text_pool() {
+    let mut files = with("yaml", &[AGENDA, DIALOGUE]);
+    let dialogue = files
+        .iter_mut()
+        .find(|f| f.path == "dialogues/keeper.yaml")
+        .unwrap();
+    let pool = "say: { text: keeper_remark }";
+    assert!(dialogue.text.contains(pool), "{}", dialogue.text);
+    dialogue.text = dialogue.text.replace(
+        pool,
+        r#"say: [{ says: "Do not touch the stove," }, { narrate: "the lock-keeper says." }]"#,
+    );
+    let project = project(files);
+    let (_, walk) = project
+        .walkthroughs
+        .iter()
+        .find(|(p, _)| p == "tests/slice_talk_pauses_agenda.yaml")
+        .unwrap();
+    let world = Arc::new(World::compile(project.story.clone()).unwrap());
+    let result = run_walkthrough(world, walk, "slice_talk_pauses_agenda");
+    assert!(
+        result.passed(),
+        "{:#?}\n\n{}",
+        result.failures,
+        result.transcript
+    );
 }
 
 #[test]
@@ -218,9 +257,31 @@ fn slice_keeper_dialogue() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, P4-02 #79"]
 fn slice_keeper_agenda() {
     assert_passes("slice_keeper_agenda", &[AGENDA]);
+
+    // The step is over in the state, and its `closes` mark is in the model
+    // for the ending checks (P4-04).
+    let project = project(with("yaml", &[AGENDA]));
+    let agenda = project
+        .story
+        .agenda_of("keeper")
+        .expect("the keeper's agenda");
+    assert_eq!(agenda.steps[0].closes, ["committed".into()]);
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    for _ in 0..17 {
+        input(&mut game, "wait");
+    }
+    assert_eq!(game.state().step_outcome("keeper", "1"), None);
+    let turn = input(&mut game, "wait");
+    assert_eq!(
+        game.state().step_outcome("keeper", "1"),
+        Some(StepOutcome::Ran),
+        "{}",
+        turn.plain_text()
+    );
 }
 
 /// The schema checks plus the ending checks of the explorer, with files.
@@ -239,7 +300,7 @@ fn ending_checks(project: &Project) -> Vec<Diagnostic> {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, P4-02 #79 (the agenda; the ending checks exist since P4-04 #81)"]
+#[ignore = "pending: phase 4, R9 text pools P4-01 #78 (the dialogue, texts and stove of NEW_SYNTAX; the agenda and the ending checks work)"]
 fn slice_endings_reachable() {
     // Two checks on the endings. A dead end (a state from which no ending can
     // be reached) is an error. A point of no return (a step after which the

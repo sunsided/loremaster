@@ -1,4 +1,4 @@
-use crate::{AwaitSpec, Id, Line, Note, StartTimers, TimeOfDay, Value};
+use crate::{AwaitSpec, CommandPattern, Id, Line, Note, StartTimers, TimeOfDay, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -44,8 +44,11 @@ pub struct Rule {
 }
 
 /// What a rule listens for.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+///
+/// In YAML, `on:` is `start`, `turn`, or a map with one event kind. Its serde
+/// form is written by hand (in `command.rs`), so that `verb` and `check`
+/// take the slots of the Command record next to the verb.
+#[derive(Debug, Clone, PartialEq)]
 pub enum EventPattern {
     /// The game begins.
     Start,
@@ -55,13 +58,15 @@ pub enum EventPattern {
     Leave(Id),
     /// The clock reaches a time of day.
     Time(TimeOfDay),
-    /// A verb was used, optionally on given things: `[verb, thing, other]`.
-    /// These rules run after the default action, or instead of it with `instead`.
-    Verb(Vec<Id>),
+    /// A verb was used. The list form `[verb, thing, other]` names the verb
+    /// and its objects; the record form `{ verb: examine, direct: stove,
+    /// actor: keeper }` names any slot of the command (D6). These rules run
+    /// after the default action, or instead of it with `instead`.
+    Verb(CommandPattern),
     /// Before a verb runs, with the same pattern as `verb`. A rule with `stop`
     /// refuses the action: the default action and the `verb` rules do not run.
     /// `[go]` and `[go, north]` check a move.
-    Check(Vec<Id>),
+    Check(CommandPattern),
     /// A timer runs out.
     Timer(Id),
     /// An `emit` effect sends this event.

@@ -5,7 +5,8 @@
 // ../yaml and ../dsl, so all three forms give one model (rule 1).
 //
 // Behind the cargo feature `dsl`. The lock machine compiles with the world!
-// core (DSL step L3, P3-03 #66); the agenda waits for D6 (P4-02 #79).
+// core (DSL step L3, P3-03 #66); the agenda waits for agendas in world!
+// (the YAML agenda loads since D6, P4-02 #79).
 
 #![cfg(feature = "dsl")]
 
@@ -16,7 +17,7 @@ use loremaster::prelude::*;
 pub mod lock;
 
 // Pending: `cfg(any())` is never true, so the compiler does not read the file.
-// world! has no agendas yet (D6, P4-02 #79).
+// world! has no agendas yet; the YAML form loads since P4-02 (#79).
 #[cfg(any())]
 #[path = "mixed/agendas/keeper.rs"]
 pub mod agenda;
@@ -41,5 +42,5 @@ pub fn today(files: Vec<SourceFile>) -> Loremaster {
 /// The whole slice. `slice_equivalence` compares its model hash with the
 /// hashes of ../yaml and ../dsl. Panics until world! has agendas.
 pub fn world() -> Loremaster {
-    panic!("the agenda (mixed/agendas/keeper.rs) is not in world! yet: D6, P4-02 #79")
+    panic!("the agenda (mixed/agendas/keeper.rs) is not in world! yet; YAML has it since P4-02 #79")
 }

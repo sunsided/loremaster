@@ -6,9 +6,23 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Command {
+    /// A verb with its objects: the direct one first, then the indirect one.
+    /// The other slots of the Command record (D6) are optional, so a host
+    /// can send `{ "type": "verb", "verb": "take", "objects": ["lamp"] }`
+    /// as before; [`Command::record`] gives the whole record.
     Verb {
         verb: Id,
         objects: Vec<Id>,
+        /// Who acts. Without it, the player. Hosts leave it out until the
+        /// story can switch the active actor (WO-5).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        actor: Option<Id>,
+        /// The word between the objects, as typed: `with`, `on`, `in`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        preposition: Option<String>,
+        /// What the command is about, for `ask … about …`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        topic: Option<String>,
     },
     Go {
         direction: String,
@@ -19,6 +33,100 @@ pub enum Command {
     },
     /// Leave a talk.
     Leave,
+}
+
+/// The actor of the player's commands, in the Command record and in event
+/// patterns (`actor: player`).
+pub const PLAYER: &str = loremaster_model::PLAYER_SPEAKER;
+
+/// A command as rules see it (D6): who acts, the verb, the direct and the
+/// indirect object, the preposition between them, and a topic. A move is the
+/// verb `go` with the direction as its direct object.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CommandRecord {
+    /// `player`, or the id of an actor thing.
+    pub actor: Id,
+    pub verb: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direct: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub indirect: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preposition: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topic: Option<String>,
+}
+
+impl CommandRecord {
+    /// The objects in order: the direct one, then the indirect one.
+    pub fn objects(&self) -> Vec<Id> {
+        self.direct
+            .iter()
+            .chain(self.indirect.iter())
+            .cloned()
+            .collect()
+    }
+
+    /// Does an event pattern of a rule match this command? A slot of the
+    /// pattern that is not set matches anything, except the actor: a pattern
+    /// without one matches only the player's commands.
+    pub fn matches(&self, pattern: &loremaster_model::CommandPattern) -> bool {
+        let actor = pattern.actor.as_ref().map_or(PLAYER, Id::as_str);
+        let slot = |want: &Option<Id>, have: &Option<Id>| want.is_none() || want == have;
+        let text = |want: &Option<String>, have: &Option<String>| {
+            want.as_ref()
+                .is_none_or(|w| have.as_ref().is_some_and(|h| h.eq_ignore_ascii_case(w)))
+        };
+        pattern.verb == self.verb
+            && actor == self.actor.as_str()
+            && slot(&pattern.direct, &self.direct)
+            && slot(&pattern.indirect, &self.indirect)
+            && text(&pattern.preposition, &self.preposition)
+            && text(&pattern.topic, &self.topic)
+    }
+}
+
+impl Command {
+    /// A verb command of the player: `Command::verb("take", vec!["lamp".into()])`.
+    pub fn verb(verb: impl Into<Id>, objects: Vec<Id>) -> Self {
+        Command::Verb {
+            verb: verb.into(),
+            objects,
+            actor: None,
+            preposition: None,
+            topic: None,
+        }
+    }
+
+    /// The Command record of a verb or a move; `None` for the answers of a
+    /// talk.
+    pub fn record(&self) -> Option<CommandRecord> {
+        match self {
+            Command::Verb {
+                verb,
+                objects,
+                actor,
+                preposition,
+                topic,
+            } => Some(CommandRecord {
+                actor: actor.clone().unwrap_or_else(|| Id::new(PLAYER)),
+                verb: verb.clone(),
+                direct: objects.first().cloned(),
+                indirect: objects.get(1).cloned(),
+                preposition: preposition.clone(),
+                topic: topic.clone(),
+            }),
+            Command::Go { direction } => Some(CommandRecord {
+                actor: Id::new(PLAYER),
+                verb: Id::new("go"),
+                direct: Some(Id::new(direction.as_str())),
+                indirect: None,
+                preposition: None,
+                topic: None,
+            }),
+            Command::Choose { .. } | Command::Leave => None,
+        }
+    }
 }
 
 /// What the parser can refer to right now.
@@ -83,6 +191,9 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
     }
 
     let (first, second) = split_objects(verb, &rest);
+    let preposition = (!second.is_empty())
+        .then(|| rest.get(first_len(&rest, verb)).cloned())
+        .flatten();
     let mut objects = Vec::new();
     match verb.slots {
         VerbSlots::None => {
@@ -113,7 +224,21 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
     Ok(Command::Verb {
         verb: verb.id.clone(),
         objects,
+        actor: None,
+        preposition,
+        topic: None,
     })
+}
+
+/// The place of the preposition in the words after a two-object verb.
+fn first_len(rest: &[String], verb: &VerbDef) -> usize {
+    rest.iter()
+        .position(|w| is_preposition(verb, w))
+        .unwrap_or(rest.len())
+}
+
+fn is_preposition(verb: &VerbDef, w: &str) -> bool {
+    verb.preposition.as_deref() == Some(w) || PREPOSITIONS.contains(&w)
 }
 
 fn direction(scope: &ParseScope, phrase: &str) -> Option<String> {
@@ -195,8 +320,7 @@ fn match_verb_wanting<'a>(
 }
 
 fn split_objects(verb: &VerbDef, rest: &[String]) -> (Vec<String>, Vec<String>) {
-    let is_prep = |w: &str| verb.preposition.as_deref() == Some(w) || PREPOSITIONS.contains(&w);
-    match rest.iter().position(|w| is_prep(w)) {
+    match rest.iter().position(|w| is_preposition(verb, w)) {
         Some(i) if verb.slots == VerbSlots::Two => {
             (strip_articles(&rest[..i]), strip_articles(&rest[i + 1..]))
         }
@@ -398,20 +522,25 @@ mod tests {
     }
 
     fn verb(id: &str, objects: &[&str]) -> Command {
-        Command::Verb {
-            verb: id.into(),
-            objects: objects.iter().map(|o| Id::new(*o)).collect(),
-        }
+        Command::verb(id, objects.iter().map(|o| Id::new(*o)).collect())
     }
 
     #[test]
     fn commands() {
         let v = standard_verbs();
         let s = scope();
-        check!(
-            parse(&v, &s, "unlock the door with the brass key")
-                == Ok(verb("unlock", &["door", "brass_key"]))
-        );
+        let Ok(Command::Verb {
+            verb: unlock,
+            objects,
+            preposition,
+            ..
+        }) = parse(&v, &s, "unlock the door with the brass key")
+        else {
+            panic!("not a verb command");
+        };
+        check!(unlock == Id::new("unlock"));
+        check!(objects == vec![Id::new("door"), Id::new("brass_key")]);
+        check!(preposition.as_deref() == Some("with"));
         check!(parse(&v, &s, "pick up iron key") == Ok(verb("take", &["iron_key"])));
         check!(
             parse(&v, &s, "n")

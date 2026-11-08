@@ -13,6 +13,7 @@ A story is a folder of YAML files. Each entity has its own file.
 | `things/*.yaml` | One thing or character in each file. A thing file can also have rules. |
 | `rules/*.yaml` | One rule, or a list of rules, in each file. Read [Rules](#rules). |
 | `timers/*.yaml` | One timer in each file. Read [Timers](#timers). |
+| `agendas/*.yaml` | One agenda of a character in each file. Read [Actors and agendas](#actors-and-agendas). |
 | `endings/*.yaml` | One ending in each file. Read [Endings](#endings). |
 | `machines/*.yaml` | One puzzle machine in each file. Read [Puzzle machines](#puzzle-machines). |
 | `verbs/*.yaml` | One custom verb in each file, as an item of `verbs:` in story.yaml. |
@@ -23,7 +24,7 @@ A story is a folder of YAML files. Each entity has its own file.
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
-The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folders `agendas/` and `texts/` are for planned parts: the loader skips them with a warning.
+The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folder `texts/` is for a planned part: the loader skips it with a warning.
 
 To examine a story for problems, run `task check:story` or `cargo run -p loremaster --no-default-features -- check <folder>`.
 
@@ -291,6 +292,7 @@ The events:
 | `{ time: "21:00" }` | The clock reaches the time. |
 | `{ check: [verb, thing] }` | Before the verb. Read [Action phases](#action-phases). `{ check: [go, north] }` checks a move. |
 | `{ verb: [verb, thing, other] }` | After the default response of the verb, or instead of it with `instead: true`. Fewer parts match more commands. |
+| `{ verb: examine, direct: stove }` | The same with named slots of the command. Read [The Command record](#the-command-record). `check` takes the same form. |
 | `{ timer: fuse }` | The timer runs out. |
 | `{ event: blast }` | An `emit: blast` effect sends the event. |
 | `{ talk: [dialogue, node] }` | A dialogue reaches the node. `[dialogue]` matches all nodes. |
@@ -313,6 +315,30 @@ The effects:
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
 More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
+
+### The Command record
+
+Each command has these slots: who acts (`actor`), the `verb`, the first object (`direct`), the second object (`indirect`), the word between the objects (`preposition`) and what the command is about (`topic`). In `unlock door with key`, the verb is `unlock`, `door` is direct, `key` is indirect and `with` is the preposition. In `go north`, the direction is direct.
+
+A `verb` or `check` event can name the slots:
+
+```yaml
+- id: keeper_comments
+  on: { verb: examine, direct: stove }
+  when: present(keeper)
+  then:
+    - say: "The keeper looks up."
+
+- id: keeper_feeds_the_stove
+  on: { verb: open, direct: stove, actor: keeper }
+  then:
+    - set: { stove.hot: true }
+```
+
+- A slot that the event does not name matches any command.
+- `actor` is different: an event without `actor` matches only the player's commands. Then the rules for the player do not fire when a character acts. `actor: player` says the same, and `actor: keeper` matches the commands of the keeper's agenda. Read [Actors and agendas](#actors-and-agendas).
+- The list form `verb: [unlock, door, key]` is the same as `{ verb: unlock, direct: door, indirect: key }`. Both forms load into one model.
+- The parser fills `preposition` with the word that you typed. Nothing fills `topic` yet; it is for a later `ask … about …`.
 
 ### Wait for the host
 
@@ -460,6 +486,55 @@ at:
 | `repeat` | `true`: the timer starts again when it runs out. |
 
 The turns left are part of the save game. In the Atlas, "State" shows them as `timer.<id>`, and you can set them.
+
+## Actors and agendas
+
+An actor is someone who acts: the player, and each thing with an agenda, such as a character. A thing that acts has a place, its location, as any thing has. Its agenda is a list of steps: at a time of day, or when a condition holds, it goes to a room and does something. Put each agenda in `agendas/<id>.yaml`.
+
+```yaml
+# agendas/keeper.yaml
+actor: keeper
+steps:
+  - at: "00:00"
+    place: kitchen
+    when: in(pages, gear_housing)
+    then:
+      - move: { pages: nowhere }
+      - set: { stove.hot: true, pages_burned: true }
+      - say: "{in(kitchen) ? The lock-keeper feeds the stove. | You smell smoke from the kitchen.}"
+    closes: [committed]
+    reason: "The keeper burns the pages at midnight. A late player gets the ashes ending."
+```
+
+| Field | Meaning |
+| --- | --- |
+| `actor` | The thing that acts. An actor has one agenda. |
+| `steps` | The steps, in order. |
+| `id` | The id of the agenda. Without it, the file name. |
+
+The fields of a step:
+
+| Field | Meaning |
+| --- | --- |
+| `at` | The time of day from which the step is due. The first step is due the first time the clock reaches it; each later step the first time the clock reaches it after the step before was due. A step without `at` is due as soon as the step before it is over. |
+| `place` | The room where the step happens. The actor walks there along the exits, one room per turn. Doors and conditions on exits do not stop it. When no exits lead there, it goes there in one turn. |
+| `when` | A condition. The actor tests it in each turn while the step is due, also while it walks to the `place`. A step with `at` is skipped in the first turn in which its condition does not hold, also when that is on the way. A step without `at` waits until its condition holds. |
+| `do` | A command of the actor: `{ verb: open, direct: stove }` or `[open, stove]`. Its `check` and verb rules fire with the actor in the [Command record](#the-command-record). The default responses of the standard verbs are the player's and do not run, so a rule with `actor:` makes the command do something. A `check` rule with `stop` refuses it; then the step is skipped and its `then` does not run. The refused try takes the actor's turn. |
+| `then` | Effects, as in a rule. `await` does not work here. |
+| `closes` | The endings that the step closes on purpose: after it, the story can no longer reach them. Read below. |
+| `reason` | Why the step closes them. `closes` without a `reason` is an error of `loremaster check`. |
+| `id` | The step's name in the save game. Without it, the step's place in the list, from 1. |
+
+How a turn goes for an actor, after the clock moved and the timers and time rules ran:
+
+- An actor does one thing per turn: it walks one room, runs one step, or tries a `do` that a `check` rule refuses. A step skipped for its `when` takes no time.
+- While the player talks with the actor, the actor waits. Its step runs late, in the turn that ends the talk.
+- The player sees an actor come into the room and leave it ("The lock-keeper comes in.").
+- A step runs once. A save game keeps which steps ran and which were skipped.
+
+`closes` marks a point of no return, for the ending checks. It is not a dead end: after the keeper burns the pages, the best ending (`committed`) is gone, but the game can still end (`ashes`). A drop in the best reachable ending is a warning, unless the step names the ending in `closes`; a dead end, where no ending can be reached at all, is an error. `loremaster check` checks today that `closes` names known endings.
+
+The explorer (`loremaster explore`) waits in a story with agendas, as it does for timers. It tells states apart by the minutes until each agenda's next step, so it reaches a step also in the middle of a phase. The ending checks treat a step's `closes` as they treat a rule's; their findings name the step as `agenda:<id>/steps[<i>]`.
 
 ## Containers and scenery
 
@@ -802,6 +877,7 @@ A save game keeps the state of a game, together with the version of its format a
 - Values that the story still has keep their saved value. New variables, things and timers start as at the start of a game.
 - Values that the story no longer has are dropped. The restore lists them, for example `fact:lamp.lit` or `thing:key`.
 - A save of another story, or of a newer loremaster, does not load. The message says why.
+- The save keeps what each actor has done of its agenda. A step that the story no longer has is dropped, for example `agenda:keeper#1`. A save from before agendas (version 1) starts each agenda at its first step.
 
 Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
 

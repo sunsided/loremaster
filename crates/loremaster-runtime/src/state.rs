@@ -73,6 +73,32 @@ pub struct State {
     /// (CK-6), by their key. Empty without hints.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub steps_done: BTreeSet<String>,
+    /// What each actor has done of its agenda (D6), by actor id. An actor
+    /// whose agenda has not moved yet has no entry. The actor's place is its
+    /// location in `locations`, as for any thing. New in save version 2.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub actors: BTreeMap<Id, ActorState>,
+}
+
+/// The state of an actor (D6): the steps of its agenda that are over.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ActorState {
+    /// Each step that is over, by its key (the step's `id`, or its place in
+    /// the agenda from 1): it ran, or it was skipped. The first step of the
+    /// agenda that is not here is the current one.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub steps: BTreeMap<String, StepOutcome>,
+}
+
+/// How a step of an agenda ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StepOutcome {
+    /// The step ran: its command and its effects.
+    Ran,
+    /// The step did not happen: its `when` did not hold when it was due, or a
+    /// `check` rule refused its command.
+    Skipped,
 }
 
 /// A paused rule, as data (XP-3): the rule, the next effect, the request.
@@ -251,6 +277,11 @@ pub struct Talk {
 }
 
 impl State {
+    /// How a step of an actor's agenda ended, if it is over.
+    pub fn step_outcome(&self, actor: &str, step: &str) -> Option<StepOutcome> {
+        self.actors.get(actor)?.steps.get(step).copied()
+    }
+
     pub fn location_of(&self, thing: &str) -> Option<&Location> {
         self.locations.get(thing)
     }

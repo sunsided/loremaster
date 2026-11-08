@@ -204,7 +204,16 @@ export interface FragmentView {
 }
 
 export type Command =
-	| { type: 'verb'; verb: string; objects: string[] }
+	| {
+			type: 'verb';
+			verb: string;
+			/** The direct object, then the indirect one. */
+			objects: string[];
+			/** Command record slots (D6), all optional. Without `actor`, the player acts. */
+			actor?: string;
+			preposition?: string;
+			topic?: string;
+	  }
 	| { type: 'go'; direction: string }
 	| { type: 'choose'; index: number }
 	| { type: 'leave' };

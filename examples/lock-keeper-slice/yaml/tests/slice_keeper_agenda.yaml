@@ -1,6 +1,5 @@
 # The keeper's agenda: at midnight he feeds the stove with the pages.
 name: The keeper at midnight
-pending: { phase: 4, needs: "D6, P4-02 #79" }
 steps:
   - wait
   - wait

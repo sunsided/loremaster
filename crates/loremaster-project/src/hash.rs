@@ -10,8 +10,8 @@ use sha2::{Digest, Sha256};
 /// (rooms, things, endings, timers, threads, dialogues, machines, variables,
 /// relations) are sorted by id first. The lists whose order the runtime uses
 /// keep it: rules (file order breaks ties between rules of one priority),
-/// verbs (the order of their words for the parser) and behaviors (the order
-/// in which they run).
+/// verbs (the order of their words for the parser), behaviors (the order
+/// in which they run) and agendas (the order in which actors act in a turn).
 ///
 /// The golden slice keeps the hash of its YAML form in `expected/model.hash`,
 /// and `slice_equivalence` compares the forms by it (DS-11 to DS-15).

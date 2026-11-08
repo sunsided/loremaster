@@ -83,7 +83,7 @@ pub mod prelude {
         variants,
     };
     pub use loremaster_model::{
-        Direction, Effect, EndingKind, EventPattern, Fragment, FragmentMode, Layer, NameStage,
-        Note, NoteRole, States, ThreadStatus, TimeOfDay, Value, VerbSlots,
+        CommandPattern, Direction, Effect, EndingKind, EventPattern, Fragment, FragmentMode, Layer,
+        NameStage, Note, NoteRole, States, ThreadStatus, TimeOfDay, Value, VerbSlots,
     };
 }
