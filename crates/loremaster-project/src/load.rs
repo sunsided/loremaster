@@ -994,11 +994,15 @@ pub fn missing_asset_files(project: &Project, root: &std::path::Path) -> Vec<Dia
 }
 
 /// The path stays inside the project: relative, without `..`, and no URL.
+/// Windows drops trailing dots and spaces of a name, so `.. ` is `..` there:
+/// a name of only dots and spaces is refused, except `.`.
 pub(crate) fn safe_asset_path(path: &str) -> bool {
     !path.is_empty()
         && !path.starts_with(['/', '\\'])
         && !path.contains(':')
-        && !path.split(['/', '\\']).any(|part| part == "..")
+        && !(path.split(['/', '\\'])).any(|part| {
+            part != "." && !part.is_empty() && part.trim_end_matches(['.', ' ']).is_empty()
+        })
 }
 
 /// Read every YAML file under a project folder.

@@ -22,6 +22,11 @@ fn files(extra: Vec<SourceFile>) -> Vec<SourceFile> {
         ),
         file("assets/pic.yaml", "file: assets/pic.png\n"),
         file("assets/boom.yaml", "file: ../boom.wav\n"),
+        file("assets/dots.yaml", "file: '.. /boom.wav'\n"),
+        file(
+            "tests/w.yaml",
+            "steps:\n  - { do: look, sound: nope }\nexpect: { sound: nada }\n",
+        ),
         file(
             "assets/idle.yaml",
             "file: assets/idle.wav\ncaption: hm\nlicence: { name: CC0-1.0, author: me }\n",
@@ -42,6 +47,10 @@ fn found(severity: Severity, needle: &str, key: &str) -> bool {
 fn the_checks_report_each_problem() {
     assert!(found(Severity::Error, "unknown asset `gone`", "room:a"));
     assert!(found(Severity::Error, "no path inside", "asset:boom"));
+    // Windows reads `.. ` as `..`.
+    assert!(found(Severity::Error, "no path inside", "asset:dots"));
+    assert!(found(Severity::Error, "unknown asset `nope`", "steps[0]"));
+    assert!(found(Severity::Error, "unknown asset `nada`", "expect"));
     assert!(found(Severity::Error, "nope", "room:a/media/illustration"));
     assert!(found(Severity::Warning, "no `licence`", "asset:pic"));
     assert!(found(Severity::Warning, "no `caption`", "asset:pic"));

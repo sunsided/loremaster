@@ -103,6 +103,10 @@ export class AudioPlayer {
 				source.start();
 				this.#playing[channel] = { url, source, fade };
 			})
-			.catch((e) => console.warn(`cannot play ${url}`, e));
+			.catch((e) => {
+				console.warn(`cannot play ${url}`, e);
+				// Forget the wish, so that the next `loop` with this file tries again.
+				if (this.#wanted[channel] === url) this.#wanted[channel] = null;
+			});
 	}
 }

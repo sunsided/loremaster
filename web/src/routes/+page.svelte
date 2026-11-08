@@ -834,6 +834,7 @@
 		audio.unlock();
 		if (event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyM') {
 			event.preventDefault();
+			if (event.repeat) return;
 			settings.sound = !settings.sound;
 			return;
 		}

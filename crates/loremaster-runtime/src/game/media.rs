@@ -22,10 +22,12 @@ impl Game {
             .collect();
         let talking = (state.talk.as_ref())
             .and_then(|t| world.dialogue(t.dialogue.as_str()))
-            .map(|d| &d.with);
-        let fighting = (state.combat.as_ref()).and_then(|c| c.spec.enemies.first());
+            .map(|d| d.with.clone());
+        // The enemy the player fights now: the first one still standing.
+        let fighting =
+            || (state.combat.as_ref()).and_then(|c| self.living(&c.spec).into_iter().next());
         if let Some(i) = talking
-            .or(fighting)
+            .or_else(fighting)
             .and_then(|t| world.thing_idx(t.as_str()))
         {
             layers.push(&world.things[i].media);
