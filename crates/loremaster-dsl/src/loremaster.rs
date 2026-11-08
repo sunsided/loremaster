@@ -251,7 +251,7 @@ impl Loremaster {
 /// A `#[test]` that runs [`Loremaster::assert_world`] on the given sources
 /// (the generated whole-world test of DS-15).
 ///
-/// ```ignore
+/// ```text
 /// loremaster::dsl::world_test!(Loremaster::new().pack(world()).yaml("story/"));
 /// ```
 #[macro_export]
