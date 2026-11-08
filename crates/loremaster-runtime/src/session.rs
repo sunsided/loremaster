@@ -31,7 +31,7 @@ pub const RESTORE: &str = "restore";
 pub const JOURNAL: &str = "journal";
 
 /// Input from the host (SE-2).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Input {

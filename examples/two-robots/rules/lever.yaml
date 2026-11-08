@@ -1,0 +1,38 @@
+# The holder cannot walk away: leaving lets the lever up.
+- id: holder_stays
+  on: { check: [go] }
+  when: (wick.active and wick_holds) or (bilge.active and bilge_holds)
+  then:
+    - say: "You cannot walk off while you hold the lever. Release it first."
+    - stop
+
+- id: hold_taken
+  on: { verb: [hold, lever] }
+  when: wick_holds or bilge_holds
+  instead: true
+  then:
+    - say: "Someone holds the lever already."
+
+- id: wick_holds_lever
+  on: { verb: [hold, lever] }
+  when: wick.active and not bilge_holds
+  instead: true
+  then:
+    - set: { wick_holds: true }
+    - say: "You clamp the lever down, and the south door grinds open."
+
+- id: bilge_holds_lever
+  on: { verb: [hold, lever] }
+  when: bilge.active and not wick_holds
+  instead: true
+  then:
+    - set: { bilge_holds: true }
+    - say: "You clamp the lever down, and the south door grinds open."
+
+- id: release_lever
+  on: { verb: [release, lever] }
+  when: (wick.active and wick_holds) or (bilge.active and bilge_holds)
+  instead: true
+  then:
+    - set: { wick_holds: false, bilge_holds: false }
+    - say: "The lever springs back up. The south door shuts."

@@ -1,0 +1,13 @@
+name: Control Gallery
+description:
+  - "A steel walkway over the pump hall, with the south door and a heavy spring lever beside it."
+  - when: seen_by(wick)
+    text: "On the wall panel, the needle of the port main shakes in the red. The starboard needle lies still."
+  - when: seen_by(bilge)
+    text: "Water drums on the far side of the wall. The panel is a flat cold surface; nothing in it makes a sound."
+  - when: wick_holds or bilge_holds
+    text: "The lever is held down, and the south door stands open."
+  - when: not (wick_holds or bilge_holds)
+    text: "The south door is shut. It only opens while the lever is down."
+exits:
+  - { direction: south, to: hall, passable: wick_holds or bilge_holds, blocked: "The south door is shut. It opens only while someone holds the lever down." }

@@ -2,6 +2,7 @@
 //! reach, with a budget. It answers "can this ever show?" and "can the player
 //! get stuck?" for the whole story, not only for the states the author tried.
 
+use crate::game::SWITCH;
 use crate::game::{ATTACK_TEXT, LUCK_TEXT};
 use crate::{BlockKind, Command, Game, Turn};
 use loremaster_model::{EventPattern, Id, Location, Value, VerbSlots};
@@ -123,8 +124,8 @@ fn fingerprint(game: &Game, counters: bool) -> String {
             .map(|a| (&a.rule, a.next, &a.request, &a.into, &a.locals)),
         // Only the hit that waits for its Luck test; round and log are history.
         s.combat.as_ref().map(|c| (true, &c.pending)),
-        &s.actors,
-        game.agenda_waits(),
+        // In one tuple: serde serializes tuples of 16 at most.
+        (&s.actors, game.agenda_waits(), &s.active, &s.orders),
     ))
     .unwrap_or_default()
 }
@@ -290,6 +291,15 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             .any(|r| matches!(r.on, EventPattern::Time(_) | EventPattern::Turn))
     {
         out.push(("wait".into(), verb("wait", Vec::new())));
+    }
+    // shortcut: orders are not tried, because a switch reaches the same
+    // states. Upgrade when an order can do what a switch cannot (timing).
+    for a in story
+        .playable
+        .iter()
+        .filter(|a| Some(*a) != game.state().active.as_ref())
+    {
+        out.push((format!("{SWITCH} {a}"), verb(SWITCH, vec![a.clone()])));
     }
     // Custom verbs without things.
     for v in story.verbs.iter().filter(|v| v.slots == VerbSlots::None) {

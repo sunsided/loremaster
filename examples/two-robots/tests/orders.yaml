@@ -1,0 +1,8 @@
+# Orders: Wick stays where it is and tells Bilge what to do. Bilge goes
+# through with the spanner and hears the live main for itself.
+name: The station holds
+steps:
+  - hold lever
+  - { do: "bilge, take spanner", see: "Bilge reports: done" }
+  - { do: "bilge, s then turn port wheel", see: ["Bilge takes the order", "the main sings under pressure"] }
+  - { do: wait, see: "pumps take the water down" }

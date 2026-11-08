@@ -10,6 +10,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Several player actors (P6-06, #100; WO-5, WO-14, TX-9): `playable: [wick, bilge]` in story.yaml gives the player a list of actors. `switch to bilge` makes one the active actor, whose room, carried things and senses are the player's; `seen_by(actor)` now tests the active actor. `bilge, take spanner then s` gives another actor an order: one step per turn, with a report at the end. The two-robot demo in `examples/two-robots` shows it: a puzzle that needs both robots, text per perceiver, and an explorer that ends.
+- **Breaking (library):** `Story` and `StoryHeader` have the new field `playable`, `State` has the new fields `active` and `orders`, and `Input` now derives `Eq`. A `Command` with an `actor` that is a playable actor is now an order; for any other thing it is still refused.
+
 - A terminal example host (P6-04, #98) in `examples/terminal-host`: it plays a story through the Session API only, with every effect, status and await, and with a save file. Its README says what a host must do. A test plays the Lighthouse walkthrough over piped input.
 - The stat sheet, the dice display and the combat panel of the web player (P5-04, #91). `stats:` in story.yaml declares the sheet: `{ var, label, short, max }` for a number or a codeword. `Session::stats()` and `Session::combat()` are in the WASM binding. `Effect::Roll` and `Turn::rolls` give the dice of a turn, with the faces, the target and the result of a Luck test in a combat. `against: <var>` on a roll names its target for the display. The dice are ASCII art with a short roll animation in the phosphor theme and drawn dice in the other themes; with reduced motion the result shows at once.
 - **Breaking (library):** `Story` and `StoryHeader` have the new field `stats`, `AwaitSpec` has the new field `against`, `Turn` has the new field `rolls`, and `Effect` (of the session) has the variant `Roll`.
