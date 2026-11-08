@@ -280,8 +280,8 @@ export type Command =
 /** A part of the story made in Rust. */
 export interface RustPart {
 	origin: { kind: 'rust'; file: string; line: number; column: number; pack: string; hash: string };
-	/** The canonical model value. */
-	value: Record<string, unknown>;
+	/** The canonical model value: an object, or a plain id for a behavior. */
+	value: unknown;
 	/** The commit that the pack was exported from, when it is known. */
 	commit: string | null;
 	/** The YAML file that overrides this part, and how it stands. */
