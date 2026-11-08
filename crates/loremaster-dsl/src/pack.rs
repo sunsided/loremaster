@@ -182,6 +182,7 @@ pub(crate) fn here(pack: &Pack) -> Origin {
         line: at.line(),
         column: at.column(),
         pack: pack.name.clone(),
+        hash: String::new(),
     }
 }
 

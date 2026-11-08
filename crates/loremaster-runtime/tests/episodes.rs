@@ -175,7 +175,7 @@ import:
             "export.relations[0]: unknown relation axis `fear`",
             "export.relations[1]: unknown thing `ghost`",
             "export.relations[2]: `trust` is not `thing.axis`",
-            "export.memories[0]: no dialogue of `keeper` remembers `forgot`",
+            "export.memories[0]: the first dialogue of `keeper`, which the talk uses, does not remember `forgot`",
             // Only the keeper's dialogue gives `asked`.
             "export.memories[1]: no dialogue of `gull` remembers `asked`",
             "import.memories[0]: unknown thing `ghost`",

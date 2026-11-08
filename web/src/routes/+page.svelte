@@ -14,7 +14,7 @@
 	import CreatePanel from '#lib/design/organisms/CreatePanel.svelte';
 	import { addExit, addMessageExit, addResponseRule, directionOf, directions, opposite, roomFile, slug, step, thingFile, type Direction } from '#lib/project/create.ts';
 	import type { CreateRequest } from '#lib/design/types.ts';
-	import type { Source } from '#lib/engine/types.ts';
+	import type { Source, SourceFile } from '#lib/engine/types.ts';
 	import type { WriterFragment, WriterTools, WritingAt } from '#lib/design/types.ts';
 	import { examples } from '#lib/engine/example.ts';
 	import { Workbench, markupTokens, newStory, notesOf, threadsOf, type NoteRef, type ThreadView } from '#lib/engine/index.ts';
@@ -53,6 +53,8 @@
 	import HerePanel from '#lib/design/organisms/HerePanel.svelte';
 	import DialogueOutline from '#lib/design/organisms/DialogueOutline.svelte';
 	import TalkEditor, { type TalkEdit } from '#lib/design/molecules/TalkEditor.svelte';
+	import RustPartsView from '#lib/design/organisms/RustPartsView.svelte';
+	import { canEject, ejectFile, overrideFile, yamlPath } from '#lib/project/rust-parts.ts';
 	import RoomDesk from '#lib/design/organisms/RoomDesk.svelte';
 	import AiHere from '#lib/design/molecules/AiHere.svelte';
 	import StatusTray from '#lib/design/molecules/StatusTray.svelte';
@@ -402,8 +404,9 @@
 
 	// The Atlas: the whole world at full width, in place of the player screen.
 	let atlasOpen = $state(false);
-	let atlasTab = $state<'map' | 'rules' | 'machines' | 'steps' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'ai'>('map');
+	let atlasTab = $state<'map' | 'rules' | 'machines' | 'steps' | 'state' | 'story' | 'checks' | 'todos' | 'threads' | 'rust' | 'ai'>('map');
 	let atlasRoom = $state<string | null>(null);
+	const rustParts = $derived(Object.keys(workspace?.project.rustParts ?? {}));
 	const atlasTabs = $derived([
 		{ id: 'map', label: 'Map' },
 		{ id: 'rules', label: 'Rules' },
@@ -414,6 +417,7 @@
 		{ id: 'checks', label: 'Checks' },
 		{ id: 'todos', label: `TODOs ${openTodos.length}` },
 		{ id: 'threads', label: `Threads ${allThreads.length}` },
+		...(rustParts.length ? [{ id: 'rust', label: `Rust ${rustParts.length}` }] : []),
 		...(ai.reachable ? [{ id: 'ai', label: `AI ${ai.proposals.length}` }] : [])
 	]);
 	// The AI tab goes away when the server stops; show the map in its place.
@@ -421,6 +425,7 @@
 		if (atlasTab === 'ai' && !ai.reachable) atlasTab = 'map';
 		if (atlasTab === 'machines' && !session?.machines.length) atlasTab = 'map';
 		if (atlasTab === 'steps' && !session?.charts.length) atlasTab = 'map';
+		if (atlasTab === 'rust' && !rustParts.length) atlasTab = 'map';
 	});
 
 	let proposalProblems = $state<Record<string, string>>({});
@@ -1161,11 +1166,25 @@
 		return problems?.length ? problems.map((p) => p.message).join(' ') : null;
 	}
 
+	async function applyRustFile(change: { path: string; text: string | null }): Promise<string | null> {
+		const problems = await workspace?.changeMany([change]);
+		return problems?.length ? problems.map((p) => p.message).join('\n') : null;
+	}
+
+	/** Write the YAML file of an eject or override. An existing file is not overwritten. */
+	async function writeRustFile(file: SourceFile): Promise<string | null> {
+		if (workspace?.project.file(file.path)) return `${file.path} exists already.`;
+		return applyRustFile(file);
+	}
+
 	/** Write a change to the file of the fragment. Returns a problem text when the story does not build with it. */
 	async function saveFragment(at: WritingAt, change: (text: string, list: (string | number)[]) => string): Promise<string | null> {
 		const ws = workspace;
 		const where = ws?.project.listOf(at.owner);
 		const file = where && ws?.project.file(where.file);
+		// The story intro is in the header, whose key is `story`.
+		const key = at.owner.startsWith('story:') ? 'story' : at.owner.split('/')[0];
+		if (where && !file && ws?.project.rustParts[key]) return `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
 		if (!ws || !where || !file) return 'The editor does not know the file of this text.';
 		let text: string;
 		try {
@@ -1419,6 +1438,7 @@
 			<RoomDesk
 				room={s.scene.room_name}
 				file={workspace?.project.origins[`room:${s.scene.room}`] ?? null}
+				rust={workspace?.project.rustParts[`room:${s.scene.room}`]?.origin ?? null}
 				level={new Set(s.map.rooms.map((r) => r.level)).size > 1 ? (s.map.rooms.find((r) => r.current)?.level ?? null) : null}
 				reach={roomReach}
 				onexplore={() => {
@@ -1620,6 +1640,16 @@
 							onexplore={runExplorer}
 						/>
 					</section>
+				{:else if atlasTab === 'rust' && workspace}
+					<RustPartsView
+						parts={workspace.project.rustParts}
+						origins={workspace.project.origins}
+						canOverride={(key) => yamlPath(key) !== null}
+						{canEject}
+						oneject={(key) => writeRustFile(ejectFile(key, workspace!.project.rustParts[key]))}
+						onoverride={(key) => writeRustFile(overrideFile(key, workspace!.project.rustParts[key]))}
+						ondelete={(path) => applyRustFile({ path, text: null })}
+					/>
 				{:else if atlasTab === 'ai'}
 					<section class="proposals-view" aria-label="AI jobs and proposals">
 						<h2 class="view-head">Jobs</h2>
@@ -1955,7 +1985,7 @@
 			<h1>The story has problems</h1>
 			<ul>
 				{#each problems as p, i (i)}
-					<li><code>{p.file}{p.line ? `:${p.line}:${p.column}` : ''}</code> {p.at ? `(${p.at})` : ''} {p.message}</li>
+					<li class="problem"><code>{p.file}{p.line ? `:${p.line}:${p.column}` : ''}</code> {p.at ? `(${p.at})` : ''} {p.message}</li>
 				{/each}
 			</ul>
 			{#if workspace?.project.edited}
@@ -1978,6 +2008,9 @@
 {/if}
 
 <style>
+	.problem {
+		white-space: pre-wrap;
+	}
 	.message {
 		padding: var(--space-9);
 	}

@@ -16,6 +16,10 @@ categories = ["games", "command-line-utilities", "game-development"]
 name = "loremaster"
 path = "src/main.rs"
 
+[[example]]
+name = "rust_overrides"
+required-features = ["dsl"]
+
 [dependencies]
 loremaster-dsl = { workspace = true, optional = true }
 loremaster-macros = { workspace = true, optional = true }
