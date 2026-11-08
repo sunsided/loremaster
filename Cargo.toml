@@ -13,6 +13,7 @@ members = [
     "crates/loremaster-wasm",
     "crates/loremaster-workbench",
     "crates/loremaster-zil",
+    "examples/terminal-host",
 ]
 
 [workspace.package]
