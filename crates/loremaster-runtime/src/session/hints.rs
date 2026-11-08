@@ -5,7 +5,9 @@
 //! [`HintBook`]. A host gives it to a session with
 //! [`Session::set_hints`]. The session marks a step done when the player
 //! gives its command in its room and the step's `facts` hold after it, or
-//! when the step's `facts` come to hold. [`Session::hints`] shows the steps
+//! when the step's `facts` come to hold. A step with `event` has no hints;
+//! it is done when the session accepts a report of its event with the
+//! step's `args` and its `facts` hold after it. [`Session::hints`] shows the steps
 //! of the current room that are not done and whose `needs` are done.
 //! [`Session::hint`] and the typed word `hint` show the next level: the
 //! hints of the step, then its command.

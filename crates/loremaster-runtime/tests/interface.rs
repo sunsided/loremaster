@@ -295,9 +295,6 @@ fn contract_names_must_make_valid_distinct_rust_names() {
             .any(|m| m.contains("would read the property `name`")),
         "{e:?}"
     );
-    // `level.x` still reads the argument: a derived name is bare only.
-    let e = bad("id: killed, args", "id: level, args");
-    assert!(!e.iter().any(|m| m.contains("built-in path")), "{e:?}");
     for id in ["hall", "time"] {
         let e = bad("id: killed, args", &format!("id: {id}, args"));
         assert!(
@@ -316,6 +313,23 @@ fn contract_names_must_make_valid_distinct_rust_names() {
         e.iter().any(|m| m.contains("Rust type `LockPickX`")),
         "{e:?}"
     );
+}
+
+#[test]
+fn an_event_with_a_derived_name_reads_its_arguments() {
+    // `level` is a derived name only when bare, so `level.boss` is the argument.
+    let story = STORY
+        .replace("id: killed, args", "id: level, args")
+        .replace("when: alive", "when: \"level.level > 0\"");
+    let rules = RULES
+        .replace("event: killed", "event: level")
+        .replace("{killed.boss}", "{level.boss}");
+    let e: Vec<_> = check(&load(files_with(&story, &rules)).unwrap())
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| d.message)
+        .collect();
+    assert_eq!(e, Vec::<String>::new());
 }
 
 #[test]
