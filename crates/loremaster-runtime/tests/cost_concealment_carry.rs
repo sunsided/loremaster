@@ -244,7 +244,7 @@ fn a_concealed_door_can_not_be_named() {
 }
 
 #[test]
-fn a_locked_concealed_door_is_no_way() {
+fn a_locked_concealed_door_names_only_the_way() {
     let hall = "name: Hall\ndescription: [\"A hall.\"]\nexits:\n  - { direction: north, to: yard, door: hatch }\n";
     let mut game = play(world_with(
         STORY,
@@ -261,7 +261,8 @@ fn a_locked_concealed_door_is_no_way() {
         ],
     ));
     let go = input(&mut game, "go north");
-    assert!(go.contains("You can't go that way."), "{go}");
+    assert!(go.contains("The way north is locked."), "{go}");
+    assert!(!go.contains("hatch"), "{go}");
     assert_eq!(game.state().room.as_str(), "hall");
 }
 

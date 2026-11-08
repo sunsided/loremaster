@@ -570,7 +570,7 @@ portable: true
 props: { concealed: true }
 ```
 
-A door can be concealed too: the player can not name it, but the exit stays. Going through it opens it without a note; while it is locked, the way is not there. To hide the exit as well, give it a `visible` condition. The explorer searches each thing that hides something it can find.
+A door can be concealed too: the player can not name it, but the exit stays. Going through it opens it without a note; while it is locked, the player reads "The way north is locked." To hide the exit as well, give it a `visible` condition. The explorer searches each thing that hides something it can find.
 
 ### Carry limit
 

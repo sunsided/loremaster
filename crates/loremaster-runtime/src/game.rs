@@ -1853,12 +1853,12 @@ impl Game {
             let the = self.the(door, false);
             let the_cap = self.the(door, true);
             // A concealed door is not named: it opens without a note, and a
-            // locked one is no way at all.
+            // locked one names only the way, which the exits still list.
             let concealed = self.state.is_concealed(door.as_str());
             if !self.state.flag(&format!("{door}.open")) {
                 if self.state.flag(&format!("{door}.locked")) {
                     let text = if concealed {
-                        "You can't go that way.".to_string()
+                        format!("The way {direction} is locked.")
                     } else {
                         format!("{the_cap} is locked.")
                     };
