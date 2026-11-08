@@ -198,6 +198,7 @@ impl<'w> Found<'w> {
             if let Some(c) = &f.when {
                 self.condition(c);
             }
+            f.inner_when.iter().for_each(|c| self.condition(c));
             f.variants.iter().for_each(|v| self.segments(v));
         }
     }

@@ -60,6 +60,8 @@ pub(crate) struct CFragment {
     pub sources: Vec<String>,
     pub when: Option<Condition>,
     pub when_src: Option<String>,
+    /// The conditions of a group's candidates (`one_of`), for the views.
+    pub inner_when: Vec<Condition>,
     pub mode: FragmentMode,
     pub layer: Layer,
     pub replaces: bool,
@@ -271,6 +273,25 @@ impl From<&CompileError> for loremaster_model::Diagnostic {
     }
 }
 
+/// The texts and conditions of the candidates of a group, nested groups too.
+fn group_texts(
+    one_of: &[loremaster_model::Candidate],
+    texts: &mut Vec<String>,
+    whens: &mut Vec<String>,
+) {
+    use loremaster_model::dramaturge_syntax::Variant;
+    for c in one_of {
+        whens.extend(c.when.iter().cloned());
+        for v in &c.variants {
+            match v {
+                Variant::Text(t) => texts.push(t.clone()),
+                Variant::Pool(p) => group_texts(&p.one_of, texts, whens),
+                _ => {}
+            }
+        }
+    }
+}
+
 /// Compiles a text of a candidate, with its place and its `when` as written.
 type LeafFn<'a, T> = dyn Fn(&str, &T, Option<&String>) -> Result<Entry<Lore>, CompileError> + 'a;
 
@@ -367,20 +388,31 @@ impl Compiler {
                 candidate.when = when.clone();
                 candidate.learn = f.learn.iter().map(|v| v.to_string()).collect();
                 pool.candidates.push(candidate);
+                // A group shows the texts of its candidates: the views (the
+                // things that a room text mentions, the matrix) read them all.
+                let (mut sources, mut whens) = (f.variants.clone(), Vec::new());
+                group_texts(&f.one_of, &mut sources, &mut whens);
                 Ok(CFragment {
                     key: format!(
                         "{owner}/{}",
                         f.id.as_ref().map_or(i.to_string(), Id::to_string)
                     ),
                     owner: owner.to_string(),
-                    variants: f
-                        .variants
+                    variants: sources
                         .iter()
                         .map(|v| self.markup(&at, v))
                         .collect::<Result<_, _>>()?,
-                    sources: f.variants.clone(),
+                    sources,
                     when,
                     when_src: f.when.clone(),
+                    inner_when: whens
+                        .iter()
+                        .map(|w| compile_condition(w, &self.scope))
+                        .collect::<Result<_, _>>()
+                        .map_err(|error| CompileError {
+                            at: at.clone(),
+                            error,
+                        })?,
                     mode: f.mode,
                     layer: f.layer,
                     replaces: f.replaces,

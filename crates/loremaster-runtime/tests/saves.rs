@@ -300,7 +300,8 @@ fn text_progress_of_old_saves_carries_over() {
         })
         .collect();
     save["state"]["progress"] = Value::Object(old);
-    let (restored, _) = Session::load(world, save).unwrap();
+    save["version"] = json!(2);
+    let (restored, _) = Session::load(world.clone(), save.clone()).unwrap();
     let keys: Vec<_> = restored.state().progress.keys().collect();
     assert_eq!(keys, game.state().progress.keys().collect::<Vec<_>>());
     assert!(
@@ -310,4 +311,9 @@ fn text_progress_of_old_saves_carries_over() {
             .values()
             .all(|p| p.pick == Some(1))
     );
+
+    // A save of the current version keeps its keys, also an id with `#`.
+    save["version"] = json!(SAVE_VERSION);
+    let (restored, _) = Session::load(world, save).unwrap();
+    assert!(restored.state().progress.contains_key("room:cottage#0"));
 }

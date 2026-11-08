@@ -61,3 +61,7 @@ from the version before. A step may give up; then the restore refuses the save.
   whose time has passed runs in the next turn.
   Version 2 also carries `state.steps_done` (the hint ladder, P4-05): it
   defaults to empty, so an older save needs no step for it.
+- 3: text progress keyed as dramaturge's text core keys it (P4-01, #78):
+  `room:shore/2` instead of `room:shore#2`. The step from 2 to 3 renames
+  the old keys; the field `sticky` reads as `pick` through a serde alias. A
+  fragment with an `id` is keyed by its id now, so its progress starts over.

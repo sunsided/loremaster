@@ -274,7 +274,8 @@ impl<'de> Deserialize<'de> for Line {
             }
 
             fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Line, A::Error> {
-                // `{ text: <pool id> }` names a text pool; any other map is one segment.
+                // `{ text: <pool id> }` names a text pool; any other map is an error
+                // that asks for a list of segments.
                 #[derive(Deserialize)]
                 #[serde(deny_unknown_fields)]
                 struct PoolRef {
