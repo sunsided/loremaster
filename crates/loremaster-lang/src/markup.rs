@@ -157,7 +157,15 @@ fn head_condition(head: &str, base: usize, scope: &Scope) -> Result<Condition, L
         return Ok(Derived::FirstVisit.to_condition(CmpOp::Eq, FactValue::Bool(true)));
     }
     let expr = parse_expr(head).map_err(|e| e.offset(base))?;
-    lower_bool(&expr, scope).map_err(|e| e.offset(base))
+    let condition = lower_bool(&expr, scope).map_err(|e| e.offset(base))?;
+    // A choice renders without a perceiver: `seen_by` would never hold.
+    if crate::has_seen_by(&condition) {
+        return Err(LangError::new(
+            crate::SEEN_BY_ELSEWHERE,
+            base..base + head.len(),
+        ));
+    }
+    Ok(condition)
 }
 
 /// A branch keeps its text but loses the spaces around the separators,

@@ -27,7 +27,7 @@ pub use error::{LangError, Span};
 pub use expr::{Expr, parse_expr};
 pub use highlight::{Token, TokenKind, condition_tokens, markup_tokens};
 pub use line::{CompiledLine, LineError, LinePart, check_speaker, compile_line};
-pub use lower::compile_condition;
+pub use lower::{SEEN_BY_ELSEWHERE, compile_condition, has_seen_by};
 pub use markup::{ChoiceSyntax, Segment, compile_markup};
 pub use reserved::{RESERVED_NAMES, Reserved, is_reserved, reserved};
 pub use scope::{PLAYER, Scope, Ty, closest};

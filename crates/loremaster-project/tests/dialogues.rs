@@ -111,3 +111,28 @@ fn a_node_that_no_start_reaches_is_reported_but_a_start_is_not() {
     check!(d[0].at == "nodes.lost");
     check!(d[0].message.contains("unreachable"), "{}", d[0].message);
 }
+
+#[test]
+fn seen_by_in_a_dialogue_condition_is_an_error() {
+    // A dialogue's conditions have no perceiver: `seen_by` never holds there.
+    let d = diagnostics(&GOOD.replace("when: bb.talked > 1", "when: seen_by(player)"));
+    check!(
+        d.iter().any(|d| d.severity == Severity::Error
+            && d.at.starts_with("nodes.again")
+            && d.message.contains("`seen_by` works only")),
+        "{d:#?}"
+    );
+}
+
+#[test]
+fn seen_by_in_inline_markup_is_an_error() {
+    let d = diagnostics(&GOOD.replace(
+        "say: \"Sit.\"",
+        "say: \"{seen_by(player) ? Sit. : Stand.}\"",
+    ));
+    check!(
+        d.iter()
+            .any(|d| d.severity == Severity::Error && d.message.contains("`seen_by` works only")),
+        "{d:#?}"
+    );
+}

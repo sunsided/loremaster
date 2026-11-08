@@ -1,6 +1,8 @@
 use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
 use dramaturge_model::{Candidate, Condition, Entry, FragmentMode, Pick, Pool, Pools, TextTypes};
-use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
+use loremaster_lang::{
+    LangError, SEEN_BY_ELSEWHERE, Scope, compile_condition, compile_markup, has_seen_by,
+};
 use loremaster_model::{
     DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
     ThreadStatus, standard_verbs,
@@ -11,16 +13,6 @@ mod walkthroughs;
 
 pub use walkthroughs::MAX_HINTS;
 pub(crate) use walkthroughs::mentions;
-
-/// The condition tests the perceiver of a text somewhere.
-fn has_seen_by(c: &Condition) -> bool {
-    match c {
-        Condition::SeenBy(_) => true,
-        Condition::All(cs) | Condition::Any(cs) => cs.iter().any(has_seen_by),
-        Condition::Not(inner) => has_seen_by(inner),
-        _ => false,
-    }
-}
 
 /// The host types of a pool in the checks: only what dramaturge's checks
 /// read (conditions for the score, the tuple keys, the named pools).
@@ -176,11 +168,7 @@ impl Checker<'_> {
     /// A condition outside a text: `seen_by` has no perceiver there.
     fn condition(&mut self, file: &str, at: &str, source: &str) {
         match compile_condition(source, &self.scope) {
-            Ok(c) if has_seen_by(&c) => self.error(
-                file,
-                at,
-                "`seen_by` works only in the `when` of a fragment or of a candidate in `one_of`: elsewhere nobody perceives",
-            ),
+            Ok(c) if has_seen_by(&c) => self.error(file, at, SEEN_BY_ELSEWHERE),
             Ok(_) => {}
             Err(e) => self.lang_error(file, at, source, e),
         }

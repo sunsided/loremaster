@@ -3,6 +3,19 @@ use dramaturge_model::{Condition, FactId, FactScope, FactValue, MemoryQuery, Rel
 use loremaster_model::Id;
 
 /// Parse, type-check and lower a condition to a dramaturge condition tree.
+/// The error for `seen_by` where no text is perceived.
+pub const SEEN_BY_ELSEWHERE: &str = "`seen_by` works only in the `when` of a fragment or of a candidate in `one_of`: elsewhere nobody perceives";
+
+/// The condition tests the perceiver of a text somewhere.
+pub fn has_seen_by(c: &Condition) -> bool {
+    match c {
+        Condition::SeenBy(_) => true,
+        Condition::All(cs) | Condition::Any(cs) => cs.iter().any(has_seen_by),
+        Condition::Not(inner) => has_seen_by(inner),
+        _ => false,
+    }
+}
+
 pub fn compile_condition(src: &str, scope: &Scope) -> Result<Condition, LangError> {
     let expr = parse_expr(src)?;
     let mut cond = lower_bool(&expr, scope)?;

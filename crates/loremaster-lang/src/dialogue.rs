@@ -161,7 +161,15 @@ impl Lower<String, Line, Effect> for Host<'_> {
     type Error = DialogueError;
 
     fn condition(&mut self, _: &mut Cx<'_>, when: &String) -> Result<Condition, DialogueError> {
-        compile_condition(when, self.scope).map_err(|e| lang(when, e))
+        let c = compile_condition(when, self.scope).map_err(|e| lang(when, e))?;
+        // A dialogue's conditions have no perceiver: `seen_by` would never hold.
+        if crate::has_seen_by(&c) {
+            return Err(lang(
+                when,
+                LangError::new(crate::SEEN_BY_ELSEWHERE, 0..when.len()),
+            ));
+        }
+        Ok(c)
     }
 
     fn text(
