@@ -181,6 +181,11 @@ export class Session {
 		this.#session.setHostRolls(hostRolls);
 	}
 
+	/** A stage host: a command on a thing in the room or a move first awaits `walk_to`. */
+	setHostWalks(hostWalks: boolean): void {
+		this.#session.setHostWalks(hostWalks);
+	}
+
 	/** Start the story again. `undo` can go back to the state before it. */
 	restart(): Step {
 		return this.#session.restart();

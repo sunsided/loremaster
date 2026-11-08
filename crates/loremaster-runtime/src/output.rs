@@ -52,6 +52,27 @@ pub struct MediaView {
     pub music: Option<MediaCue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ambience: Option<MediaCue>,
+    /// The hotspots of the illustration whose thing or exit the player can
+    /// see now (ME-4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<SceneRegion>,
+}
+
+/// A hotspot on the illustration. A click on it is a command on its thing,
+/// or `go` through its exit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct SceneRegion {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thing: Option<String>,
+    /// The direction of the exit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit: Option<String>,
+    /// The name to show and to read out: the thing's name now, or the room
+    /// behind the exit.
+    pub name: String,
+    /// Left, top, width and height, in percent of the image.
+    pub rect: [u8; 4],
 }
 
 /// One roll of the dice, for a host that shows dice.

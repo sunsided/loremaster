@@ -202,9 +202,9 @@ fn ask(request: &AwaitRequest) {
         AwaitRequest::Roll { dice, min, max } => {
             println!("\n(Roll {dice} and type the total, {min} to {max}.)");
         }
-        AwaitRequest::WalkTo { room } => {
+        AwaitRequest::WalkTo { .. } => {
             // A terminal has no walking: the player says what happened.
-            println!("\n(Walk to {room}.)");
+            println!("\n({}.)", request.describe());
             list(&[loremaster_runtime::ARRIVED, loremaster_runtime::REFUSED]);
         }
         AwaitRequest::DeathPrompt { ending, options } => {

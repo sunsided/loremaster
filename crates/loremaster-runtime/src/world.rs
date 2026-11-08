@@ -109,10 +109,17 @@ pub(crate) struct CompiledRoom {
     pub media: CompiledMedia,
 }
 
+/// A variant of a slot: its condition, its asset and its hotspots.
+pub(crate) type CompiledVariant = (
+    Option<Condition>,
+    crate::MediaCue,
+    Vec<loremaster_model::Region>,
+);
+
 /// The variants of each media slot, in the order of `Media::slots`.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct CompiledMedia {
-    pub slots: [Vec<(Option<Condition>, crate::MediaCue)>; 4],
+    pub slots: [Vec<CompiledVariant>; 4],
 }
 
 #[derive(Debug, Clone)]
@@ -352,7 +359,11 @@ impl Compiler {
         for (slot, (name, variants)) in media.slots().into_iter().enumerate() {
             let at = format!("{owner}/media/{name}");
             for v in variants {
-                out.slots[slot].push((self.cond(&at, &v.when)?, self.cue(&at, &v.asset)?));
+                out.slots[slot].push((
+                    self.cond(&at, &v.when)?,
+                    self.cue(&at, &v.asset)?,
+                    v.regions.clone(),
+                ));
             }
         }
         Ok(out)

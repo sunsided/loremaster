@@ -1804,7 +1804,24 @@
 		{#snippet player()}
 			{#if s.stats.length}<StatSheet stats={s.stats} inventory={s.scene.inventory} />{/if}
 			{#if hasAssets}
-				<MediaPanel illustration={image(s.media.illustration)} portrait={image(s.media.portrait)}>
+				{@const regions = s.media.regions ?? []}
+				<MediaPanel
+					illustration={image(s.media.illustration)}
+					portrait={image(s.media.portrait)}
+					hotspots={regions.map((r) => ({
+						label: !r.exit ? r.name : r.name === r.exit ? `Go ${r.exit}` : `Go ${r.exit} to ${r.name}`,
+						rect: r.rect,
+						inspect: r.thing ? `thing:${r.thing}` : `exit:${r.exit}`
+					}))}
+					onhotspot={async (i, button) => {
+						const r = regions[i];
+						if (r?.thing) s.pickThing(r.thing, r.name);
+						else if (r?.exit) s.pickExit(r.exit);
+						// The hotspot is gone, for example after "take": the focus goes to the prompt, not to the page.
+						await tick();
+						if (!button.isConnected) prompt?.focus();
+					}}
+				>
 					<AudioControls
 						bind:sound={settings.sound}
 						bind:captions={settings.captions}

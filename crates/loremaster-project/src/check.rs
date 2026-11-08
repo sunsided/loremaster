@@ -804,6 +804,11 @@ impl Checker<'_> {
                     if let Some(when) = &v.when {
                         self.condition(&file, &at, when);
                     }
+                    let room = (name == "illustration")
+                        .then(|| key.strip_prefix("room:"))
+                        .flatten()
+                        .and_then(|id| story.room(id));
+                    self.regions(&file, &at, room, &v.regions);
                 }
             }
         }
@@ -830,6 +835,56 @@ impl Checker<'_> {
                     &file,
                     &key,
                     "the asset has no `caption` (or `decorative: true`)",
+                );
+            }
+        }
+    }
+
+    /// Each hotspot is on a room's illustration, points to one thing or one
+    /// exit of the room, and lies inside the image (ME-4).
+    fn regions(
+        &mut self,
+        file: &str,
+        at: &str,
+        room: Option<&loremaster_model::Room>,
+        regions: &[loremaster_model::Region],
+    ) {
+        if regions.is_empty() {
+            return;
+        }
+        let Some(room) = room else {
+            self.error(file, at, "`regions` belong on the illustration of a room");
+            return;
+        };
+        for (i, r) in regions.iter().enumerate() {
+            let at = format!("{at}/regions/{i}");
+            match (&r.thing, &r.exit) {
+                (Some(thing), None) => {
+                    if self.story().thing(thing.as_str()).is_none() {
+                        self.error(
+                            file,
+                            &at,
+                            format!("the region points to the unknown thing `{thing}`"),
+                        );
+                    }
+                }
+                (None, Some(dir)) => {
+                    if !room.exits.iter().any(|e| e.direction == *dir) {
+                        self.error(file, &at, format!("the room has no exit `{}`", dir.name()));
+                    }
+                }
+                _ => self.error(
+                    file,
+                    &at,
+                    "a region points to exactly one `thing` or `exit`",
+                ),
+            }
+            let [x, y, w, h] = r.rect.map(u16::from);
+            if w == 0 || h == 0 || x + w > 100 || y + h > 100 {
+                self.error(
+                    file,
+                    &at,
+                    "`rect` is left, top, width and height in percent, inside the image",
                 );
             }
         }

@@ -1,8 +1,11 @@
 //! Media slots and sound effects (ME-1, ME-2), on `examples/gatehouse`.
 
+use loremaster_model::Value;
 use loremaster_model::{Expect, WalkStep, Walkthrough};
 use loremaster_project::{load, read_dir};
-use loremaster_runtime::{Effect, Input, MediaView, Session, World, run_walkthrough};
+use loremaster_runtime::{
+    ARRIVED, Effect, Input, MediaView, REFUSED, Session, World, run_walkthrough,
+};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -119,4 +122,151 @@ fn a_walkthrough_checks_sounds() {
     assert!(run_walkthrough(world(), &walk("gate_creak"), "t").passed());
     let failed = run_walkthrough(world(), &walk("bell"), "t");
     assert!(failed.failures[0].contains("does not play the sound `bell`"));
+}
+
+fn regions(game: &Session) -> Vec<(String, String)> {
+    (game.media().regions.iter())
+        .map(|r| {
+            let to = r.thing.clone().or(r.exit.clone()).unwrap_or_default();
+            (to, r.name.clone())
+        })
+        .collect()
+}
+
+#[test]
+fn hotspots_show_what_the_player_sees() {
+    let mut game = Session::new(world());
+    game.start();
+    assert_eq!(
+        regions(&game),
+        [
+            ("iron_gate".into(), "iron gate".into()),
+            ("rope".into(), "bell rope".into())
+        ]
+    );
+    let region = &game.media().regions[0];
+    assert_eq!(region.rect, [31, 33, 38, 67]);
+    // The open gate has its own image with the same hotspots.
+    play(&mut game, "open gate");
+    assert_eq!(id(&game.media().illustration), "gate_open");
+    assert_eq!(regions(&game).len(), 2);
+    play(&mut game, "north");
+    assert_eq!(
+        regions(&game),
+        [
+            ("south".into(), "The Road".into()),
+            ("keeper".into(), "keeper".into())
+        ]
+    );
+}
+
+#[test]
+fn a_stage_host_walks_before_the_command() {
+    use loremaster_runtime::{AwaitRequest, Status};
+    let mut game = Session::new(world());
+    game.set_host_walks(true);
+    game.start();
+    let step = game.submit(Input::Text("open gate".into()));
+    let Status::Await { awaiting } = step.status else {
+        panic!("no walk: {:?}", step.status);
+    };
+    assert!(matches!(
+        &awaiting.request,
+        AwaitRequest::WalkTo { thing: Some(t), .. } if t.as_str() == "iron_gate"
+    ));
+    assert!(!game.state().flag("iron_gate.open"), "the gate waits");
+    // A refused walk drops the command.
+    game.resume(&awaiting.id, Value::Text(REFUSED.into()))
+        .unwrap();
+    assert!(!game.state().flag("iron_gate.open"));
+
+    let Status::Await { awaiting } = game.submit(Input::Text("open gate".into())).status else {
+        panic!("no walk");
+    };
+    let done = game
+        .resume(&awaiting.id, Value::Text(ARRIVED.into()))
+        .unwrap();
+    assert!(game.state().flag("iron_gate.open"));
+    assert!(
+        done.effects
+            .iter()
+            .any(|e| matches!(e, Effect::Sound { .. }))
+    );
+
+    // A move walks to the exit first.
+    let Status::Await { awaiting } = game.submit(Input::Text("north".into())).status else {
+        panic!("no walk");
+    };
+    assert!(matches!(
+        &awaiting.request,
+        AwaitRequest::WalkTo { exit: Some(d), .. } if d == "north"
+    ));
+    game.resume(&awaiting.id, Value::Text(ARRIVED.into()))
+        .unwrap();
+    assert_eq!(game.state().room.as_str(), "yard");
+}
+
+#[test]
+fn a_text_host_walks_at_once() {
+    let mut game = Session::new(world());
+    game.start();
+    let step = game.submit(Input::Text("open gate".into()));
+    assert_eq!(step.status, loremaster_runtime::Status::Ready);
+    assert!(game.state().flag("iron_gate.open"));
+}
+
+#[test]
+fn a_walk_survives_a_carry_over() {
+    use loremaster_runtime::authoring::carry_over;
+    let mut game = Session::new(world());
+    game.set_host_walks(true);
+    game.start();
+    game.submit(Input::Text("open gate".into()));
+    let mut next = carry_over(&game, world());
+    let open = next.state().awaiting.clone().expect("the walk waits");
+    next.resume(&open.id, Value::Text(ARRIVED.into())).unwrap();
+    assert!(next.state().flag("iron_gate.open"));
+}
+
+/// A dark cellar with a crate, and a hidden exit with a hatch.
+fn cellar(dark: bool) -> Session {
+    use loremaster_project::SourceFile;
+    let file = |path: &str, text: &str| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    };
+    let tags = if dark { "tags: [dark]\n" } else { "" };
+    let room = format!(
+        "name: Cellar\n{tags}exits: [{{ direction: down, to: pit, door: hatch, visible: found }}]\nmedia:\n  illustration:\n    asset: pic\n    regions:\n      - {{ thing: crate, rect: [0, 0, 10, 10] }}\n      - {{ thing: hatch, rect: [20, 0, 10, 10] }}\n"
+    );
+    let project = load(vec![
+        file(
+            "story.yaml",
+            "title: T\nstart: cellar\nvars: [{ id: found, type: bool, initial: false }]\n",
+        ),
+        file("rooms/cellar.yaml", &room),
+        file("rooms/pit.yaml", "name: Pit\n"),
+        file(
+            "things/crate.yaml",
+            "name: crate\nlocation: { room: cellar }\n",
+        ),
+        file(
+            "things/hatch.yaml",
+            "name: hatch\nlocation: { room: pit }\nprops: { open: false }\n",
+        ),
+        file(
+            "assets/pic.yaml",
+            "file: assets/pic.png\ndecorative: true\n",
+        ),
+    ])
+    .unwrap_or_else(|e| panic!("{e:#?}"));
+    let mut game = Session::new(Arc::new(World::compile(project.story).unwrap()));
+    game.start();
+    game
+}
+
+#[test]
+fn no_hotspot_for_a_dark_room_or_the_door_of_a_hidden_exit() {
+    assert_eq!(regions(&cellar(false)), [("crate".into(), "crate".into())]);
+    assert_eq!(regions(&cellar(true)), []);
 }

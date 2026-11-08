@@ -44,7 +44,7 @@ pub use loremaster_model::{Interface, InterfaceMismatch, Value};
 pub use outline::{DialogueOutline, OutlineLine, OutlineNode, OutlineOption};
 pub use output::{
     Block, BlockKind, Choice, JournalEntry, Link, LinkKind, LogEntry, MediaCue, MediaView,
-    RollDetail, Run, Source, TalkInfo, Turn,
+    RollDetail, Run, SceneRegion, Source, TalkInfo, Turn,
 };
 pub use parser::{Command, CommandRecord, PLAYER, Preview};
 pub(crate) use save::Restored;

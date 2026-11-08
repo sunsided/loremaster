@@ -371,6 +371,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     // The explorer rolls itself: a roll for the host would leave it without
     // a move. An action without results stays a dead end; its host decides.
     game.host_rolls = false;
+    game.host_walks = false;
     let opening = game.start();
     let counters = reads_counters(&game);
 

@@ -100,24 +100,28 @@ impl Checker<'_> {
                 first.entry(id).or_insert(i);
             }
         }
-        let story = self.story().clone();
-        let unknown = |sound: &String| story.asset(sound).is_none();
-        for sound in walk.expect.sound.iter().filter(|s| unknown(s)) {
-            (self.out).push(Diagnostic::error(
-                key,
-                "expect",
-                format!("unknown asset `{sound}`"),
-            ));
+        // The unknown sounds first, by step (`None` for `expect`): the
+        // diagnostics below borrow `self` mutably.
+        let unknown: Vec<(Option<usize>, &String)> = {
+            let story = self.story();
+            let steps = walk.steps.iter().enumerate();
+            (walk.expect.sound.iter().map(|s| (None, s)))
+                .chain(steps.flat_map(|(i, step)| {
+                    step.expect()
+                        .into_iter()
+                        .flat_map(move |e| e.sound.iter().map(move |s| (Some(i), s)))
+                }))
+                .filter(|(_, s)| story.asset(s).is_none())
+                .collect()
+        };
+        for (step, sound) in unknown {
+            let message = format!("unknown asset `{sound}`");
+            match step {
+                Some(i) => self.at_step(key, i, Severity::Error, message),
+                None => self.at_place(key, "expect".into(), None, Severity::Error, message),
+            }
         }
         for (i, step) in walk.steps.iter().enumerate() {
-            for sound in step
-                .expect()
-                .into_iter()
-                .flat_map(|e| &e.sound)
-                .filter(|s| unknown(s))
-            {
-                self.at_step(key, i, Severity::Error, format!("unknown asset `{sound}`"));
-            }
             let Some(plan) = step.plan() else { continue };
             if let Some(room) = &plan.at
                 && self.story().room(room.as_str()).is_none()
@@ -249,13 +253,27 @@ impl Checker<'_> {
         severity: Severity,
         message: impl Into<String>,
     ) {
-        let at = format!("steps[{i}]");
+        self.at_place(key, format!("steps[{i}]"), Some(i), severity, message);
+    }
+
+    /// A diagnostic of a walkthrough at `at`, with the line of step `i` in
+    /// YAML, or the place in the Rust source of a Rust walkthrough.
+    fn at_place(
+        &mut self,
+        key: &str,
+        at: String,
+        step: Option<usize>,
+        severity: Severity,
+        message: impl Into<String>,
+    ) {
         let mut d = match severity {
             Severity::Error => Diagnostic::error(key, at, message),
             _ => Diagnostic::warning(key, at, message),
         };
         if let Some(f) = self.project.file(key) {
-            if let Some(pos) = step_position(self.project, key, &f.text, i) {
+            if let Some(i) = step
+                && let Some(pos) = step_position(self.project, key, &f.text, i)
+            {
                 let (line, column) = line_col(&f.text, pos);
                 d.line = Some(line);
                 d.column = Some(column);
@@ -481,6 +499,27 @@ mod tests {
             .filter(|d| d.file == "tests/win.yaml")
             .map(|d| format!("{:?} {}: {}", d.severity, d.at, d.message))
             .collect()
+    }
+
+    #[test]
+    fn an_unknown_sound_of_a_rust_walkthrough_points_into_the_source() {
+        let mut project = crate::load(files("steps: [look]\n")).unwrap();
+        let walk = loremaster_model::Walkthrough {
+            name: None,
+            steps: vec![],
+            seed: None,
+            expect: loremaster_model::Expect {
+                sound: vec!["boom".into()],
+                ..Default::default()
+            },
+            pending: None,
+        };
+        project
+            .walkthroughs
+            .push(("src/world.rs:12:3".into(), walk));
+        let d = crate::check(&project);
+        let d = d.iter().find(|d| d.message.contains("`boom`")).unwrap();
+        check!((d.file.as_str(), d.line, d.column) == ("src/world.rs", Some(12), Some(3)));
     }
 
     #[test]

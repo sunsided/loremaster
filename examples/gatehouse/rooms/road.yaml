@@ -4,8 +4,15 @@ description:
   - "The road ends at an iron gate in a stone wall. A bell rope hangs beside it."
 media:
   illustration:
-    - { asset: gate_open, when: iron_gate.open }
-    - gate_closed
+    - asset: gate_open
+      when: iron_gate.open
+      regions:
+        - { thing: iron_gate, rect: [31, 33, 38, 67] }
+        - { thing: rope, rect: [68, 8, 8, 54] }
+    - asset: gate_closed
+      regions:
+        - { thing: iron_gate, rect: [31, 33, 38, 67] }
+        - { thing: rope, rect: [68, 8, 8, 54] }
   ambience: wind
   music: calm
 exits:

@@ -67,7 +67,7 @@ export class Session {
 	/** The newest sound captions, oldest first. */
 	captions = $state<{ id: number; text: string }[]>([]);
 	#onsound: ((sound: MediaCue) => void) | null = null;
-	/** Sounds played before the host set `onsound`, such as those of the start turn. */
+	/** Sounds played before the host set `onsound`, such as those of the start turn. Only the newest few wait. */
 	#unheard: MediaCue[] = [];
 	/** The host plays a sound effect here. Sounds from before it is set play when it is set. */
 	get onsound() {
@@ -166,7 +166,7 @@ export class Session {
 		});
 		const sounds = turn.sounds ?? [];
 		if (this.#onsound) for (const sound of sounds) this.#onsound(sound);
-		else this.#unheard.push(...sounds);
+		else this.#unheard = [...this.#unheard, ...sounds].slice(-3);
 		const texts = [...changed, ...sounds].flatMap((c) => (c.caption ? [c.caption] : []));
 		this.captions = [...this.captions, ...texts.map((text) => ({ id: this.#next++, text }))].slice(-3);
 	}

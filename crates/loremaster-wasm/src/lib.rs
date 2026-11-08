@@ -242,6 +242,12 @@ impl JsSession {
         self.session.set_host_rolls(host_rolls);
     }
 
+    /// Let the host walk the player before a command, with `resume`.
+    #[wasm_bindgen(js_name = setHostWalks)]
+    pub fn set_host_walks(&mut self, host_walks: bool) {
+        self.session.set_host_walks(host_walks);
+    }
+
     /// Start the story again. `undo` can go back to the state before it.
     pub fn restart(&mut self) -> Result<JsValue, JsValue> {
         to_js(&self.session.restart())

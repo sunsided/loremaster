@@ -400,7 +400,7 @@ A `verb` or `check` event can name the slots:
 | --- | --- |
 | `choice: [left, { id: right, text: "the right door" }]` | One of the options. A player types its number, its id or its text. |
 | `roll: 2d6` | A number from the dice. The game rolls itself, unless the host rolls (`set_host_rolls`). |
-| `walk_to: dock` | `arrived` or `refused`. With `arrived`, the player is in the room. |
+| `walk_to: dock` | `arrived` or `refused`. With `arrived`, the player is in the room. A stage host also gets a `walk_to` with a `thing` or an `exit` before a command (see [Scenes with hotspots](#scenes-with-hotspots)). |
 | `action: open_sluice`, with `args` and `results` | One of the `results`. The host does the action, for example an animation. |
 
 `into: path` keeps the answer in a variable: an enum variable that has all answers, or a number variable for a roll.
@@ -587,6 +587,26 @@ A walkthrough checks it with `sound:`, in a step or in `expect`: `{ do: open gat
 `loremaster check` reports an unknown asset, a file that does not exist and a path outside the project as errors. An asset without a licence, an unused asset and a missing caption are warnings.
 
 The web player shows the images and plays the audio. The sound is off by default; Alt+M switches it. Audio starts after the first input of the player. Captions show while the sound is off, or with the Captions switch. The web player has the files of the bundled examples only: a story from a folder or a zip shows the captions in place of its media.
+
+### Scenes with hotspots
+
+A variant of a room's `illustration` can have `regions`: hotspots that point to a thing or to an exit of the room. `rect` is left, top, width and height, in percent of the image, so the story keeps no pixels.
+
+```yaml
+# rooms/road.yaml
+media:
+  illustration:
+    asset: gate_closed
+    regions:
+      - { thing: iron_gate, rect: [31, 33, 38, 67] }
+      - { thing: rope, rect: [68, 8, 8, 54] }
+```
+
+A region of an exit names its direction: the yard of the example has `{ exit: south, rect: [40, 25, 20, 30] }` on the gate in its wall.
+
+`Session::media()` lists the hotspots whose thing the player can see in the room (not carried) and whose exit is visible, each with its name now. A click on one is a command on the thing, or `go` through the exit. In the web player, the hotspots are buttons over the illustration: Tab reaches each one, and a click uses the verb of the prompt, or looks at the thing. `loremaster check` reports a region with an unknown thing, an exit the room does not have, both or neither, a `rect` outside the image, and regions on another slot.
+
+A stage host that animates the walk calls `set_host_walks(true)`. Then a command on a thing in the room, or a move, first waits for `walk_to` with the `thing` or the `exit`; `arrived` runs the command, and `refused` drops it. Time passes when the command runs, not while the walk waits. Without it, as in the web player, the walk happens at once.
 
 ## Endings
 

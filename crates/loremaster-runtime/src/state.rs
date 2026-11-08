@@ -196,6 +196,10 @@ pub struct Awaiting {
     /// Local values of the rule. Empty until rules get locals.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub locals: BTreeMap<String, Value>,
+    /// The command that waits for a walk; it runs after `arrived`. Then
+    /// `rule` and `next` are not used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<Box<crate::Command>>,
 }
 
 /// What a paused rule asks the host (SE-5).
@@ -215,8 +219,17 @@ pub enum AwaitRequest {
     },
     /// Roll dice and report the total.
     Roll { dice: String, min: i64, max: i64 },
-    /// Walk the player to a room; answer `arrived` or `refused`.
-    WalkTo { room: Id },
+    /// Walk the player to a room; answer `arrived` or `refused`. With a
+    /// `thing` or an `exit`, the walk is in this room, before a command on
+    /// it (`Session::set_host_walks`): `arrived` runs the command.
+    WalkTo {
+        room: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thing: Option<Id>,
+        /// The direction of the exit.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        exit: Option<String>,
+    },
     /// The player died (SE-9): answer `undo`, `restart` or `restore`. The
     /// session does `undo` and `restart` itself; for `restore`, the host
     /// loads a save with `Session::restore` or `Session::load`.
@@ -258,9 +271,11 @@ impl AwaitRequest {
                 max: dice.max(),
             });
         }
-        spec.walk_to
-            .as_ref()
-            .map(|room| AwaitRequest::WalkTo { room: room.clone() })
+        spec.walk_to.as_ref().map(|room| AwaitRequest::WalkTo {
+            room: room.clone(),
+            thing: None,
+            exit: None,
+        })
     }
 
     /// The answers that a list can offer, with their texts. A roll and an
@@ -332,7 +347,13 @@ impl AwaitRequest {
                     .join(", ")
             ),
             AwaitRequest::Roll { dice, .. } => format!("roll {dice}"),
-            AwaitRequest::WalkTo { room } => format!("walk to {room}"),
+            AwaitRequest::WalkTo {
+                thing: Some(thing), ..
+            } => format!("walk to {thing}"),
+            AwaitRequest::WalkTo {
+                exit: Some(dir), ..
+            } => format!("walk to the exit {dir}"),
+            AwaitRequest::WalkTo { room, .. } => format!("walk to {room}"),
             AwaitRequest::DeathPrompt { options, .. } => format!(
                 "you died: {}",
                 options
