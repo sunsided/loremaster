@@ -246,4 +246,4 @@ Binaries on GitHub Releases are not available yet. They can come later.
 ## Rules for the work
 
 - Write all documentation in ASD-STE100 Simplified Technical English. The "Foundations/Writing documentation" page in Storybook gives the rules.
-- For web work, obey the design system rules in "Design system" above: design tokens only, WCAG 2.2 AA, all widths from 320px, and a story with documentation for each element.
+- For web work, obey the design system rules in [Design system](#design-system): design tokens only, WCAG 2.2 AA, all widths from 320px, and a story with documentation for each element.
