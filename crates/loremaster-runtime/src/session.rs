@@ -525,7 +525,6 @@ impl Session {
                 options,
             },
             into: None,
-            locals: BTreeMap::new(),
             command: None,
         })
     }

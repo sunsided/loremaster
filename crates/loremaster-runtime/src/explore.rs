@@ -121,7 +121,7 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         // Not the await's id: it counts the awaits, and equal states stay equal.
         s.awaiting
             .as_ref()
-            .map(|a| (&a.rule, a.next, &a.request, &a.into, &a.locals)),
+            .map(|a| (&a.rule, a.next, &a.request, &a.into)),
         // Only the hit that waits for its Luck test; round and log are history.
         s.combat.as_ref().map(|c| (true, &c.pending)),
         // In one tuple: serde serializes tuples of 16 at most.

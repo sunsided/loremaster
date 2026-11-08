@@ -193,9 +193,6 @@ pub struct Awaiting {
     /// The variable that takes the answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub into: Option<String>,
-    /// Local values of the rule. Empty until rules get locals.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub locals: BTreeMap<String, Value>,
     /// The command that waits for a walk; it runs after `arrived`. Then
     /// `rule` and `next` are not used.
     #[serde(default, skip_serializing_if = "Option::is_none")]
