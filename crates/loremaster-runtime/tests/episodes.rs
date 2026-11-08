@@ -177,7 +177,7 @@ import:
             "export.relations[2]: `trust` is not `thing.axis`",
             "export.memories[0]: the first dialogue of `keeper`, which the talk uses, does not remember `forgot`",
             // Only the keeper's dialogue gives `asked`.
-            "export.memories[1]: the first dialogue of `gull`, which the talk uses, does not remember `asked`",
+            "export.memories[1]: no dialogue of `gull` remembers `asked`",
             "import.memories[0]: unknown thing `ghost`",
         ]
     );
