@@ -1083,7 +1083,7 @@ import:
   memories: [keeper.asked]
 ```
 
-`loremaster check` examines both lists. A fact must be a story variable or a thing property. A relation needs a thing and an axis in `relations`. A memory needs a thing, and in `export` a dialogue that remembers the key, or an import of it. An imported memory declares its key, so `remembers(keeper, asked)` works in the next story without a dialogue that gives it.
+`loremaster check` examines both lists. A fact must be a story variable or a thing property. A relation needs a thing and an axis in `relations`. A memory needs a thing, and in `export` a dialogue of that thing that remembers the key, or an import of it. An imported memory declares its key, so `remembers(keeper, asked)` works in the next story without a dialogue that gives it.
 
 The host writes the episode with `Session::episode()`, at the end or at any time. It is a small value with a format, a version and the id of the story. `Session::from_episode(world, episode)` starts a new game of the next story with it; call `start` next, as for a new game. The new game takes only what `import` lists. The report says what it took (`applied`), what the story does not import (`skipped`) and what does not fit (`misfits`): a value of another type, or a state that the enum does not have. A number takes the limits of the next story. A relation that no dialogue changed and a memory that the thing does not keep are not in the episode.
 
