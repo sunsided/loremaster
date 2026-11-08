@@ -253,11 +253,26 @@ impl Game {
         if let Some(open) = &self.state.awaiting {
             return Err(format!("the story waits: {}", open.request.describe()));
         }
+        // The precondition sees the reported arguments; a refusal puts the
+        // values before back.
+        let before: Vec<(String, Option<Value>)> = (args.iter())
+            .map(|(arg, value)| {
+                let key = format!("{name}.{arg}");
+                let old = self.state.facts.insert(key.clone(), value.clone());
+                (key, old)
+            })
+            .collect();
         if world
             .event_when
             .get(name)
             .is_some_and(|when| !self.eval().holds(when))
         {
+            for (key, old) in before {
+                match old {
+                    Some(v) => self.state.facts.insert(key, v),
+                    None => self.state.facts.remove(&key),
+                };
+            }
             return Err(format!(
                 "the precondition of the event `{name}` does not hold"
             ));

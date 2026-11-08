@@ -38,6 +38,8 @@ struct HintStep {
     room: Id,
     /// The keys of the steps that must be done first.
     needs: Vec<String>,
+    /// The host event that the step reports, for a step without a command.
+    event: Option<Id>,
     hints: Vec<String>,
     /// The facts that hold after the step, from its checks.
     facts: BTreeMap<String, Value>,
@@ -61,8 +63,7 @@ impl HintBook {
             let chart = loremaster_model::step_chart(key, walk);
             for (i, step) in walk.steps.iter().enumerate() {
                 let Some(plan) = step.plan() else { continue };
-                // The host reports an event; the player cannot type it.
-                if plan.event.is_some() || (plan.id.is_none() && plan.hints.is_empty()) {
+                if plan.id.is_none() && plan.hints.is_empty() {
                     continue;
                 }
                 let key = match &plan.id {
@@ -83,7 +84,14 @@ impl HintBook {
                     command: step.command().to_string(),
                     room: plan.at.clone().unwrap_or_else(|| rooms[i].clone()),
                     needs,
-                    hints: plan.hints.clone(),
+                    // The host reports an event; the player cannot type it.
+                    // The step stays in the book, so `needs` can name it.
+                    hints: if plan.event.is_some() {
+                        Vec::new()
+                    } else {
+                        plan.hints.clone()
+                    },
+                    event: plan.event.clone(),
                     facts: step.expect().map(|e| e.facts.clone()).unwrap_or_default(),
                 });
             }
@@ -277,6 +285,16 @@ impl Session {
             None => Vec::new(),
         };
         (matched, pending)
+    }
+
+    /// The steps not done yet that report the host event `name`.
+    pub(super) fn event_steps(&self, name: &str) -> Vec<usize> {
+        let state = self.game.state();
+        (self.hints.steps.iter().enumerate())
+            .filter(|(_, s)| s.event.as_ref().is_some_and(|e| e.as_str() == name))
+            .filter(|(_, s)| !state.steps_done.contains(&s.key))
+            .map(|(i, _)| i)
+            .collect()
     }
 
     /// After an input: a step is done when the player gave its command and
