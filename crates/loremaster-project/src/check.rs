@@ -248,6 +248,24 @@ impl Checker<'_> {
         self.room_ref(&header, "start", story.start.as_str());
         self.fragments(&header, "intro", &story.intro);
         self.frames(&header, "frames", &story.frames);
+        let mut verbs: BTreeSet<String> = standard_verbs()
+            .iter()
+            .chain(story.verbs.iter())
+            .map(|v| v.id.to_string())
+            .collect();
+        // The world adds the `score` verb for a story with a score.
+        if story.score.is_some() {
+            verbs.insert("score".into());
+        }
+        for verb in story.clock.costs.keys() {
+            if !verbs.contains(verb.as_str()) {
+                self.error(
+                    &header,
+                    &format!("clock.costs.{verb}"),
+                    format!("unknown verb `{verb}`"),
+                );
+            }
+        }
         for v in &story.vars {
             let ok = match (&v.ty, &v.initial) {
                 (loremaster_model::VarType::Bool, loremaster_model::Value::Bool(_)) => true,

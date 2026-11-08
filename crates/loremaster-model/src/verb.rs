@@ -144,5 +144,14 @@ pub fn standard_verbs() -> Vec<VerbDef> {
             false,
         ),
         verb("wait", "Wait", &["wait", "z"], zero, None, false),
+        // Reveals the concealed things in or on its object (WO-2).
+        verb(
+            "search",
+            "Search",
+            &["search", "look under", "look behind", "look in"],
+            one,
+            None,
+            false,
+        ),
     ]
 }

@@ -8,7 +8,7 @@ A story is a folder of YAML files. Each entity has its own file.
 
 | Path | Contents |
 | --- | --- |
-| `story.yaml` | Title, start room, intro, clock, variables, custom verbs, the score and story frames. |
+| `story.yaml` | Title, start room, intro, clock and action costs, variables, custom verbs, the carry limit, the score and story frames. |
 | `rooms/*.yaml` | One room in each file. A room file can also have rules. |
 | `things/*.yaml` | One thing or character in each file. A thing file can also have rules. |
 | `rules/*.yaml` | One rule, or a list of rules, in each file. Read [Rules](#rules). |
@@ -559,6 +559,38 @@ props: { open: false, transparent: true }
 - The contents move with their container. A carried bag carries what is in it.
 
 Scenery can be in more than one room. `also_in: [forest_1, forest_2]` or `also_in: [forest]` (a region) puts the thing in these rooms too, while its location is not `nowhere`.
+
+### Concealed things
+
+A thing with `concealed: true` in its properties is hidden: it is not in the room text, the contents or the inventory, and the player can not name it. Put it in or on the thing that hides it. The verb `search` (also `look under`, `look behind`, `look in`) reveals the concealed things in or on its object: "You find a brass key." A rule reveals a thing with `set: { key.concealed: false }`. The contents of a concealed thing are hidden too.
+
+```yaml
+# things/key.yaml
+name: brass key
+location: { on: rug }
+portable: true
+props: { concealed: true }
+```
+
+A door can be concealed too: the player can not name it, but the exit stays. Going through it opens it without a note; while it is locked, the player reads "The way north is locked." To hide the exit as well, give it a `visible` condition. The explorer searches each thing that hides something it can find.
+
+### Carry limit
+
+`carry_limit: 4` in story.yaml is the number of things that the player can hold. A `take` beyond it says "Your hands are full." Things in a carried bag do not count, so a bag lets the player carry more. A rule that moves a thing to `carried` does not check the limit. In a story with a limit, the explorer drops what the player holds when the hands are full, and it tries a `take` with full hands only when a rule listens to `take`.
+
+## Action cost
+
+A turn moves the clock by `minutes_per_turn`. `costs` in the clock gives a verb its own number of minutes, for the standard verbs and for custom ones. A cost of 0 lets a verb take no time; the turn still counts.
+
+```yaml
+# story.yaml
+clock:
+  start: "22:00"
+  minutes_per_turn: 1
+  costs: { search: 10, wait: 15, go: 5 }
+```
+
+The cost is for the player's command. A tick of the host and a choice in a talk take `minutes_per_turn`; leaving a talk takes no time. Actors act in the player's turn and have no cost of their own. Timers count turns, not minutes; time rules and agenda steps see the minutes, so a long search can let the clock pass midnight.
 
 ## Score
 

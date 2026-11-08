@@ -1,4 +1,6 @@
+use crate::Id;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 
@@ -67,6 +69,10 @@ pub struct ClockConfig {
     pub start: TimeOfDay,
     pub minutes_per_turn: u16,
     pub phases: Vec<Phase>,
+    /// Action cost (WO-4): the minutes that a turn of the player takes with
+    /// this verb, in place of `minutes_per_turn`, e.g. `{ search: 10 }`.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub costs: BTreeMap<Id, u16>,
 }
 
 impl Default for ClockConfig {
@@ -96,6 +102,7 @@ impl Default for ClockConfig {
                     from: TimeOfDay::hm(21, 0),
                 },
             ],
+            costs: BTreeMap::new(),
         }
     }
 }
@@ -111,6 +118,14 @@ impl ClockConfig {
             .find(|p| p.from <= time)
             .or_else(|| sorted.last())
             .map(|p| p.name.as_str())
+    }
+
+    /// The minutes that a turn of the player with this verb takes.
+    pub fn minutes_for(&self, verb: &str) -> u16 {
+        self.costs
+            .get(verb)
+            .copied()
+            .unwrap_or(self.minutes_per_turn)
     }
 
     /// Distinct phase names in declaration order.

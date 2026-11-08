@@ -338,6 +338,31 @@ impl State {
         None
     }
 
+    /// The thing, or a holder around it, is concealed (WO-2): its
+    /// `concealed` property is true. Search or a rule reveals it.
+    pub fn is_concealed(&self, thing: &str) -> bool {
+        let mut at = thing;
+        // A loop of containers is an authoring error; give up after a few steps.
+        for _ in 0..16 {
+            if self.flag(&format!("{at}.concealed")) {
+                return true;
+            }
+            match self.locations.get(at).and_then(Location::holder) {
+                Some(holder) => at = holder.as_str(),
+                None => return false,
+            }
+        }
+        false
+    }
+
+    /// How many things the player holds in the hands, for the carry limit.
+    pub fn held_count(&self) -> u32 {
+        self.locations
+            .values()
+            .filter(|l| matches!(l, Location::Carried))
+            .count() as u32
+    }
+
     /// The things directly in or on a holder, in id order.
     pub fn contents(&self, holder: &str) -> Vec<&Id> {
         self.locations
