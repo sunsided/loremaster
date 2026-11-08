@@ -294,6 +294,11 @@ pub trait Effects: Sized {
     fn cancel(self, timer: impl AsRef<str>) -> Self {
         self.effect(Effect::Cancel(id(timer)))
     }
+
+    /// Play a sound asset once: `play sound gate_creak`.
+    fn play_sound(self, sound: impl AsRef<str>) -> Self {
+        self.effect(Effect::PlaySound(id(sound)))
+    }
 }
 
 /// A plain list of effects, for a dialogue's `then:`

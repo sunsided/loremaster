@@ -100,7 +100,24 @@ impl Checker<'_> {
                 first.entry(id).or_insert(i);
             }
         }
+        let story = self.story().clone();
+        let unknown = |sound: &String| story.asset(sound).is_none();
+        for sound in walk.expect.sound.iter().filter(|s| unknown(s)) {
+            (self.out).push(Diagnostic::error(
+                key,
+                "expect",
+                format!("unknown asset `{sound}`"),
+            ));
+        }
         for (i, step) in walk.steps.iter().enumerate() {
+            for sound in step
+                .expect()
+                .into_iter()
+                .flat_map(|e| &e.sound)
+                .filter(|s| unknown(s))
+            {
+                self.at_step(key, i, Severity::Error, format!("unknown asset `{sound}`"));
+            }
             let Some(plan) = step.plan() else { continue };
             if let Some(room) = &plan.at
                 && self.story().room(room.as_str()).is_none()

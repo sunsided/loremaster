@@ -1,0 +1,8 @@
+name: keeper
+location: { room: yard }
+description:
+  - "An old keeper with a ring of keys."
+media:
+  portrait:
+    - { asset: keeper_glad, when: keeper_won }
+    - keeper

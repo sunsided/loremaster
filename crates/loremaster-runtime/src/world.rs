@@ -7,7 +7,8 @@ use loremaster_lang::{
     CompiledLine, LangError, Scope, Segment, compile_condition, compile_dialogue, compile_markup,
 };
 use loremaster_model::{
-    DialogueId, Effect, Fragment, FragmentMode, Id, Layer, Story, Value, VerbDef, standard_verbs,
+    DialogueId, Effect, Fragment, FragmentMode, Id, Layer, Media, Story, Value, VerbDef,
+    standard_verbs,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -41,6 +42,8 @@ pub struct World {
     pub(crate) dialogues: Vec<std::sync::Arc<CompiledDialogue>>,
     /// The machines with `quest: true`, with the journal text of their states.
     pub(crate) quests: Vec<CompiledQuest>,
+    /// The media of machine states, by machine and state name. Machines without media are not here.
+    pub(crate) machine_media: Vec<(Id, BTreeMap<String, CompiledMedia>)>,
     /// The named text pools of `texts/`.
     pub(crate) pools: Pools<Lore>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
@@ -103,6 +106,13 @@ pub(crate) struct CompiledRoom {
     pub description: CompiledText,
     pub frames: BTreeMap<Id, CompiledFrame>,
     pub exits: Vec<CompiledExit>,
+    pub media: CompiledMedia,
+}
+
+/// The variants of each media slot, in the order of `Media::slots`.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CompiledMedia {
+    pub slots: [Vec<(Option<Condition>, crate::MediaCue)>; 4],
 }
 
 #[derive(Debug, Clone)]
@@ -120,6 +130,7 @@ pub(crate) struct CompiledThing {
     /// The condition of each name stage.
     pub names: Vec<Option<Condition>>,
     pub frames: BTreeMap<Id, CompiledFrame>,
+    pub media: CompiledMedia,
 }
 
 /// A compiled action frame.
@@ -239,6 +250,7 @@ pub(crate) enum CompiledEffect {
     /// `calc`: each target with its signed terms.
     Calc(Vec<(String, Vec<(i64, loremaster_model::Term)>)>),
     Say(loremaster_lang::CompiledLine),
+    PlaySound(crate::MediaCue),
     /// `say: { text: <id> }`: show a named text pool.
     SayPool(Id),
     Move(BTreeMap<Id, Id>),
@@ -317,9 +329,35 @@ type LeafFn<'a, T> = dyn Fn(&str, &T, Option<&String>) -> Result<Entry<Lore>, Co
 struct Compiler {
     scope: Scope,
     endings: BTreeMap<Id, loremaster_model::Ending>,
+    assets: BTreeMap<Id, loremaster_model::Asset>,
 }
 
 impl Compiler {
+    fn cue(&self, at: &str, id: &Id) -> Result<crate::MediaCue, CompileError> {
+        let Some(asset) = self.assets.get(id) else {
+            return Err(CompileError {
+                at: at.to_string(),
+                error: LangError::new(format!("unknown asset `{id}`"), 0..id.as_str().len()),
+            });
+        };
+        Ok(crate::MediaCue {
+            id: id.to_string(),
+            file: asset.file.clone(),
+            caption: asset.caption.clone(),
+        })
+    }
+
+    fn media(&self, owner: &str, media: &Media) -> Result<CompiledMedia, CompileError> {
+        let mut out = CompiledMedia::default();
+        for (slot, (name, variants)) in media.slots().into_iter().enumerate() {
+            let at = format!("{owner}/media/{name}");
+            for v in variants {
+                out.slots[slot].push((self.cond(&at, &v.when)?, self.cue(&at, &v.asset)?));
+            }
+        }
+        Ok(out)
+    }
+
     fn cond(&self, at: &str, src: &Option<String>) -> Result<Option<Condition>, CompileError> {
         src.as_deref()
             .map(|s| compile_condition(s, &self.scope))
@@ -599,6 +637,7 @@ impl Compiler {
             Effect::Call(b) => CompiledEffect::Call(b.clone()),
             Effect::Start(t) => CompiledEffect::Start(t.entries()),
             Effect::Cancel(t) => CompiledEffect::Cancel(t.clone()),
+            Effect::PlaySound(id) => CompiledEffect::PlaySound(self.cue(at, id)?),
         })
     }
 
@@ -633,6 +672,9 @@ impl World {
                 .iter()
                 .map(|e| (e.id.clone(), e.clone()))
                 .collect(),
+            assets: (story.assets.iter())
+                .map(|a| (a.id.clone(), a.clone()))
+                .collect(),
         };
         let intro = c.fragments("story:intro", &story.intro)?;
         let mut event_when = BTreeMap::new();
@@ -649,6 +691,7 @@ impl World {
                 Ok(CompiledRoom {
                     description: c.fragments(&owner, &room.description)?,
                     frames: c.frames(&owner, &room.frames)?,
+                    media: c.media(&owner, &room.media)?,
                     exits: room
                         .exits
                         .iter()
@@ -689,6 +732,7 @@ impl World {
                         .map(|(i, n)| c.cond(&format!("{owner}/names[{i}]"), &n.when))
                         .collect::<Result<_, _>>()?,
                     frames: c.frames(&owner, &t.frames)?,
+                    media: c.media(&owner, &t.media)?,
                 })
             })
             .collect::<Result<_, CompileError>>()?;
@@ -876,9 +920,23 @@ impl World {
                 })
             })
             .collect::<Result<_, CompileError>>()?;
+        let mut machine_media = Vec::new();
+        for m in &story.machines {
+            let mut states = BTreeMap::new();
+            for s in &m.states {
+                if let Some(media) = s.media().filter(|media| !media.is_empty()) {
+                    let owner = format!("machine:{}/states/{}", m.id, s.name());
+                    states.insert(s.name().to_string(), c.media(&owner, media)?);
+                }
+            }
+            if !states.is_empty() {
+                machine_media.push((m.id.clone(), states));
+            }
+        }
         let levels = levels(&story);
         Ok(Self {
             levels,
+            machine_media,
             scope,
             event_when,
             story,

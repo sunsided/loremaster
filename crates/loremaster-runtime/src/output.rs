@@ -17,12 +17,41 @@ pub struct Turn {
     /// The dice of this turn, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rolls: Vec<RollDetail>,
+    /// The sounds of this turn, in order. They are one-shot and not saved.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sounds: Vec<MediaCue>,
     /// `on: next` steps taken in this turn, for the step limit.
     #[serde(skip)]
     pub(crate) machine_steps: u32,
     /// The note about the step limit is in this turn.
     #[serde(skip)]
     pub(crate) step_limit_noted: bool,
+}
+
+/// An asset as the host needs it: the id, the file and the text for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct MediaCue {
+    pub id: String,
+    /// The path of the file, relative to the project folder.
+    pub file: String,
+    /// The alt text of an image, or the caption of a sound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
+}
+
+/// The active media slots now. A host reads them after each step.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct MediaView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub illustration: Option<MediaCue>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub portrait: Option<MediaCue>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub music: Option<MediaCue>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ambience: Option<MediaCue>,
 }
 
 /// One roll of the dice, for a host that shows dice.

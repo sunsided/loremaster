@@ -1,0 +1,16 @@
+with: keeper
+start: hello
+nodes:
+  hello:
+    say: '"You came through the gate," the keeper says.'
+    options:
+      - say: '"It was not locked."'
+        go: laugh
+      - say: '"Goodbye."'
+        go: end
+  laugh:
+    say: 'The keeper laughs. "No. It never was."'
+    set: { keeper_won: true }
+    options:
+      - say: '"Goodbye."'
+        go: end

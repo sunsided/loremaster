@@ -90,6 +90,7 @@ pub fn check(project: &Project) -> Vec<Diagnostic> {
         place: None,
         named: None,
         contract: contract::Seen::default(),
+        played: BTreeSet::new(),
     };
     c.run();
     c.out
@@ -107,6 +108,8 @@ struct Checker<'a> {
     named: Option<Pools<CheckTypes>>,
     /// What the host contract check needs, gathered during the run (IF-2).
     contract: contract::Seen,
+    /// The assets that `play_sound` names.
+    played: BTreeSet<String>,
 }
 
 impl Checker<'_> {
@@ -763,7 +766,73 @@ impl Checker<'_> {
             self.effects(&file, "then", &rule.then);
         }
         self.walkthroughs();
+        self.media();
         self.contract();
+    }
+
+    /// Slots name assets and their conditions compile; each asset has its
+    /// licence, a caption where it needs one, and a use (ME-3).
+    fn media(&mut self) {
+        let story = self.story().clone();
+        let owners = (story.rooms.iter())
+            .map(|r| (format!("room:{}", r.id), &r.media))
+            .chain(
+                story
+                    .things
+                    .iter()
+                    .map(|t| (format!("thing:{}", t.id), &t.media)),
+            )
+            .chain(story.machines.iter().flat_map(|m| {
+                let key = format!("machine:{}", m.id);
+                (m.states.iter())
+                    .filter_map(move |s| Some((format!("{key}#{}", s.name()), s.media()?)))
+            }));
+        let mut used = self.played.clone();
+        let mut shown = BTreeSet::new();
+        for (key, media) in owners {
+            let file = self.file_of(key.split('#').next().unwrap_or(&key));
+            for (name, variants) in media.slots() {
+                let at = format!("{key}/media/{name}");
+                for v in variants {
+                    used.insert(v.asset.to_string());
+                    if matches!(name, "illustration" | "portrait") {
+                        shown.insert(v.asset.to_string());
+                    }
+                    if story.asset(v.asset.as_str()).is_none() {
+                        self.error(&file, &at, format!("unknown asset `{}`", v.asset));
+                    }
+                    if let Some(when) = &v.when {
+                        self.condition(&file, &at, when);
+                    }
+                }
+            }
+        }
+        for asset in &story.assets {
+            let key = format!("asset:{}", asset.id);
+            let file = self.file_of(&key);
+            if !crate::load::safe_asset_path(&asset.file) {
+                self.error(
+                    &file,
+                    &key,
+                    format!("`{}` is no path inside the project", asset.file),
+                );
+            }
+            if asset.licence.is_none() {
+                self.warning(&file, &key, "the asset has no `licence`");
+            }
+            if !used.contains(asset.id.as_str()) {
+                self.warning(&file, &key, "no slot and no `play_sound` uses the asset");
+            }
+            let needs_text =
+                shown.contains(asset.id.as_str()) || self.played.contains(asset.id.as_str());
+            if needs_text && !asset.decorative && asset.caption.is_none() {
+                self.warning(
+                    &file,
+                    &key,
+                    "the asset has no `caption` (or `decorative: true`)",
+                );
+            }
+        }
     }
 
     /// Variables, machines, rooms and things must not take a built-in name
@@ -1094,6 +1163,12 @@ impl Checker<'_> {
                             &at,
                             format!("`call: {b}` names no behavior of the story (`behaviors:` in story.yaml or `behaviors/{b}.yaml`)"),
                         );
+                    }
+                }
+                Effect::PlaySound(id) => {
+                    self.played.insert(id.to_string());
+                    if self.story().asset(id.as_str()).is_none() {
+                        self.error(file, &at, format!("unknown asset `{id}`"));
                     }
                 }
                 Effect::Stop | Effect::Emit(_) => {}

@@ -1,0 +1,19 @@
+# The alarm music wins over the music of the rooms while the bell rings.
+start: quiet
+states:
+  - quiet
+  - name: ringing
+    media: { music: alarm }
+steps:
+  - from: quiet
+    on: { verb: [pull, rope] }
+    to: ringing
+    instead: true
+    say: "High above, a bell starts to toll."
+    then:
+      - play_sound: bell
+  - from: ringing
+    on: { verb: [pull, rope] }
+    to: quiet
+    instead: true
+    say: "The bell falls silent."

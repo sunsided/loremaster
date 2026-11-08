@@ -39,7 +39,7 @@
 	<span class="right">
 		<span><span class="wide">Day {day} · </span>{time} · {phase}</span>
 		<MenuButton label="Turn {turn}: game actions" items={turnItems} align="end" look="inverse"
-			><span class="wide">Turn </span><span class="narrow" aria-hidden="true">T</span>{turn}</MenuButton
+			><span class="wide">Turn {turn}</span><span class="narrow">{turn}</span></MenuButton
 		>
 	</span>
 </div>
@@ -87,6 +87,10 @@
 	}
 	.narrow {
 		display: none;
+	}
+	/* Generated, so the visible text of the button stays part of its accessible name. */
+	.narrow::before {
+		content: 'T';
 	}
 	/* On a phone the line stays one row: the day and the word "Turn" go. */
 	@media (max-width: 599px) {

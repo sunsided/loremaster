@@ -1,0 +1,10 @@
+# A small story with media slots, sound effects and captions.
+# All assets were made for this example. See README.md.
+title: The Gatehouse
+author: loremaster example
+start: road
+seed: 1
+intro:
+  - "You come to the gatehouse at dusk."
+vars:
+  - { id: keeper_won, type: bool, initial: false }

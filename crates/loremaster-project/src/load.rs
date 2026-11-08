@@ -1,8 +1,8 @@
 use crate::merge::{Extension, MergeMode, extend_entity, merge_mode};
 use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
-    Agenda, ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note, Room,
-    Rule, Story, TextPool, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
+    Agenda, Asset, ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note,
+    Room, Rule, Story, TextPool, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -148,6 +148,8 @@ pub struct Pack {
     pub verbs: Vec<VerbDef>,
     pub timers: Vec<Timer>,
     pub endings: Vec<Ending>,
+    /// Media files with their licence and caption, from `assets/`.
+    pub assets: Vec<Asset>,
     /// Named text pools, from `texts/`.
     pub texts: Vec<TextPool>,
     /// What actors do on their own (D6).
@@ -201,6 +203,7 @@ impl Pack {
         let mut verbs: Vec<VerbDef> = Vec::new();
         let mut timers: Vec<Timer> = Vec::new();
         let mut endings: Vec<Ending> = Vec::new();
+        let mut assets: Vec<Asset> = Vec::new();
         let mut texts: Vec<TextPool> = Vec::new();
         let mut agendas: Vec<Agenda> = Vec::new();
         let mut replaces = BTreeSet::new();
@@ -341,6 +344,15 @@ impl Pack {
                     origins.insert(format!("behavior:{stem}"), Origin::yaml(path));
                     behaviors.push(Id::new(stem));
                 }
+                "assets" => {
+                    match serde_saphyr::from_str::<Asset>(&with_default_id(&file_text, stem)) {
+                        Ok(a) => {
+                            origins.insert(format!("asset:{}", a.id), Origin::yaml(path));
+                            assets.push(a);
+                        }
+                        Err(e) => errors.push(parse_err(e)),
+                    }
+                }
                 "endings" => {
                     match serde_saphyr::from_str::<Ending>(&with_default_id(&file_text, stem)) {
                         Ok(e) => {
@@ -446,6 +458,7 @@ impl Pack {
             verbs,
             timers,
             endings,
+            assets,
             texts,
             agendas,
             files,
@@ -476,6 +489,7 @@ pub const FOLDERS: &[&str] = &[
     "agendas",
     "behaviors",
     "tests",
+    "assets",
 ];
 
 fn unknown_folder(path: &str, dir: &str) -> Diagnostic {
@@ -571,6 +585,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut behaviors: Vec<Id> = Vec::new();
     let mut verbs: Vec<VerbDef> = Vec::new();
     let mut timers: Vec<Timer> = Vec::new();
+    let mut assets: Vec<Asset> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
     let mut texts: Vec<TextPool> = Vec::new();
     let mut agendas: Vec<Agenda> = Vec::new();
@@ -671,6 +686,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         verbs.extend(pack.verbs);
         timers.extend(pack.timers);
         endings.extend(pack.endings);
+        assets.extend(pack.assets);
         texts.extend(pack.texts);
         agendas.extend(pack.agendas);
         files.extend(pack.files);
@@ -758,6 +774,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         things,
         rules,
         endings,
+        assets,
         timers: header.timers.into_iter().chain(timers).collect(),
         agendas,
         behaviors: header
@@ -991,6 +1008,36 @@ fn parse_diagnostic(path: &str, message: &str) -> Diagnostic {
         line: number_after("line"),
         column: number_after("column"),
     }
+}
+
+/// The asset files that are not in the project folder (ME-3). This needs
+/// the disk, so it is apart from [`check`].
+#[cfg(not(target_family = "wasm"))]
+pub fn missing_asset_files(project: &Project, root: &std::path::Path) -> Vec<Diagnostic> {
+    (project.story.assets.iter())
+        .filter(|a| safe_asset_path(&a.file) && !root.join(&a.file).is_file())
+        .map(|a| {
+            let key = format!("asset:{}", a.id);
+            let file = project.origins.get(&key).map(|o| o.file().to_string());
+            Diagnostic::error(
+                file.unwrap_or_default(),
+                key,
+                format!("the file `{}` does not exist", a.file),
+            )
+        })
+        .collect()
+}
+
+/// The path stays inside the project: relative, without `..`, and no URL.
+/// Windows drops trailing dots and spaces of a name, so `.. ` is `..` there:
+/// a name of only dots and spaces is refused, except `.`.
+pub(crate) fn safe_asset_path(path: &str) -> bool {
+    !path.is_empty()
+        && !path.starts_with(['/', '\\'])
+        && !path.contains(':')
+        && !(path.split(['/', '\\'])).any(|part| {
+            part != "." && !part.is_empty() && part.trim_end_matches(['.', ' ']).is_empty()
+        })
 }
 
 /// Read every YAML file under a project folder.
