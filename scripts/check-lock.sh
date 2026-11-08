@@ -30,6 +30,9 @@ registry = "registry+https://github.com/rust-lang/crates.io-index"
 
 def allows(req, version):
     """Cargo's rule for `=x.y.z` (exact) and a plain `x.y` (caret)."""
+    version = version.split("+")[0]  # build metadata does not count
+    if not re.fullmatch(r"=?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?", req):
+        raise ValueError(req)
     if req.startswith("="):
         return version == req[1:]
     if "-" in version:
@@ -44,6 +47,7 @@ def allows(req, version):
 assert allows("0.3", "0.3.1") and allows("0.3", "0.3.0") and not allows("0.3", "0.4.0")
 assert not allows("0.3", "0.3.0-alpha.5") and allows("=0.3.0-alpha.5", "0.3.0-alpha.5")
 assert allows("1.2", "1.9.0") and not allows("1.2", "1.1.9") and not allows("1.2", "2.0.0")
+assert allows("0.3", "0.3.1+build")
 
 bad = False
 for crate in (
@@ -63,7 +67,14 @@ for crate in (
         if source != registry:
             print(f"error: Cargo.lock does not take {crate} from crates.io ({source})")
             bad = True
-        elif not allows(want, p["version"]):
+            continue
+        try:
+            ok = allows(want, p["version"])
+        except ValueError:
+            print(f"error: check-lock.sh only reads `=x.y.z` and `x.y[.z]`; {crate} asks for {want!r}")
+            bad = True
+            continue
+        if not ok:
             print(f"error: Cargo.lock has {crate} {p['version']}, Cargo.toml asks for {want}")
             bad = True
 if bad:

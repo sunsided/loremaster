@@ -98,10 +98,13 @@ jobs:
           key: dramaturge-tip
       - name: Patch dramaturge to the tip of main
         run: |
-          # A patch applies only when its version satisfies the requirement.
-          # Allow any version from 0.3.0 on, so the patch also applies after
-          # main raised the minor version.
-          sed -i -E 's/^(dramaturge-[a-z]+ = (\{ version = )?)"[^"]+"/\1">=0.3.0"/' Cargo.toml
+          # A patch applies only when its version satisfies the requirement,
+          # and a range never takes a pre-release of another version. Ask
+          # for exactly the version on main, whatever it is.
+          version=$(curl -fsSL https://raw.githubusercontent.com/sunsided/dramaturge/main/Cargo.toml \
+            | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
+          test -n "$version"
+          sed -i -E "s/^(dramaturge-[a-z]+ = (\\{ version = )?)\"[^\"]+\"/\\1\"=$version\"/" Cargo.toml
           mkdir -p .cargo
           {
             echo '[patch.crates-io]'

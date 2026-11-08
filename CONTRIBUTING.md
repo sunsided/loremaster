@@ -139,7 +139,7 @@ loremaster takes the dramaturge crates from crates.io (`"0.3"` in `Cargo.toml`).
   dramaturge-syntax = { path = "../dramaturge/crates/dramaturge-syntax" }
   ```
 
-  Cargo uses a patch only when its version satisfies the requirement in `Cargo.toml`. Between releases, dramaturge keeps the released version on `main` (cargo-release sets the version at the release), so the patch applies. If `../dramaturge` has a version outside `0.3`, cargo prints "Patch ... was not used" and builds the crates.io release: then relax the requirement in `Cargo.toml` locally, and do not commit that change.
+  Cargo uses a patch only when its version satisfies the requirement in `Cargo.toml`. Between releases, dramaturge keeps the released version on `main` (cargo-release sets the version at the release), so the patch applies. If `../dramaturge` has a version outside `0.3`, or a pre-release such as `0.3.2-alpha.1` (a requirement without a pre-release never takes one), cargo prints "Patch ... was not used" and builds the crates.io release: then relax the requirement in `Cargo.toml` locally, and do not commit that change.
 
   With the patch, each cargo command rewrites `Cargo.lock` with path sources. Do not commit that file: `task lock:check` (part of `task verify`, and the first step in CI) fails on a staged `Cargo.lock` without the crates.io source.
 
