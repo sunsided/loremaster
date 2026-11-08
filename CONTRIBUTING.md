@@ -30,17 +30,17 @@ The crate `loremaster` builds with the web editor by default. In a git checkout,
 
 ### How loremaster uses dramaturge
 
-loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.2 (`dramaturge-model`, `dramaturge-runtime` and `dramaturge-authoring`) for conditions, the stored facts and dialogues. All other parts are loremaster's own.
+loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.3 (`dramaturge-model`, `dramaturge-runtime`, `dramaturge-authoring` and `dramaturge-syntax`) for conditions, dialogues and the selection of text. loremaster keeps all state: its `State` holds the facts, relations and memories once, and dramaturge reads and writes them through its `NarrativeState` trait (`crates/loremaster-runtime/src/game/narrative.rs`).
 
 | Part | dramaturge | loremaster |
 | --- | --- | --- |
-| Conditions | Each `when:` compiles to a dramaturge `Condition` tree: `FactEquals`, `FactAtLeast`, `FactAtMost`, `All`, `Any`, `Not` | `loremaster-lang` parses the condition language and does the compilation |
-| Stored facts | Story variables and thing properties are world facts (`FactScope::World`) in a `DialogWorldState` | The save state keeps the same facts again (`State.facts`), because dramaturge 0.1 had no serialization |
-| Derived values | One `Condition::Custom` with the key `loremaster.derived` | A `CustomHandler` answers the time of day, the room, visits, carried things and the action verb |
-| Evaluation | `DefaultConditionEvaluator` walks `All`, `Any` and `Not` | `crates/loremaster-runtime/src/eval.rs` |
-| Text fragments, rules, verbs, parser, map, clock | Not used | loremaster's own model and runtime |
-| Dialogues | `dialogues/*.yaml` compiles to a `DialogueGraph`, with ids from a `SymbolTable`. `DefaultRuntime` selects the answers that show and applies their outcomes. `dramaturge-authoring` examines each graph in `loremaster check` | `crates/loremaster-lang/src/dialogue.rs` and `crates/loremaster-runtime/src/game/talk.rs`. The text stays loremaster markup. World effects (`then`) and `add` go through `Outcome::Custom` |
-| Relations and memories | `<thing>.<axis>` and `remembers(<thing>, <memory>)` compile to `RelationshipAtLeast`/`AtMost` and `HasMemory`. The player is the entity `@player` | The save state keeps the same values again (`State.relations`, `State.memories`). Read [docs/dramaturge-dialogue-fit.md](docs/dramaturge-dialogue-fit.md) |
+| Conditions | Each `when:` compiles to a dramaturge `Condition` tree | `loremaster-lang` parses the condition language and compiles it. Derived values (time of day, room, visits, carried things, the action) are one `Condition::Custom` with the key `loremaster.derived` |
+| Stored state | Reads and writes through `NarrativeState` | `State.facts`, `State.relations` and `State.memories`, the only copy, also in the save |
+| Dialogues | The dialogue AST of `dramaturge-syntax` and the runtime that selects answers and applies outcomes. `dramaturge-authoring` examines each graph in `loremaster check` | `dialogues/*.yaml` and `world!` read into the AST. The text stays loremaster markup |
+| Text pools | The selection core: pools, `select`, `commit`, the trace | Markup, layers and room assembly on top (`crates/loremaster-runtime/src/text.rs`) |
+| Rules, verbs, parser, map, clock, machines, combat | Not used | loremaster's own model and runtime |
+
+The fit reports in `docs/` (`dramaturge-dialogue-fit.md`, `dramaturge-lock-keeper-fit.md`) give the details.
 
 ### Commands
 
@@ -55,11 +55,10 @@ Install [go-task](https://taskfile.dev), Trunk and Node.js before you start, and
 | `task build:static` | Builds the browser-only site for GitHub Pages into `web/build`, below `/loremaster`. |
 | `task release:ui` | Builds the web app below `/` and copies it into `crates/loremaster-mcp/ui` for the embedded editor. |
 | `task build:local` | Builds `target/release/loremaster` with the web editor in it. |
-| `task package` | Builds the web editor, then packages the crates for crates.io. It does not upload them. |
 | `task serve:local` | Builds the local binary, then opens the example in the editor. |
 | `task storybook` | Starts Storybook on port 6006. |
-| `task web:check` | Type-checks the Svelte code and the stories. |
-| `task verify` | Examines the format, runs clippy and runs the Rust tests. |
+
+The commands that check a change are in "Checks" below.
 
 If you do not use go-task:
 
@@ -83,10 +82,6 @@ These rules apply to all web work:
 - Make each element accessible from the start. The target is WCAG 2.2 AA.
 - Make each element work at all widths from 320px.
 - Write a story with documentation for each element.
-
-### Documentation
-
-Write all documentation in ASD-STE100 Simplified Technical English. The "Foundations/Writing documentation" page in Storybook gives the rules.
 
 ## Branches
 
