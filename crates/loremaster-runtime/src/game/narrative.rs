@@ -103,7 +103,9 @@ impl NarrativeState for Game {
             return;
         }
         if let Some(key) = self.relation_key(source, target, &axis.0) {
-            *self.state.relations.entry(key).or_insert(0) += delta;
+            // Saturates: an imported episode can hold any value.
+            let value = self.state.relations.entry(key).or_insert(0);
+            *value = value.saturating_add(delta);
         }
     }
 

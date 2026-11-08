@@ -104,6 +104,28 @@ impl Score {
     }
 }
 
+/// What an episode carries from one story of a series to the next (TX-12):
+/// the lists `export:` and `import:` in story.yaml.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EpisodeItems {
+    /// Story variables and thing properties, for example `gold` or `lamp.lit`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub facts: Vec<String>,
+    /// Relations as `thing.axis`, for example `keeper.trust`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub relations: Vec<String>,
+    /// Memories as `thing.key`, for example `keeper.asked`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub memories: Vec<String>,
+}
+
+impl EpisodeItems {
+    pub fn is_empty(&self) -> bool {
+        self.facts.is_empty() && self.relations.is_empty() && self.memories.is_empty()
+    }
+}
+
 /// A whole story: everything a project folder holds, and what the bundle carries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Story {
@@ -193,6 +215,12 @@ pub struct Story {
     /// Long-range threads: promises to the reader, with their beats in notes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub threads: Vec<Thread>,
+    /// What the episode of this story carries to the next story (TX-12).
+    #[serde(default, skip_serializing_if = "EpisodeItems::is_empty")]
+    pub export: EpisodeItems,
+    /// What this story takes from the episode of the story before (TX-12).
+    #[serde(default, skip_serializing_if = "EpisodeItems::is_empty")]
+    pub import: EpisodeItems,
 }
 
 fn yes() -> bool {

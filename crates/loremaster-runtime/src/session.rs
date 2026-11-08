@@ -217,6 +217,19 @@ impl Session {
         Self::load(world, json)
     }
 
+    /// A new game of `world` that starts with an episode of the story
+    /// before (TX-12), as JSON. It takes only what `import` in story.yaml
+    /// lists; the report says what it took and what did not fit. Call
+    /// [`Session::start`] next, as for a new game.
+    pub fn from_episode(
+        world: Arc<World>,
+        episode: serde_json::Value,
+    ) -> Result<(Self, crate::Imported), SaveError> {
+        let mut session = Self::new(world);
+        let imported = session.game.import_episode(episode)?;
+        Ok((session, imported))
+    }
+
     /// The opening: the intro and the first room. A second call, or a call
     /// after a restore, starts nothing again and only reports the status.
     pub fn start(&mut self) -> Step {
@@ -367,6 +380,12 @@ impl Session {
     /// Choose an answer: a short form of `submit(Input::Choice(index))`.
     pub fn choose(&mut self, index: usize) -> Step {
         self.submit(Input::Choice(index))
+    }
+
+    /// The episode for the next story (TX-12): the values that `export` in
+    /// story.yaml lists. A host writes it at the end, or at any time.
+    pub fn episode(&self) -> crate::Episode {
+        self.game.episode()
     }
 
     /// The game as a save game (ADR 0001).
