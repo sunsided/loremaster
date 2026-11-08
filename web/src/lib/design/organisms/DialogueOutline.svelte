@@ -18,7 +18,7 @@
 	const nodeId = (key: string) => `${uid}-node-${key}`;
 	const problems = $derived(
 		outline
-			? outline.nodes.reduce((n, node) => n + (node.unreachable ? 1 : 0) + node.options.filter((o) => o.missing).length, 0)
+			? outline.nodes.reduce((n, node) => n + (node.unreachable ? 1 : 0) + node.options.filter((o) => o.missing).length + (node.next_missing ? 1 : 0), 0)
 			: 0
 	);
 
@@ -94,7 +94,9 @@
 							{/each}
 						</ol>
 					{/if}
-					{#if node.next === 'end' || node.next === 'back'}
+					{#if node.next_missing}
+						<p class="go"><span class="problem">▲ goes on to <code>{node.next}</code>, but there is no node “{node.next}”</span></p>
+					{:else if node.next === 'end' || node.next === 'back'}
 						<p class="go muted">Without an answer: {node.next === 'end' ? '→ ends the talk' : '→ back to the node before'}</p>
 					{:else if node.next}
 						<p class="go"><span class="muted">Without an answer:</span> <button type="button" class="link" onclick={() => goTo(node.next ?? '')}>→ {node.next}</button></p>

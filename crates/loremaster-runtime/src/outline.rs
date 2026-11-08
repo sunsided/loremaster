@@ -29,6 +29,9 @@ pub struct OutlineNode {
     /// Where the talk goes on without a choice: a node key, `end` or `back`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Option<String>,
+    /// `next` names a node that does not exist.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub next_missing: bool,
     pub outcomes: Vec<String>,
     pub options: Vec<OutlineOption>,
     /// No start node leads here.
@@ -95,6 +98,7 @@ impl DialogueOutline {
                         })
                         .collect(),
                     next: n.next.as_ref().map(|t| t.as_key().to_string()),
+                    next_missing: matches!(&n.next, Some(DialogueTarget::Node(g)) if !keys.contains(g.as_str())),
                     outcomes: describe(&n.outcomes),
                     options: n
                         .options

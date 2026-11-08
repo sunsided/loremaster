@@ -125,6 +125,8 @@ export interface OutlineNode {
 	lines?: OutlineLine[];
 	/** Where the talk goes on without a choice: a node key, `end` or `back`. */
 	next?: string;
+	/** `next` names a node that does not exist. */
+	next_missing?: boolean;
 	outcomes: string[];
 	options: OutlineOption[];
 	/** No start node leads here. */
