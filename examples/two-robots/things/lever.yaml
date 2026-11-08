@@ -1,0 +1,6 @@
+name: spring lever
+aliases: [lever]
+listed: false
+location: { room: gallery }
+description:
+  - "It lifts back up the moment nothing holds it down."

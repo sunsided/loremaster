@@ -74,7 +74,7 @@ description:
         learn: [ash_is_fresh]
 ```
 
-`pick` is `first` (the default: the first candidate whose condition holds), `best` (the candidate with the most tests: each test in `when` counts 1, `a and b` the sum, `a or b` the smaller side, and `speaker` and `topic` 1 each; a tie goes to the file order) or `all` (every candidate that holds, as a plain fragment list). A candidate is a text, or a map with `key`, `when`, `mode`, `text` or `variants`, `learn`, `speaker` and `topic`, or an inner group (`id`, `pick`, `one_of`). `seen_by(x)` is true when `x` sees the text: today the player always does, so the slice writes `seen_by(player)`.
+`pick` is `first` (the default: the first candidate whose condition holds), `best` (the candidate with the most tests: each test in `when` counts 1, `a and b` the sum, `a or b` the smaller side, and `speaker` and `topic` 1 each; a tie goes to the file order) or `all` (every candidate that holds, as a plain fragment list). A candidate is a text, or a map with `key`, `when`, `mode`, `text` or `variants`, `learn`, `speaker` and `topic`, or an inner group (`id`, `pick`, `one_of`). `seen_by(x)` is true when `x` sees the text: the active actor (the player, unless the story has `playable` actors; see [Several player actors](#several-player-actors)).
 
 ### Named text pools
 
@@ -691,6 +691,33 @@ How a turn goes for an actor, after the clock moved and the timers and time rule
 `closes` marks a point of no return, for the ending checks. It is not a dead end: after the keeper burns the pages, the best ending (`committed`) is gone, but the game can still end (`ashes`). A drop in the best reachable ending is a warning, unless the step names the ending in `closes`; a dead end, where no ending can be reached at all, is an error. `loremaster check` checks today that `closes` names known endings.
 
 The explorer (`loremaster explore`) waits in a story with agendas, as it does for timers. It tells states apart by the minutes until each agenda's next step, so it reaches a step also in the middle of a phase. The ending checks treat a step's `closes` as they treat a rule's; their findings name the step as `agenda:<id>/steps[<i>]`.
+
+## Several player actors
+
+A story can give the player more than one body. List the actors in story.yaml; each is a thing in a room, with `container: true`. The first one starts the story and must be in the `start` room.
+
+```yaml
+# story.yaml
+playable: [wick, bilge]
+```
+
+```yaml
+# things/wick.yaml
+name: Wick
+proper: true
+container: true
+location: { room: gallery }
+props: { active: true }
+```
+
+- `switch to bilge` (also `become`, `control`) makes Bilge the active actor. It takes no turn and shows Bilge's view of its room. A switch is no entry: Bilge stood there already, so no `enter` rule runs and no visit counts. Only a story with `playable` has this verb.
+- The active actor is the player's body: `State.room`, the carried things and the default actions are its own. The active actor is not listed in the room. The things another playable actor carries are `in` it, so they are out of reach and do not count for `carried`.
+- `seen_by(bilge)` shows text only to Bilge. The perceiver of a text is the active actor.
+- `bilge.active` is true while the player steers Bilge, for rule conditions. Declare it as a property to use it in a rule.
+- An order to another actor: `bilge, take spanner` or `bilge, s then turn port wheel`, or a `Command` record with `actor: bilge`. An order takes the player's turn; each step then runs in one turn, after the agendas, as that actor. The player reads what the actor perceives as it acts, and the actor reports when it is done. A new order replaces the old one. A switch to the actor cancels its orders. A step that the parser cannot read ends the order.
+- `loremaster check` wants each playable actor in a room, `container: true`, not `portable`, and without an agenda.
+
+The active actor is in the save (`State.active`, `State.orders`). The state explorer tries a `switch`, but not orders: they reach the same states. Read `examples/two-robots`.
 
 ## Containers and scenery
 

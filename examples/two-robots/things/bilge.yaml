@@ -1,0 +1,10 @@
+name: Bilge
+aliases: [robot]
+proper: true
+container: true
+location: { room: gallery }
+props: { active: false }
+description:
+  - "A squat maintenance robot with a microphone on top. It has no camera."
+presence:
+  - "Bilge waits here on its treads."

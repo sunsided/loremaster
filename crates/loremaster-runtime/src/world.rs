@@ -867,6 +867,19 @@ impl World {
                 default: None,
             });
         }
+        if !story.playable.is_empty() {
+            verbs.push(VerbDef {
+                id: Id::new(crate::game::SWITCH),
+                label: "Switch to".into(),
+                words: ["switch to", "switch", "become", "control"]
+                    .map(String::from)
+                    .to_vec(),
+                slots: loremaster_model::VerbSlots::One,
+                preposition: None,
+                bar: false,
+                default: None,
+            });
+        }
         verbs.extend(story.verbs.iter().cloned());
         let room_index = story
             .rooms

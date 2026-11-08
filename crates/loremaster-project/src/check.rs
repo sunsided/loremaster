@@ -655,6 +655,7 @@ impl Checker<'_> {
         self.texts();
         self.player_thing();
         self.timers();
+        self.playable();
         self.agendas();
         self.endings();
         self.machines();
@@ -1535,6 +1536,57 @@ impl Checker<'_> {
                 format!("unknown actor `{actor}`: an actor is `player` or a thing with an agenda")
             };
             self.error(file, &format!("{at}.actor"), message);
+        }
+    }
+
+    /// Each playable actor (WO-5): a thing in a room, that can hold what the
+    /// actor carries while the player steers another one, and that no agenda
+    /// moves behind the player's back. The first one starts the story.
+    fn playable(&mut self) {
+        let story = self.story();
+        let playable = story.playable.clone();
+        let start = story.start.clone();
+        let file = self.file_of("story");
+        let mut seen = BTreeSet::new();
+        for (i, id) in playable.iter().enumerate() {
+            let at = format!("playable[{i}]");
+            if !seen.insert(id) {
+                self.error(&file, &at, format!("`{id}` is playable twice"));
+                continue;
+            }
+            let story = self.story();
+            let Some(thing) = story.thing(id.as_str()) else {
+                self.error(
+                    &file,
+                    &at,
+                    format!("unknown thing `{id}`: a playable actor is a thing"),
+                );
+                continue;
+            };
+            let mut problems = Vec::new();
+            match &thing.location {
+                Location::Room(r) if i == 0 && *r != start => problems.push(format!(
+                    "the first playable actor starts the story: put `{id}` in `{start}`"
+                )),
+                Location::Room(_) => {}
+                _ => problems.push(format!("`{id}` needs a room as its location")),
+            }
+            if !thing.container {
+                problems.push(format!(
+                    "`{id}` needs `container: true`: it holds what it carries"
+                ));
+            }
+            if thing.portable {
+                problems.push(format!("`{id}` is portable; a playable actor is not"));
+            }
+            if story.agenda_of(id.as_str()).is_some() {
+                problems.push(format!(
+                    "`{id}` has an agenda; the player steers a playable actor"
+                ));
+            }
+            for message in problems {
+                self.error(&file, &at, message);
+            }
         }
     }
 

@@ -1,0 +1,6 @@
+name: wall panel
+aliases: [panel, needle]
+listed: false
+location: { room: gallery }
+description:
+  - "Two dials, port and starboard."
