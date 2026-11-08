@@ -122,7 +122,10 @@ impl Loremaster {
         for (path, mut pack) in packs {
             let tmp = path.with_extension("yaml.tmp");
             std::fs::write(&tmp, pack.to_yaml())?;
-            std::fs::rename(&tmp, &path)?;
+            if let Err(e) = std::fs::rename(&tmp, &path) {
+                let _ = std::fs::remove_file(&tmp);
+                return Err(e);
+            }
             paths.push(path);
         }
         for entry in std::fs::read_dir(&out)? {

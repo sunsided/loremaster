@@ -22,8 +22,8 @@ export function yamlPath(key: string): string | null {
 	const at = key.indexOf(':');
 	const folder = at > 0 ? FOLDERS[key.slice(0, at)] : undefined;
 	const id = key.slice(at + 1);
-	// A file name on every system: no `:` or `/`, no leading dot, no reserved Windows name.
-	const safe = /^[\w-][\w.-]*$/.test(id) && !/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(id);
+	// A file name on every system: no `:` or `/`, no leading or trailing dot, no reserved Windows name.
+	const safe = /^[\w-]([\w.-]*[\w-])?$/.test(id) && !/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(id);
 	return folder && safe ? `${folder}/${id}.yaml` : null;
 }
 
