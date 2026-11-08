@@ -1807,6 +1807,7 @@ impl Game {
                 self.state.ending = Some(ending.clone());
                 // An ended story answers no await.
                 self.state.awaiting = None;
+                self.state.combat = None;
             }
             CEffect::Stop => self.stopped = true,
             CEffect::Call(id) => self.call_behavior(turn, rule, id, depth),

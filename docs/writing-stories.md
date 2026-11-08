@@ -442,7 +442,7 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: "Test your Luck", rolls: [4] }
 ```
 
-`combat` works only in rules. The `min` of `stamina` must be 0 or less, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, or rounds of an all-at-once combat in which the player hits and an enemy hits too.
+`combat` works only in rules. The `min` of `stamina` must be a number of 0 or less, not a variable, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, and it does not force rounds of an all-at-once combat in which the player hits and an enemy hits too.
 
 ### Number limits and sums
 
