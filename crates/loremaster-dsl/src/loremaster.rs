@@ -3,7 +3,8 @@
 use loremaster_project::{
     Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble, check,
 };
-use loremaster_runtime::World;
+use loremaster_runtime::{Behavior, World};
+use std::sync::Arc;
 
 /// The sources of a story, in a fixed order: packs from Rust and YAML
 /// folders. A later pack can extend or replace an entity of an earlier one.
@@ -146,10 +147,28 @@ impl Loremaster {
 
     /// Join the packs, check the project and compile the world. Warnings of
     /// the check do not stop the build; [`check`](Self::check) returns them.
+    /// The behaviors that the Rust packs keep ([`BuildPack::register`](crate::BuildPack::register))
+    /// are registered in the world.
     pub fn build(self) -> Result<World, Vec<Diagnostic>> {
+        let behaviors: Vec<Arc<dyn Behavior>> = self
+            .sources
+            .iter()
+            .filter_map(|s| match s {
+                Source::Pack(p) => Some(&p.instances),
+                _ => None,
+            })
+            .flatten()
+            .filter_map(|i| i.downcast_ref::<Arc<dyn Behavior>>().cloned())
+            .collect();
         let (project, _warnings) = self.check()?;
-        World::compile(project.story.clone())
-            .map_err(|e| vec![rust_place(&project, Diagnostic::from(&e))])
+        let mut world = World::compile(project.story.clone())
+            .map_err(|e| vec![rust_place(&project, Diagnostic::from(&e))])?;
+        // Reversed: the world takes the first with an id, and the `rust` block
+        // of a replacing machine must win.
+        for b in behaviors.into_iter().rev() {
+            world.register_shared(b);
+        }
+        Ok(world)
     }
 }
 
