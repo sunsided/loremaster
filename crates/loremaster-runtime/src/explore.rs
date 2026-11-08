@@ -177,7 +177,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     // of the player, and an indirect object needs a direct one.
     for rule in &story.rules {
         if let EventPattern::Verb(p) = &rule.on
-            && p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
+            && for_player(p)
             && (p.direct.is_some() || p.indirect.is_none())
         {
             let objects: Vec<Id> = p.objects().cloned().collect();
@@ -206,7 +206,9 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     }
     // The standard verbs that change state.
     let take_rules = story.rules.iter().any(|r| {
-        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p) if p.verb.as_str() == "take")
+        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
+            if p.verb.as_str() == "take"
+                && for_player(p))
     });
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();
@@ -280,6 +282,11 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out.dedup_by(|a, b| a.0 == b.0);
     out
+}
+
+/// A pattern that matches the player's commands: no `actor`, or the player.
+fn for_player(p: &loremaster_model::CommandPattern) -> bool {
+    p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
 }
 
 fn facts_of(game: &Game) -> Vec<String> {

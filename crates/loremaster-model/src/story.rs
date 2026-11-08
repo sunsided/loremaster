@@ -100,7 +100,8 @@ pub struct Story {
     #[serde(default = "yes", skip_serializing_if = "is_true")]
     pub death_prompt: bool,
     /// How many things the player can hold in the hands (WO-3). Things
-    /// inside a carried container do not count. Without it, any number.
+    /// inside a carried container, and concealed things, do not count.
+    /// Without it, any number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub carry_limit: Option<u32>,
     /// Counters that go down each turn.
