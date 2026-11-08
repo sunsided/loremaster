@@ -67,7 +67,8 @@ pub(crate) fn take_override(text: &str) -> Result<(Option<OverrideBase>, String)
         .take_while(|l| l.is_empty() || l.starts_with([' ', '\t']))
         .count();
     let end = start + 1 + inside;
-    let block = lines[start..end].join("\n") + "\n";
+    // Blank lines before the block keep the line numbers of errors right.
+    let block = "\n".repeat(start) + &lines[start..end].join("\n") + "\n";
     let block: Block = serde_saphyr::from_str(&block).map_err(|e| e.to_string())?;
     lines[start..end].fill("");
     Ok((Some(block.r#override), lines.join("\n") + "\n"))
@@ -204,6 +205,9 @@ mod tests {
         assert_eq!(base.commit, None);
         assert_eq!(rest, "\n\n\n\n\n\nname: A\n");
         assert_eq!(take_override("name: A\n").unwrap().0, None);
+        // An error in the block names the line of the file.
+        let bad = "name: A\noverride:\n  entity: room:a\n  line: x\n";
+        assert!(take_override(bad).unwrap_err().contains("line 4"));
     }
 
     #[test]

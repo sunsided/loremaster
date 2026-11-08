@@ -273,3 +273,15 @@ fn the_model_hash_does_not_depend_on_the_order_of_files_or_packs() {
     assert_ne!(one.story.things, two.story.things, "the order differs");
     assert_eq!(model_hash(&one.story), model_hash(&two.story));
 }
+
+#[test]
+fn a_json_file_that_is_not_an_export_is_an_error() {
+    for text in ["{}", r#"{ "name": "w", "roomz": [] }"#] {
+        let files = vec![SourceFile {
+            path: "packs/w.json".into(),
+            text: text.into(),
+        }];
+        let found = messages(load(files));
+        assert!(found[0].starts_with("not an exported pack"), "{found:?}");
+    }
+}

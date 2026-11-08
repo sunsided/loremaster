@@ -80,22 +80,24 @@ impl Loremaster {
     }
 
     /// Write each Rust pack to `<dir>/packs/<name>.json`, for the generic
-    /// editor (`loremaster export-pack`), with the git commit when there is
-    /// one. Returns the paths.
+    /// editor (`loremaster export-pack`), with the git commit of `dir` when
+    /// there is one. Other `.json` files in `packs/` are removed: the loader
+    /// reads every one. Returns the paths.
     #[cfg(not(target_family = "wasm"))]
     pub fn export_packs(
         &self,
         dir: impl AsRef<std::path::Path>,
     ) -> std::io::Result<Vec<std::path::PathBuf>> {
         let out = dir.as_ref().join("packs");
-        std::fs::create_dir_all(&out)?;
         let commit = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir.as_ref())
             .args(["rev-parse", "HEAD"])
             .output()
             .ok()
             .filter(|o| o.status.success())
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
-        let mut paths = Vec::new();
+        let mut packs = Vec::new();
         for source in &self.sources {
             let Source::Pack(pack) = source else {
                 continue;
@@ -104,12 +106,25 @@ impl Loremaster {
             pack.commit.clone_from(&commit);
             // A world! pack is named after its module path.
             let path = out.join(format!("{}.json", pack.name.replace("::", "-")));
-            if paths.contains(&path) {
+            if packs.iter().any(|(p, _)| *p == path) {
                 return Err(std::io::Error::other(format!(
                     "two packs are named `{}`",
                     pack.name
                 )));
             }
+            packs.push((path, pack));
+        }
+        std::fs::create_dir_all(&out)?;
+        for entry in std::fs::read_dir(&out)? {
+            let path = entry?.path();
+            let stale = path.extension().is_some_and(|e| e == "json")
+                && !packs.iter().any(|(p, _)| *p == path);
+            if stale {
+                std::fs::remove_file(&path)?;
+            }
+        }
+        let mut paths = Vec::new();
+        for (path, mut pack) in packs {
             std::fs::write(&path, pack.to_json())?;
             paths.push(path);
         }

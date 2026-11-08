@@ -154,12 +154,18 @@ pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diag
     let mut packs = Vec::new();
     let mut errors = Vec::new();
     for f in files.iter().filter(|f| is_exported_pack(&f.path)) {
+        // Every export has a name, so `{}` is not one.
         match serde_json::from_str::<Pack>(&f.text) {
-            Ok(pack) => packs.push(pack),
-            Err(e) => errors.push(Diagnostic::error(
+            Ok(pack) if !pack.name.is_empty() => packs.push(pack),
+            found => errors.push(Diagnostic::error(
                 &f.path,
                 "",
-                format!("not an exported pack: {e}"),
+                format!(
+                    "not an exported pack: {}",
+                    found
+                        .err()
+                        .map_or("no `name`".to_string(), |e| e.to_string())
+                ),
             )),
         }
     }
@@ -185,7 +191,7 @@ fn is_exported_pack(path: &str) -> bool {
 /// that only a running program can have (`files`, `warnings`, `overrides`,
 /// `instances`) are not in it.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct Pack {
     /// The name in diagnostics, for example `yaml` or a Rust module.
     pub name: String,
@@ -574,6 +580,20 @@ impl Pack {
                     }
                 }
                 _ => {}
+            }
+        }
+        // An `id:` in the body that is not the overridden one would leave the
+        // Rust part in place.
+        for o in &overrides {
+            let defined = origins.get(&o.base.entity).and_then(Origin::yaml_path);
+            if defined != Some(o.path.as_str()) && !errors.iter().any(|d| d.file == o.path) {
+                errors.push(parse_diagnostic(
+                    &o.path,
+                    &format!(
+                        "this file overrides `{}`, but does not define it",
+                        o.base.entity
+                    ),
+                ));
             }
         }
 

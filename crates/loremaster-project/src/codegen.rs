@@ -14,7 +14,14 @@ use std::fmt::Write;
 /// The `world!` snippet for the entity `key` of `pack`.
 pub fn world_snippet(pack: &Pack, key: &str) -> Option<String> {
     let (kind, id) = key.split_once(':')?;
+    // `world!` reads an id as a Rust identifier and has no quoted form.
+    let ident = id
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphabetic() || c == '_')
+        && id.chars().all(|c| c.is_alphanumeric() || c == '_');
     let body = match kind {
+        _ if !ident => format!("    // port by hand: {key}: {}\n", pack.entity_value(key)?),
         "room" => room(pack.rooms.iter().find(|e| e.id.as_str() == id)?),
         "thing" => thing(pack.things.iter().find(|e| e.id.as_str() == id)?),
         "ending" => ending(pack.endings.iter().find(|e| e.id.as_str() == id)?),
@@ -63,7 +70,7 @@ fn frag(f: &Fragment) -> Option<String> {
 }
 
 fn plain_note(n: &Note) -> bool {
-    n.id.is_none() && !n.todo && !n.done
+    n.id.is_none() && !n.todo && !n.done && n.thread.is_none() && n.role.is_none()
 }
 
 /// The snake_case word of a unit variant, as in YAML.
@@ -95,7 +102,7 @@ fn hand(out: &mut String, what: &str, value: &Value) {
 
 fn notes(out: &mut String, list: &[Note]) {
     for n in list {
-        if n.id.is_some() || n.done {
+        if n.id.is_some() || n.done || n.thread.is_some() || n.role.is_some() {
             hand(out, "note", &serde_json::to_value(n).unwrap_or_default());
         } else {
             let kw = if n.todo { "todo" } else { "note" };
@@ -233,4 +240,40 @@ fn timer(t: &Timer) -> String {
     notes(&mut b, &t.notes);
     hand_field(&mut b, t, &["at"]);
     format!("    timer {} turns {} {{\n{b}    }}\n", t.id, t.turns)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use loremaster_model::{Id, NoteRole};
+
+    fn pack_with(room: Room) -> Pack {
+        Pack {
+            rooms: vec![room],
+            ..Pack::default()
+        }
+    }
+
+    #[test]
+    fn what_world_cannot_say_is_ported_by_hand() {
+        let mut beat = Note::text("The gull knows.");
+        beat.thread = Some(Id::new("lost_key"));
+        beat.role = Some(NoteRole::Setup);
+        let room = Room {
+            notes: vec![beat],
+            ..serde_json::from_value(serde_json::json!({ "id": "shore", "name": "Shore" })).unwrap()
+        };
+        let s = world_snippet(&pack_with(room), "room:shore").unwrap();
+        assert!(s.contains("// port by hand: note:"), "{s}");
+        assert!(s.contains("lost_key"), "{s}");
+
+        let room: Room =
+            serde_json::from_value(serde_json::json!({ "id": "front-door", "name": "Door" }))
+                .unwrap();
+        let s = world_snippet(&pack_with(room), "room:front-door").unwrap();
+        assert!(
+            s.starts_with("world! {\n    // port by hand: room:front-door:"),
+            "{s}"
+        );
+    }
 }

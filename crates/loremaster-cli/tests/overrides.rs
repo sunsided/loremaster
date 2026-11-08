@@ -216,3 +216,41 @@ fn the_whole_world_test_fails_on_warnings_only_when_strict() {
 
 // The generated test, on the world without an override.
 loremaster::dsl::world_test!(Loremaster::new().pack(world::pack()));
+
+#[test]
+fn an_override_whose_body_has_another_id_is_an_error() {
+    let mut files = override_files();
+    let shore = files
+        .iter_mut()
+        .find(|f| f.path == "rooms/shore.yaml")
+        .unwrap();
+    shore.text = shore.text.replace("\nid: shore\n", "\nid: beach\n");
+    let found = Loremaster::new()
+        .pack(world::pack())
+        .yaml_files(files)
+        .check()
+        .unwrap_err();
+    assert!(
+        found.iter().any(|d| d
+            .message
+            .contains("overrides `room:shore`, but does not define it")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn an_export_removes_stale_packs() {
+    let dir = std::env::temp_dir().join(format!("loremaster-export-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("packs")).unwrap();
+    std::fs::write(dir.join("packs/old.json"), "{}").unwrap();
+    let paths = Loremaster::new()
+        .pack(world::pack())
+        .export_packs(&dir)
+        .unwrap();
+    let left: Vec<_> = std::fs::read_dir(dir.join("packs"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert_eq!(left, paths);
+}

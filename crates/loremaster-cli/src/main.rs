@@ -182,13 +182,18 @@ fn codegen(dir: &Path) -> ExitCode {
     if pack.overrides.is_empty() {
         println!("// No overrides.");
     }
+    let mut code = ExitCode::SUCCESS;
     for o in &pack.overrides {
         println!("// {} (replaces {}:{})", o.path, o.base.file, o.base.line);
-        if let Some(s) = world_snippet(&pack, &o.base.entity) {
-            print!("{s}");
+        match world_snippet(&pack, &o.base.entity) {
+            Some(s) => print!("{s}"),
+            None => {
+                eprintln!("error: {}: no `{}` to print", o.path, o.base.entity);
+                code = ExitCode::FAILURE;
+            }
         }
     }
-    ExitCode::SUCCESS
+    code
 }
 
 /// Write the files of a new story into a folder. The folder must not hold a story yet.
