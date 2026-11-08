@@ -601,6 +601,10 @@ fn a_check_of_an_actor_that_waits_holds_its_command() {
     let turn = input(&mut game, "wait");
     assert!(game.state().awaiting.is_some());
     assert_eq!(game.state().facts["opened_by_keeper"], Value::Bool(false));
+    assert_eq!(
+        game.state().step_outcome("keeper", "1"),
+        Some(StepOutcome::Ran)
+    );
     assert!(
         !turn.log.iter().any(|l| l.text.contains("refused")),
         "{:?}",
