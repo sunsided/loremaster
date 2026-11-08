@@ -93,6 +93,8 @@ impl Game {
         // An order ends when the player takes over.
         self.state.orders.remove(to);
         turn.say(BlockKind::Response, format!("You are {name} now."));
+        // A switch is no entry: the actor stood here already, so no `enter`
+        // rule runs and no visit counts.
         self.describe_room(turn);
     }
 
@@ -100,37 +102,44 @@ impl Game {
     pub(super) fn order_in(&self, text: &str) -> Option<(Id, Vec<Input>)> {
         let (name, rest) = text.split_once(',')?;
         let name = name.trim().to_lowercase();
-        let actor = (self.world.story.playable.iter()).find(|a| {
+        let mut named = (self.world.story.playable.iter()).filter(|a| {
             self.world
                 .thing(a.as_str())
                 .is_some_and(|t| self.nouns_of(t).contains(&name))
-        })?;
-        let steps = rest
-            .split(" then ")
-            .map(|s| Input::Text(s.trim().to_string()))
-            .collect();
+        });
+        // A noun that names two actors (`robot`) names none of them.
+        let (Some(actor), None) = (named.next(), named.next()) else {
+            return None;
+        };
+        let steps: Vec<_> = rest.split(" then ").map(str::trim).collect();
+        // `bilge,` alone, or an empty step, is no order: the parser answers it.
+        if steps.iter().any(|s| s.is_empty()) {
+            return None;
+        }
+        let steps = steps.into_iter().map(|s| Input::Text(s.into())).collect();
         Some((actor.clone(), steps))
     }
 
-    /// Give `actor` new orders; earlier ones it had are gone.
-    pub(super) fn give_order(&mut self, turn: &mut Turn, actor: &Id, steps: Vec<Input>) {
+    /// Give `actor` new orders; earlier ones it had are gone. False when it
+    /// takes none, because the player steers it.
+    pub(super) fn give_order(&mut self, turn: &mut Turn, actor: &Id, steps: Vec<Input>) -> bool {
         let name = self.the(actor, true);
         if self.state.active.as_ref() == Some(actor) {
-            return turn.say(BlockKind::Response, format!("{name} is you now."));
+            turn.say(BlockKind::Response, format!("{name} is you now."));
+            return false;
         }
         turn.say(BlockKind::Response, format!("{name} takes the order."));
         self.state.orders.insert(actor.clone(), steps.into());
+        true
     }
 
     /// Each actor with an order runs its next step.
     pub(super) fn run_orders(&mut self, turn: &mut Turn) {
-        // A talk or a rule that waits holds the orders until it is over.
-        if self.state.talk.is_some() || self.state.awaiting.is_some() {
-            return;
-        }
         let actors: Vec<Id> = self.state.orders.keys().cloned().collect();
         for actor in actors {
-            if self.state.ended {
+            // A talk or a rule that waits holds the orders until it is over,
+            // also when the step of an actor before opened it.
+            if self.state.ended || self.state.talk.is_some() || self.state.awaiting.is_some() {
                 return;
             }
             let Some(queue) = self.state.orders.get_mut(&actor) else {
@@ -151,8 +160,10 @@ impl Game {
     fn order_step(&mut self, turn: &mut Turn, actor: &Id, step: Input, last: bool) {
         let name = self.the(actor, true);
         let home = self.state.active.clone();
-        // An actor's commands do not count as repeats of the player's.
+        // An actor's commands do not count as repeats of the player's, and
+        // do not change the player's way back.
         let repeats = (self.state.last_command.clone(), self.state.repeat);
+        let previous = self.state.previous.clone();
         if !self.steer(actor) {
             self.state.orders.remove(actor);
             return turn.say(BlockKind::Note, format!("{name} does not answer."));
@@ -180,6 +191,7 @@ impl Game {
             self.steer(home);
         }
         (self.state.last_command, self.state.repeat) = repeats;
+        self.state.previous = previous;
         if failed {
             self.state.orders.remove(actor);
             turn.say(

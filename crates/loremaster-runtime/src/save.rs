@@ -228,18 +228,40 @@ fn v1_to_v2(state: &mut Value) -> Result<(), SaveError> {
     Ok(())
 }
 
+/// Forget active actors and orders that the story no longer has. When the
+/// active actor is gone, or the save is from before the story had
+/// `playable`, the first playable actor takes over where the player stands,
+/// with what the player carries and what it holds itself.
+pub(crate) fn keep_known_actors(world: &World, state: &mut State) {
+    let playable = &world.story.playable;
+    state.orders.retain(|a, _| playable.contains(a));
+    if state.active.as_ref().is_some_and(|a| playable.contains(a)) {
+        return;
+    }
+    state.active = playable.first().cloned();
+    let Some(first) = state.active.clone() else {
+        return;
+    };
+    for a in playable {
+        state.facts.insert(
+            format!("{a}.active"),
+            loremaster_model::Value::Bool(*a == first),
+        );
+    }
+    state.orders.remove(&first);
+    for at in state.locations.values_mut() {
+        if at.holder() == Some(&first) {
+            *at = Location::Carried;
+        }
+    }
+    state
+        .locations
+        .insert(first, Location::Room(state.room.clone()));
+}
+
 /// Keep the progress of the agendas that the story still has: an actor
 /// without an agenda, and a step that its agenda no longer has, are dropped.
 /// Returns what it dropped, as `agenda:<actor>#<step>` (or `agenda:<actor>`).
-/// Forget active actors and orders that the story no longer has.
-pub(crate) fn keep_known_actors(world: &World, state: &mut State) {
-    let playable = &world.story.playable;
-    if state.active.as_ref().is_some_and(|a| !playable.contains(a)) {
-        state.active = playable.first().cloned();
-    }
-    state.orders.retain(|a, _| playable.contains(a));
-}
-
 pub(crate) fn keep_known_steps(
     world: &World,
     actors: &mut std::collections::BTreeMap<Id, crate::ActorState>,
@@ -348,11 +370,11 @@ fn reconcile(
             .or_insert_with(|| location.clone());
     }
 
-    keep_known_actors(world, &mut state);
     if !has_room(&state.room) {
         dropped.push(format!("room:{}", state.room));
         state.room = story.start.clone();
     }
+    keep_known_actors(world, &mut state);
     if state.previous.as_ref().is_some_and(|r| !has_room(r)) {
         state.previous = None;
     }

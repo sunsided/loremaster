@@ -226,3 +226,99 @@ fn the_checks_accept_the_demo_and_refuse_a_bad_playable_list() {
         );
     }
 }
+
+#[test]
+fn the_checks_report_every_fault_of_a_playable_actor() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/two-robots");
+    let mut files = read_dir(&dir).unwrap();
+    let story = files.iter_mut().find(|f| f.path == "story.yaml").unwrap();
+    story.text = story
+        .text
+        .replace("start: gallery", "start: hall")
+        .replace("[wick, bilge]", "[spanner, bilge, bilge]");
+    let found = errors(files);
+    for message in [
+        "put `spanner` in `hall`",
+        "`spanner` needs `container: true`",
+        "`spanner` is portable",
+        "`bilge` is playable twice",
+    ] {
+        assert!(
+            found.iter().any(|d| d.message.contains(message)),
+            "{message}: {found:#?}"
+        );
+    }
+}
+
+#[test]
+fn the_first_actor_carries_what_it_holds_at_the_start() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/two-robots");
+    let mut files = read_dir(&dir).unwrap();
+    let spanner = (files.iter_mut())
+        .find(|f| f.path == "things/spanner.yaml")
+        .unwrap();
+    spanner.text = spanner.text.replace("{ room: gallery }", "{ in: wick }");
+    let project = load(files).unwrap();
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let mut s = session(world);
+    assert_eq!(s.state().location_of("spanner"), Some(&Location::Carried));
+    assert!(say(&mut s, "inventory").contains("spanner"));
+}
+
+#[test]
+fn an_order_text_needs_a_command_and_a_refused_order_takes_no_turn() {
+    let (_, world) = demo();
+    let mut s = session(world);
+    // `bilge,` has no step, and `robot` names both robots.
+    for text in ["bilge,", "robot, look"] {
+        let turn = say(&mut s, text);
+        assert!(!turn.contains("takes the order"), "{text}: {turn}");
+        assert!(s.state().orders.is_empty(), "{text}");
+    }
+    let turns = s.state().turns;
+    let turn = say(&mut s, "wick, look");
+    assert!(turn.contains("is you now"), "{turn}");
+    assert_eq!(s.state().turns, turns);
+}
+
+#[test]
+fn an_order_keeps_the_players_way_back() {
+    let (_, world) = demo();
+    let mut s = session(world);
+    say(&mut s, "switch to bilge");
+    say(&mut s, "hold lever");
+    say(&mut s, "switch to wick");
+    say(&mut s, "s");
+    assert_eq!(s.state().previous.as_ref().unwrap().as_str(), "gallery");
+    let turn = say(&mut s, "bilge, look");
+    assert!(turn.contains("Bilge reports: done"), "{turn}");
+    assert_eq!(s.state().room.as_str(), "hall");
+    assert_eq!(s.state().previous.as_ref().unwrap().as_str(), "gallery");
+}
+
+#[test]
+fn a_save_from_before_playable_gets_an_active_actor() {
+    let (_, world) = demo();
+    let mut s = session(world.clone());
+    say(&mut s, "take spanner");
+    let mut save = serde_json::to_value(s.save()).unwrap();
+    // As a save of the story before it had `playable`.
+    save["story"]["hash"] = "older".into();
+    let state = save["state"].as_object_mut().unwrap();
+    state.remove("active");
+    let facts = state["facts"].as_object_mut().unwrap();
+    facts.remove("wick.active");
+    facts.remove("bilge.active");
+    let (restored, _) = Session::load(world, save).unwrap();
+    let state = restored.state();
+    assert_eq!(state.active.as_ref().unwrap().as_str(), "wick");
+    assert_eq!(
+        state.facts.get("wick.active"),
+        Some(&loremaster_model::Value::Bool(true))
+    );
+    assert_eq!(
+        state.location_of("wick"),
+        Some(&Location::Room(state.room.clone()))
+    );
+    assert_eq!(state.location_of("spanner"), Some(&Location::Carried));
+}

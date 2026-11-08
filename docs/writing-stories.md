@@ -669,7 +669,7 @@ location: { room: gallery }
 props: { active: true }
 ```
 
-- `switch to bilge` (also `become`, `control`) makes Bilge the active actor. It takes no turn and shows Bilge's view of its room. Only a story with `playable` has this verb.
+- `switch to bilge` (also `become`, `control`) makes Bilge the active actor. It takes no turn and shows Bilge's view of its room. A switch is no entry: Bilge stood there already, so no `enter` rule runs and no visit counts. Only a story with `playable` has this verb.
 - The active actor is the player's body: `State.room`, the carried things and the default actions are its own. The active actor is not listed in the room. The things another playable actor carries are `in` it, so they are out of reach and do not count for `carried`.
 - `seen_by(bilge)` shows text only to Bilge. The perceiver of a text is the active actor.
 - `bilge.active` is true while the player steers Bilge, for rule conditions. Declare it as a property to use it in a rule.

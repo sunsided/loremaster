@@ -1464,49 +1464,60 @@ impl Checker<'_> {
         }
     }
 
-    /// Agendas (D6): the actor is a thing with one agenda, each step's
-    /// place, condition, command and effects check, and `closes` names
-    /// endings, with a `reason`.
     /// Each playable actor (WO-5): a thing in a room, that can hold what the
     /// actor carries while the player steers another one, and that no agenda
-    /// moves behind the player's back.
+    /// moves behind the player's back. The first one starts the story.
     fn playable(&mut self) {
         let story = self.story();
         let playable = story.playable.clone();
         let start = story.start.clone();
+        let file = self.file_of("story");
+        let mut seen = BTreeSet::new();
         for (i, id) in playable.iter().enumerate() {
             let at = format!("playable[{i}]");
+            if !seen.insert(id) {
+                self.error(&file, &at, format!("`{id}` is playable twice"));
+                continue;
+            }
             let story = self.story();
             let Some(thing) = story.thing(id.as_str()) else {
                 self.error(
-                    "story.yaml",
+                    &file,
                     &at,
                     format!("unknown thing `{id}`: a playable actor is a thing"),
                 );
                 continue;
             };
-            let problem = match &thing.location {
-                Location::Room(r) if i == 0 && *r != start => Some(format!(
+            let mut problems = Vec::new();
+            match &thing.location {
+                Location::Room(r) if i == 0 && *r != start => problems.push(format!(
                     "the first playable actor starts the story: put `{id}` in `{start}`"
                 )),
-                Location::Room(_) if !thing.container => Some(format!(
+                Location::Room(_) => {}
+                _ => problems.push(format!("`{id}` needs a room as its location")),
+            }
+            if !thing.container {
+                problems.push(format!(
                     "`{id}` needs `container: true`: it holds what it carries"
-                )),
-                Location::Room(_) if thing.portable => {
-                    Some(format!("`{id}` is portable; a playable actor is not"))
-                }
-                Location::Room(_) if story.agenda_of(id.as_str()).is_some() => Some(format!(
+                ));
+            }
+            if thing.portable {
+                problems.push(format!("`{id}` is portable; a playable actor is not"));
+            }
+            if story.agenda_of(id.as_str()).is_some() {
+                problems.push(format!(
                     "`{id}` has an agenda; the player steers a playable actor"
-                )),
-                Location::Room(_) => None,
-                _ => Some(format!("`{id}` needs a room as its location")),
-            };
-            if let Some(message) = problem {
-                self.error("story.yaml", &at, message);
+                ));
+            }
+            for message in problems {
+                self.error(&file, &at, message);
             }
         }
     }
 
+    /// Agendas (D6): the actor is a thing with one agenda, each step's
+    /// place, condition, command and effects check, and `closes` names
+    /// endings, with a `reason`.
     fn agendas(&mut self) {
         let agendas = self.story().agendas.clone();
         let verbs: BTreeSet<String> = standard_verbs()

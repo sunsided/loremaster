@@ -262,6 +262,12 @@ impl Game {
             if let Some(Location::Room(r)) = state.locations.get(first) {
                 state.room = r.clone();
             }
+            // What the first actor holds at the start, the player carries.
+            for at in state.locations.values_mut() {
+                if at.holder() == Some(first) {
+                    *at = Location::Carried;
+                }
+            }
         }
         Self::restore(world, state)
     }
@@ -526,8 +532,9 @@ impl Game {
         }
         if let Some((actor, steps)) = self.order_in(text) {
             let minutes = self.world.story.clock.minutes_per_turn;
-            self.give_order(&mut turn, &actor, steps);
-            self.advance(&mut turn, minutes);
+            if self.give_order(&mut turn, &actor, steps) {
+                self.advance(&mut turn, minutes);
+            }
             return self.finish(turn);
         }
         match parse(&self.world.verbs, &self.parse_scope(), text) {
@@ -713,8 +720,9 @@ impl Game {
                             preposition,
                             topic,
                         });
+                        // Giving an order is a plain turn, as in the text `bilge, ...`.
                         self.give_order(turn, &other, vec![step]);
-                        return Some(minutes);
+                        return Some(self.world.story.clock.minutes_per_turn);
                     }
                     turn.say(
                         BlockKind::Response,
