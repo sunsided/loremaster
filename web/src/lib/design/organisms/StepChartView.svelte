@@ -88,8 +88,8 @@
 	step comes up. A long run of width 1 is marked: there the game is in series only. The list under the drawing
 	says the same in words.
 -->
-<section class="chart-view" aria-labelledby="chart-title">
-	<Heading level={2} id="chart-title">Steps</Heading>
+<section class="chart-view" aria-labelledby="{uid}-title">
+	<Heading level={2} id="{uid}-title">Steps</Heading>
 
 	{#each charts as c, ci (c.walkthrough)}
 		{@const g = layout(c)}

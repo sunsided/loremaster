@@ -702,7 +702,7 @@
 		const items: PaletteItem[] = [];
 		items.push({ id: 'todo-add', group: 'Notes', label: 'Add a TODO, or find the done ones', keywords: 'note todo task struck', run: () => openAtlas('todos') });
 		items.push({ id: 'atlas', group: 'Atlas', label: atlasOpen ? 'Close the Atlas' : 'Open the Atlas', keywords: 'world map ctrl m', run: () => (atlasOpen ? closeAtlas() : openAtlas()) });
-		if (s.hints.length) items.push({ id: 'hint', group: 'Play', label: 'Show the next hint for this place', keywords: 'hint help stuck', run: () => s.hint() });
+		if (s.hasHints) items.push({ id: 'hint', group: 'Play', label: 'Show the next hint for this place', keywords: 'hint help stuck', run: () => s.hint() });
 		for (const tab of atlasTabs) {
 			items.push({ id: `atlas-${tab.id}`, group: 'Atlas', label: `Show ${tab.label} in the Atlas`, keywords: tab.id === 'checks' ? 'explore' : '', run: () => openAtlas(tab.id as typeof atlasTab) });
 		}
@@ -1418,7 +1418,7 @@
 				ruleCount={s.rules.length}
 				last={s.history.at(-1) ?? null}
 				talk={s.talkView}
-				hints={s.charts.some((c) => c.steps.some((st) => st.hints > 0)) || s.hints.length ? s.hints : null}
+				hints={s.hasHints ? s.hints : null}
 				onhint={(step) => {
 					s.hint(step);
 					prompt?.focus();

@@ -63,6 +63,8 @@ export class Session {
 	hints = $state<Hint[]>([]);
 	/** The dependency charts of the walkthroughs (CK-7). They change only with the story. */
 	charts = $state.raw<StepChart[]>([]);
+	/** The story has hints, also when none is open in this room now. */
+	hasHints = $state(false);
 	phases: PhaseView[] = [];
 	/** The playthrough so far, one step per turn. */
 	history = $state<StoryStep[]>([]);
@@ -87,6 +89,7 @@ export class Session {
 		this.verbs = bench.verbs();
 		this.phases = bench.phases();
 		this.charts = bench.charts();
+		this.hasHints = bench.hasHints();
 		this.#push(first ?? bench.start());
 	}
 
@@ -134,6 +137,7 @@ export class Session {
 		this.verbs = bench.verbs();
 		this.phases = bench.phases();
 		this.charts = bench.charts();
+		this.hasHints = bench.hasHints();
 		this.#refresh();
 		// The last turn that showed a room text, when that room is still the current room.
 		const at = this.entries.findLastIndex((e) => e.turn.blocks.some((b) => b.kind === 'title'));

@@ -458,6 +458,12 @@ impl JsWorkbench {
         self.bench.set_walkthroughs(self.walkthroughs.clone());
     }
 
+    /// The story has hints, also when none is open in this room now.
+    #[wasm_bindgen(js_name = hasHints)]
+    pub fn has_hints(&self) -> bool {
+        self.bench.session().has_hints()
+    }
+
     /// The hint ladder of the current room, as `Session.hints`.
     pub fn hints(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().hints())

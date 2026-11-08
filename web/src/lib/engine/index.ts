@@ -345,6 +345,11 @@ export class Workbench {
 		return this.#bench.hints();
 	}
 
+	/** The story has hints, also when none is open in this room now. */
+	hasHints(): boolean {
+		return this.#bench.hasHints();
+	}
+
 	/** Show the next hint level, of `step` or of the first step with a level left, as a turn with a note. It is no turn of the game. */
 	hint(step?: string): Turn {
 		return this.#bench.hint(step);

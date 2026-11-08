@@ -151,6 +151,11 @@ impl Session {
         self.set_hints(book);
     }
 
+    /// The story has hints at all, also when none is open in this room now.
+    pub fn has_hints(&self) -> bool {
+        !self.hints.is_empty()
+    }
+
     /// The steps of the current room that the player has not done and can do
     /// now (their `needs` are done), each with the levels shown so far (UI-1).
     pub fn hints(&self) -> Vec<Hint> {

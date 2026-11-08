@@ -158,13 +158,15 @@ impl Workbench {
     /// history of the session does not carry over.
     pub fn reload(&mut self, world: Arc<World>) {
         self.session = authoring::carry_over(&self.session, world);
+        // The hint book plays the walkthroughs in its world: build it again.
+        self.session.set_hints_from(&self.walkthroughs);
     }
 
     /// A new workbench with the game of this one in a changed world. This one
     /// does not change. Read [`Workbench::reload`].
     pub fn carried_to(&self, world: Arc<World>) -> Self {
         let mut next = Self::from_session(authoring::carry_over(&self.session, world));
-        next.walkthroughs = self.walkthroughs.clone();
+        next.set_walkthroughs(self.walkthroughs.clone());
         next
     }
 

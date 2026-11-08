@@ -565,4 +565,9 @@ fn the_walkthrough_gives_the_chart_and_the_hints() {
     let next = game.carried_to(Arc::new(game.world().clone()));
     assert_eq!(next.session().hints()[0].shown.len(), 1);
     assert_eq!(next.charts().len(), 1);
+    assert!(next.session().has_hints());
+    // A reload builds the hint book again in the new world, and keeps what the player saw.
+    game.reload(Arc::new(game.world().clone()));
+    assert!(game.session().has_hints());
+    assert_eq!(game.session().hints()[0].shown.len(), 1);
 }
