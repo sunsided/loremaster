@@ -131,10 +131,18 @@ impl Game {
                 out.applied.push(name);
             }
         }
-        // Clamp after all facts are in: a limit can name an imported variable.
-        for key in taken {
-            let value = self.clamped(&key, self.state().facts[&key].clone());
-            self.state_mut().facts.insert(key, value);
+        // Clamp after all facts are in: a limit can name an imported variable,
+        // whose own limit can name another. Repeat until nothing changes.
+        for _ in 0..=taken.len() {
+            let mut changed = false;
+            for key in &taken {
+                let value = self.clamped(key, self.state().facts[key].clone());
+                changed |= self.state().facts[key] != value;
+                self.state_mut().facts.insert(key.clone(), value);
+            }
+            if !changed {
+                break;
+            }
         }
         for (key, value) in episode.relations {
             if import.relations.contains(&key) {

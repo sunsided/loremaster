@@ -1348,8 +1348,9 @@ impl Checker<'_> {
                             || story
                                 .dialogues
                                 .iter()
-                                .filter(|d| d.with.as_str() == thing)
-                                .any(|d| {
+                                // The talk uses the first dialogue of a thing.
+                                .find(|d| d.with.as_str() == thing)
+                                .is_some_and(|d| {
                                     d.nodes.iter().any(|n| {
                                         n.outcomes.remember.iter().any(|m| m == key)
                                             || n.options.iter().any(|o| {
