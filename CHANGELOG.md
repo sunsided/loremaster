@@ -125,6 +125,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - `carried(x)` is also true for a thing in a carried container.
 - The ZIL importer writes containers, surfaces and local-global scenery, and reads `machines/` and `timers/` for the flags that they use.
 
+### Removed
+
+- **Breaking (library):** `Awaiting` no longer has the field `locals`. It was never filled; a rule keeps values between await and resume in story variables (`into:`). Saves do not change, because the empty field was never written.
+
 ## [0.1.0] - 2026-10-31
 
 ### Added

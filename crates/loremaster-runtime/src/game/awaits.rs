@@ -124,7 +124,6 @@ impl Game {
             next,
             request,
             into,
-            locals: BTreeMap::new(),
             command: None,
         });
         AwaitStep::Paused

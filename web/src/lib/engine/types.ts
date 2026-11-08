@@ -736,7 +736,6 @@ export interface Awaiting {
 	next: number;
 	request: AwaitRequest;
 	into?: string;
-	locals?: Record<string, Value>;
 	/** The command that waits for a walk. */
 	command?: Command;
 }
