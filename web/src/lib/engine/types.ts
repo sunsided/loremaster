@@ -277,8 +277,19 @@ export type Command =
 	| { type: 'choose'; index: number }
 	| { type: 'leave' };
 
+/** A part of the story made in Rust. */
+export interface RustPart {
+	origin: { kind: 'rust'; file: string; line: number; column: number; pack: string; hash: string };
+	/** The canonical model value. */
+	value: Record<string, unknown>;
+	/** The commit that the pack was exported from, when it is known. */
+	commit: string | null;
+	/** The YAML file that overrides this part, and how it stands. */
+	overridden_by: [string, 'active' | 'no_longer_needed'] | null;
+}
+
 export interface Diagnostic {
-	severity: 'error' | 'warning';
+	severity: 'error' | 'warning' | 'info';
 	file: string;
 	at: string;
 	message: string;

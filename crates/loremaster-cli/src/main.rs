@@ -1,7 +1,9 @@
 //! `loremaster new <dir> [--title T] [--idea I]`, `loremaster play <dir>`, `loremaster check <dir> [--todos]`,
-//! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
+//! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>`, `loremaster codegen <dir>`, `loremaster export-pack <dir> [cargo args]` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
-use loremaster_project::{Diagnostic, Project, check_files, open_todos, read_dir};
+use loremaster_project::{
+    Diagnostic, Pack, Project, check_files, open_todos, read_dir, world_snippet,
+};
 use loremaster_runtime::{
     AwaitRequest, Block, BlockKind, Effect, HintBook, Input, LinkKind, RESTORE, Session, Status,
     Step, Verdict, World,
@@ -12,7 +14,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: loremaster <play|check|quality|explore|test|mcp> <project-folder>\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
+const USAGE: &str = "usage: loremaster <play|check|quality|explore|test|mcp> <project-folder>\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]\n       loremaster codegen <project-folder>\n       loremaster export-pack <project-folder> [cargo run arguments]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -100,6 +102,13 @@ fn main() -> ExitCode {
             }
         };
     }
+    // Before `open`: a game's override may not assemble yet, and printing
+    // it (or the pack) must work anyway.
+    match cmd.as_str() {
+        "export-pack" => return export_pack(dir, &args[2..]),
+        "codegen" => return codegen(Path::new(dir)),
+        _ => {}
+    }
     let Some(project) = open(Path::new(dir)) else {
         return ExitCode::FAILURE;
     };
@@ -132,6 +141,54 @@ fn main() -> ExitCode {
             ExitCode::from(2)
         }
     }
+}
+
+/// Build and run the game, which writes its Rust packs to `<dir>/packs/`
+/// (`Loremaster::export_packs`, called when the game gets `export-pack
+/// <dir>`). `cargo_args` choose the game, for example `--bin mygame`. This
+/// binary cannot compile the game's Rust itself.
+fn export_pack(dir: &str, cargo_args: &[String]) -> ExitCode {
+    let status = std::process::Command::new("cargo")
+        .arg("run")
+        .args(cargo_args)
+        .args(["--", "export-pack", dir])
+        .status();
+    match status {
+        Ok(s) if s.success() => ExitCode::SUCCESS,
+        Ok(_) => ExitCode::FAILURE,
+        Err(e) => {
+            eprintln!("error: cannot run cargo: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Print each override of a YAML folder as a `world!` snippet (DS-14).
+fn codegen(dir: &Path) -> ExitCode {
+    let files = match read_dir(dir) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("error: cannot read {}: {e}", dir.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let pack = match Pack::from_files(files) {
+        Ok(pack) => pack,
+        Err(found) => {
+            found.iter().for_each(|d| eprintln!("{d}"));
+            return ExitCode::FAILURE;
+        }
+    };
+    if pack.overrides.is_empty() {
+        println!("// No overrides.");
+    }
+    for o in &pack.overrides {
+        println!("// {} (replaces {}:{})", o.path, o.base.file, o.base.line);
+        if let Some(s) = world_snippet(&pack, &o.base.entity) {
+            print!("{s}");
+        }
+    }
+    ExitCode::SUCCESS
 }
 
 /// Write the files of a new story into a folder. The folder must not hold a story yet.

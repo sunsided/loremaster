@@ -33,9 +33,14 @@ export class Workspace {
 	async #start(files: SourceFile[]): Promise<boolean> {
 		const game = await this.#build(files);
 		if (!game) return false;
-		this.project.origins = game.origins();
+		this.#adopt(game);
 		this.session = new Session(game);
 		return true;
+	}
+
+	#adopt(game: Workbench) {
+		this.project.origins = game.origins();
+		this.project.rustParts = game.rustParts();
 	}
 
 	async #build(files: SourceFile[]): Promise<Workbench | null> {
@@ -71,7 +76,7 @@ export class Workspace {
 			if (c.text === null) await this.project.remove(c.path);
 			else await this.project.write(c.path, c.text);
 		}
-		this.project.origins = game.origins();
+		this.#adopt(game);
 		this.session?.carryOver(game);
 		return null;
 	}
@@ -100,9 +105,13 @@ export class Workspace {
 	async importZip(file: File) {
 		const files = fromZip(new Uint8Array(await file.arrayBuffer()));
 		const game = await this.#build(files);
-		if (!game) return;
+		if (!game) {
+			// No session: the page then shows the problems, for example a drifted override.
+			this.session = null;
+			return;
+		}
 		await this.project.replaceAll(files);
-		this.project.origins = game.origins();
+		this.#adopt(game);
 		this.session = new Session(game);
 	}
 

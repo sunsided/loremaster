@@ -20,6 +20,7 @@ fn rust(line: u32) -> Origin {
         line,
         column: 5,
         pack: "world".into(),
+        hash: String::new(),
     }
 }
 

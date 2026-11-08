@@ -26,6 +26,15 @@ pub fn model_hash(story: &Story) -> String {
         .collect()
 }
 
+/// The content hash of one entity value (DS-11). `serde_json` keeps the keys
+/// of a value sorted, so the text is canonical.
+pub(crate) fn value_hash(value: &serde_json::Value) -> String {
+    Sha256::digest(value.to_string().as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 fn canonical(story: &Story) -> Story {
     let mut s = story.clone();
     s.rooms.sort_by(|a, b| a.id.cmp(&b.id));

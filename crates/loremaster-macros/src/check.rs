@@ -200,6 +200,7 @@ pub fn check(world: &World) -> Result<(), Error> {
             line: 0,
             column: 0,
             pack: "world".into(),
+            hash: String::new(),
         };
     }
     let stubs = stubs(world, &mut pack, &mut spans);
@@ -218,6 +219,7 @@ pub fn check(world: &World) -> Result<(), Error> {
                             line: 0,
                             column: 0,
                             pack: "world".into(),
+                            hash: String::new(),
                         };
                     }
                 }
@@ -441,6 +443,7 @@ fn stubs(world: &World, pack: &mut Pack, spans: &mut Spans) -> Pack {
             line: 0,
             column: 0,
             pack: "extern".into(),
+            hash: String::new(),
         };
     }
     stub

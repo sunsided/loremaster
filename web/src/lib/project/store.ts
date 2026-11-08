@@ -12,6 +12,8 @@ const ROOT = 'loremaster';
 // The copy from the old folder name runs once per page load.
 let migrated: Promise<void> | undefined;
 const isYaml = (name: string) => /\.ya?ml$/.test(name);
+/** A Rust pack that a game build exported. */
+const isExportedPack = (path: string) => /(^|\/)packs\/[^/]+\.json$/.test(path);
 
 async function root(): Promise<FileSystemDirectoryHandle | null> {
 	try {
@@ -36,7 +38,7 @@ export async function readFolder(dir: FileSystemDirectoryHandle, prefix = ''): P
 	const out: SourceFile[] = [];
 	for await (const [name, handle] of dir.entries()) {
 		if (handle.kind === 'directory') out.push(...(await readFolder(handle as FileSystemDirectoryHandle, `${prefix}${name}/`)));
-		else if (isYaml(name)) out.push({ path: `${prefix}${name}`, text: await (await (handle as FileSystemFileHandle).getFile()).text() });
+		else if (isYaml(name) || isExportedPack(`${prefix}${name}`)) out.push({ path: `${prefix}${name}`, text: await (await (handle as FileSystemFileHandle).getFile()).text() });
 	}
 	return out.sort((a, b) => a.path.localeCompare(b.path));
 }
@@ -207,13 +209,13 @@ export function toZip(files: SourceFile[]): Uint8Array {
 	return zipSync(Object.fromEntries(files.map((f) => [f.path, strToU8(f.text)])));
 }
 
-/** The YAML files in a zip archive. A single top folder (as made by "compress folder") is removed. */
+/** The YAML files and exported packs in a zip archive. A single top folder (as made by "compress folder") is removed. */
 export function fromZip(data: Uint8Array): SourceFile[] {
 	const entries = Object.entries(unzipSync(data))
-		.filter(([path]) => isYaml(path) && !path.startsWith('__MACOSX/'))
+		.filter(([path]) => (isYaml(path) || isExportedPack(path)) && !path.startsWith('__MACOSX/'))
 		.map(([path, bytes]) => ({ path, text: strFromU8(bytes) }));
 	const tops = new Set(entries.map((e) => e.path.split('/')[0]));
-	const single = tops.size === 1 && entries.every((e) => e.path.includes('/')) && !entries.some((e) => e.path.split('/')[0] === 'story.yaml');
+	const single = tops.size === 1 && entries.every((e) => e.path.includes('/')) && !entries.some((e) => ['story.yaml', 'packs'].includes(e.path.split('/')[0]));
 	return entries
 		.map((e) => (single ? { ...e, path: e.path.split('/').slice(1).join('/') } : e))
 		.sort((a, b) => a.path.localeCompare(b.path));
