@@ -81,7 +81,8 @@ impl Loremaster {
 
     /// Write each Rust pack to `<dir>/packs/<name>.json`, for the generic
     /// editor (`loremaster export-pack`), with the git commit of `dir` when
-    /// there is one. Other `.json` files in `packs/` are removed: the loader
+    /// there is one. `packs/` belongs to this export: after the new packs are
+    /// written, the other `.json` files there are removed, because the loader
     /// reads every one. Returns the paths.
     #[cfg(not(target_family = "wasm"))]
     pub fn export_packs(
@@ -115,18 +116,20 @@ impl Loremaster {
             packs.push((path, pack));
         }
         std::fs::create_dir_all(&out)?;
-        for entry in std::fs::read_dir(&out)? {
-            let path = entry?.path();
-            let stale = path.extension().is_some_and(|e| e == "json")
-                && !packs.iter().any(|(p, _)| *p == path);
-            if stale {
-                std::fs::remove_file(&path)?;
-            }
-        }
+        // Each pack goes to a temporary file first and is renamed into place,
+        // so a failed export never leaves a half-written pack.
         let mut paths = Vec::new();
         for (path, mut pack) in packs {
-            std::fs::write(&path, pack.to_json())?;
+            let tmp = path.with_extension("json.tmp");
+            std::fs::write(&tmp, pack.to_json())?;
+            std::fs::rename(&tmp, &path)?;
             paths.push(path);
+        }
+        for entry in std::fs::read_dir(&out)? {
+            let path = entry?.path();
+            if path.extension().is_some_and(|e| e == "json") && !paths.contains(&path) {
+                std::fs::remove_file(&path)?;
+            }
         }
         Ok(paths)
     }

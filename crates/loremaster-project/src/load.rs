@@ -191,8 +191,10 @@ pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diag
     Ok(packs)
 }
 
+/// Only the top level of `packs/`, which `export_packs` writes and cleans.
 fn is_exported_pack(path: &str) -> bool {
-    path.starts_with("packs/") && path.ends_with(".json")
+    path.strip_prefix("packs/")
+        .is_some_and(|name| !name.contains('/') && name.ends_with(".json"))
 }
 
 /// The parts of a project that one source gives (DS-1): a YAML folder, and
@@ -604,19 +606,20 @@ impl Pack {
                 }
                 _ => {}
             }
-        }
-        // An `id:` in the body that is not the overridden one would leave the
-        // Rust part in place.
-        for o in &overrides {
-            let defined = origins.get(&o.base.entity).and_then(Origin::yaml_path);
-            if defined != Some(o.path.as_str()) && !errors.iter().any(|d| d.file == o.path) {
-                errors.push(parse_diagnostic(
-                    &o.path,
-                    &format!(
-                        "this file overrides `{}`, but does not define it",
-                        o.base.entity
-                    ),
-                ));
+            // An `id:` in the body that is not the overridden one would leave
+            // the Rust part in place. Checked now, before a later file with
+            // the same entity takes its origin.
+            if let Some(o) = overrides.last().filter(|o| o.path == path) {
+                let defined = origins.get(&o.base.entity).and_then(Origin::yaml_path);
+                if defined != Some(path) && !errors.iter().any(|d| d.file == path) {
+                    errors.push(parse_diagnostic(
+                        path,
+                        &format!(
+                            "this file overrides `{}`, but does not define it",
+                            o.base.entity
+                        ),
+                    ));
+                }
             }
         }
 

@@ -1184,7 +1184,8 @@
 		const file = where && ws?.project.file(where.file);
 		// The story intro is in the header, whose key is `story`.
 		const key = at.owner.startsWith('story:') ? 'story' : at.owner.split('/')[0];
-		if (where && !file && ws?.project.rustParts[key]) return `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
+		if (where && !file && ws?.project.rustParts[key])
+			return key === 'story' ? `The story header is made in Rust and is read-only (${where.file}).` : `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
 		if (!ws || !where || !file) return 'The editor does not know the file of this text.';
 		let text: string;
 		try {

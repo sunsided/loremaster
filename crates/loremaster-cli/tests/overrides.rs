@@ -240,17 +240,67 @@ fn an_override_whose_body_has_another_id_is_an_error() {
 
 #[test]
 fn an_export_removes_stale_packs() {
-    let dir = std::env::temp_dir().join(format!("loremaster-export-{}", std::process::id()));
-    std::fs::create_dir_all(dir.join("packs")).unwrap();
-    std::fs::write(dir.join("packs/old.json"), "{}").unwrap();
+    /// Removes the folder also when an assert fails.
+    struct Gone(std::path::PathBuf);
+    impl Drop for Gone {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let dir = Gone(std::env::temp_dir().join(format!("loremaster-export-{}", std::process::id())));
+    let _ = std::fs::remove_dir_all(&dir.0);
+    std::fs::create_dir_all(dir.0.join("packs")).unwrap();
+    std::fs::write(dir.0.join("packs/old.json"), "{}").unwrap();
     let paths = Loremaster::new()
         .pack(world::pack())
-        .export_packs(&dir)
+        .export_packs(&dir.0)
         .unwrap();
-    let left: Vec<_> = std::fs::read_dir(dir.join("packs"))
+    let left: Vec<_> = std::fs::read_dir(dir.0.join("packs"))
         .unwrap()
         .map(|e| e.unwrap().path())
         .collect();
-    std::fs::remove_dir_all(&dir).unwrap();
     assert_eq!(left, paths);
+}
+
+#[test]
+fn a_second_file_of_the_overridden_entity_does_not_blame_the_override() {
+    let mut files = override_files();
+    let shore = files.iter().find(|f| f.path == "rooms/shore.yaml").unwrap();
+    // Sorted after the override, so its origin is the last one.
+    files.push(SourceFile {
+        path: "rooms/shore.yml".into(),
+        text: shore
+            .text
+            .lines()
+            .skip_while(|l| !l.starts_with("id:"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    });
+    let found = Loremaster::new()
+        .pack(world::pack())
+        .yaml_files(files)
+        .check()
+        .err()
+        .unwrap_or_default();
+    assert!(
+        !found
+            .iter()
+            .any(|d| d.message.contains("but does not define it")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_nested_json_file_in_packs_is_not_read() {
+    let files = vec![
+        SourceFile {
+            path: "packs/world.json".into(),
+            text: world::pack().to_json(),
+        },
+        SourceFile {
+            path: "packs/backup/old.json".into(),
+            text: "{}".into(),
+        },
+    ];
+    load(files).expect("loads");
 }

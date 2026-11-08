@@ -104,6 +104,8 @@ export class Workspace {
 	/** Load the story from a zip archive. */
 	async importZip(file: File) {
 		const files = fromZip(new Uint8Array(await file.arrayBuffer()));
+		// Not a story: keep the working copy as it is.
+		if (!files.length) throw new Error('The archive has no story files.');
 		const game = await this.#build(files);
 		// The import replaces the story also when it does not build: the page then shows its problems
 		// (for example a drifted override), and export and reset work on the imported files.
