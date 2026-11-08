@@ -151,3 +151,48 @@ fn a_cost_for_an_unknown_verb_is_an_error() {
         "{found:#?}"
     );
 }
+
+/// The keeper locks up at 22:20 and the game is lost. The cost of `search`
+/// decides whether the player finds the key in time.
+fn with_keeper(story: &str) -> Arc<World> {
+    let mut files = files(story);
+    for (path, text) in [
+        (
+            "things/keeper.yaml",
+            "name: keeper\nlocation: { room: hall }\n",
+        ),
+        ("endings/lost.yaml", "kind: loss\nrank: 2\ntitle: Lost\n"),
+        (
+            "agendas/keeper.yaml",
+            "actor: keeper\nsteps:\n  - at: \"22:20\"\n    then:\n      - end: lost\n",
+        ),
+    ] {
+        files.push(SourceFile {
+            path: path.into(),
+            text: text.into(),
+        });
+    }
+    Arc::new(World::compile(load(files).unwrap().story).unwrap())
+}
+
+#[test]
+fn an_action_cost_can_make_an_agenda_step_come_due() {
+    let slow = STORY.replace("search: 10", "search: 30");
+    // At play: the search ends at 22:30, past the step, which runs in the
+    // same turn.
+    let mut game = Session::new(with_keeper(&slow));
+    authoring::start(&mut game);
+    input(&mut game, "search rug");
+    assert!(game.state().ended);
+    // The explorer sees the same: with a slow search, no path takes the key.
+    let wins = |world| {
+        explore(world, Budget::default())
+            .endings
+            .iter()
+            .filter(|e| e.path.last().is_some_and(|c| c == "take key"))
+            .count()
+    };
+    assert_eq!(wins(with_keeper(&slow)), 0);
+    // A quick search leaves time to take the key.
+    assert_eq!(wins(with_keeper(STORY)), 1);
+}
