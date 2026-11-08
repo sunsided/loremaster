@@ -76,10 +76,11 @@ fn the_pages_count_only_while_the_player_holds_them() {
     // The best path to the pages and the weapon; the coroner comes at three.
     // With the pages in hand, the case is whole. Dropped in the chamber,
     // they are no proof, and the case is weak, as with the ash.
-    // The route follows `demo/tests/best.yaml` through `search chest`; the
-    // three waits after it are this test's own and land on the coroner's
-    // step at 03:00 with the clock of `demo/story.yaml` (15-minute turns
-    // from 22:00), so don't add best.yaml's accusation here.
+    // The route follows `examples/lock-keeper-slice/demo/tests/best.yaml`
+    // through `search chest`. The three waits after it are this test's own:
+    // they land on the coroner's step at 03:00 with the clock of
+    // `examples/lock-keeper-slice/demo/story.yaml` (15-minute turns from
+    // 22:00), so don't add best.yaml's accusation here.
     let (_, world) = demo();
     let to_pages = [
         "w",
