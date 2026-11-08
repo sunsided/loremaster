@@ -469,9 +469,13 @@ impl Checker<'_> {
     /// checks of all of them.
     fn texts(&mut self) {
         let story = self.story().clone();
+        let mut seen = BTreeSet::new();
         for p in &story.texts {
             let id = p.id.clone().unwrap_or_default();
             let file = self.file_of(&format!("text:{id}"));
+            if !seen.insert(id.clone()) {
+                self.error(&file, "id", format!("text pool `{id}` is defined twice"));
+            }
             self.candidates(&file, "", &p.one_of, &mut |c, at, line| {
                 c.line(&file, at.trim_start_matches('.'), line)
             });

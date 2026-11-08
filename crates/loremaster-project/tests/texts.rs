@@ -129,3 +129,14 @@ fn an_option_cannot_say_a_pool() {
         "{found:#?}"
     );
 }
+
+#[test]
+fn two_pools_with_one_id_are_an_error() {
+    let pool = "id: remark\none_of:\n  - \"A.\"\n";
+    let found = lighthouse_with(&[("texts/a.yaml", pool), ("texts/b.yaml", pool)]);
+    assert!(
+        found.iter().any(|d| d.severity == Severity::Error
+            && d.message.contains("text pool `remark` is defined twice")),
+        "{found:#?}"
+    );
+}
