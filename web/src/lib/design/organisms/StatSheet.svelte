@@ -46,7 +46,11 @@
 				const same = s.value === before.value;
 				const up = same ? (s.max ?? 0) > (before.max ?? 0) : s.value > before.value;
 				marks[s.var] = up ? 'up' : 'down';
-				said.push(same ? `${spoken(s)}.` : `${s.label} ${up ? 'up' : 'down'} to ${amount(s)}.`);
+				said.push(
+					same
+						? `${s.label} maximum ${up ? 'up' : 'down'} to ${s.max}.`
+						: `${s.label} ${up ? 'up' : 'down'} to ${amount(s)}.`
+				);
 			} else if (typeof s.value === 'boolean') {
 				if (s.value) marks[s.var] = 'up';
 				said.push(s.value ? `Codeword ${s.label}.` : `Codeword ${s.label} removed.`);
