@@ -1,0 +1,5 @@
+name: "6. The Stairs"
+description:
+  - "Stairs go up into the dark."
+exits:
+  - { direction: "climb the stairs", to: section_8 }

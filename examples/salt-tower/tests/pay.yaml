@@ -1,0 +1,14 @@
+name: Pay path
+seed: 42
+steps:
+  - roll your character
+  - ring the bell
+  - { do: pay 3 gold, room: section_6 }
+  - take brass lantern
+  - climb the stairs
+  - { do: test your luck, room: section_9 }
+  - show the letter
+expect:
+  facts: { gold: 2 }
+  ended: true
+  ending: delivered

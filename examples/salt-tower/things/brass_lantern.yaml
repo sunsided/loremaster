@@ -1,0 +1,5 @@
+name: brass lantern
+location: { room: section_6 }
+portable: true
+description:
+  - "A lamp on a hook, brass gone green at the seams."

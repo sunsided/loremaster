@@ -1,0 +1,5 @@
+name: "8. The Rotten Step"
+description:
+  - "A rotten step breaks under your foot. {stamina < 5: You are very tired, and the drop looks long.}"
+exits:
+  - { direction: "test your luck", to: section_9 }

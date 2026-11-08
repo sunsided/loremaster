@@ -1,0 +1,5 @@
+name: "1. The Road"
+description:
+  - "The flats shine like a plate. Before you go on, take stock of yourself: SKILL, STAMINA and LUCK."
+exits:
+  - { direction: "roll your character", to: section_2 }

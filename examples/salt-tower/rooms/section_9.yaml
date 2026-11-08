@@ -1,0 +1,14 @@
+name: "9. The Keeper"
+description:
+  - "At the top, the keeper holds a knife to the door and does not trust you."
+exits:
+  - { direction: "say the word hearth", to: lamp_room, visible: codeword_hearth }
+  - { direction: "show the letter", to: lamp_room, visible: "carried(brass_lantern)", traversal: "You lift the lantern. The keeper sees the seal, and the knife goes down." }
+rules:
+  - id: sent_away
+    on: turn
+    when: "stamina > 0 and not codeword_hearth and not carried(brass_lantern)"
+    closes: [delivered]
+    reason: "Without the word or the lantern, the keeper sends the courier away."
+    then:
+      - end: sent_away

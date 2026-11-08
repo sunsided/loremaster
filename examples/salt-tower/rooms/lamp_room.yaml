@@ -1,0 +1,9 @@
+# Not a section: the win goes through this room, because an exit needs a room.
+name: "The Lamp Room"
+description:
+  - "The keeper breaks the seal and reads by the great lamp."
+rules:
+  - id: delivered
+    on: { enter: lamp_room }
+    then:
+      - end: delivered

@@ -1,0 +1,13 @@
+# A Luck test: as skill_test, but it reads and spends `luck`.
+start: idle
+steps:
+  - from: idle
+    on: { check: [go, "test your luck"] }
+    to: compare
+    then:
+      - await: { roll: 2d6, into: r }
+      - calc: { margin: "luck - r" }
+      - say: "{r} against LUCK {luck}."
+      - add: { luck: -1 }
+  - { from: compare, on: next, when: "margin >= 0", to: idle, say: "You catch the rail in time.", then: [{ goto: section_9 }, stop] }
+  - { from: compare, on: next, to: idle, say: "You fall through to the knee.", then: [{ add: { stamina: -3 } }, { goto: section_9 }, stop] }

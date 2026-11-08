@@ -1,0 +1,13 @@
+name: Grate path
+steps:
+  - { do: roll your character, rolls: [4, 7, 3] }
+  - open the grate
+  - { do: test your skill, rolls: [12], room: section_7, facts: { stamina: 17, codeword_hearth: true } }
+  - crawl on
+  - climb the stairs
+  - { do: test your luck, rolls: [2] }
+  - say the word hearth
+expect:
+  facts: { codeword_hearth: true, stamina: 17 }
+  ended: true
+  ending: delivered

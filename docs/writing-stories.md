@@ -442,7 +442,7 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: "Test your Luck", rolls: [4] }
 ```
 
-`combat` works only in rules. The `min` of `stamina` must be 0 or less, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, or rounds of an all-at-once combat in which the player hits and an enemy hits too.
+`combat` works only in rules. The `min` of `stamina` must be a number of 0 or less, not a variable, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, and it does not force rounds of an all-at-once combat in which the player hits and an enemy hits too.
 
 ### Number limits and sums
 
@@ -469,7 +469,7 @@ Then a later rule tests `total >= 9`.
 
 A verb goes through these phases:
 
-1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes.
+1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes. A check rule that waits for the host (`await`) also holds the action: the later phases do not run, also after the answer. Such a rule must do the move or the action itself.
 2. `instead` rules (verb rules with `instead: true`). If one fires, it replaces the default response.
 3. The default response of the verb, or an `instead` frame.
 4. The other verb rules. They can read the result of the default response, for example `lamp.lit`.
