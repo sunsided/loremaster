@@ -265,7 +265,7 @@ impl Checker<'_> {
                 self.error(
                     file,
                     at,
-                    format!("`learn` names a story variable of type bool, and `{var}` is none"),
+                    format!("`learn` needs a story variable of type bool; `{var}` is not one"),
                 );
             }
         }

@@ -63,7 +63,7 @@ fn a_group_learns_only_bool_variables_and_says_known_pools() {
     assert!(
         found.iter().any(|d| d.file == "things/note.yaml"
             && d.severity == Severity::Error
-            && d.message.contains("no_such_var")),
+            && d.message.contains("`no_such_var` is not one")),
         "{found:#?}"
     );
 }
