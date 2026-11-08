@@ -348,8 +348,7 @@ fn the_save_keeps_the_actors_and_an_old_save_migrates() {
 fn the_explorer_waits_for_agenda_steps() {
     // The story has no timer and no time rule. The explorer offers `wait`
     // because it has an agenda (as for timers), and finds the ending of the
-    // step. Like timers, the explorer counts the clock by phase only, so a
-    // step later in the same phase is out of its reach.
+    // step.
     let agenda = r#"
 actor: keeper
 steps:
@@ -422,4 +421,70 @@ steps:
     ] {
         assert!(found.iter().any(|f| f == want), "{want}\n{found:#?}");
     }
+}
+
+/// The keeper burns the pages in the first turn. Taking them is the best
+/// ending; examining the stove is a worse one that stays.
+fn burning(closes: &str) -> loremaster_project::Project {
+    let agenda = format!(
+        r#"
+actor: keeper
+steps:
+  - at: "22:10"
+    when: not carried(pages)
+    then:
+      - move: {{ pages: nowhere }}
+{closes}"#
+    );
+    let rules = "- id: win\n  on: { verb: [take, pages] }\n  then: [{ end: won }]\n- id: lose\n  on: { verb: [examine, stove] }\n  then: [{ end: lost }]\n";
+    let files: Vec<SourceFile> = [
+        ("story.yaml", STORY),
+        (
+            "rooms/hall.yaml",
+            "name: Hall\ndescription: [\"A hall.\"]\n",
+        ),
+        (
+            "things/keeper.yaml",
+            "name: keeper\nlocation: { room: hall }\n",
+        ),
+        ("things/stove.yaml", STOVE),
+        ("things/pages.yaml", PAGES),
+        ("endings/won.yaml", ENDING),
+        ("endings/lost.yaml", "kind: loss\nrank: 2\ntitle: Lost\n"),
+        ("rules/rules.yaml", rules),
+        ("agendas/keeper.yaml", agenda.as_str()),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    })
+    .into();
+    load(files).unwrap()
+}
+
+fn ending_warnings(project: &loremaster_project::Project) -> Vec<loremaster_model::Diagnostic> {
+    let world = Arc::new(World::compile(project.story.clone()).unwrap());
+    let found = explore(world, Budget::default());
+    assert!(found.ending_checks.proven, "{found:#?}");
+    found
+        .ending_checks
+        .diagnostics()
+        .into_iter()
+        .map(|d| project.locate(d))
+        .collect()
+}
+
+#[test]
+fn an_agenda_steps_closes_accepts_its_point_of_no_return() {
+    let marked = burning("    closes: [won]\n    reason: \"The pages burn.\"\n");
+    let found = ending_warnings(&marked);
+    assert!(found.is_empty(), "{found:#?}");
+
+    let found = ending_warnings(&burning(""));
+    assert!(
+        found.iter().any(|d| d.file == "agendas/keeper.yaml"
+            && d.at == "agenda:keeper/steps[0].closes"
+            && d.message.contains("`won`")),
+        "{found:#?}"
+    );
 }

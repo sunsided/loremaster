@@ -57,8 +57,11 @@ names a slot of the command.
 
 - `EventPattern::Verb` and `Check` hold a `CommandPattern`, and `Command::Verb`
   and `Event::Verb` have new fields: a breaking change for library users.
-- The explorer offers `wait` in a story with agendas, and the actors are part
-  of its state fingerprint. It still counts the clock by phase, as for timers.
+- The explorer offers `wait` in a story with agendas. The actors and the
+  minutes until each agenda's next step are part of its state fingerprint,
+  so waiting reaches a step in the middle of a phase. The ending checks
+  (P4-04) read an agenda step's `closes` as a rule's, as the closer
+  `agenda:<id>/steps[<i>]`.
 - A step key from the position in the list moves when an author inserts a
   step before it; an `id` keeps it stable for saves.
 - `world!` has no agenda syntax yet. Its form should give the same `Agenda`

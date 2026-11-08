@@ -534,7 +534,7 @@ How a turn goes for an actor, after the clock moved and the timers and time rule
 
 `closes` marks a point of no return, for the ending checks. It is not a dead end: after the keeper burns the pages, the best ending (`committed`) is gone, but the game can still end (`ashes`). A drop in the best reachable ending is a warning, unless the step names the ending in `closes`; a dead end, where no ending can be reached at all, is an error. `loremaster check` checks today that `closes` names known endings.
 
-The explorer (`loremaster explore`) waits in a story with agendas, as it does for timers. Like timers, it counts the clock only by phase: a step later in the same phase is out of its reach.
+The explorer (`loremaster explore`) waits in a story with agendas, as it does for timers. It tells states apart by the minutes until each agenda's next step, so it reaches a step also in the middle of a phase. The ending checks treat a step's `closes` as they treat a rule's; their findings name the step as `agenda:<id>/steps[<i>]`.
 
 ## Containers and scenery
 

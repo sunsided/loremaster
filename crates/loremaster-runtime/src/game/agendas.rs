@@ -120,6 +120,23 @@ impl Game {
         Move::Rest
     }
 
+    /// For each agenda, the minutes until its current step is due (0 when it
+    /// is due or the agenda is over). The explorer keeps them in its state
+    /// fingerprint, so that waiting reaches a step later in the same phase.
+    pub(crate) fn agenda_waits(&self) -> Vec<u32> {
+        self.world
+            .agendas
+            .iter()
+            .map(|a| {
+                let done = self.state.actors.get(a.actor.as_str());
+                a.steps
+                    .iter()
+                    .find(|s| done.is_none_or(|d| !d.steps.contains_key(&s.key)))
+                    .map_or(0, |s| s.due.saturating_sub(self.state.minutes))
+            })
+            .collect()
+    }
+
     fn end_step(&mut self, actor: &str, key: &str, outcome: StepOutcome) {
         self.state
             .actors

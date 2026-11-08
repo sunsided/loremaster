@@ -300,7 +300,7 @@ fn ending_checks(project: &Project) -> Vec<Diagnostic> {
 }
 
 #[test]
-#[ignore = "pending: phase 4, D6, P4-02 #79 (the agenda; the ending checks exist since P4-04 #81)"]
+#[ignore = "pending: phase 4, R9 text pools P4-01 #78 (the dialogue, texts and stove of NEW_SYNTAX; the agenda and the ending checks work)"]
 fn slice_endings_reachable() {
     // Two checks on the endings. A dead end (a state from which no ending can
     // be reached) is an error. A point of no return (a step after which the

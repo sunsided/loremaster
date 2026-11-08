@@ -4,9 +4,11 @@
 //! - A **dead end** is a reachable state from which no ending can be reached,
 //!   the softlock of early King's Quest. It is an error.
 //! - A **point of no return** is a turn after which the best reachable ending
-//!   (by rank, 1 is the best) gets worse. It is a warning, unless a rule or
-//!   machine step names the endings with `closes` (and a `reason`): then the
-//!   check compares the list with the endings that really drop out.
+//!   (by rank, 1 is the best) gets worse. It is a warning, unless a rule,
+//!   machine step or agenda step names the endings with `closes` (and a
+//!   `reason`): then the check compares the list with the endings that really
+//!   drop out. A closer is named by its rule id, or by
+//!   `agenda:<id>/steps[<i>]` for an agenda step.
 //!
 //! A reached ending, even a bad one, resolves the game, so a turn into an
 //! ended state is neither. When the budget stopped the walk, a state whose
@@ -95,6 +97,15 @@ impl NoReturn {
     }
 }
 
+/// " (rule `x`)", or " (agenda step `agenda:keeper/steps[0]`)".
+fn blame(closer: &str) -> String {
+    if closer.starts_with("agenda:") {
+        format!(" (agenda step `{closer}`)")
+    } else {
+        format!(" (rule `{closer}`)")
+    }
+}
+
 fn quoted(path: &[String]) -> String {
     if path.is_empty() {
         "the start".into()
@@ -129,15 +140,13 @@ impl EndingCheck {
             return out;
         }
         let at = |rule: &Option<String>, field: &str| match rule {
+            // An agenda step: `agenda:keeper/steps[0].closes`.
+            Some(r) if r.starts_with("agenda:") => format!("{r}{}", field.replace('/', ".")),
             Some(r) => format!("rule:{r}{field}"),
             None => "story:explore".into(),
         };
         for d in &self.dead_ends {
-            let by = d
-                .rule
-                .as_ref()
-                .map(|r| format!(" (rule `{r}`)"))
-                .unwrap_or_default();
+            let by = d.rule.as_ref().map(|r| blame(r)).unwrap_or_default();
             let more = if d.turns > 1 {
                 format!("; {} explored turns lead into dead ends this way", d.turns)
             } else {
@@ -154,11 +163,7 @@ impl EndingCheck {
             ));
         }
         for p in self.no_return.iter().filter(|p| !p.accepted()) {
-            let by = p
-                .rule
-                .as_ref()
-                .map(|r| format!(" (rule `{r}`)"))
-                .unwrap_or_default();
+            let by = p.rule.as_ref().map(|r| blame(r)).unwrap_or_default();
             let more = if p.turns > 1 {
                 format!(" ({} explored turns)", p.turns)
             } else {
@@ -181,7 +186,7 @@ impl EndingCheck {
         for s in &self.stale {
             out.push(Diagnostic::warning(
                 "",
-                format!("rule:{}/closes", s.rule),
+                at(&Some(s.rule.clone()), "/closes"),
                 format!(
                     "`closes` of `{}` names {}, but no explored turn of the rule loses it",
                     s.rule,
@@ -226,14 +231,75 @@ pub(super) struct Outcome {
     pub stuck_path: Vec<String>,
 }
 
-/// The rules with `closes`, numbered.
+/// The rules and agenda steps with `closes`, numbered.
 pub(super) fn closers(story: &Story) -> HashMap<String, u32> {
     let mut out: HashMap<String, u32> = HashMap::new();
     // Numbered by the map's size, so that two rules with one id (a check
     // error, but `explore` may run without `check`) keep the numbers dense.
-    for r in story.rules.iter().filter(|r| !r.closes.is_empty()) {
+    let rules = story.rules.iter().filter(|r| !r.closes.is_empty());
+    let steps = story.agendas.iter().flat_map(|a| {
+        a.steps
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| !s.closes.is_empty())
+            .map(move |(i, _)| step_closer(&a.id, i))
+    });
+    for id in rules.map(|r| r.id.to_string()).chain(steps) {
         let next = out.len() as u32;
-        out.entry(r.id.to_string()).or_insert(next);
+        out.entry(id).or_insert(next);
+    }
+    out
+}
+
+/// The closer id of an agenda step.
+fn step_closer(agenda: &loremaster_model::Id, index: usize) -> String {
+    format!("agenda:{agenda}/steps[{index}]")
+}
+
+/// The agenda step of a closer id.
+fn step_of<'a>(story: &'a Story, id: &str) -> Option<&'a loremaster_model::AgendaStep> {
+    story.agendas.iter().find_map(|a| {
+        a.steps
+            .iter()
+            .enumerate()
+            .find(|(i, _)| step_closer(&a.id, *i) == id)
+            .map(|(_, s)| s)
+    })
+}
+
+/// The `closes` and `reason` of a closer: a rule, or an agenda step.
+fn closes_and_reason<'a>(
+    story: &'a Story,
+    id: &str,
+) -> Option<(&'a [loremaster_model::Id], Option<&'a String>)> {
+    if let Some(r) = story.rules.iter().find(|r| r.id.as_str() == id) {
+        return Some((&r.closes, r.reason.as_ref()));
+    }
+    step_of(story, id).map(|s| (s.closes.as_slice(), s.reason.as_ref()))
+}
+
+/// The rules that fired on a turn, by id, and the agenda steps that ran,
+/// as closer ids, in log order.
+pub(super) fn fired(story: &Story, turn: &crate::Turn) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for entry in &turn.log {
+        let id = match entry.kind.as_str() {
+            "rule" => Some(entry.text.clone()),
+            // `keeper#1 runs`: the agenda and the key of the step.
+            "agenda" => entry
+                .text
+                .strip_suffix(" runs")
+                .and_then(|name| name.split_once('#'))
+                .and_then(|(agenda, key)| {
+                    let a = story.agenda(agenda)?;
+                    let i = a.keyed_steps().position(|(k, _)| k == key)?;
+                    Some(step_closer(&a.id, i))
+                }),
+            _ => None,
+        };
+        if let Some(id) = id.filter(|id| !out.contains(id)) {
+            out.push(id);
+        }
     }
     out
 }
@@ -417,8 +483,8 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
         ahead.close(&preds);
     }
     let closes_of = |r: usize| -> Vec<usize> {
-        rules[closer_ids[r].as_str()]
-            .closes
+        closes_and_reason(story, &closer_ids[r])
+            .map_or(&[][..], |(c, _)| c)
             .iter()
             .filter_map(|e| index.get(e.as_str()).copied())
             .collect()
@@ -440,19 +506,14 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
         let Some((_, cmd)) = commands(&game).into_iter().nth(c as usize) else {
             return Vec::new();
         };
-        let turn = game.act(cmd);
-        let mut fired: Vec<String> = Vec::new();
-        for entry in turn.log.iter().filter(|l| l.kind == "rule") {
-            if !fired.contains(&entry.text) {
-                fired.push(entry.text.clone());
-            }
-        }
-        fired
+        fired(story, &game.act(cmd))
     };
     let changes = |id: &str| {
-        rules
+        let then = rules
             .get(id)
-            .is_some_and(|r| r.then.iter().any(|e| !matches!(e, Effect::Say(_))))
+            .map(|r| &r.then)
+            .or_else(|| step_of(story, id).map(|s| &s.then));
+        then.is_some_and(|t| t.iter().any(|e| !matches!(e, Effect::Say(_))))
     };
     // The shortest path into a state, then the command of the turn.
     let path_of = |i: usize, c: u32| {
@@ -575,9 +636,8 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                     let reasons = accepted_by
                         .iter()
                         .map(|r| {
-                            rules
-                                .get(r.as_str())
-                                .and_then(|r| r.reason.clone())
+                            closes_and_reason(story, r)
+                                .and_then(|(_, reason)| reason.cloned())
                                 .unwrap_or_default()
                         })
                         .collect();
@@ -607,8 +667,8 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
             .iter()
             .enumerate()
             .filter_map(|(r, id)| {
-                let endings: Vec<String> = rules[id.as_str()]
-                    .closes
+                let endings: Vec<String> = closes_and_reason(story, id)
+                    .map_or(&[][..], |(c, _)| c)
                     .iter()
                     .filter(|e| index.get(e.as_str()).is_some_and(|&x| !lost_by[r][x]))
                     .map(ToString::to_string)

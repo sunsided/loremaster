@@ -86,8 +86,9 @@ pub struct Exploration {
 }
 
 /// A state as the explorer compares it: the parts that change what can happen.
-/// The clock counts only by phase. Counters count only up to 3, and only when
-/// the story reads them.
+/// The clock counts only by phase, and by the minutes until each agenda's
+/// next step is due. Counters count only up to 3, and only when the story
+/// reads them.
 fn fingerprint(game: &Game, counters: bool) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
@@ -114,6 +115,7 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         &s.memories,
         &s.awaiting,
         &s.actors,
+        game.agenda_waits(),
     ))
     .unwrap_or_default()
 }
@@ -400,11 +402,11 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             let mut next = game.clone();
             let turn = next.act(cmd);
             sources(&turn, &mut shown);
-            let mut closing: Vec<u32> = Vec::new();
+            let closing: Vec<u32> = endings::fired(&start.world().story, &turn)
+                .iter()
+                .filter_map(|id| closers.get(id.as_str()).copied())
+                .collect();
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
-                if let Some(&r) = closers.get(entry.text.as_str()) {
-                    closing.push(r);
-                }
                 fired.insert(entry.text.clone());
             }
             let key = fingerprint(&next, counters);
