@@ -9,7 +9,7 @@
 //! Their methods call only `Session` and `Workbench`.
 
 use loremaster_model::{Value, Walkthrough};
-use loremaster_project::{Diagnostic, SourceFile, check_files, load};
+use loremaster_project::{Diagnostic, RustPart, SourceFile, check_files, load};
 use loremaster_runtime::{HintBook, Input, Session, Snapshot, World};
 use loremaster_workbench::{AuthorCommand, Budget, MarkupCheck, Workbench};
 use serde::Serialize;
@@ -52,6 +52,7 @@ fn or_null<T: Serialize>(value: Option<T>) -> Result<JsValue, JsValue> {
 struct Story {
     world: Arc<World>,
     origins: BTreeMap<String, String>,
+    rust_parts: BTreeMap<String, RustPart>,
     walkthroughs: Vec<(String, Walkthrough)>,
 }
 
@@ -69,8 +70,8 @@ fn compile(files: JsValue) -> Result<Story, JsValue> {
     Ok(Story {
         world: Arc::new(world),
         walkthroughs: project.walkthroughs,
-        // The editor opens files by path. Origins in Rust (DSL step L6) get
-        // their own field when the editor shows them as read-only.
+        rust_parts: project.rust_parts,
+        // The editor opens files by path; `rust_parts` has the Rust origins.
         origins: project
             .origins
             .into_iter()
@@ -360,6 +361,7 @@ impl JsSession {
 pub struct JsWorkbench {
     world: Arc<World>,
     origins: BTreeMap<String, String>,
+    rust_parts: BTreeMap<String, RustPart>,
     walkthroughs: Vec<(String, Walkthrough)>,
     bench: Workbench,
 }
@@ -377,6 +379,7 @@ impl JsWorkbench {
             bench,
             world: story.world,
             origins: story.origins,
+            rust_parts: story.rust_parts,
             walkthroughs: story.walkthroughs,
         })
     }
@@ -389,6 +392,13 @@ impl JsWorkbench {
     /// The file of each entity, for example `room:shore` to `rooms/shore.yaml`.
     pub fn origins(&self) -> Result<JsValue, JsValue> {
         to_js(&self.origins)
+    }
+
+    /// The entities from Rust, with their source place, content hash and
+    /// value, for the read-only badge, eject and override.
+    #[wasm_bindgen(js_name = rustParts)]
+    pub fn rust_parts(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.rust_parts)
     }
 
     // ---- play: whole turns for the transcript ------------------------------

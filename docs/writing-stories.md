@@ -912,6 +912,48 @@ A build without the code, such as the editor or `loremaster play`, plays the sto
 
 A rule, a dialogue or a timer can run a behavior at a place of its own with `call: thief`: the behavior gets `Event::Call` with the id of the owner (the rule's id, or `dialogue:<id>` / `timer:<id>`), whatever its manifest says about events, and `Flow::Stop` stops the rest of the rule, the dialogue node's effects or the timer step's effects. `loremaster check` gives an error for a `call` that names no behavior of the story. `Flow::Stop` from `handle` works as the `stop` effect. The example is the thief of Zork I: `examples/zork1/thief.rs`. Run `cargo run -p loremaster-runtime --example zork` to play Zork I with it.
 
+## Parts made in Rust
+
+A game can make parts of its story in Rust, with `world!`. The editor shows these parts read-only, with a lock and their source line, in the panel of the room and in Atlas › Rust. A game exports them for the generic editor:
+
+```sh
+loremaster export-pack story/ --bin mygame
+```
+
+This runs `cargo run --bin mygame -- export-pack story/`. The game must then call `Loremaster::export_packs("story/")`, which writes `story/packs/<name>.json` with the git commit of `story/`, and removes the other `.json` files there. The story loads these files before its YAML files. Behaviors are not in them.
+
+In Atlas › Rust, a writer has two ways to change a Rust part:
+
+- **Eject to YAML** writes a file with `replace: true`. The part is now YAML. Delete it in Rust; until then `check` warns. Rules cannot be ejected, only overridden.
+- **Override** asks first. Then it writes a file with the base of the part:
+
+```yaml
+override:
+  entity: room:shore
+  file: src/world.rs
+  line: 11
+  base_hash: af66c54b...
+  commit: 6113e866          # when it is known
+  base: { id: shore, name: The Shore }   # the whole Rust value
+id: shore
+name: The Shore
+```
+
+The file must be in the folder of its kind, and named after its id. `base` is the value itself, because the three-way diff needs it. The hash is of the model value, so `rustfmt` and comments do not change it.
+
+| Rust part | `check` says |
+| --- | --- |
+| Same as `base_hash` | warning: override active, port it to the DSL |
+| Changed | error: both sides changed, with base, Rust now and override for each field |
+| Equal to the override | info: override no longer needed; the editor offers to delete the file |
+| Gone | error |
+
+Without the Rust pack (only YAML files), an override stands alone, with a warning.
+
+`loremaster codegen <folder>` prints each override as a `world!` snippet to paste over the Rust part. Rooms, things, endings and timers print as code. What `world!` printing does not cover yet, such as frames, rules and effects, prints as a `// port by hand` comment with its JSON.
+
+`loremaster::dsl::world_test!(Loremaster::new().pack(world()).yaml("story/"));` makes a `#[test]` that assembles the packs, runs `check` and all walkthroughs. It fails on errors, so also on an override whose Rust part changed. Add `.strict()` to the sources to fail on warnings too. `examples/rust-overrides` shows all of this.
+
 ## Author notes and threads
 
 Notes are text for the authors. The player does not see them. Put the notes in the file of the entity that they are about, in a `notes:` list. You can add notes to `story.yaml`, to rooms, things and rules, and to a fragment in its map form.

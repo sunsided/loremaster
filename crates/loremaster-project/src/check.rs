@@ -70,8 +70,8 @@ pub fn check_packs(packs: Vec<Pack>) -> Checked {
 /// [`check_packs`] for the files of one YAML folder: a file that does not
 /// read (an unknown field, an unknown folder) is an error too.
 pub fn check_files(files: Vec<SourceFile>) -> Checked {
-    match Pack::from_files(files) {
-        Ok(pack) => check_packs(vec![pack]),
+    match crate::load::packs_of(files) {
+        Ok(packs) => check_packs(packs),
         Err(diagnostics) => Checked {
             project: None,
             diagnostics,
@@ -1399,25 +1399,26 @@ impl Checker<'_> {
                 let at = format!("{list}.memories[{i}]");
                 match name.split_once('.') {
                     Some((thing, key)) if story.thing(thing).is_some() => {
+                        // The talk uses the first dialogue of a thing.
+                        let first = story.dialogues.iter().find(|d| d.with.as_str() == thing);
                         let given = story.import.memories.contains(name)
-                            || story
-                                .dialogues
-                                .iter()
-                                .filter(|d| d.with.as_str() == thing)
-                                .any(|d| {
-                                    d.nodes.iter().any(|n| {
-                                        n.outcomes.remember.iter().any(|m| m == key)
-                                            || n.options.iter().any(|o| {
-                                                o.outcomes.remember.iter().any(|m| m == key)
-                                            })
-                                    })
-                                });
+                            || first.is_some_and(|d| {
+                                d.nodes.iter().any(|n| {
+                                    n.outcomes.remember.iter().any(|m| m == key)
+                                        || n.options
+                                            .iter()
+                                            .any(|o| o.outcomes.remember.iter().any(|m| m == key))
+                                })
+                            });
                         if !given {
-                            self.error(
-                                file,
-                                &at,
-                                format!("no dialogue of `{thing}` remembers `{key}`"),
-                            );
+                            let message = if first.is_some() {
+                                format!(
+                                    "the first dialogue of `{thing}`, which the talk uses, does not remember `{key}`"
+                                )
+                            } else {
+                                format!("no dialogue of `{thing}` remembers `{key}`")
+                            };
+                            self.error(file, &at, message);
                         }
                     }
                     Some((thing, _)) => self.error(file, &at, format!("unknown thing `{thing}`")),

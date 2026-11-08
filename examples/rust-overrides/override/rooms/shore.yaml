@@ -1,0 +1,20 @@
+override:
+  entity: room:shore
+  file: examples/rust-overrides/world.rs
+  line: 11
+  base_hash: af66c54b32e32eed3f41d131bd53c446835dbbb80049992feca5ad19e711f875
+  base:
+    id: shore
+    name: The Shore
+    description:
+      - Shingle crunches underfoot.
+    exits:
+      - direction: north
+        blocked: The cliff is sheer.
+id: shore
+name: The Shore
+description:
+  - Shingle crunches underfoot. The tide is out.
+exits:
+  - direction: north
+    blocked: The cliff is sheer.

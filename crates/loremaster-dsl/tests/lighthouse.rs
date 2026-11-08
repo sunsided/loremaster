@@ -353,6 +353,7 @@ fn an_origin_is_the_line_and_column_of_the_call() {
         line,
         column,
         pack: "lines".into(),
+        hash: String::new(),
     };
     // The column is the one of the method name: `room` after `    p.`.
     assert_eq!(p.origins["room:cellar"], at(line + 1, 7));

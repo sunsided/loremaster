@@ -3,7 +3,7 @@
 use loremaster_project::{
     Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble, check,
 };
-use loremaster_runtime::{Behavior, World};
+use loremaster_runtime::{Behavior, Verdict, World, run_walkthrough};
 use std::sync::Arc;
 
 /// The sources of a story, in a fixed order: packs from Rust and YAML
@@ -34,6 +34,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Default)]
 pub struct Loremaster {
     sources: Vec<Source>,
+    strict: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +70,65 @@ impl Loremaster {
     pub fn yaml_files(mut self, files: Vec<SourceFile>) -> Self {
         self.sources.push(Source::Files(files));
         self
+    }
+
+    /// With [`assert_world`](Self::assert_world), fail on warnings too, for
+    /// example an active override (DS-15).
+    pub fn strict(mut self) -> Self {
+        self.strict = true;
+        self
+    }
+
+    /// Write each Rust pack to `<dir>/packs/<name>.json`, for the generic
+    /// editor (`loremaster export-pack`), with the git commit of `dir` when
+    /// there is one. Other `.json` files in `packs/` are removed: the loader
+    /// reads every one. Returns the paths.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn export_packs(
+        &self,
+        dir: impl AsRef<std::path::Path>,
+    ) -> std::io::Result<Vec<std::path::PathBuf>> {
+        let out = dir.as_ref().join("packs");
+        let commit = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir.as_ref())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        let mut packs = Vec::new();
+        for source in &self.sources {
+            let Source::Pack(pack) = source else {
+                continue;
+            };
+            let mut pack = pack.as_ref().clone();
+            pack.commit.clone_from(&commit);
+            // A world! pack is named after its module path.
+            let path = out.join(format!("{}.json", pack.name.replace("::", "-")));
+            if packs.iter().any(|(p, _)| *p == path) {
+                return Err(std::io::Error::other(format!(
+                    "two packs are named `{}`",
+                    pack.name
+                )));
+            }
+            packs.push((path, pack));
+        }
+        std::fs::create_dir_all(&out)?;
+        for entry in std::fs::read_dir(&out)? {
+            let path = entry?.path();
+            let stale = path.extension().is_some_and(|e| e == "json")
+                && !packs.iter().any(|(p, _)| *p == path);
+            if stale {
+                std::fs::remove_file(&path)?;
+            }
+        }
+        let mut paths = Vec::new();
+        for (path, mut pack) in packs {
+            std::fs::write(&path, pack.to_json())?;
+            paths.push(path);
+        }
+        Ok(paths)
     }
 
     /// Read the sources and join the packs in their order
@@ -150,6 +210,37 @@ impl Loremaster {
     /// The behaviors that the Rust packs keep ([`BuildPack::register`](crate::BuildPack::register))
     /// are registered in the world.
     pub fn build(self) -> Result<World, Vec<Diagnostic>> {
+        self.built().map(|(world, _, _)| world)
+    }
+
+    /// The whole-world test (DS-15): join the packs, check them and run all
+    /// walkthroughs. Panics on an error, for example an override whose Rust
+    /// part changed, and with [`strict`](Self::strict) on a warning. An
+    /// override that is still active stays a warning without it.
+    /// [`world_test!`](crate::world_test) makes the `#[test]`.
+    pub fn assert_world(self) {
+        let strict = self.strict;
+        let (world, project, warnings) = match self.built() {
+            Ok(built) => built,
+            Err(found) => panic!("{}", list(&found)),
+        };
+        let warnings: Vec<_> = warnings
+            .into_iter()
+            .filter(|d| strict && d.severity == Severity::Warning)
+            .collect();
+        assert!(warnings.is_empty(), "strict: {}", list(&warnings));
+        let world = Arc::new(world);
+        for (key, walk) in &project.walkthroughs {
+            let result = run_walkthrough(world.clone(), walk, key);
+            assert!(
+                !matches!(result.verdict(), Verdict::Failed | Verdict::UnexpectedPass),
+                "walkthrough {key}: {:?}",
+                result.failures
+            );
+        }
+    }
+
+    fn built(self) -> Result<(World, Project, Vec<Diagnostic>), Vec<Diagnostic>> {
         let behaviors: Vec<Arc<dyn Behavior>> = self
             .sources
             .iter()
@@ -160,7 +251,7 @@ impl Loremaster {
             .flatten()
             .filter_map(|i| i.downcast_ref::<Arc<dyn Behavior>>().cloned())
             .collect();
-        let (project, _warnings) = self.check()?;
+        let (project, warnings) = self.check()?;
         let mut world = World::compile(project.story.clone())
             .map_err(|e| vec![rust_place(&project, Diagnostic::from(&e))])?;
         // Reversed: the world takes the first with an id, and the `rust` block
@@ -168,8 +259,32 @@ impl Loremaster {
         for b in behaviors.into_iter().rev() {
             world.register_shared(b);
         }
-        Ok(world)
+        Ok((world, project, warnings))
     }
+}
+
+/// A `#[test]` that runs [`Loremaster::assert_world`] on the given sources
+/// (the generated whole-world test of DS-15).
+///
+/// ```text
+/// loremaster::dsl::world_test!(Loremaster::new().pack(world()).yaml("story/"));
+/// ```
+#[macro_export]
+macro_rules! world_test {
+    ($sources:expr) => {
+        #[test]
+        fn whole_world() {
+            $sources.assert_world();
+        }
+    };
+}
+
+fn list(found: &[Diagnostic]) -> String {
+    found
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Start each path of a YAML pack with `prefix`.

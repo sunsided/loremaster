@@ -16,6 +16,7 @@ fn rust_origin(line: u32) -> Origin {
         line,
         column: 5,
         pack: "extra".into(),
+        hash: String::new(),
     }
 }
 
@@ -121,7 +122,12 @@ fn a_machine_from_a_second_pack_gets_its_rules_and_variable() {
             .iter()
             .any(|r| r.id.as_str() == "tide#1")
     );
-    assert_eq!(project.origins.get("rule:tide#1"), Some(&rust_origin(7)));
+    // The step rule has the place of its machine, with the machine's hash.
+    assert_eq!(
+        project.origins["rule:tide#1"],
+        project.origins["machine:tide"]
+    );
+    assert_eq!(project.origins["rule:tide#1"].file(), "src/world.rs");
 }
 
 #[test]
@@ -266,4 +272,16 @@ fn the_model_hash_does_not_depend_on_the_order_of_files_or_packs() {
     let two = assemble(vec![lamp_first, rest]).unwrap();
     assert_ne!(one.story.things, two.story.things, "the order differs");
     assert_eq!(model_hash(&one.story), model_hash(&two.story));
+}
+
+#[test]
+fn a_json_file_that_is_not_an_export_is_an_error() {
+    for text in ["{}", r#"{ "name": "w", "roomz": [] }"#] {
+        let files = vec![SourceFile {
+            path: "packs/w.json".into(),
+            text: text.into(),
+        }];
+        let found = messages(load(files));
+        assert!(found[0].starts_with("not an exported pack"), "{found:?}");
+    }
 }

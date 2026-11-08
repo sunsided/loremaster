@@ -13,7 +13,8 @@
 //!
 //! The other folders are in [`FOLDERS`]. A YAML file in an unknown folder, and
 //! an unknown field in any file, is an error. An entity's `id` defaults to its
-//! file name. Loading works on in-memory files so the same code runs in the
+//! file name. `packs/*.json` are Rust packs that a game build exported
+//! ([`Pack::to_json`]); they load before the YAML files. Loading works on in-memory files so the same code runs in the
 //! browser; [`read_dir`] collects them from disk.
 //!
 //! [`check_packs`] is the one function for the schema checks: the YAML loader
@@ -22,6 +23,7 @@
 
 mod bindings;
 mod check;
+mod codegen;
 mod hash;
 mod load;
 mod merge;
@@ -32,11 +34,14 @@ mod scaffold;
 
 pub use bindings::{json_schema, rust_bindings, typescript};
 pub use check::{Checked, MAX_HINTS, check, check_files, check_packs};
+pub use codegen::world_snippet;
 pub use hash::model_hash;
-pub use load::{FOLDERS, Pack, Project, SourceFile, StoryHeader, assemble, load};
+pub use load::{
+    FOLDERS, OverrideState, Pack, Project, RustPart, SourceFile, StoryHeader, assemble, load,
+};
 /// The one diagnostic form of loremaster (XP-6). It lives in `loremaster-model`.
 pub use loremaster_model::{Diagnostic, Severity};
-pub use merge::{Extension, MergeMode};
+pub use merge::{Extension, MergeMode, Override, OverrideBase};
 pub use notes::{NoteRef, ThreadView, notes, open_todos, threads};
 pub use origin::Origin;
 pub use quality::{
