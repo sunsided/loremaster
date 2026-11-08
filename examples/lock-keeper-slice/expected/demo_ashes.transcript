@@ -1,0 +1,167 @@
+Autumn 1923. At half past nine they found Amos Reed, the lock-keeper, drowned in his own lock. It looks like a fall from the gate in the dark. You are the county constable. The coroner comes at three. By then you need a case, or it goes down as an accident.
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
+
+Exits: west, north, south.
+
+> w
+w
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots dries by the stove. Hester Reed, Amos's daughter, is here.
+
+Exits: east, west, up.
+
+> examine boots
+examine boots
+
+Town boots, wet to the ankle, with canal mud in the welts. Marsh said he never left the parlour.
+
+You write it in your notebook: Marsh was out in the wet.
+
+Hester Reed goes up.
+
+> e
+e
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Somewhere a rope creaks.
+
+Bert Pike, the lock hand, is here.
+
+Exits: west, north, south.
+
+> s
+s
+
+Lock Hut
+
+A brick hut for the lock hands. Oilskins on a nail, a tool chest under the window.
+
+The tool chest contains a coil of rope.
+
+Exits: north.
+
+Bert Pike comes in.
+
+> search chest
+search chest
+
+You find a windlass.
+
+You write it in your notebook: the weapon.
+
+> n
+n
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
+
+Exits: west, north, south.
+
+> w
+w
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots stands by the stove, clean.
+
+Exits: east, west, up.
+
+> examine stove
+examine stove
+
+The stove ticks as it cools. Nothing in it but coal.
+
+> wait
+wait
+
+Time passes.
+
+Hester Reed comes in.
+
+> wait
+wait
+
+Time passes.
+
+Hester Reed goes east.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+Ivo Marsh comes in.
+
+> wait
+wait
+
+Time passes.
+
+Ivo Marsh goes east.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+Far off, water roars at the lock.
+
+> wait
+wait
+
+Time passes.
+
+Hester Reed comes in.
+
+> wait
+wait
+
+Time passes.
+
+Hester Reed goes up.
+
+Ivo Marsh comes in.
+
+> wait
+wait
+
+Time passes.
+
+Marsh feeds an oilcloth packet into the stove.
+
+> examine stove
+examine stove
+
+Fresh ash on the grate. One scrap did not burn: a corner with half of the company's stamp.
+
+You write it in your notebook: someone burned the company's paper.
+
+> accuse marsh
+accuse marsh
+
+You tell Marsh what you know. He asks for the pages, and you do not have them.
+
+Charged, case weak
+
+Marsh is charged with the murder of Amos Reed. Without the true pages, his counsel will make a meal of it. The ash in the stove is all that is left of them.

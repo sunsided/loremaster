@@ -1,0 +1,6 @@
+# Hester Reed: she goes out to the barge at midnight, to Crane.
+actor: hester
+steps:
+  - { id: room, at: "22:30", place: hester_room }
+  - { id: barge, at: "00:00", place: barge_cabin }
+  - { id: back, at: "00:30", place: hester_room }
