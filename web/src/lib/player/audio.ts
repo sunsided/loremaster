@@ -18,6 +18,8 @@ export class AudioPlayer {
 	#buffers = new Map<string, Promise<AudioBuffer>>();
 	#wanted: Record<Loop, string | null> = { music: null, ambience: null };
 	#playing: Record<Loop, Playing | null> = { music: null, ambience: null };
+	/** Sound effects from before `unlock`, such as those of the start turn. Only the newest few wait. */
+	#early: string[] = [];
 
 	/** Call it on the first input of the player. Before it, nothing plays. */
 	unlock() {
@@ -33,6 +35,7 @@ export class AudioPlayer {
 		void context.resume();
 		this.#sync('music');
 		this.#sync('ambience');
+		for (const url of this.#early.splice(0)) this.once(url);
 	}
 
 	/** Set a volume, from 0 to 1. */
@@ -48,10 +51,13 @@ export class AudioPlayer {
 		this.#sync(channel);
 	}
 
-	/** Play a sound effect once. */
+	/** Play a sound effect once. Before `unlock`, it waits for it. */
 	once(url: string) {
 		const context = this.#context;
-		if (!context) return;
+		if (!context) {
+			this.#early = [...this.#early, url].slice(-3);
+			return;
+		}
 		void this.#buffer(context, url)
 			.then((buffer) => {
 				const source = context.createBufferSource();
