@@ -444,6 +444,19 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 
 `combat` works only in rules. The `min` of `stamina` must be 0 or less, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, or rounds of an all-at-once combat in which the player hits and an enemy hits too.
 
+### The adventure sheet
+
+`stats:` in story.yaml declares the sheet that the web player shows. A story without `stats:` shows no sheet.
+
+```yaml
+stats:
+  - { var: stamina, label: STAMINA, short: ST, max: stamina_initial }
+  - { var: gold, label: Gold }
+  - { var: hearth, label: HEARTH }
+```
+
+`var` is a number or a true/false variable, or a property of a thing. A number shows as its value, with "/ max" when the stat has `max` (a number or a number variable). A true/false value shows as a codeword when it is true. The stat with `short` also shows in the one-line sheet on a phone. The equipment on the sheet is the inventory of the player.
+
 ### Number limits and sums
 
 A number variable can have limits, written as `min` and `max` in `story.yaml`: a number, or the id of another number variable.

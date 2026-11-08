@@ -5,7 +5,7 @@
 //! usual; `resume` runs the rest of the paused rule, without a new turn.
 
 use super::Game;
-use crate::output::Choice;
+use crate::output::{Choice, RollDetail};
 use crate::rng;
 use crate::state::{AwaitRequest, Awaiting};
 use crate::world::CEffect;
@@ -66,8 +66,8 @@ impl Game {
     /// Roll, or take the next forced total, and log the roll.
     pub(crate) fn take_roll(&mut self, turn: &mut Turn, dice: Dice, roll: &str) -> i64 {
         // A forced total (a walkthrough's `rolls:`) comes before the RNG.
-        let total = match self.forced.totals.pop_front() {
-            Some(n) if (dice.min()..=dice.max()).contains(&n) => n,
+        let (total, faces) = match self.forced.totals.pop_front() {
+            Some(n) if (dice.min()..=dice.max()).contains(&n) => (n, Vec::new()),
             Some(n) => {
                 self.forced.misfits.push(format!(
                     "the forced roll {n} is not in the range of {roll} ({} to {})",
@@ -81,6 +81,14 @@ impl Game {
         turn.log.push(LogEntry {
             kind: "roll".into(),
             text: format!("{roll} = {total}"),
+        });
+        turn.rolls.push(RollDetail {
+            dice: roll.to_string(),
+            total,
+            faces,
+            who: None,
+            target: None,
+            result: None,
         });
         total
     }
@@ -245,6 +253,7 @@ impl Game {
                 Ok(done) => {
                     turn.blocks.extend(done.blocks);
                     turn.log.extend(done.log);
+                    turn.rolls.extend(done.rolls);
                 }
                 Err(why) => turn.say(BlockKind::Response, why),
             },
@@ -275,12 +284,12 @@ impl Game {
         }
     }
 
-    fn roll_dice(&mut self, dice: Dice) -> i64 {
+    /// The total with the bonus, and the result of each die.
+    fn roll_dice(&mut self, dice: Dice) -> (i64, Vec<i64>) {
         let sides = dice.sides as usize;
-        let mut total = dice.bonus;
-        for _ in 0..dice.count {
-            total += rng::below(&mut self.state.rng, sides) as i64 + 1;
-        }
-        total
+        let faces: Vec<i64> = (0..dice.count)
+            .map(|_| rng::below(&mut self.state.rng, sides) as i64 + 1)
+            .collect();
+        (dice.bonus + faces.iter().sum::<i64>(), faces)
     }
 }

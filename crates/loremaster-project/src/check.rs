@@ -656,6 +656,7 @@ impl Checker<'_> {
         self.endings();
         self.machines();
         self.score();
+        self.stats();
 
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
@@ -1171,6 +1172,36 @@ impl Checker<'_> {
     }
 
     /// The score: a number variable, a positive maximum, and ranks in reach.
+    /// A stat names a number or a flag. Only a number has a `max`, and a
+    /// `max` that is a variable is a number variable.
+    fn stats(&mut self) {
+        use loremaster_lang::Ty;
+        use loremaster_model::Limit;
+        let stats = self.story().stats.clone();
+        let file = &self.file_of("story");
+        for (i, stat) in stats.iter().enumerate() {
+            let at = format!("stats[{i}]");
+            let ty = self.ty_of(&stat.var);
+            if !matches!(ty, Some(Ty::Int | Ty::Bool)) {
+                let var = &stat.var;
+                self.error(
+                    file,
+                    &at,
+                    format!("`{var}` is not a number or a true/false value"),
+                );
+            }
+            match &stat.max {
+                Some(_) if ty == Some(Ty::Bool) => {
+                    self.error(file, &at, "a true/false stat can not have `max`");
+                }
+                Some(Limit::Var(max)) if self.ty_of(max.as_str()) != Some(Ty::Int) => {
+                    self.error(file, &at, format!("`{max}` is not a number variable"));
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn score(&mut self) {
         let Some(score) = self.story().score.clone() else {
             return;

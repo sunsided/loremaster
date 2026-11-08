@@ -301,6 +301,16 @@ impl JsSession {
         to_js(&self.session.journal())
     }
 
+    /// The combat in progress, or null.
+    pub fn combat(&self) -> Result<JsValue, JsValue> {
+        or_null(self.session.combat())
+    }
+
+    /// The adventure sheet: `[{ var, label, short?, value, max? }]`.
+    pub fn stats(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.session.stats())
+    }
+
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.verbs())
     }
@@ -421,6 +431,16 @@ impl JsWorkbench {
     /// The quest journal of the session.
     pub fn journal(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().journal())
+    }
+
+    /// The combat in progress, or null.
+    pub fn combat(&self) -> Result<JsValue, JsValue> {
+        or_null(self.bench.session().combat())
+    }
+
+    /// The adventure sheet: `[{ var, label, short?, value, max? }]`.
+    pub fn stats(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.session().stats())
     }
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {

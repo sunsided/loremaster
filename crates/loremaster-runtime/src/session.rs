@@ -5,7 +5,7 @@
 //! terminal, the walkthrough runner and the AI tools. The effects carry no
 //! HTML, CSS or pixel positions; the host decides how to show them.
 
-use crate::output::{Block, BlockKind, Choice, LogEntry, TalkInfo};
+use crate::output::{Block, BlockKind, Choice, LogEntry, RollDetail, TalkInfo};
 use crate::state::{AwaitRequest, Awaiting};
 use crate::{Command, Game, Restored, Save, SaveError, State, Turn, World};
 use loremaster_model::Value;
@@ -59,6 +59,9 @@ pub enum Effect {
         talk: TalkInfo,
         choices: Vec<Choice>,
     },
+    /// A roll of the dice: the dice, the total and any test. A `roll` notice
+    /// has the same total as text.
+    Roll { roll: RollDetail },
     /// The story has ended.
     Ending { ending: EndingInfo },
 }
@@ -515,6 +518,7 @@ impl Session {
                 .filter(|e| NOTICE_KINDS.contains(&e.kind.as_str()))
                 .map(|entry| Effect::Notice { entry }),
         );
+        effects.extend(turn.rolls.into_iter().map(|roll| Effect::Roll { roll }));
         // While a rule waits, its answers come with `Status::Await`, not as
         // the choices of a talk.
         if let Some(talk) = turn.talk

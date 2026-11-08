@@ -35,6 +35,7 @@ impl<'a> StoryBuilder<'a> {
             death_prompt: true,
             carry_limit: None,
             step_limit: None,
+            stats: Vec::new(),
             notes: Vec::new(),
             timers: Vec::new(),
             machines: Vec::new(),

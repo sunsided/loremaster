@@ -159,6 +159,19 @@ pub struct EnemyView {
     pub strength: Option<i64>,
 }
 
+/// A line of the adventure sheet. See `Session::stats`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct StatView {
+    pub var: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short: Option<String>,
+    pub value: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<i64>,
+}
+
 /// A paused rule, as data (XP-3): the rule, the next effect, the request.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Awaiting {

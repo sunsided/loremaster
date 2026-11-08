@@ -50,6 +50,23 @@ impl From<&str> for Limit {
     }
 }
 
+/// A line of the adventure sheet (`stats:` in story.yaml). A number shows as
+/// a value and a true flag shows as a codeword.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Stat {
+    /// The variable, or a property such as `codeword.hearth`.
+    pub var: String,
+    pub label: String,
+    /// The short name in the one-line form of the sheet, for example `ST`.
+    /// A stat without it does not show in that line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short: Option<String>,
+    /// The value to show after the slash, for a number.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<Limit>,
+}
+
 /// The score of the story: a number variable, its maximum and the ranks.
 /// With a score, the `score` command shows it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -134,6 +151,9 @@ pub struct Story {
     /// The most `on: next` machine steps in one turn. Without it, 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step_limit: Option<u32>,
+    /// The adventure sheet of the player. Without it, the player shows no sheet.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stats: Vec<Stat>,
     /// Counters that go down each turn.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub timers: Vec<Timer>,
