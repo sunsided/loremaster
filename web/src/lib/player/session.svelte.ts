@@ -14,7 +14,9 @@ import {
 	type VarView,
 	type Command,
 	type FragmentView,
+	type Hint,
 	type MapView,
+	type StepChart,
 	type Preview,
 	type RoomParts,
 	type RuleView,
@@ -40,6 +42,8 @@ export class Session {
 	/** How many turns `undo` can go back. */
 	undoSteps = $state(0);
 	entries = $state<Entry[]>([]);
+	/** Counts the turns of the game, also author commands and undo. A hint is no turn and does not count. */
+	turns = $state(0);
 	scene = $state<Scene>() as Scene;
 	assembly = $state<FragmentView[]>([]);
 	map = $state<MapView>({ rooms: [], links: [] });
@@ -57,6 +61,12 @@ export class Session {
 	talkView = $state<TalkView | null>(null);
 	/** Every dialogue of the story, as an outline. */
 	dialogues = $state<DialogueOutline[]>([]);
+	/** The hint ladder of the current room (CK-6). */
+	hints = $state<Hint[]>([]);
+	/** The dependency charts of the walkthroughs (CK-7). They change only with the story. */
+	charts = $state.raw<StepChart[]>([]);
+	/** The story has hints, also when none is open in this room now. */
+	hasHints = $state(false);
 	phases: PhaseView[] = [];
 	/** The playthrough so far, one step per turn. */
 	history = $state<StoryStep[]>([]);
@@ -80,6 +90,8 @@ export class Session {
 		this.bench = bench;
 		this.verbs = bench.verbs();
 		this.phases = bench.phases();
+		this.charts = bench.charts();
+		this.hasHints = bench.hasHints();
 		this.#push(first ?? bench.start());
 	}
 
@@ -99,6 +111,7 @@ export class Session {
 	}
 
 	#push(turn: Turn) {
+		this.turns++;
 		this.entries.push({ id: this.#next++, turn });
 		this.#refresh();
 		// A chosen answer in a talk has no typed command: the answer is the command.
@@ -126,6 +139,8 @@ export class Session {
 		this.bench = bench;
 		this.verbs = bench.verbs();
 		this.phases = bench.phases();
+		this.charts = bench.charts();
+		this.hasHints = bench.hasHints();
 		this.#refresh();
 		// The last turn that showed a room text, when that room is still the current room.
 		const at = this.entries.findLastIndex((e) => e.turn.blocks.some((b) => b.kind === 'title'));
@@ -161,6 +176,7 @@ export class Session {
 			? { dialogue: this.talkView.dialogue, with: this.talkView.with, name: this.talkView.name, node: this.talkView.node }
 			: null;
 		this.dialogues = this.bench.dialogues();
+		this.hints = this.bench.hints();
 	}
 
 	/** Play one input. */
@@ -208,6 +224,15 @@ export class Session {
 		} catch (e) {
 			this.#push({ blocks: [{ kind: 'note', runs: [{ text: String(e) }] }], ended: false, log: [] });
 		}
+	}
+
+	/**
+	 * Show the next level of the hint ladder (UI-1), of `step` or of the first step with a level left. The hint
+	 * shows in the transcript as a note. It is no turn, so the playthrough does not list it.
+	 */
+	hint(step?: string) {
+		this.entries.push({ id: this.#next++, turn: this.bench.hint(step) });
+		this.#refresh();
 	}
 
 	/** Go back to the state before the last turn. The transcript keeps the turns; the undo shows as a new turn. */

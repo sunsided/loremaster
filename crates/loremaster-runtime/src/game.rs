@@ -210,6 +210,7 @@ impl Game {
             talk: None,
             relations: Default::default(),
             memories: Default::default(),
+            steps_done: Default::default(),
             timers: story
                 .timers
                 .iter()
@@ -838,6 +839,12 @@ impl Game {
             .enumerate()
             .filter(|(i, _)| ev.holds_opt(&self.world.rooms[ri].exits[*i].visible))
             .collect()
+    }
+
+    /// The command record of typed text in the state now, without running
+    /// it. `None` when the parser does not understand the text.
+    pub(crate) fn parse_text(&self, text: &str) -> Option<Command> {
+        parse(&self.world.verbs, &self.parse_scope(), text).ok()
     }
 
     fn parse_scope(&self) -> ParseScope {

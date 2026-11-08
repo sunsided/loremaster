@@ -327,7 +327,10 @@ fn walkthrough_tests() {
     assert_eq!(w.pending.as_ref().unwrap().phase, 4);
     assert_eq!(w.steps.len(), 5);
     assert!(matches!(&w.steps[2], WalkStep::Command(c) if c == "wait"));
-    let WalkStep::Checked { command, expect } = &w.steps[3] else {
+    let WalkStep::Checked {
+        command, expect, ..
+    } = &w.steps[3]
+    else {
         panic!("{:?}", w.steps[3]);
     };
     assert_eq!(command, "open hatch");
