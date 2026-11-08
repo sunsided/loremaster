@@ -6,14 +6,18 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
-fn pascal(id: &str) -> String {
-    id.split('_')
+/// `broken_pick` is `BrokenPick`. Two ids can meet (`level_2`, `level2`);
+/// the check reports that (`check/contract.rs`).
+pub(crate) fn pascal(id: &str) -> String {
+    let out: String = id
+        .split('_')
         .map(|part| {
             let mut c = part.chars();
             c.next()
                 .map_or(String::new(), |f| f.to_uppercase().chain(c).collect())
         })
-        .collect()
+        .collect();
+    if out == "Self" { "Self_".into() } else { out }
 }
 
 /// A Rust field name: a keyword gets the `r#` prefix, and the names that
@@ -23,10 +27,11 @@ fn field(name: &str) -> String {
         return format!("{name}_");
     }
     const KEYWORDS: &[&str] = &[
-        "as", "async", "await", "break", "const", "continue", "dyn", "else", "enum", "extern",
-        "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut",
-        "pub", "ref", "return", "static", "struct", "trait", "true", "type", "unsafe", "use",
-        "where", "while",
+        "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "do",
+        "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl", "in",
+        "let", "loop", "macro", "match", "mod", "move", "mut", "override", "priv", "pub", "ref",
+        "return", "static", "struct", "trait", "true", "try", "type", "typeof", "unsafe",
+        "unsized", "use", "virtual", "where", "while", "yield",
     ];
     if KEYWORDS.contains(&name) {
         format!("r#{name}")
@@ -120,6 +125,32 @@ fn write_arg(krate: &str, arg: &str, ty: &ArgType) -> String {
         ArgType::Text => format!("{krate}::Value::Text({f}.clone())"),
         ArgType::Enum(_) => format!("{f}.value()"),
     }
+}
+
+/// The types that [`rust_bindings`] declares, each with what it is for. Two
+/// with one name do not compile; the check reports them.
+pub(crate) fn type_names(interface: &Interface) -> Vec<(String, String)> {
+    let mut out = vec![
+        ("Request".to_string(), "the requests".to_string()),
+        ("HostEvent".to_string(), "the host events".to_string()),
+    ];
+    for a in &interface.actions {
+        if !a.results.is_empty() {
+            let what = format!("the results of the action `{}`", a.id);
+            out.push((format!("{}Result", pascal(a.id.as_str())), what));
+        }
+    }
+    let owners = (interface.actions.iter().map(|a| ("action", &a.id, &a.args)))
+        .chain(interface.events.iter().map(|e| ("event", &e.id, &e.args)));
+    for (kind, id, args) in owners {
+        for (arg, ty) in args {
+            if let ArgType::Enum(_) = ty {
+                let what = format!("the argument `{arg}` of the {kind} `{id}`");
+                out.push((rust_type(id.as_str(), arg, ty), what));
+            }
+        }
+    }
+    out
 }
 
 /// Rust source with the hash, `Request`, one result enum per action and
@@ -276,15 +307,28 @@ pub fn json_schema(interface: &Interface) -> Value {
         .events
         .iter()
         .map(|e| {
+            let required = if e.args.is_empty() {
+                json!(["name"])
+            } else {
+                json!(["name", "args"])
+            };
             json!({
                 "type": "object",
                 "properties": { "name": { "const": e.id }, "args": args_schema(&e.args) },
-                "required": ["name", "args"],
+                "required": required,
             })
         })
         .collect();
-    defs.insert("Request".into(), json!({ "oneOf": requests }));
-    defs.insert("HostEvent".into(), json!({ "oneOf": events }));
+    // An empty `oneOf` is no valid schema; `false` matches nothing.
+    let one_of = |v: Vec<Value>| {
+        if v.is_empty() {
+            json!(false)
+        } else {
+            json!({ "oneOf": v })
+        }
+    };
+    defs.insert("Request".into(), one_of(requests));
+    defs.insert("HostEvent".into(), one_of(events));
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "loremaster host interface",
@@ -306,12 +350,14 @@ fn ts_type(ty: &ArgType) -> String {
     }
 }
 
+/// The `args` property: optional when there are none, as on the wire.
 fn ts_args(args: &BTreeMap<String, ArgType>) -> String {
     let fields: Vec<String> = args
         .iter()
         .map(|(a, t)| format!("{a:?}: {}", ts_type(t)))
         .collect();
-    format!("{{ {} }}", fields.join("; "))
+    let colon = if args.is_empty() { "?:" } else { ":" };
+    format!("args{colon} {{ {} }}", fields.join("; "))
 }
 
 /// TypeScript types of the same contract as [`json_schema`].
@@ -320,7 +366,7 @@ pub fn typescript(interface: &Interface) -> String {
     let mut requests = Vec::new();
     for a in &interface.actions {
         let mut body = format!(
-            "kind: 'action'; name: {:?}; args: {}",
+            "kind: 'action'; name: {:?}; {}",
             a.id.as_str(),
             ts_args(&a.args)
         );
@@ -339,13 +385,7 @@ pub fn typescript(interface: &Interface) -> String {
     let events: Vec<String> = interface
         .events
         .iter()
-        .map(|e| {
-            format!(
-                "{{ name: {:?}; args: {} }}",
-                e.id.as_str(),
-                ts_args(&e.args)
-            )
-        })
+        .map(|e| format!("{{ name: {:?}; {} }}", e.id.as_str(), ts_args(&e.args)))
         .collect();
     let union = |v: Vec<String>| {
         if v.is_empty() {
@@ -392,8 +432,28 @@ mod tests {
     #[test]
     fn a_name_that_cannot_be_raw_gets_an_underscore() {
         assert_eq!(field("type"), "r#type");
+        assert_eq!(field("try"), "r#try");
         assert_eq!(field("self"), "self_");
         assert_eq!(field("boss"), "boss");
+        assert_eq!(pascal("self"), "Self_");
+        assert_eq!(pascal("broken_pick"), "BrokenPick");
+    }
+
+    #[test]
+    fn no_arguments_and_no_entries_stay_valid() {
+        let i: Interface =
+            serde_json::from_value(json!({ "events": [{ "id": "found" }] })).unwrap();
+        let s = json_schema(&i);
+        assert_eq!(s["$defs"]["Request"], json!(false));
+        assert_eq!(
+            s["$defs"]["HostEvent"]["oneOf"][0]["required"],
+            json!(["name"])
+        );
+        assert!(
+            typescript(&i).contains("name: \"found\"; args?: {  }"),
+            "{}",
+            typescript(&i)
+        );
     }
 
     #[test]

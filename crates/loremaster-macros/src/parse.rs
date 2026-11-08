@@ -653,6 +653,9 @@ fn declared_args(
                     list.parse::<Token![,]>()?;
                 }
             }
+            if values.is_empty() {
+                return Err(Error::new(arg.span, "an enum needs at least one value"));
+            }
             ArgType::Enum(values)
         } else {
             let word = name(&body)?;
@@ -668,6 +671,9 @@ fn declared_args(
                 }
             }
         };
+        if out.contains_key(&arg.value) {
+            return Err(Error::new(arg.span, format!("`{}` comes twice", arg.value)));
+        }
         out.insert(arg.value, ty);
         if !body.is_empty() {
             body.parse::<Token![,]>()?;

@@ -21,6 +21,7 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::sync::Arc;
 
+const INVALID_REQUEST: i64 = -32600;
 const INVALID_PARAMS: i64 = -32602;
 const METHOD_NOT_FOUND: i64 = -32601;
 const NOT_STARTED: i64 = -32002;
@@ -84,10 +85,19 @@ impl Protocol {
             Ok(v) => v,
             Err(e) => return Some(error_reply(Value::Null, -32700, &e.to_string())),
         };
-        let id = msg.get("id")?.clone();
-        let method = msg["method"].as_str().unwrap_or("");
+        let id = msg.get("id").cloned();
         let params = msg.get("params").cloned().unwrap_or_else(|| json!({}));
-        Some(match self.call(method, params) {
+        let method = match msg.get("method").and_then(Value::as_str) {
+            Some(m) if msg["jsonrpc"] == "2.0" && params.is_object() => m,
+            _ => {
+                let why = "a request is an object with `jsonrpc: \"2.0\"`, a `method` and object `params`";
+                return Some(error_reply(id.unwrap_or(Value::Null), INVALID_REQUEST, why));
+            }
+        };
+        let answer = self.call(method, params);
+        // A notification runs, but gets no reply.
+        let id = id?;
+        Some(match answer {
             Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
             Err((code, message, data)) => {
                 let mut reply = error_reply(id, code, &message);
@@ -166,9 +176,13 @@ impl Protocol {
                 return Err((INTERFACE_MISMATCH, m.to_string(), data));
             }
         }
-        let mut session = match params.get("seed").and_then(Value::as_u64) {
-            Some(seed) => Session::with_seed(self.world.clone(), seed),
-            None => Session::new(self.world.clone()),
+        let mut session = match params.get("seed") {
+            None | Some(Value::Null) => Session::new(self.world.clone()),
+            Some(seed) => {
+                let seed = (seed.as_u64())
+                    .ok_or_else(|| failure(INVALID_PARAMS, "`seed` is an unsigned integer"))?;
+                Session::with_seed(self.world.clone(), seed)
+            }
         };
         let step = session.start();
         self.session = Some(session);

@@ -3,7 +3,7 @@
 
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 const STORY: &str = r#"
@@ -58,7 +58,7 @@ struct Host {
 }
 
 impl Host {
-    fn start(dir: &PathBuf) -> Self {
+    fn start(dir: &Path) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_loremaster"))
             .arg("protocol")
             .arg(dir)
@@ -86,6 +86,17 @@ impl Host {
         let reply: Value = serde_json::from_str(&line).unwrap();
         assert_eq!(reply["id"], json!(self.next), "{reply}");
         reply
+    }
+
+    /// Send one raw line; read a reply only when `reply` is set.
+    fn raw(&mut self, line: &str, reply: bool) -> Option<Value> {
+        writeln!(self.stdin, "{line}").unwrap();
+        self.stdin.flush().unwrap();
+        reply.then(|| {
+            let mut line = String::new();
+            self.stdout.read_line(&mut line).unwrap();
+            serde_json::from_str(&line).unwrap()
+        })
     }
 
     fn result(&mut self, method: &str, params: Value) -> Value {
@@ -168,5 +179,25 @@ fn a_host_built_for_another_interface_is_refused() {
     assert!(message.contains("added: action lockpick"), "{message}");
     assert!(message.contains("removed: action dance"), "{message}");
     assert_eq!(reply["error"]["data"]["removed"], json!(["action dance"]));
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn notifications_run_and_bad_requests_get_an_error() {
+    let dir = project("shape");
+    let mut host = Host::start(&dir);
+    // A notification gets no reply, but it runs: the session is started.
+    host.raw(r#"{ "jsonrpc": "2.0", "method": "session/start" }"#, false);
+    host.result("session/status", json!({}));
+    for bad in [
+        "42",
+        r#"{ "jsonrpc": "2.0", "id": 9 }"#,
+        r#"{ "jsonrpc": "2.0", "id": 9, "method": "session/status", "params": 1 }"#,
+    ] {
+        let reply = host.raw(bad, true).unwrap();
+        assert_eq!(reply["error"]["code"], -32600, "{reply}");
+    }
+    let seed = host.call("session/start", json!({ "seed": "7" }));
+    assert_eq!(seed["error"]["code"], -32602, "{seed}");
     std::fs::remove_dir_all(&dir).unwrap();
 }

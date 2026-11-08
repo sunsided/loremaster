@@ -428,7 +428,7 @@ interface:
     - { id: killed, args: { boss: text }, when: "not game_over" }
 ```
 
-An argument type is `bool`, `int`, `text` or `{ enum: [a, b] }`. An `await` of a declared action can leave out `results`.
+An argument type is `bool`, `int`, `text` or `{ enum: [a, b] }`. An `await` of a declared action can leave out `results`. The ids, arguments, results and enum values become names in the host's code: they are plain names (lowercase letters, digits and single `_`, from a letter on), and two of them must not make one Rust name (`level_2` and `level2`). An event argument cannot have the name of a thing property such as `name` or `location`. The `when` of an event cannot read its own arguments: it runs before they are stored, so test them in the rule.
 
 With the section, `loremaster check` fails when:
 
@@ -439,7 +439,7 @@ With the section, `loremaster check` fails when:
 
 Rules hear a host event with `on: { event: killed }`. Its arguments read as `killed.boss`: the last reported value. The host reports it with `Session::host_event`. The session refuses an undeclared event, a wrong argument, a false `when`, and an event while a rule waits. An event is not a turn: the clock does not move.
 
-`Session::for_host` refuses to start when the host was built for another interface: the message names the added, removed and changed entries. In a walkthrough, an `await` of an action takes only a declared result, by name, and a step `{ event: killed, args: { boss: ogre } }` reports an event.
+`Session::for_host` refuses to start when the host was built for another interface: the message names the added, removed and changed entries. In a walkthrough, an `await` of an action takes only a declared result, by name, and a step `{ event: killed, args: { boss: ogre } }` reports an event. A step has `do` or `event`, not both.
 
 A Rust host gets its types from the `loremaster-build` crate in `build.rs`, or from `world!`, which writes the module `interface`. `loremaster interface <project> --ts` or `--json-schema` writes them for other languages. `loremaster protocol <project>` plays the story as a JSON-RPC 2.0 server on stdio, one message per line, for hosts in any language.
 

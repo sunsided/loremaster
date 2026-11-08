@@ -2397,7 +2397,8 @@ fn default_arg(ty: &loremaster_model::ArgType) -> Value {
         ArgType::Bool => Value::Bool(false),
         ArgType::Int => Value::Int(0),
         ArgType::Text => Value::Text(String::new()),
-        ArgType::Enum(values) => Value::Text(values.first().cloned().unwrap_or_default()),
+        // The least value: the interface hash does not see the order.
+        ArgType::Enum(values) => Value::Text(values.iter().min().cloned().unwrap_or_default()),
     }
 }
 

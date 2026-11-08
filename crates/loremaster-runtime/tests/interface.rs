@@ -41,8 +41,12 @@ const RULES: &str = r#"
 "#;
 
 fn files(rules: &str) -> Vec<SourceFile> {
+    files_with(STORY, rules)
+}
+
+fn files_with(story: &str, rules: &str) -> Vec<SourceFile> {
     vec![
-        file("story.yaml", STORY),
+        file("story.yaml", story),
         file(
             "rooms/hall.yaml",
             "name: Hall\ndescription: [\"A hall with a lever.\"]\n",
@@ -246,4 +250,121 @@ fn an_event_step_while_awaiting_is_no_answer_to_the_action() {
         "{:?}",
         r.failures
     );
+}
+
+fn story_diagnostics(story: &str, extra: Vec<SourceFile>) -> Vec<String> {
+    let mut all = files_with(story, RULES);
+    all.extend(extra);
+    check(&load(all).unwrap())
+        .into_iter()
+        .map(|d| format!("{:?}: {}", d.severity, d.message))
+        .collect()
+}
+
+#[test]
+fn contract_names_must_make_valid_distinct_rust_names() {
+    let bad = |from: &str, to: &str| story_diagnostics(&STORY.replace(from, to), vec![]);
+    let e = bad(
+        "id: killed, args: { boss: text",
+        "id: killed, args: { Boss-x: text",
+    );
+    assert!(
+        e.iter().any(|m| m.contains("`Boss-x` is no plain name")),
+        "{e:?}"
+    );
+    let e = bad(
+        "results: [success, broken_pick]",
+        "results: [success, success, broken_pick]",
+    );
+    assert!(
+        e.iter()
+            .any(|m| m.contains("two results have the id `success`")),
+        "{e:?}"
+    );
+    let e = bad(
+        "results: [success, broken_pick]",
+        "results: [success, broken_pick, pick_2, pick2]",
+    );
+    assert!(
+        e.iter().any(|m| m.contains("Rust variant `Pick2`")),
+        "{e:?}"
+    );
+    let e = bad("level: int }", "level: int, name: text }");
+    assert!(
+        e.iter()
+            .any(|m| m.contains("would read the property `name`")),
+        "{e:?}"
+    );
+    let e = bad("when: alive", "when: \"killed.level > 0\"");
+    assert!(
+        e.iter().any(|m| m.contains("cannot read its arguments")),
+        "{e:?}"
+    );
+    // An action `lock_pick` with an enum argument `x` and an event `lock` with
+    // an enum argument `pick_x` are both `LockPickX`.
+    let e = bad(
+        "  events:\n",
+        "    - { id: lock_pick, args: { x: { enum: [a] } } }\n  events:\n    - { id: lock, args: { pick_x: { enum: [a] } } }\n",
+    );
+    assert!(
+        e.iter().any(|m| m.contains("Rust type `LockPickX`")),
+        "{e:?}"
+    );
+}
+
+#[test]
+fn a_declared_host_event_needs_no_emit() {
+    let d = story_diagnostics(STORY, vec![]);
+    assert!(!d.iter().any(|m| m.contains("no `emit` sends")), "{d:?}");
+}
+
+#[test]
+fn a_dialogue_when_is_a_branch_for_a_result() {
+    let rules = RULES.replace("{lock == broken_pick: The pick snaps.}", "");
+    let mut all = files(&rules);
+    all.push(file(
+        "things/bb.yaml",
+        "name: man\nlocation: { room: hall }\n",
+    ));
+    all.push(file(
+        "dialogues/bb.yaml",
+        "with: bb\nstart: [snapped]\nnodes:\n  snapped:\n    when: lock == broken_pick\n    say: \"Snapped?\"\n",
+    ));
+    let e: Vec<_> = check(&load(all).unwrap())
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| d.message)
+        .collect();
+    assert!(!e.iter().any(|m| m.contains("broken_pick")), "{e:?}");
+}
+
+#[test]
+fn a_step_is_a_command_or_an_event() {
+    let errs = |yaml: &str| {
+        let mut all = files(RULES);
+        all.push(file("tests/t.yaml", yaml));
+        check(&load(all).unwrap())
+            .into_iter()
+            .filter(|d| d.severity == Severity::Error)
+            .map(|d| d.message)
+            .collect::<Vec<_>>()
+    };
+    let e = errs("steps:\n  - { do: look, event: killed, args: { boss: ogre, level: 2 } }\n");
+    assert!(e.iter().any(|m| m.contains("not both")), "{e:?}");
+    let e = errs("steps:\n  - { do: look, args: { boss: ogre } }\n");
+    assert!(
+        e.iter().any(|m| m.contains("`args` belong to an `event`")),
+        "{e:?}"
+    );
+}
+
+#[test]
+fn an_event_step_gives_no_hint() {
+    let mut all = files(RULES);
+    all.push(file(
+        "tests/t.yaml",
+        "steps:\n  - { event: killed, args: { boss: ogre, level: 2 }, hints: [\"Wait.\"] }\n",
+    ));
+    let project = load(all).unwrap();
+    assert!(loremaster_runtime::HintBook::new(world(), &project.walkthroughs).is_empty());
 }

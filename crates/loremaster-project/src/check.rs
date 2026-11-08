@@ -670,7 +670,15 @@ impl Checker<'_> {
             .chain(story.verbs.iter())
             .map(|v| v.id.to_string())
             .collect();
-        let emitted = emitted_events(&story);
+        let mut emitted = emitted_events(&story);
+        // The host sends the declared events.
+        emitted.extend(
+            story
+                .interface
+                .iter()
+                .flat_map(|i| &i.events)
+                .map(|e| e.id.to_string()),
+        );
         let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
@@ -880,6 +888,9 @@ impl Checker<'_> {
                 }
             }
             for n in &d.nodes {
+                // A dialogue can branch on the result of an action.
+                let whens = std::iter::once(&n.when).chain(n.options.iter().map(|o| &o.when));
+                self.contract.tests.extend(whens.flatten().cloned());
                 let at = format!("nodes.{}", n.key);
                 self.line(&file, &at, &n.say);
                 for (i, l) in n.lines.iter().enumerate() {

@@ -234,8 +234,6 @@ impl Game {
             .collect()
     }
 
-    /// Typed input while a rule waits: a number of the list, or an answer
-    /// as written (an option id or its text, a result, a rolled number).
     /// A host event (IF-1): check it against the interface, keep its
     /// arguments as `event.arg`, and run the rules that listen for it. It is
     /// no turn: the clock does not move.
@@ -272,6 +270,8 @@ impl Game {
         Ok(self.finish(turn))
     }
 
+    /// Typed input while a rule waits: a number of the list, or an answer
+    /// as written (an option id or its text, a result, a rolled number).
     pub(crate) fn await_input(&mut self, turn: &mut Turn, text: &str) {
         let Some(open) = self.state.awaiting.clone() else {
             return;
