@@ -142,8 +142,9 @@ pub struct Session {
     game: Game,
     /// The seed of a new game, for `restart`.
     seed: u64,
-    /// The states before the last inputs, the newest last (SE-8).
-    history: VecDeque<State>,
+    /// The states before the last inputs, the newest last (SE-8). A
+    /// restart also keeps the hint levels it cleared, for its undo.
+    history: VecDeque<(State, Option<BTreeMap<String, usize>>)>,
     undo_depth: usize,
     /// `start` ran, or the game came from a save.
     started: bool,
@@ -366,13 +367,18 @@ impl Session {
 
     /// Keep the state before an input for `undo`, if the input changed it.
     fn remember(&mut self, before: Option<State>) {
+        self.remember_with(before, None);
+    }
+
+    /// [`Self::remember`], with the hint levels that `undo` brings back.
+    fn remember_with(&mut self, before: Option<State>, revealed: Option<BTreeMap<String, usize>>) {
         let Some(before) = before else {
             return;
         };
         if &before == self.game.state() {
             return;
         }
-        self.history.push_back(before);
+        self.history.push_back((before, revealed));
         while self.history.len() > self.undo_depth {
             self.history.pop_front();
         }

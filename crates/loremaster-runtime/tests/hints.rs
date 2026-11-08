@@ -148,6 +148,17 @@ fn a_restart_starts_the_ladders_again() {
 }
 
 #[test]
+fn undo_after_a_restart_brings_the_ladders_back() {
+    let mut s = lighthouse();
+    say(&mut s, "n");
+    say(&mut s, "hint");
+    say(&mut s, "hint");
+    s.restart();
+    s.undo();
+    assert_eq!(say(&mut s, "hint").split(':').next(), Some("Hint 3 of 3"));
+}
+
+#[test]
 fn an_author_command_that_sets_the_facts_does_the_step() {
     use loremaster_model::Value;
     use loremaster_runtime::authoring::{AuthorCommand, author};
