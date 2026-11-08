@@ -94,6 +94,9 @@ pub struct StoryHeader {
     /// How many things the player can hold (WO-3).
     #[serde(default)]
     pub carry_limit: Option<u32>,
+    /// The most `on: next` machine steps in one turn (P5-02).
+    #[serde(default)]
+    pub step_limit: Option<u32>,
     #[serde(default)]
     pub notes: Vec<Note>,
     #[serde(default)]
@@ -756,6 +759,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         seed: header.seed,
         death_prompt: header.death_prompt,
         carry_limit: header.carry_limit,
+        step_limit: header.step_limit,
         notes: header.notes,
         threads,
     };

@@ -117,6 +117,12 @@ pub mod on {
         EventPattern::Turn
     }
 
+    /// `next`: in a machine step, the step runs by itself right after the
+    /// machine enters its `from` state.
+    pub fn next() -> EventPattern {
+        EventPattern::Next
+    }
+
     /// `enter: room`.
     pub fn enter(room: impl AsRef<str>) -> EventPattern {
         EventPattern::Enter(id(room))

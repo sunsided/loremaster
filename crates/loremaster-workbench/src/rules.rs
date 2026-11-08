@@ -98,6 +98,9 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
             let when = match &r.on {
                 EventPattern::Start => "the game starts".to_string(),
                 EventPattern::Turn => "a turn passes".to_string(),
+                EventPattern::Next => {
+                    "by itself, right after the machine enters the state".to_string()
+                }
                 EventPattern::Enter(room) => {
                     format!("the player enters {}", thing_or_room(room))
                 }
@@ -196,6 +199,7 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
             let trigger = match &r.on {
                 EventPattern::Start => "start",
                 EventPattern::Turn => "turn",
+                EventPattern::Next => "next",
                 EventPattern::Enter(_) => "enter",
                 EventPattern::Leave(_) => "leave",
                 EventPattern::Time(_) => "time",
@@ -341,6 +345,9 @@ fn relevance(ins: Inspector<'_>, rule: &loremaster_model::Rule) -> Option<String
             .as_ref()
             .filter(|t| parts.first() == Some(&t.dialogue))
             .map(|_| "about the talk now".into()),
-        EventPattern::Leave(_) | EventPattern::Start | EventPattern::Event(_) => None,
+        EventPattern::Leave(_)
+        | EventPattern::Start
+        | EventPattern::Event(_)
+        | EventPattern::Next => None,
     }
 }

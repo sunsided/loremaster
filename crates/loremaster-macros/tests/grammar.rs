@@ -716,6 +716,21 @@ mod more {
     }
 }
 
+mod trial {
+    use loremaster::prelude::*;
+
+    world! {
+        machine trial starts rolling {
+            rolling -> done on next;
+        }
+    }
+}
+
+#[test]
+fn a_step_can_run_by_itself() {
+    assert_eq!(trial::pack().machines[0].steps[0].on, EventPattern::Next);
+}
+
 mod scored {
     use loremaster::prelude::*;
 

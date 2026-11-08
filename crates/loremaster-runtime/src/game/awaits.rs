@@ -134,19 +134,39 @@ impl Game {
             return;
         };
         let outer = std::mem::replace(&mut self.stopped, false);
+        // After the answer, the `on: next` steps of a machine go on.
+        if self.run_effects(turn, i, from, 1)
+            && let Some(m) = &world.story.rules[i].machine
+        {
+            self.run_next(turn, m, 1);
+        }
+        self.stopped = outer;
+    }
+
+    /// Run the effects of rule `i` from position `from` on. False when the
+    /// rule pauses at an await, or skips the rest of it.
+    pub(crate) fn run_effects(
+        &mut self,
+        turn: &mut Turn,
+        i: usize,
+        from: usize,
+        depth: u8,
+    ) -> bool {
+        let world = self.world.clone();
+        let rule = &world.story.rules[i].id;
         for (k, effect) in world.rules[i].then.iter().enumerate().skip(from) {
             if let CEffect::Await(spec) = effect {
                 if self.begin_await(turn, rule, k + 1, spec) != AwaitStep::Answered {
-                    break;
+                    return false;
                 }
                 continue;
             }
-            self.apply(turn, rule, effect, 1);
+            self.apply(turn, rule, effect, depth);
             if self.stopped || self.state.ended {
                 break;
             }
         }
-        self.stopped = outer;
+        true
     }
 
     /// The answers of the open await as choices, for the hosts that show a

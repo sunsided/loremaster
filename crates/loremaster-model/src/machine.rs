@@ -32,7 +32,8 @@ pub struct Machine {
 }
 
 /// One step of a machine: in one of the `from` states, on the event, while
-/// `when` holds, the machine goes to `to`.
+/// `when` holds, the machine goes to `to`. With `on: next`, the step runs by
+/// itself right after the machine enters a `from` state, in the same turn.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
