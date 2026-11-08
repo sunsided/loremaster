@@ -292,7 +292,11 @@ fn list_items(text: &str, from: usize) -> Vec<usize> {
             continue;
         }
         let n = line.len() - trimmed.len();
-        let item = body == "-" || body.starts_with("- ");
+        // YAML separates the `-` from its item with a space or a tab.
+        let item = body == "-"
+            || body
+                .strip_prefix('-')
+                .is_some_and(|r| r.starts_with([' ', '\t']));
         match indent {
             None if item => indent = Some(n),
             None => break,
@@ -547,6 +551,12 @@ mod tests {
         .collect();
         check!(d.len() == 1, "{d:?}");
         check!(d[0].line == Some(3), "{d:?}");
+    }
+
+    #[test]
+    fn a_tab_after_the_dash_starts_an_item_too() {
+        let text = "steps:\n  -\t{ do: wait }\n  - look\n";
+        check!(list_items(text, 0) == vec![11, 28]);
     }
 
     #[test]
