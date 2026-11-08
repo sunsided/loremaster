@@ -1,5 +1,7 @@
 # Fit test: dialogues through dramaturge
 
+The second fit report, on the Lock-Keeper and dramaturge 0.3.0-alpha.5 (phase 4), is `docs/dramaturge-lock-keeper-fit.md`.
+
 This report tells how well dramaturge 0.2 fits loremaster beyond conditions. The test case is the cantina example: the three Blackbeard talk rules became `examples/cantina/dialogues/blackbeard.yaml`, with a `trust` relation and an `asked_marigold` memory.
 
 The boundary of the test:
