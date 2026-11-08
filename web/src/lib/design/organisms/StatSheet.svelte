@@ -53,7 +53,10 @@
 		changed = marks;
 		announcement = said.join(' ');
 		clearTimeout(timer);
-		timer = setTimeout(() => (changed = {}), STAT_MARK_MS);
+		timer = setTimeout(() => {
+			changed = {};
+			announcement = '';
+		}, STAT_MARK_MS);
 	});
 	$effect(() => () => clearTimeout(timer));
 </script>
