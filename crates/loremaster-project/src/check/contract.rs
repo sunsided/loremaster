@@ -89,9 +89,12 @@ impl Checker<'_> {
             if self.story().thing(e.id.as_str()).is_some()
                 || self.story().var(e.id.as_str()).is_some()
                 || self.story().room(e.id.as_str()).is_some()
-                || loremaster_lang::is_reserved(e.id.as_str())
+                || matches!(
+                    loremaster_lang::reserved(e.id.as_str()),
+                    Some(loremaster_lang::Reserved::Keyword | loremaster_lang::Reserved::Path)
+                )
             {
-                self.error(&header, &at, format!("the event `{}` has the id of a thing, a variable, a room or a built-in name; its arguments would clash", e.id));
+                self.error(&header, &at, format!("the event `{}` has the id of a thing, a variable, a room or a built-in path or keyword; its arguments would clash", e.id));
             }
             if let Some(when) = &e.when {
                 self.condition(&header, &format!("{at}.when"), when);

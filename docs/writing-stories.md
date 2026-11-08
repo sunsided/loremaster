@@ -426,10 +426,10 @@ interface:
   actions:
     - { id: lockpick, args: { difficulty: int }, results: [success, failure, broken_pick] }
   events:
-    - { id: killed, args: { boss: text }, when: "not game_over" }
+    - { id: killed, args: { boss: text, level: int }, when: "not game_over" }
 ```
 
-An argument type is `bool`, `int`, `text` or `{ enum: [a, b] }`. An `await` of a declared action can leave out `results`. The ids, arguments, results and enum values become names in the host's code: they are plain names (lowercase letters, digits and single `_`, from a letter on), and two of them must not make one Rust name (`level_2` and `level2`). An event argument cannot have the name of a thing property such as `name` or `location`. The `when` of an event sees the reported arguments (`when: "killed.level > 0"`); when it is false, the session refuses the event and keeps the values before. An event cannot have the id of a thing, a variable, a room or a built-in name such as `time`.
+An argument type is `bool`, `int`, `text` or `{ enum: [a, b] }`. An `await` of a declared action can leave out `results`. The ids, arguments, results and enum values become names in the host's code: they are plain names (lowercase letters, digits and single `_`, from a letter on), and two of them must not make one Rust name (`level_2` and `level2`). An event argument cannot have the name of a thing property such as `name` or `location`. The `when` of an event sees the reported arguments (`when: "killed.level > 0"`); when it is false, the session refuses the event and keeps the values before. An event cannot have the id of a thing, a variable, a room, a keyword or a built-in path such as `time`.
 
 With the section, `loremaster check` fails when:
 

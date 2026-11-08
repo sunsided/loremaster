@@ -295,10 +295,14 @@ fn contract_names_must_make_valid_distinct_rust_names() {
             .any(|m| m.contains("would read the property `name`")),
         "{e:?}"
     );
+    // `level.x` still reads the argument: a derived name is bare only.
+    let e = bad("id: killed, args", "id: level, args");
+    assert!(!e.iter().any(|m| m.contains("built-in path")), "{e:?}");
     for id in ["hall", "time"] {
         let e = bad("id: killed, args", &format!("id: {id}, args"));
         assert!(
-            e.iter().any(|m| m.contains("a room or a built-in name")),
+            e.iter()
+                .any(|m| m.contains("a room or a built-in path or keyword")),
             "{id}: {e:?}"
         );
     }
@@ -415,5 +419,40 @@ fn a_step_after_an_event_step_opens_when_the_event_comes() {
         ("level".to_string(), Value::Int(2)),
     ]);
     s.host_event("killed", args).unwrap();
+    assert_eq!(s.hints().len(), 1, "{:?}", s.hints());
+}
+
+#[test]
+fn an_event_step_is_done_only_by_its_event_with_its_args() {
+    let mut all = files(RULES);
+    all.push(file(
+        "tests/t.yaml",
+        "steps:\n  - { id: boss, event: killed, args: { boss: ogre, level: 2 }, facts: { lock: success } }\n  - { do: look, needs: [boss], hints: [\"Look.\"] }\n",
+    ));
+    let project = load(all).unwrap();
+    let mut s = Session::new(world());
+    s.set_hints(loremaster_runtime::HintBook::new(
+        world(),
+        &project.walkthroughs,
+    ));
+    s.start();
+    // The facts of the step come to hold without the event: not done.
+    s.submit(loremaster_runtime::Input::Text("pull lever".into()));
+    s.submit(loremaster_runtime::Input::Text("success".into()));
+    assert_eq!(
+        s.state().facts.get("lock"),
+        Some(&Value::Text("success".into()))
+    );
+    assert!(s.hints().is_empty(), "{:?}", s.hints());
+    let report = |boss: &str| {
+        BTreeMap::from([
+            ("boss".to_string(), Value::Text(boss.into())),
+            ("level".to_string(), Value::Int(2)),
+        ])
+    };
+    // Another boss is not the step's report.
+    s.host_event("killed", report("troll")).unwrap();
+    assert!(s.hints().is_empty(), "{:?}", s.hints());
+    s.host_event("killed", report("ogre")).unwrap();
     assert_eq!(s.hints().len(), 1, "{:?}", s.hints());
 }

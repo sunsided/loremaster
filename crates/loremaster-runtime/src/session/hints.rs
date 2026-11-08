@@ -40,6 +40,8 @@ struct HintStep {
     needs: Vec<String>,
     /// The host event that the step reports, for a step without a command.
     event: Option<Id>,
+    /// The arguments of `event`: a report with others does not do the step.
+    args: BTreeMap<String, Value>,
     hints: Vec<String>,
     /// The facts that hold after the step, from its checks.
     facts: BTreeMap<String, Value>,
@@ -92,6 +94,7 @@ impl HintBook {
                         plan.hints.clone()
                     },
                     event: plan.event.clone(),
+                    args: plan.args.clone(),
                     facts: step.expect().map(|e| e.facts.clone()).unwrap_or_default(),
                 });
             }
@@ -263,6 +266,8 @@ impl Session {
                 .filter(|(_, s)| !state.steps_done.contains(&s.key))
         };
         let pending: Vec<usize> = open()
+            // An event step is done only by its event (`event_steps`).
+            .filter(|(_, s)| s.event.is_none())
             .filter(|(_, s)| !s.facts.is_empty() && !facts_hold(state, &s.facts))
             .map(|(i, _)| i)
             .collect();
@@ -287,11 +292,12 @@ impl Session {
         (matched, pending)
     }
 
-    /// The steps not done yet that report the host event `name`.
-    pub(super) fn event_steps(&self, name: &str) -> Vec<usize> {
+    /// The steps not done yet that report the host event `name` with `args`.
+    pub(super) fn event_steps(&self, name: &str, args: &BTreeMap<String, Value>) -> Vec<usize> {
         let state = self.game.state();
         (self.hints.steps.iter().enumerate())
             .filter(|(_, s)| s.event.as_ref().is_some_and(|e| e.as_str() == name))
+            .filter(|(_, s)| s.args == *args)
             .filter(|(_, s)| !state.steps_done.contains(&s.key))
             .map(|(i, _)| i)
             .collect()
