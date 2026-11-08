@@ -249,6 +249,7 @@ pub struct Event {
 pub enum EventKind {
     Start,
     Turn,
+    Next,
     Enter(Name),
     Leave(Name),
     Time(Text),

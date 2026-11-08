@@ -384,6 +384,7 @@ export interface RuleView {
 	trigger:
 		| 'start'
 		| 'turn'
+		| 'next'
 		| 'enter'
 		| 'leave'
 		| 'time'

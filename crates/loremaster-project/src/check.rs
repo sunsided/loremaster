@@ -716,7 +716,13 @@ impl Checker<'_> {
                         );
                     }
                 }
-                EventPattern::Start | EventPattern::Turn | EventPattern::Time(_) => {}
+                EventPattern::Next if rule.machine.is_none() => {
+                    self.error(&file, "on", "`on: next` works only in a machine step")
+                }
+                EventPattern::Start
+                | EventPattern::Turn
+                | EventPattern::Time(_)
+                | EventPattern::Next => {}
             }
             if let Some(w) = &rule.within
                 && self.story().thing(w.as_str()).is_none()
@@ -1299,6 +1305,13 @@ impl Checker<'_> {
                     }
                 }
             }
+            if let Some(state) = endless_loop(m) {
+                self.error(
+                    &file,
+                    &at,
+                    format!("the `on: next` steps from the state `{state}` loop forever: give a step `when:`, or an `await`, `end` or `stop`"),
+                );
+            }
             for s in &states {
                 if *s != m.start && !m.steps.iter().any(|step| step.to == *s) {
                     self.warning(&file, &at, format!("no step goes to the state `{s}`"));
@@ -1691,4 +1704,45 @@ fn line_col(text: &str, pos: usize) -> (u32, u32) {
     let line = before.matches('\n').count() as u32 + 1;
     let col = before.rsplit('\n').next().map_or(0, |l| l.chars().count()) as u32 + 1;
     (line, col)
+}
+
+/// A state on a loop of `on: next` steps that never ends: in each state of
+/// it, the first `on: next` step has no `when`, no `await` and no `end`, so
+/// it always runs.
+fn endless_loop(m: &loremaster_model::Machine) -> Option<String> {
+    let always = |state: &str| -> Option<&str> {
+        let step = m
+            .steps
+            .iter()
+            .find(|s| s.on == EventPattern::Next && s.from.list().contains(&state))?;
+        let stops = step.when.is_some()
+            || step
+                .then
+                .iter()
+                .any(|e| matches!(e, Effect::Await(_) | Effect::End(_) | Effect::Stop));
+        (!stops).then_some(step.to.as_str())
+    };
+    // A state that no step reaches can not loop; the checks warn about it.
+    let mut reached = vec![m.start.clone()];
+    let mut i = 0;
+    while i < reached.len() {
+        for step in &m.steps {
+            if step.from.list().contains(&reached[i].as_str()) && !reached.contains(&step.to) {
+                reached.push(step.to.clone());
+            }
+        }
+        i += 1;
+    }
+    for start in &reached {
+        let mut seen = vec![start.as_str()];
+        let mut at = start.as_str();
+        while let Some(to) = always(at) {
+            if seen.contains(&to) {
+                return Some(to.to_string());
+            }
+            seen.push(to);
+            at = to;
+        }
+    }
+    None
 }

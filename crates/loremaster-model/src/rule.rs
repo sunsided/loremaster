@@ -45,7 +45,7 @@ pub struct Rule {
 
 /// What a rule listens for.
 ///
-/// In YAML, `on:` is `start`, `turn`, or a map with one event kind. Its serde
+/// In YAML, `on:` is `start`, `turn`, `next`, or a map with one event kind. Its serde
 /// form is written by hand (in `command.rs`), so that `verb` and `check`
 /// take the slots of the Command record next to the verb.
 #[derive(Debug, Clone, PartialEq)]
@@ -54,6 +54,9 @@ pub enum EventPattern {
     Start,
     /// Every turn, after the command is handled.
     Turn,
+    /// Only in a machine step: the step runs by itself right after the
+    /// machine enters its `from` state, in the same turn.
+    Next,
     Enter(Id),
     Leave(Id),
     /// The clock reaches a time of day.

@@ -295,6 +295,7 @@ impl<'de> Deserialize<'de> for CommandPattern {
 const EVENT_KEYS: &[&str] = &[
     "start",
     "turn",
+    "next",
     "enter",
     "leave",
     "time",
@@ -310,7 +311,7 @@ const EVENT_KEYS: &[&str] = &[
     "topic",
 ];
 
-/// `on:` is a word (`start`, `turn`) or a map with one event kind, as before
+/// `on:` is a word (`start`, `turn`, `next`) or a map with one event kind, as before
 /// D6. A `verb` or `check` takes the list form, or a verb id with more slots
 /// of the Command record next to it: `{ verb: examine, direct: stove }`.
 impl Serialize for EventPattern {
@@ -331,6 +332,7 @@ impl Serialize for EventPattern {
         match self {
             EventPattern::Start => serializer.serialize_str("start"),
             EventPattern::Turn => serializer.serialize_str("turn"),
+            EventPattern::Next => serializer.serialize_str("next"),
             EventPattern::Enter(_) => one("enter", serializer),
             EventPattern::Leave(_) => one("leave", serializer),
             EventPattern::Time(_) => one("time", serializer),
@@ -364,13 +366,16 @@ impl<'de> Deserialize<'de> for EventPattern {
         impl<'de> Visitor<'de> for V {
             type Value = EventPattern;
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("an event: `start`, `turn`, or a map such as `{ verb: [take, lamp] }`")
+                f.write_str(
+                    "an event: `start`, `turn`, `next`, or a map such as `{ verb: [take, lamp] }`",
+                )
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<EventPattern, E> {
                 match v {
                     "start" => Ok(EventPattern::Start),
                     "turn" => Ok(EventPattern::Turn),
-                    other => Err(E::unknown_variant(other, &["start", "turn"])),
+                    "next" => Ok(EventPattern::Next),
+                    other => Err(E::unknown_variant(other, &["start", "turn", "next"])),
                 }
             }
             fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<EventPattern, A::Error> {
@@ -388,12 +393,12 @@ impl<'de> Deserialize<'de> for EventPattern {
                         continue;
                     }
                     let next = match key.as_str() {
-                        "start" | "turn" => {
+                        "start" | "turn" | "next" => {
                             map.next_value::<de::IgnoredAny>()?;
-                            Head::Done(if key == "start" {
-                                EventPattern::Start
-                            } else {
-                                EventPattern::Turn
+                            Head::Done(match key.as_str() {
+                                "start" => EventPattern::Start,
+                                "turn" => EventPattern::Turn,
+                                _ => EventPattern::Next,
                             })
                         }
                         "enter" => Head::Done(EventPattern::Enter(map.next_value()?)),
@@ -415,7 +420,7 @@ impl<'de> Deserialize<'de> for EventPattern {
                 }
                 let Some((key, head)) = head else {
                     return Err(de::Error::custom(
-                        "the event names no kind: give one of `start`, `turn`, `enter`, `leave`, `time`, `verb`, `check`, `timer`, `event` or `talk`",
+                        "the event names no kind: give one of `start`, `turn`, `next`, `enter`, `leave`, `time`, `verb`, `check`, `timer`, `event` or `talk`",
                     ));
                 };
                 match head {
@@ -450,6 +455,8 @@ mod tests {
         check!(serde_json::to_string(&p).unwrap() == r#"{"verb":["take","lamp"]}"#);
         check!(serde_json::to_string(&EventPattern::Start).unwrap() == r#""start""#);
         check!(read(r#""turn""#).unwrap() == EventPattern::Turn);
+        check!(read(r#""next""#).unwrap() == EventPattern::Next);
+        check!(serde_json::to_string(&EventPattern::Next).unwrap() == r#""next""#);
     }
 
     #[test]

@@ -871,6 +871,7 @@ fn event(e: &Event) -> EventPattern {
     match &e.kind {
         EventKind::Start => on::start(),
         EventKind::Turn => on::turn(),
+        EventKind::Next => on::next(),
         EventKind::Enter(r) => on::enter(r.value.as_str()),
         EventKind::Leave(r) => on::leave(r.value.as_str()),
         EventKind::Time(t) => on::time(t.value.as_str()),
