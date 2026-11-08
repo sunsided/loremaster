@@ -131,11 +131,6 @@ fn reads_counters(game: &Game) -> bool {
 /// commands that can not change the state (examine with no rule, wait in a
 /// story without time rules) are left out, so the walk stays small. With a
 /// carry limit and full hands, `drop` frees a hand, so it is tried then.
-/// A pattern that matches the player's commands: no `actor`, or the player.
-fn for_player(p: &loremaster_model::CommandPattern) -> bool {
-    p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
-}
-
 fn commands(game: &Game) -> Vec<(String, Command)> {
     let world = game.world();
     let story = &world.story;
@@ -287,6 +282,11 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out.dedup_by(|a, b| a.0 == b.0);
     out
+}
+
+/// A pattern that matches the player's commands: no `actor`, or the player.
+fn for_player(p: &loremaster_model::CommandPattern) -> bool {
+    p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
 }
 
 fn facts_of(game: &Game) -> Vec<String> {
