@@ -356,10 +356,11 @@ impl State {
     }
 
     /// How many things the player holds in the hands, for the carry limit.
+    /// A concealed thing does not count: the player can not name it to drop it.
     pub fn held_count(&self) -> u32 {
         self.locations
-            .values()
-            .filter(|l| matches!(l, Location::Carried))
+            .iter()
+            .filter(|(id, l)| matches!(l, Location::Carried) && !self.is_concealed(id.as_str()))
             .count() as u32
     }
 

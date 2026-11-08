@@ -206,7 +206,9 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     }
     // The standard verbs that change state.
     let take_rules = story.rules.iter().any(|r| {
-        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p) if p.verb.as_str() == "take")
+        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
+            if p.verb.as_str() == "take"
+                && p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER))
     });
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();

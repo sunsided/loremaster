@@ -389,3 +389,22 @@ fn a_cost_for_the_score_verb_checks_clean() {
     let found = check(&load(files(&story)).unwrap());
     assert!(found.is_empty(), "{found:#?}");
 }
+
+#[test]
+fn a_concealed_thing_in_the_hands_does_not_fill_them() {
+    let rules = "- id: slip\n  on: { verb: [pull, rug] }\n  then:\n    - move: { key: carried }\n";
+    let mut files = files(STORY);
+    files
+        .iter_mut()
+        .find(|f| f.path == "rules/rules.yaml")
+        .unwrap()
+        .text = rules.into();
+    let mut game = Session::new(Arc::new(
+        World::compile(load(files).unwrap().story).unwrap(),
+    ));
+    authoring::start(&mut game);
+    input(&mut game, "pull rug");
+    assert_eq!(game.state().locations["key"].to_word(), "carried");
+    let coin = input(&mut game, "take coin");
+    assert!(coin.contains("Taken"), "{coin}");
+}
