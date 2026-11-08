@@ -311,6 +311,11 @@ impl JsSession {
         to_js(&self.session.stats())
     }
 
+    /// The active illustration, portrait, music and ambience.
+    pub fn media(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.session.media())
+    }
+
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.verbs())
     }
@@ -441,6 +446,11 @@ impl JsWorkbench {
     /// The adventure sheet: `[{ var, label, short?, value, max? }]`.
     pub fn stats(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().stats())
+    }
+
+    /// The active illustration, portrait, music and ambience.
+    pub fn media(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.session().media())
     }
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {

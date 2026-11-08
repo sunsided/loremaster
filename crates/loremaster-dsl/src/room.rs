@@ -33,6 +33,7 @@ impl<'a> RoomBuilder<'a> {
     pub(crate) fn new(pack: &'a mut Pack, id: Id, name: String) -> Self {
         register(pack, format!("room:{id}"));
         pack.rooms.push(Room {
+            media: Default::default(),
             id,
             name,
             region: None,

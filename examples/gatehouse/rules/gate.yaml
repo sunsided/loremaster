@@ -1,0 +1,4 @@
+- id: gate_creaks
+  on: { verb: [open, iron_gate] }
+  then:
+    - play_sound: gate_creak

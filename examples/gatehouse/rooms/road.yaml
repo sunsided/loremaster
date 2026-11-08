@@ -1,0 +1,12 @@
+name: The Road
+position: [0, 0]
+description:
+  - "The road ends at an iron gate in a stone wall. A bell rope hangs beside it."
+media:
+  illustration:
+    - { asset: gate_open, when: iron_gate.open }
+    - gate_closed
+  ambience: wind
+  music: calm
+exits:
+  - { direction: north, to: yard, door: iron_gate }

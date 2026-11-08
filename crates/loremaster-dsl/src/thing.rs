@@ -18,6 +18,7 @@ impl<'a> ThingBuilder<'a> {
     pub(crate) fn new(pack: &'a mut Pack, id: Id, name: String) -> Self {
         register(pack, format!("thing:{id}"));
         pack.things.push(Thing {
+            media: Default::default(),
             id,
             name,
             aliases: Vec::new(),

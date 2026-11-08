@@ -118,6 +118,8 @@ struct CheckedStep {
     ended: Option<bool>,
     #[serde(default)]
     ending: Option<Id>,
+    #[serde(default, deserialize_with = "one_or_many")]
+    sound: Vec<String>,
     #[serde(default)]
     id: Option<Id>,
     #[serde(default)]
@@ -147,6 +149,7 @@ impl<'de> Deserialize<'de> for WalkStep {
                     room: s.room,
                     ended: s.ended,
                     ending: s.ending,
+                    sound: s.sound,
                 },
                 plan: Box::new(StepPlan {
                     id: s.id,
@@ -238,6 +241,13 @@ pub struct Expect {
     /// The game has ended with this ending, from `endings/`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ending: Option<Id>,
+    /// Sound assets that must play: in the step, or anywhere in the game at the end.
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "one_or_many"
+    )]
+    pub sound: Vec<String>,
 }
 
 fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {

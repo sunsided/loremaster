@@ -1,0 +1,7 @@
+name: iron gate
+aliases: [gate]
+location: { room: road }
+listed: false
+props: { open: false }
+description:
+  - "Tall black bars. It is {iron_gate.open ? open | shut}."

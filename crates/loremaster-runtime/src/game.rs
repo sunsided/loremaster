@@ -12,6 +12,7 @@ mod agendas;
 mod awaits;
 mod combat;
 mod machines;
+mod media;
 pub use awaits::{ARRIVED, REFUSED};
 pub(crate) use combat::{ATTACK_TEXT, LUCK_TEXT};
 mod narrative;
@@ -1813,6 +1814,7 @@ impl Game {
                 self.state.combat = None;
             }
             CompiledEffect::Stop => self.stopped = true,
+            CompiledEffect::PlaySound(cue) => turn.sounds.push(cue.clone()),
             CompiledEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             // Only a rule can pause (the fire loop handles it there); the checks
             // reject `await` in timers and dialogues.
