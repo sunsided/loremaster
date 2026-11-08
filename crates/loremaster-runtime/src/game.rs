@@ -644,7 +644,8 @@ impl Game {
                     preposition: None,
                     topic: None,
                 };
-                if !self.fire(turn, &check, 0).stopped {
+                // A check rule that waits holds the move: it moves the player itself.
+                if !self.fire(turn, &check, 0).stopped && self.state.awaiting.is_none() {
                     self.go(turn, &direction);
                     self.frame_text(turn, frame.as_ref().map(|f| &f.after));
                 }
@@ -690,7 +691,9 @@ impl Game {
                 };
                 self.frame_text(turn, frame.as_ref().map(|f| &f.before));
                 // `check` rules can refuse the action with `stop`.
-                if !self.fire(turn, &event(Phase::Check), 0).stopped {
+                if !self.fire(turn, &event(Phase::Check), 0).stopped
+                    && self.state.awaiting.is_none()
+                {
                     // `instead` rules run before the default and replace it;
                     // other rules run after it, so their text follows the response.
                     let instead = self.fire(turn, &event(Phase::Instead), 0);
@@ -1807,6 +1810,7 @@ impl Game {
                 self.state.ending = Some(ending.clone());
                 // An ended story answers no await.
                 self.state.awaiting = None;
+                self.state.combat = None;
             }
             CEffect::Stop => self.stopped = true,
             CEffect::Call(id) => self.call_behavior(turn, rule, id, depth),

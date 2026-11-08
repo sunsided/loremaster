@@ -1,0 +1,8 @@
+name: "5. The Warden"
+description:
+  - "The warden draws a short iron bar from his belt."
+rules:
+  - id: warden_attacks
+    on: { enter: section_5 }
+    then:
+      - combat: { enemies: [warden], win: section_6, loss: fallen }

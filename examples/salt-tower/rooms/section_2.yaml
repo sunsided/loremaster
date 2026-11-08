@@ -1,0 +1,6 @@
+name: "2. The Door"
+description:
+  - "The tower door is locked. A rusty bell hangs beside it. A drain grate is at the base of the wall."
+exits:
+  - { direction: "ring the bell", to: section_3 }
+  - { direction: "open the grate", to: section_4 }

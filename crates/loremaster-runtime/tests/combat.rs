@@ -471,3 +471,18 @@ fn check_refuses_a_bad_stat() {
         );
     }
 }
+
+#[test]
+fn an_ending_clears_a_combat_that_a_rule_started_on_the_same_event() {
+    let mut f = files("{ enemies: [warden], win: yard, loss: fallen }", 0);
+    f.push(file("endings/over.yaml", "kind: neutral\ntitle: Over\n"));
+    f.push(file(
+        "rules/zz_end.yaml",
+        "- { id: finish, on: { event: go }, then: [{ end: over }] }\n",
+    ));
+    let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    assert!(s.state().ended);
+    assert!(s.state().combat.is_none());
+}

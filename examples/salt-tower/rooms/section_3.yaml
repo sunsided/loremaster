@@ -1,0 +1,13 @@
+name: "3. The Toll"
+description:
+  - "The gate warden opens the door a hand wide. He wants 3 gold as a toll."
+exits:
+  - { direction: "pay 3 gold", to: section_6, visible: "gold >= 3" }
+  - { direction: "refuse", to: section_5 }
+rules:
+  - id: pay_the_toll
+    on: { check: [go, "pay 3 gold"] }
+    then:
+      - add: { gold: -3 }
+      - goto: section_6
+      - stop

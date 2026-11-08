@@ -1,0 +1,23 @@
+name: Fight path
+steps:
+  - { do: roll your character, rolls: [4, 7, 3], facts: { skill: 10, stamina: 19, stamina_initial: 19, luck: 9 } }
+  - ring the bell
+  - refuse
+  # The enemy total, then yours. After a hit that does not kill, Luck is on offer.
+  - { do: attack, rolls: [2, 12] }
+  - go on
+  - { do: attack, rolls: [12, 2] }
+  - go on
+  - { do: attack, rolls: [2, 12] }
+  - go on
+  - { do: attack, rolls: [2, 12] }
+  - go on
+  - { do: attack, rolls: [2, 12], room: section_6, facts: { stamina: 17, stamina_initial: 19, warden.stamina: 0 } }
+  - take brass lantern
+  - climb the stairs
+  - { do: test your luck, rolls: [2] }
+  - show the letter
+expect:
+  facts: { stamina: 17, stamina_initial: 19 }
+  ended: true
+  ending: delivered

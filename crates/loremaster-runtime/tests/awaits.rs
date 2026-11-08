@@ -339,3 +339,29 @@ fn the_session_roll_is_a_notice() {
         "{step:?}"
     );
 }
+
+#[test]
+fn a_check_rule_that_waits_holds_the_action() {
+    let mut s = session(
+        r#"
+- id: ask
+  on: { check: [pull, lever] }
+  then:
+    - await: { choice: [left, right], into: path }
+- id: pulled
+  on: { verb: [pull, lever] }
+  then:
+    - say: "Pulled."
+"#,
+    );
+    let step = s.submit(Input::Text("pull lever".into()));
+    let Status::Await { awaiting } = &step.status else {
+        panic!("no await: {}", step.plain_text());
+    };
+    assert!(!step.plain_text().contains("Pulled."));
+    let done = s
+        .resume(&awaiting.id.clone(), Value::Text("left".into()))
+        .unwrap();
+    assert!(!done.plain_text().contains("Pulled."));
+    assert_eq!(s.state().facts["path"], Value::Text("left".into()));
+}
