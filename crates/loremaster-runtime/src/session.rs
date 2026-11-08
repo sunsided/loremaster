@@ -297,9 +297,10 @@ impl Session {
         args: BTreeMap<String, Value>,
     ) -> Result<Step, String> {
         let before = self.before();
-        let candidates = self.step_candidates(&Input::Tick);
+        let (mut matched, pending) = self.step_candidates(&Input::Tick);
+        matched.extend(self.event_steps(name, &args));
         let turn = self.game.host_event(name, &args)?;
-        self.mark_steps(candidates);
+        self.mark_steps((matched, pending));
         self.remember(before);
         Ok(self.step(turn))
     }

@@ -96,6 +96,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Changed
 
+- The `when` of a host event sees the reported arguments; a refused event keeps the values before. An event cannot have the id of a room, a keyword or a built-in path (`time`, `action`, `timer`). An event step of a walkthrough is done when the session accepts a report of its event with its `args` and its `facts` hold; a later step that `needs` it can then open in the hint ladder.
 - loremaster depends on dramaturge 0.3.0-alpha.5 from crates.io (the text selection core, R9).
 - **Breaking:** save version 3 (ADR 0001). Text progress uses dramaturge's keys: `room:shore/2` instead of `room:shore#2`, and the fragment's `id` in place of its index when it has one. The save field `sticky` of a fragment's progress is `pick` now (`sticky` still loads), and the step from version 2 renames old keys; a fragment with an `id` starts its progress over. `shuffle` never shows the variant it showed last; `first_visit` on an examined thing, the intro and a frame means the first time the text shows, and on a presence text the first visit of the room, as on a room. The explorer finds 4 instead of 3 texts of the Lighthouse shore (its `shuffle` fragment); no walkthrough or test transcript changed.
 - The explorer counts a walk that the depth limit (40 commands) stopped as `truncated`, as one that the state budget stopped. `stuck` counts only proven dead ends: a state whose future the walk did not finish is not one.

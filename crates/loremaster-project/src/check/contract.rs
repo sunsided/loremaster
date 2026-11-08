@@ -84,17 +84,17 @@ impl Checker<'_> {
                     self.error(&header, &format!("{at}.args.{arg}"), format!("`{}.{arg}` would read the property `{arg}`, not the argument; rename it", e.id));
                 }
             }
-            if let Some(when) = &e.when
-                && when
-                    .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '.'))
-                    .any(|w| w.starts_with(&format!("{}.", e.id)))
-            {
-                self.error(&header, &format!("{at}.when"), format!("the `when` of `{}` cannot read its arguments: it runs before they are stored. Test them in the rule", e.id));
-            }
+            // `event.arg` reads like `thing.prop`: an id that conditions
+            // already read another way would hide the arguments.
             if self.story().thing(e.id.as_str()).is_some()
                 || self.story().var(e.id.as_str()).is_some()
+                || self.story().room(e.id.as_str()).is_some()
+                || matches!(
+                    loremaster_lang::reserved(e.id.as_str()),
+                    Some(loremaster_lang::Reserved::Keyword | loremaster_lang::Reserved::Path)
+                )
             {
-                self.error(&header, &at, format!("the event `{}` has the id of a thing or a variable; its arguments would clash", e.id));
+                self.error(&header, &at, format!("the event `{}` has the id of a thing, a variable, a room or a built-in path or keyword; its arguments would clash", e.id));
             }
             if let Some(when) = &e.when {
                 self.condition(&header, &format!("{at}.when"), when);

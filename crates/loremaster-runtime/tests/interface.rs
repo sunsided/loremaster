@@ -295,11 +295,14 @@ fn contract_names_must_make_valid_distinct_rust_names() {
             .any(|m| m.contains("would read the property `name`")),
         "{e:?}"
     );
-    let e = bad("when: alive", "when: \"killed.level > 0\"");
-    assert!(
-        e.iter().any(|m| m.contains("cannot read its arguments")),
-        "{e:?}"
-    );
+    for id in ["hall", "time"] {
+        let e = bad("id: killed, args", &format!("id: {id}, args"));
+        assert!(
+            e.iter()
+                .any(|m| m.contains("a room or a built-in path or keyword")),
+            "{id}: {e:?}"
+        );
+    }
     // An action `lock_pick` with an enum argument `x` and an event `lock` with
     // an enum argument `pick_x` are both `LockPickX`.
     let e = bad(
@@ -310,6 +313,23 @@ fn contract_names_must_make_valid_distinct_rust_names() {
         e.iter().any(|m| m.contains("Rust type `LockPickX`")),
         "{e:?}"
     );
+}
+
+#[test]
+fn an_event_with_a_derived_name_reads_its_arguments() {
+    // `level` is a derived name only when bare, so `level.boss` is the argument.
+    let story = STORY
+        .replace("id: killed, args", "id: level, args")
+        .replace("when: alive", "when: \"level.level > 0\"");
+    let rules = RULES
+        .replace("event: killed", "event: level")
+        .replace("{killed.boss}", "{level.boss}");
+    let e: Vec<_> = check(&load(files_with(&story, &rules)).unwrap())
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| d.message)
+        .collect();
+    assert_eq!(e, Vec::<String>::new());
 }
 
 #[test]
@@ -367,4 +387,86 @@ fn an_event_step_gives_no_hint() {
     ));
     let project = load(all).unwrap();
     assert!(loremaster_runtime::HintBook::new(world(), &project.walkthroughs).is_empty());
+}
+
+#[test]
+fn an_event_when_sees_the_reported_arguments() {
+    let story = STORY.replace("when: alive", "when: \"killed . level > 0\"");
+    let world = Arc::new(World::compile(load(files_with(&story, RULES)).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    let args = |level| {
+        BTreeMap::from([
+            ("boss".to_string(), Value::Text("ogre".into())),
+            ("level".to_string(), Value::Int(level)),
+        ])
+    };
+    assert!(
+        s.host_event("killed", args(0))
+            .unwrap_err()
+            .contains("precondition")
+    );
+    assert_eq!(s.state().facts.get("killed.level"), Some(&Value::Int(0)));
+    s.host_event("killed", args(2)).unwrap();
+    assert!(s.host_event("killed", args(0)).is_err());
+    // The refused report keeps the values before.
+    assert_eq!(s.state().facts.get("killed.level"), Some(&Value::Int(2)));
+}
+
+#[test]
+fn a_step_after_an_event_step_opens_when_the_event_comes() {
+    let mut all = files(RULES);
+    all.push(file(
+        "tests/t.yaml",
+        "steps:\n  - { id: boss, event: killed, args: { boss: ogre, level: 2 } }\n  - { do: pull lever, needs: [boss], hints: [\"Pull it.\"] }\n",
+    ));
+    let project = load(all).unwrap();
+    let mut s = Session::new(world());
+    s.set_hints(loremaster_runtime::HintBook::new(
+        world(),
+        &project.walkthroughs,
+    ));
+    s.start();
+    assert!(s.hints().is_empty());
+    let args = BTreeMap::from([
+        ("boss".to_string(), Value::Text("ogre".into())),
+        ("level".to_string(), Value::Int(2)),
+    ]);
+    s.host_event("killed", args).unwrap();
+    assert_eq!(s.hints().len(), 1, "{:?}", s.hints());
+}
+
+#[test]
+fn an_event_step_is_done_only_by_its_event_with_its_args() {
+    let mut all = files(RULES);
+    all.push(file(
+        "tests/t.yaml",
+        "steps:\n  - { id: boss, event: killed, args: { boss: ogre, level: 2 }, facts: { lock: success } }\n  - { do: look, needs: [boss], hints: [\"Look.\"] }\n",
+    ));
+    let project = load(all).unwrap();
+    let mut s = Session::new(world());
+    s.set_hints(loremaster_runtime::HintBook::new(
+        world(),
+        &project.walkthroughs,
+    ));
+    s.start();
+    // The facts of the step come to hold without the event: not done.
+    s.submit(loremaster_runtime::Input::Text("pull lever".into()));
+    s.submit(loremaster_runtime::Input::Text("success".into()));
+    assert_eq!(
+        s.state().facts.get("lock"),
+        Some(&Value::Text("success".into()))
+    );
+    assert!(s.hints().is_empty(), "{:?}", s.hints());
+    let report = |boss: &str| {
+        BTreeMap::from([
+            ("boss".to_string(), Value::Text(boss.into())),
+            ("level".to_string(), Value::Int(2)),
+        ])
+    };
+    // Another boss is not the step's report.
+    s.host_event("killed", report("troll")).unwrap();
+    assert!(s.hints().is_empty(), "{:?}", s.hints());
+    s.host_event("killed", report("ogre")).unwrap();
+    assert_eq!(s.hints().len(), 1, "{:?}", s.hints());
 }
