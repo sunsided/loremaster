@@ -497,10 +497,62 @@ export interface Exploration {
 	never_shown: string[];
 	never_fired: string[];
 	endings: { text: string; path: string[] }[];
+	/** Dead ends: states from which no ending can be reached. When the walk stopped early, only the proven ones. */
 	stuck: number;
 	stuck_path: string[];
 	/** For each open or resolved thread with a payoff: whether a payoff showed, and in which order. */
 	threads: ThreadReach[];
+	/** The ending checks: dead ends and points of no return. Missing from engines before P4-04. */
+	ending_checks?: EndingCheck;
+}
+
+/** The ending checks of the explorer: dead ends (errors) and points of no return (warnings). */
+export interface EndingCheck {
+	/** False when the story has no ending. */
+	ran: boolean;
+	/** True when the walk finished every state. False: no finding does not mean "no dead end". */
+	proven: boolean;
+	/** States whose future the walk did not finish; the checks say nothing about them. */
+	unproven: number;
+	dead_ends: DeadEnd[];
+	no_return: NoReturn[];
+	/** `closes` lists that name an ending which never drops out at the rule. */
+	stale: { rule: string; endings: string[] }[];
+}
+
+/** A turn into a state from which no ending can be reached. */
+export interface DeadEnd {
+	/** The shortest command list into the dead end; empty when the start is one. */
+	path: string[];
+	/** The room of the last command. */
+	room: string;
+	/** The rule that the turn blames, or null when only the command's own action ran. */
+	rule: string | null;
+	fired: string[];
+	/** How many explored turns have this cause. */
+	turns: number;
+}
+
+/** A turn after which the best reachable ending gets worse. */
+export interface NoReturn {
+	path: string[];
+	room: string;
+	rule: string | null;
+	fired: string[];
+	best_before: string | null;
+	rank_before: number | null;
+	/** Null when only endings without a rank are left. */
+	best_after: string | null;
+	rank_after: number | null;
+	/** The endings that drop out. */
+	lost: string[];
+	/** The ranked endings in `lost` that no `closes` names; empty when accepted. */
+	unaccepted: string[];
+	/** The rules whose `closes` accept the drop. */
+	accepted_by: string[];
+	/** The `reason` of each rule in `accepted_by`, in the same order. */
+	reasons: string[];
+	turns: number;
 }
 
 /** What the explorer found for one thread. */

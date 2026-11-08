@@ -103,7 +103,7 @@ pub fn tools() -> Vec<ToolDef> {
         ),
         def(
             "explore",
-            "Play every way through the story from the start and report: the text variants of each room and whether it was reached, endings with the shortest command list, stuck states, fragments never shown and rules never fired. Can take some seconds on a large story.",
+            "Play every way through the story from the start and report: the text variants of each room and whether it was reached, endings with the shortest command list, stuck states, fragments never shown and rules never fired, and the ending checks (`ending_checks`): dead ends (no ending reachable, an error), points of no return (the best ending by rank gets worse, a warning unless a step's `closes` names the lost endings), and whether the checks are proven or the budget stopped the walk. Can take some seconds on a large story.",
             schema(
                 json!({
                     "max_states": { "type": "integer", "minimum": 1, "description": "Default 2000." },

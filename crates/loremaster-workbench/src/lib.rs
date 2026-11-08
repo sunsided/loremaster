@@ -40,9 +40,9 @@ pub use atlas::{AtlasRoom, MapEnd, MapLink, MapRoom, MapView};
 pub use checks::{MarkupCheck, Symbol, TextError};
 pub use inspect::{Inspect, PhaseView, VarView};
 pub use loremaster_runtime::authoring::{
-    AuthorCommand, Budget, Dimension, EndingFound, Exploration, FragmentView, FrameFragment,
-    FramePart, FrameUse, MAX_CELLS, MatrixCell, PartView, RoomCoverage, RoomMatrix, RoomParts,
-    TalkOptionView, TalkView, TextVariant, ThreadReach,
+    AuthorCommand, Budget, DeadEnd, Dimension, EndingCheck, EndingFound, Exploration, FragmentView,
+    FrameFragment, FramePart, FrameUse, MAX_CELLS, MatrixCell, NoReturn, PartView, RoomCoverage,
+    RoomMatrix, RoomParts, StaleCloses, TalkOptionView, TalkView, TextVariant, ThreadReach,
 };
 pub use loremaster_runtime::{
     DialogueOutline, ExitInfo, OutlineNode, OutlineOption, Scene, ThingInfo, VerbInfo,
@@ -269,8 +269,10 @@ impl Workbench {
     }
 
     /// Walk the reachable states from the start of the story, and report the
-    /// rooms, texts, endings and threads it reached. It does not change the
-    /// running game.
+    /// rooms, texts, endings and threads it reached, and the ending checks
+    /// (`ending_checks`: dead ends and points of no return;
+    /// [`EndingCheck::diagnostics`] gives them as diagnostics). It does not
+    /// change the running game.
     pub fn explore(&self, budget: Budget) -> Exploration {
         self.ins().explore(budget)
     }
