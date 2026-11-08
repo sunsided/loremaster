@@ -19,7 +19,7 @@
 
 use super::Game;
 use crate::state::StepOutcome;
-use crate::world::CAgenda;
+use crate::world::CompiledAgenda;
 use crate::{BlockKind, CommandRecord, Event, LogEntry, Phase, Turn};
 use loremaster_model::{Id, Location};
 
@@ -50,7 +50,7 @@ impl Game {
         }
     }
 
-    fn agenda_turn(&mut self, turn: &mut Turn, agenda: &CAgenda) -> Move {
+    fn agenda_turn(&mut self, turn: &mut Turn, agenda: &CompiledAgenda) -> Move {
         let actor = agenda.actor.as_str();
         let done = self.state.actors.get(actor);
         let Some(step) = agenda

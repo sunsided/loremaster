@@ -126,7 +126,7 @@ impl<'a> Inspector<'a> {
         &self,
         room: &str,
         exit: usize,
-        condition: impl Fn(&crate::world::CExit) -> &Option<Condition>,
+        condition: impl Fn(&crate::world::CompiledExit) -> &Option<Condition>,
     ) -> bool {
         let world = self.game.world();
         world

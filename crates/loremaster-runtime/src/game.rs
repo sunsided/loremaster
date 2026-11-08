@@ -1,7 +1,7 @@
 use crate::eval::Eval;
 use crate::parser::{ParseScope, parse};
 use crate::text::{self, article};
-use crate::world::{CEffect, CText, Within};
+use crate::world::{CompiledEffect, CompiledText, Within};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
 use crate::{Event, Phase};
 use loremaster_model::{Id, Limit, Location, Term, TimeOfDay, Value, VerbSlots};
@@ -739,7 +739,7 @@ impl Game {
     }
 
     /// The most specific frame for a verb: the thing's, then the room's, then the story's.
-    fn frame_for(&mut self, verb: &Id, thing: Option<&Id>) -> Option<crate::world::CFrame> {
+    fn frame_for(&mut self, verb: &Id, thing: Option<&Id>) -> Option<crate::world::CompiledFrame> {
         let world = self.world.clone();
         let found = thing
             .and_then(|t| {
@@ -764,10 +764,10 @@ impl Game {
     }
 
     /// Evaluate a frame for the assembly panel, before its fragments are used.
-    fn frame_use(&self, verb: &Id, scope: &str, frame: &crate::world::CFrame) -> FrameUse {
+    fn frame_use(&self, verb: &Id, scope: &str, frame: &crate::world::CompiledFrame) -> FrameUse {
         let ev = self.eval();
         let s = &self.state;
-        let part = |name: &str, fragments: &CText| {
+        let part = |name: &str, fragments: &CompiledText| {
             let visible = text::visible(&ev, fragments);
             FramePart {
                 part: name.to_string(),
@@ -831,7 +831,7 @@ impl Game {
     }
 
     /// Show frame fragments as one response block. Returns true if any showed.
-    fn frame_text(&mut self, turn: &mut Turn, fragments: Option<&CText>) -> bool {
+    fn frame_text(&mut self, turn: &mut Turn, fragments: Option<&CompiledText>) -> bool {
         let Some(fragments) = fragments.filter(|f| !f.is_empty()) else {
             return false;
         };
@@ -1323,7 +1323,7 @@ impl Game {
 
     // ---- text -----------------------------------------------------------
 
-    fn assemble(&mut self, turn: &mut Turn, fragments: &CText) -> Vec<Run> {
+    fn assemble(&mut self, turn: &mut Turn, fragments: &CompiledText) -> Vec<Run> {
         self.assemble_with_picks(turn, fragments).0
     }
 
@@ -1332,7 +1332,7 @@ impl Game {
     fn assemble_with_picks(
         &mut self,
         turn: &mut Turn,
-        fragments: &CText,
+        fragments: &CompiledText,
     ) -> (Vec<Run>, Vec<usize>) {
         let world = self.world.clone();
         let mut rng = self.state.rng;
@@ -1742,20 +1742,20 @@ impl Game {
         }
     }
 
-    fn apply(&mut self, turn: &mut Turn, rule: &Id, effect: &CEffect, depth: u8) {
+    fn apply(&mut self, turn: &mut Turn, rule: &Id, effect: &CompiledEffect, depth: u8) {
         match effect {
-            CEffect::Set(values) => {
+            CompiledEffect::Set(values) => {
                 for (k, v) in values {
                     self.set_fact(turn, k, v.clone());
                 }
             }
-            CEffect::Add(values) => {
+            CompiledEffect::Add(values) => {
                 for (k, n) in values {
                     let cur = self.state.facts.get(k).and_then(Value::as_int).unwrap_or(0);
                     self.set_fact(turn, k, Value::Int(cur + n));
                 }
             }
-            CEffect::Calc(sums) => {
+            CompiledEffect::Calc(sums) => {
                 // Each sum reads the values from before the effect.
                 let int = |name: &str| self.state.facts.get(name).and_then(Value::as_int);
                 let totals: Vec<_> = sums
@@ -1775,15 +1775,15 @@ impl Game {
                     self.set_fact(turn, &name, Value::Int(total));
                 }
             }
-            CEffect::Say(line) => {
+            CompiledEffect::Say(line) => {
                 let runs = text::line_runs(&self.eval(), line, &rule_run(String::new(), rule));
                 turn.push(BlockKind::Narration, runs);
             }
-            CEffect::SayPool(id) => {
+            CompiledEffect::SayPool(id) => {
                 let runs = self.say_pool(turn, id.as_str(), &rule_run(String::new(), rule));
                 turn.push(BlockKind::Narration, runs);
             }
-            CEffect::Move(moves) => {
+            CompiledEffect::Move(moves) => {
                 for (thing, to) in moves {
                     let loc = Location::from_word(to.as_str());
                     turn.log.push(LogEntry {
@@ -1793,8 +1793,8 @@ impl Game {
                     self.move_thing(thing, loc);
                 }
             }
-            CEffect::Goto(room) => self.move_player(turn, room.clone(), depth),
-            CEffect::End {
+            CompiledEffect::Goto(room) => self.move_player(turn, room.clone(), depth),
+            CompiledEffect::End {
                 ending,
                 title,
                 text,
@@ -1812,22 +1812,22 @@ impl Game {
                 self.state.awaiting = None;
                 self.state.combat = None;
             }
-            CEffect::Stop => self.stopped = true,
-            CEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
+            CompiledEffect::Stop => self.stopped = true,
+            CompiledEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             // Only a rule can pause (the fire loop handles it there); the checks
             // reject `await` in timers and dialogues.
-            CEffect::Await(_) | CEffect::Combat(_) => turn.log.push(LogEntry {
+            CompiledEffect::Await(_) | CompiledEffect::Combat(_) => turn.log.push(LogEntry {
                 kind: "await".into(),
                 text: format!("{rule}: `await` and `combat` work only in rules"),
             }),
-            CEffect::Emit(name) => {
+            CompiledEffect::Emit(name) => {
                 turn.log.push(LogEntry {
                     kind: "event".into(),
                     text: name.to_string(),
                 });
                 self.fire(turn, &Event::Custom(name.clone()), depth);
             }
-            CEffect::Start(timers) => {
+            CompiledEffect::Start(timers) => {
                 for (id, turns) in timers {
                     let Some(t) = self.world.story.timer(id.as_str()) else {
                         continue;
@@ -1840,7 +1840,7 @@ impl Game {
                     self.state.timers.insert(id.clone(), turns);
                 }
             }
-            CEffect::Cancel(id) => {
+            CompiledEffect::Cancel(id) => {
                 if self.state.timers.remove(id).is_some() {
                     turn.log.push(LogEntry {
                         kind: "timer".into(),

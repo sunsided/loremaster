@@ -19,26 +19,26 @@ use std::sync::Arc;
 pub struct World {
     pub story: Story,
     pub verbs: Vec<VerbDef>,
-    pub(crate) intro: CText,
-    pub(crate) rooms: Vec<CRoom>,
-    pub(crate) things: Vec<CThing>,
-    pub(crate) rules: Vec<CRule>,
+    pub(crate) intro: CompiledText,
+    pub(crate) rooms: Vec<CompiledRoom>,
+    pub(crate) things: Vec<CompiledThing>,
+    pub(crate) rules: Vec<CompiledRule>,
     /// Rule indexes in the order they run: more specific scope first, then
     /// higher priority, then file order.
     pub(crate) rule_order: Vec<usize>,
-    pub(crate) timers: Vec<CTimer>,
+    pub(crate) timers: Vec<CompiledTimer>,
     /// The agendas, in the order of the story's agendas.
-    pub(crate) agendas: Vec<CAgenda>,
+    pub(crate) agendas: Vec<CompiledAgenda>,
     /// Registered behaviors that the story names, in story order.
     pub(crate) behaviors: Vec<std::sync::Arc<dyn crate::Behavior>>,
     /// The manifests of `behaviors`, in the same order.
     pub(crate) manifests: Vec<crate::Manifest>,
     /// Every registered behavior, also the ones that the story does not name.
     registered: Vec<std::sync::Arc<dyn crate::Behavior>>,
-    pub(crate) frames: BTreeMap<Id, CFrame>,
+    pub(crate) frames: BTreeMap<Id, CompiledFrame>,
     pub(crate) dialogues: Vec<std::sync::Arc<CompiledDialogue>>,
     /// The machines with `quest: true`, with the journal text of their states.
-    pub(crate) quests: Vec<CQuest>,
+    pub(crate) quests: Vec<CompiledQuest>,
     /// The named text pools of `texts/`.
     pub(crate) pools: Pools<Lore>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
@@ -52,7 +52,7 @@ pub struct World {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CFragment {
+pub(crate) struct CompiledFragment {
     pub key: String,
     pub owner: String,
     pub variants: Vec<Vec<Segment>>,
@@ -74,12 +74,12 @@ pub(crate) struct CFragment {
 /// and the pool that dramaturge's core chooses from. The pool id is the
 /// owner (`room:shore`); each fragment is a candidate of a `pick: all` pool.
 #[derive(Debug, Clone)]
-pub(crate) struct CText {
-    pub fragments: Vec<CFragment>,
+pub(crate) struct CompiledText {
+    pub fragments: Vec<CompiledFragment>,
     pub pool: LorePool,
 }
 
-impl Default for CText {
+impl Default for CompiledText {
     fn default() -> Self {
         Self {
             fragments: Vec::new(),
@@ -88,23 +88,23 @@ impl Default for CText {
     }
 }
 
-impl std::ops::Deref for CText {
-    type Target = [CFragment];
+impl std::ops::Deref for CompiledText {
+    type Target = [CompiledFragment];
 
-    fn deref(&self) -> &[CFragment] {
+    fn deref(&self) -> &[CompiledFragment] {
         &self.fragments
     }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CRoom {
-    pub description: CText,
-    pub frames: BTreeMap<Id, CFrame>,
-    pub exits: Vec<CExit>,
+pub(crate) struct CompiledRoom {
+    pub description: CompiledText,
+    pub frames: BTreeMap<Id, CompiledFrame>,
+    pub exits: Vec<CompiledExit>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CExit {
+pub(crate) struct CompiledExit {
     pub visible: Option<Condition>,
     pub passable: Option<Condition>,
     pub blocked: Option<Vec<Segment>>,
@@ -112,26 +112,26 @@ pub(crate) struct CExit {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CThing {
-    pub description: CText,
-    pub presence: CText,
+pub(crate) struct CompiledThing {
+    pub description: CompiledText,
+    pub presence: CompiledText,
     /// The condition of each name stage.
     pub names: Vec<Option<Condition>>,
-    pub frames: BTreeMap<Id, CFrame>,
+    pub frames: BTreeMap<Id, CompiledFrame>,
 }
 
 /// A compiled action frame.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct CFrame {
-    pub before: CText,
-    pub instead: CText,
-    pub after: CText,
+pub(crate) struct CompiledFrame {
+    pub before: CompiledText,
+    pub instead: CompiledText,
+    pub after: CompiledText,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CRule {
+pub(crate) struct CompiledRule {
     pub when: Option<Condition>,
-    pub then: Vec<CEffect>,
+    pub then: Vec<CompiledEffect>,
     pub within: Option<Within>,
 }
 
@@ -156,22 +156,22 @@ impl Within {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct CTimer {
+pub(crate) struct CompiledTimer {
     pub runs_while: Option<Condition>,
-    pub at: BTreeMap<u32, Vec<CEffect>>,
+    pub at: BTreeMap<u32, Vec<CompiledEffect>>,
 }
 
 /// A compiled agenda (D6).
 #[derive(Debug, Clone)]
-pub(crate) struct CAgenda {
+pub(crate) struct CompiledAgenda {
     pub id: Id,
     pub actor: Id,
-    pub steps: Vec<CStep>,
+    pub steps: Vec<CompiledStep>,
 }
 
 /// A compiled agenda step.
 #[derive(Debug, Clone)]
-pub(crate) struct CStep {
+pub(crate) struct CompiledStep {
     /// The key in the save: the step's id, or its place from 1.
     pub key: String,
     /// The step has a time `at`; else it is due when the step before it is over.
@@ -183,13 +183,13 @@ pub(crate) struct CStep {
     pub place: Option<Id>,
     pub when: Option<Condition>,
     pub action: Option<loremaster_model::CommandPattern>,
-    pub then: Vec<CEffect>,
+    pub then: Vec<CompiledEffect>,
 }
 
 /// A quest machine, compiled: its title and the journal text per state, with
 /// `done` for a finished state.
 #[derive(Debug, Clone)]
-pub(crate) struct CQuest {
+pub(crate) struct CompiledQuest {
     pub machine: Id,
     pub title: String,
     pub states: BTreeMap<String, (CompiledLine, bool)>,
@@ -202,17 +202,17 @@ pub(crate) struct CompiledDialogue {
     pub with: Id,
     /// The graph; a `then` list is a host outcome with the compiled effects,
     /// and a line is host text, the compiled line.
-    pub graph: DialogueGraph<Arc<[CEffect]>, CompiledLine>,
+    pub graph: DialogueGraph<Arc<[CompiledEffect]>, CompiledLine>,
     /// The node keys, in the order of the graph's nodes.
     pub keys: Vec<String>,
 }
 
 impl CompiledDialogue {
-    pub fn node(&self, id: DialogueNodeId) -> Option<&CNode> {
+    pub fn node(&self, id: DialogueNodeId) -> Option<&CompiledNode> {
         self.graph.node(id)
     }
 
-    pub fn node_by_key(&self, key: &str) -> Option<&CNode> {
+    pub fn node_by_key(&self, key: &str) -> Option<&CompiledNode> {
         let i = self.keys.iter().position(|k| k == key)?;
         self.graph.nodes.get(i)
     }
@@ -224,13 +224,14 @@ impl CompiledDialogue {
 }
 
 /// A dialogue node with its compiled `then` lists.
-pub(crate) type CNode = dramaturge_model::DialogueNode<Arc<[CEffect]>, CompiledLine>;
+pub(crate) type CompiledNode = dramaturge_model::DialogueNode<Arc<[CompiledEffect]>, CompiledLine>;
 
 /// A dialogue option with its compiled `then` list and line.
-pub(crate) type COption = dramaturge_model::DialogueOption<Arc<[CEffect]>, CompiledLine>;
+pub(crate) type CompiledOption =
+    dramaturge_model::DialogueOption<Arc<[CompiledEffect]>, CompiledLine>;
 
 #[derive(Debug, Clone)]
-pub(crate) enum CEffect {
+pub(crate) enum CompiledEffect {
     Set(BTreeMap<String, Value>),
     Add(BTreeMap<String, i64>),
     /// `calc`: each target with its signed terms.
@@ -351,7 +352,7 @@ impl Compiler {
         })
     }
 
-    fn fragments(&self, owner: &str, list: &[Fragment]) -> Result<CText, CompileError> {
+    fn fragments(&self, owner: &str, list: &[Fragment]) -> Result<CompiledText, CompileError> {
         // `first_visit` is the first visit of a room, for a room and the
         // things in it; for a thing that is examined, the intro and a frame
         // it means the first time the text shows.
@@ -409,7 +410,7 @@ impl Compiler {
                 let (mut sources, mut whens) = (f.variants.clone(), Vec::new());
                 let mut gates = vec![Vec::new(); sources.len()];
                 group_texts(&f.one_of, &[], &mut sources, &mut gates, &mut whens);
-                Ok(CFragment {
+                Ok(CompiledFragment {
                     key: format!(
                         "{owner}/{}",
                         f.id.as_ref().map_or(i.to_string(), Id::to_string)
@@ -437,7 +438,7 @@ impl Compiler {
                 })
             })
             .collect::<Result<_, CompileError>>()?;
-        Ok(CText { fragments, pool })
+        Ok(CompiledText { fragments, pool })
     }
 
     /// A pool of `one_of` candidates: a group in a description, or a named
@@ -522,7 +523,7 @@ impl Compiler {
 }
 
 impl Compiler {
-    fn effect(&self, at: &str, e: &Effect) -> Result<CEffect, CompileError> {
+    fn effect(&self, at: &str, e: &Effect) -> Result<CompiledEffect, CompileError> {
         Ok(match e {
             Effect::Await(spec) => {
                 let shape = if spec.kinds() != 1 {
@@ -552,11 +553,11 @@ impl Compiler {
                         error: loremaster_lang::LangError::new("dice such as `2d6` expected", 0..0),
                     });
                 }
-                CEffect::Await(spec.clone())
+                CompiledEffect::Await(spec.clone())
             }
-            Effect::Combat(spec) => CEffect::Combat(spec.clone()),
-            Effect::Set(m) => CEffect::Set(m.clone()),
-            Effect::Add(m) => CEffect::Add(m.clone()),
+            Effect::Combat(spec) => CompiledEffect::Combat(spec.clone()),
+            Effect::Set(m) => CompiledEffect::Set(m.clone()),
+            Effect::Add(m) => CompiledEffect::Add(m.clone()),
             Effect::Calc(m) => {
                 let mut sums = Vec::new();
                 for (name, sum) in m {
@@ -567,14 +568,14 @@ impl Compiler {
                         })?;
                     sums.push((name.clone(), terms));
                 }
-                CEffect::Calc(sums)
+                CompiledEffect::Calc(sums)
             }
             Effect::Say(line) => match &line.pool {
-                Some(pool) => CEffect::SayPool(pool.clone()),
-                None => CEffect::Say(self.line(at, line)?),
+                Some(pool) => CompiledEffect::SayPool(pool.clone()),
+                None => CompiledEffect::Say(self.line(at, line)?),
             },
-            Effect::Move(m) => CEffect::Move(m.clone()),
-            Effect::Goto(r) => CEffect::Goto(r.clone()),
+            Effect::Move(m) => CompiledEffect::Move(m.clone()),
+            Effect::Goto(r) => CompiledEffect::Goto(r.clone()),
             Effect::End(id) => {
                 let Some(ending) = self.endings.get(id) else {
                     return Err(CompileError {
@@ -585,17 +586,17 @@ impl Compiler {
                         ),
                     });
                 };
-                CEffect::End {
+                CompiledEffect::End {
                     ending: id.clone(),
                     title: self.markup(&format!("ending:{id}/title"), &ending.title)?,
                     text: self.markup(&format!("ending:{id}/text"), &ending.text)?,
                 }
             }
-            Effect::Stop => CEffect::Stop,
-            Effect::Emit(e) => CEffect::Emit(e.clone()),
-            Effect::Call(b) => CEffect::Call(b.clone()),
-            Effect::Start(t) => CEffect::Start(t.entries()),
-            Effect::Cancel(t) => CEffect::Cancel(t.clone()),
+            Effect::Stop => CompiledEffect::Stop,
+            Effect::Emit(e) => CompiledEffect::Emit(e.clone()),
+            Effect::Call(b) => CompiledEffect::Call(b.clone()),
+            Effect::Start(t) => CompiledEffect::Start(t.entries()),
+            Effect::Cancel(t) => CompiledEffect::Cancel(t.clone()),
         })
     }
 
@@ -603,14 +604,14 @@ impl Compiler {
         &self,
         owner: &str,
         frames: &loremaster_model::Frames,
-    ) -> Result<BTreeMap<Id, CFrame>, CompileError> {
+    ) -> Result<BTreeMap<Id, CompiledFrame>, CompileError> {
         frames
             .iter()
             .map(|(verb, f)| {
                 let at = format!("{owner}/frames/{verb}");
                 Ok((
                     verb.clone(),
-                    CFrame {
+                    CompiledFrame {
                         before: self.fragments(&format!("{at}/before"), &f.before)?,
                         instead: self.fragments(&format!("{at}/instead"), &f.instead)?,
                         after: self.fragments(&format!("{at}/after"), &f.after)?,
@@ -637,7 +638,7 @@ impl World {
             .iter()
             .map(|room| {
                 let owner = format!("room:{}", room.id);
-                Ok(CRoom {
+                Ok(CompiledRoom {
                     description: c.fragments(&owner, &room.description)?,
                     frames: c.frames(&owner, &room.frames)?,
                     exits: room
@@ -646,7 +647,7 @@ impl World {
                         .enumerate()
                         .map(|(i, e)| {
                             let at = format!("{owner}/exits[{i}]");
-                            Ok(CExit {
+                            Ok(CompiledExit {
                                 visible: c.cond(&at, &e.visible)?,
                                 passable: c.cond(&at, &e.passable)?,
                                 blocked: e
@@ -670,7 +671,7 @@ impl World {
             .iter()
             .map(|t| {
                 let owner = format!("thing:{}", t.id);
-                Ok(CThing {
+                Ok(CompiledThing {
                     description: c.fragments(&owner, &t.description)?,
                     presence: c.fragments(&format!("{owner}/presence"), &t.presence)?,
                     names: t
@@ -683,7 +684,7 @@ impl World {
                 })
             })
             .collect::<Result<_, CompileError>>()?;
-        let rules: Vec<CRule> = story
+        let rules: Vec<CompiledRule> = story
             .rules
             .iter()
             .map(|r| {
@@ -697,7 +698,7 @@ impl World {
                         Within::Region(w.clone())
                     }
                 });
-                Ok(CRule {
+                Ok(CompiledRule {
                     within,
                     when: c.cond(&at, &r.when)?,
                     then: r
@@ -722,7 +723,7 @@ impl World {
             .iter()
             .map(|t| {
                 let at = format!("timer:{}", t.id);
-                Ok(CTimer {
+                Ok(CompiledTimer {
                     runs_while: c.cond(&at, &t.runs_while)?,
                     at: t
                         .at
@@ -752,7 +753,7 @@ impl World {
                             due = next_at(due, t);
                         }
                         let at = format!("{at}/steps/{key}");
-                        Ok(CStep {
+                        Ok(CompiledStep {
                             key,
                             timed: step.at.is_some(),
                             due,
@@ -767,7 +768,7 @@ impl World {
                         })
                     })
                     .collect::<Result<_, CompileError>>()?;
-                Ok(CAgenda {
+                Ok(CompiledAgenda {
                     id: a.id.clone(),
                     actor: a.actor.clone(),
                     steps,
@@ -847,7 +848,7 @@ impl World {
                         Ok((name.to_string(), (c.line(&at, line)?, done)))
                     })
                     .collect::<Result<_, CompileError>>()?;
-                Ok(CQuest {
+                Ok(CompiledQuest {
                     machine: m.id.clone(),
                     title: m.title.clone().unwrap_or_else(|| m.id.to_string()),
                     states,
