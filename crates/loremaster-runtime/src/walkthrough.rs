@@ -59,6 +59,16 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
     let mut failures = Vec::new();
     for (i, step) in walk.steps.iter().enumerate() {
         let command = step.command();
+        // `at`: the room where the player does the step (CK-4).
+        if let Some(at) = step.plan().and_then(|p| p.at.as_ref())
+            && session.state().room != *at
+        {
+            failures.push(format!(
+                "step {} (`{command}`): the player is in `{}`, not at `{at}`",
+                i + 1,
+                session.state().room
+            ));
+        }
         let text = session.submit(Input::Text(command.into())).plain_text();
         transcript.push_str(&format!("\n\n> {command}\n{text}"));
         if let Some(expect) = step.expect() {

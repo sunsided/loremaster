@@ -69,6 +69,10 @@ pub struct State {
     /// A rule that waits for the host (SE-6): where it goes on, and what it asked.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub awaiting: Option<Awaiting>,
+    /// The walkthrough steps of the hint ladder that the player has done
+    /// (CK-6), by their key. Empty without hints.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub steps_done: BTreeSet<String>,
     /// What each actor has done of its agenda (D6), by actor id. An actor
     /// whose agenda has not moved yet has no entry. The actor's place is its
     /// location in `locations`, as for any thing. New in save version 2.

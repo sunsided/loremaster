@@ -1,17 +1,36 @@
 # The shortest way to light the beacon. `loremaster test examples/lighthouse` runs it.
+# The steps with an `id` make the dependency chart in the Atlas, and their
+# `hints` the hint ladder of the player (`hint`).
 name: Light the beacon
 steps:
   - n
-  - { do: open drawer, see: "Under a fold of oilcloth lies an iron key." }
-  - take key
-  - take lamp
-  - take matches
-  - light lamp
+  - id: drawer
+    do: open drawer
+    at: cottage
+    see: "Under a fold of oilcloth lies an iron key."
+    hints:
+      - "Hal kept his few things in the cottage. Look at the furniture."
+      - "The dresser has a deep drawer."
+  - { id: key, do: take key, needs: drawer, hints: ["What lay under the oilcloth may be useful."] }
+  - { id: lamp, do: take lamp, hints: ["It will be dark where you are going. Something on the table could show you the way."] }
+  - { id: matches, do: take matches, hints: ["An oil lamp is no good without a flame."] }
+  - { id: lit, do: light lamp, needs: [lamp, matches], hints: ["You carry a lamp and a way to make fire."] }
   - s
-  - unlock iron door with key
+  - id: door
+    do: unlock iron door with key
+    at: shore
+    needs: key
+    hints:
+      - "The lighthouse is locked, and you have found a key."
   - e
   - up
-  - light beacon
+  - id: beacon
+    do: light beacon
+    at: lantern_room
+    needs: [lit, door]
+    hints:
+      - "The great lens is dark. It waits for a flame."
+      - "Your lamp burns. Bring it to the lens."
 expect:
   facts: { beacon_lit: true }
   room: lantern_room

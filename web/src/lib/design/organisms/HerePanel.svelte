@@ -1,5 +1,6 @@
 <script lang="ts">
-	import type { MapView, RuleView, TalkView } from '#lib/engine/types.ts';
+	import type { Hint, MapView, RuleView, TalkView } from '#lib/engine/types.ts';
+	import HintLadder from '../molecules/HintLadder.svelte';
 	import PanelSection from '../molecules/PanelSection.svelte';
 	import TalkInspector from '../molecules/TalkInspector.svelte';
 	import StateSwitches from '../molecules/StateSwitches.svelte';
@@ -31,6 +32,10 @@
 		onopen: (view: 'map' | 'story' | 'rules' | 'explore') => void;
 		/** The talk in progress, or null. It shows first. */
 		talk?: TalkView | null;
+		/** The hint ladder of the room (UI-1). Null: the story has no hints, and the section does not show. */
+		hints?: Hint[] | null;
+		/** Show the next hint level of a step. */
+		onhint?: (step: string) => void;
 	}
 
 	let {
@@ -46,13 +51,15 @@
 		onapply,
 		onrule,
 		onopen,
-		talk = null
+		talk = null,
+		hints = null,
+		onhint
 	}: Props = $props();
 </script>
 
 <!--
 	The Here panel in play mode: a playtest inspector for the current room. It has sections that fold, not tabs:
-	the talk in progress (only during a talk),
+	the talk in progress (only during a talk), the hint ladder of the room (when the story has hints),
 	the rooms around, the values that the room text depends on (with a preview), the rules that matter here,
 	and what the last turn changed. The tools of the author are in the room desk of write mode.
 	The whole world is one step away in the Atlas.
@@ -61,6 +68,11 @@
 	{#if talk}
 		<PanelSection id="here-talk" title="Talk" meta="with {talk.name}">
 			<TalkInspector {talk} />
+		</PanelSection>
+	{/if}
+	{#if hints && onhint}
+		<PanelSection id="here-hints" title="Hints" meta={hints.length ? `${hints.length} here` : 'none here'}>
+			<HintLadder {hints} {onhint} />
 		</PanelSection>
 	{/if}
 	{#if map}
