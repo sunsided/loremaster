@@ -64,6 +64,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Changed
 
+- loremaster depends on dramaturge 0.3.0-alpha.5 from crates.io (the text selection core, R9).
 - Text progress uses dramaturge's keys: `room:shore/2` instead of `room:shore#2`, and the fragment's `id` in place of its index when it has one. The save field `sticky` of a fragment's progress is `pick` now (`sticky` still loads), and old keys are renamed on load; a fragment with an `id` starts its progress over. `shuffle` never shows the variant it showed last; `first_visit` on an examined thing, the intro and a frame means the first time the text shows, and on a presence text the first visit of the room, as on a room. The explorer finds 4 instead of 3 texts of the Lighthouse shore (its `shuffle` fragment); no walkthrough or test transcript changed.
 - The explorer counts a walk that the depth limit (40 commands) stopped as `truncated`, as one that the state budget stopped. `stuck` counts only proven dead ends: a state whose future the walk did not finish is not one.
 - Dialogues use more of dramaturge 0.3: `add` lowers to `Outcome::AddFact` (a missing value counts as 0 as before; the sum now saturates at the `i64` limits instead of overflowing), `remembers()` queries the memory id (memories no longer carry the key as a tag), the checker filters validator issues by kind and skips cycles through the validator options, and the player's key comes from `SymbolTable::PLAYER_KEY`. Saves stay compatible.
