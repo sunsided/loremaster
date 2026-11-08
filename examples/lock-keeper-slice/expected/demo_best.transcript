@@ -1,0 +1,181 @@
+Autumn 1923. At half past nine they found Amos Reed, the lock-keeper, drowned in his own lock. It looks like a fall from the gate in the dark. You are the county constable. The coroner comes at three. By then you need a case, or it goes down as an accident.
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
+
+Exits: west, north, south.
+
+> w
+w
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots dries by the stove. Hester Reed, Amos's daughter, is here.
+
+Exits: east, west, up.
+
+> examine boots
+examine boots
+
+Town boots, wet to the ankle, with canal mud in the welts. Marsh said he never left the parlour.
+
+You write it in your notebook: Marsh was out in the wet.
+
+> e
+e
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Somewhere a rope creaks.
+
+Bert Pike, the lock hand, is here.
+
+Exits: west, north, south.
+
+> n
+n
+
+Lock Side
+
+The lock gates stand black against the sky, and a gangplank leads east to a barge. Black water fills the chamber to the brim.
+
+Exits: south, east.
+
+> e
+e
+
+Barge Cabin
+
+The cabin of the *Kestrel*: a bunk, a stove the size of a hatbox, the smell of coal and wet rope. A tarpaulin covers something in the corner.
+
+Silas Crane, master of the *Kestrel*, is here, with a mug of something.
+
+Exits: west.
+
+> talk to crane
+talk to crane
+
+"Constable. I wait for the dawn and the lock, same as every man here."
+
+> 1
+"I need to empty the lock. Have you a windlass?"
+
+"Take the spare. Bring it back."
+
+Hester Reed comes in.
+
+> w
+w
+
+Lock Side
+
+The lock gates stand black against the sky, and a gangplank leads east to a barge. Black water fills the chamber to the brim.
+
+Exits: south, east.
+
+> open lower paddles
+open lower paddles
+
+You fit Crane's windlass and turn. Water roars out under the lower gate.
+
+> wait
+wait
+
+Time passes.
+
+Hester Reed comes in.
+
+> wait
+wait
+
+Time passes.
+
+The chamber is empty. Wet ladder rungs go down into the dark.
+
+Hester Reed goes south.
+
+> down
+down
+
+Lock Bottom
+
+Mud and weed at the bottom of the empty chamber. The walls rise wet on all sides.
+
+The gear housing contains an oilcloth packet.
+
+Exits: up.
+
+> take pages
+take pages
+
+Taken.
+
+You write it in your notebook: the true pages.
+
+> up
+up
+
+Lock Side
+
+The lock gates stand black against the sky, and a gangplank leads east to a barge. The chamber is empty. Wet ladder rungs go down into the dark.
+
+Exits: south, east, down.
+
+> s
+s
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
+
+Exits: west, north, south.
+
+> s
+s
+
+Lock Hut
+
+A brick hut for the lock hands. Oilskins on a nail, a tool chest under the window.
+
+Bert Pike, the lock hand, is here, asleep on a bench. The tool chest contains a coil of rope.
+
+Exits: north.
+
+> search chest
+search chest
+
+You find a windlass.
+
+You write it in your notebook: the weapon.
+
+> n
+n
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Somewhere a rope creaks.
+
+Exits: west, north, south.
+
+> w
+w
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots stands by the stove, clean. Ivo Marsh, the toll clerk, is here.
+
+Exits: east, west, up.
+
+> accuse marsh
+accuse marsh
+
+You lay the pages and your notes on the table, and tell him of the dented windlass in the tool chest. Marsh reads them, and sits down.
+
+Committed for trial
+
+At dawn the county takes Ivo Marsh to town. The pages go with him, in your coat.
