@@ -419,9 +419,9 @@ impl Game {
             if paused != Some(&machine.id) {
                 self.run_next(&mut turn, &machine.id, 0);
             }
+            // A `stop` in a chain ends only that chain.
+            self.stopped = false;
         }
-        // A `stop` in a chain ends only that chain.
-        self.stopped = false;
         self.finish(turn)
     }
 

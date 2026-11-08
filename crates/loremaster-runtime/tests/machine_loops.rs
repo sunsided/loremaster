@@ -253,7 +253,11 @@ fn an_await_at_the_start_does_not_hold_back_other_machines() {
     ));
     let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
     let mut s = Session::new(world);
-    s.start();
+    let step = s.start();
+    assert!(
+        matches!(step.status, Status::Await { .. }),
+        "the first machine waits"
+    );
     assert_eq!(state(&s, "n"), Value::Text("b".into()));
 }
 
@@ -265,4 +269,19 @@ fn a_loop_no_step_can_reach_is_no_error() {
         !found.iter().any(|m| m.contains("loop forever")),
         "{found:?}"
     );
+}
+
+#[test]
+fn a_stop_in_a_start_chain_ends_only_that_chain() {
+    let stops = "start: a\nsteps:\n  - { from: a, on: next, to: b, then: [stop] }\n  - { from: b, on: next, to: c }\n";
+    let mut f = files("", stops);
+    f.push(file(
+        "machines/n.yaml",
+        "start: a\nsteps:\n  - { from: a, on: next, to: b }\n",
+    ));
+    let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
+    let mut s = Session::new(world);
+    s.start();
+    assert_eq!(state(&s, "m"), Value::Text("b".into()));
+    assert_eq!(state(&s, "n"), Value::Text("b".into()));
 }
