@@ -459,11 +459,12 @@ impl Checker<'_> {
     /// checks of all of them.
     fn texts(&mut self) {
         let story = self.story().clone();
-        let mut seen = BTreeSet::new();
+        let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         for p in &story.texts {
             let id = p.id.clone().unwrap_or_default();
             let file = self.file_of(&format!("text:{id}"));
-            if !seen.insert(id.clone()) {
+            // One error per id: its origin is the last file of the id.
+            if !seen.insert(id.clone()) && reported.insert(id.clone()) {
                 self.error(&file, "id", format!("text pool `{id}` is defined twice"));
             }
             self.candidates(&file, "", &p.one_of, &mut |c, at, line| {
@@ -661,10 +662,11 @@ impl Checker<'_> {
             .map(|v| v.id.to_string())
             .collect();
         let emitted = emitted_events(&story);
-        let mut seen = BTreeSet::new();
+        let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
-            if !seen.insert(rule.id.as_str()) {
+            // One error per id: its origin is the last file of the id.
+            if !seen.insert(rule.id.as_str()) && reported.insert(rule.id.as_str()) {
                 self.error(&file, "id", format!("rule `{}` is defined twice", rule.id));
             }
             self.closes(

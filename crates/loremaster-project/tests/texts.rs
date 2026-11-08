@@ -133,12 +133,21 @@ fn an_option_cannot_say_a_pool() {
 #[test]
 fn two_pools_with_one_id_are_an_error() {
     let pool = "id: remark\none_of:\n  - \"A.\"\n";
-    let found = lighthouse_with(&[("texts/a.yaml", pool), ("texts/b.yaml", pool)]);
-    assert!(
-        found.iter().any(|d| d.severity == Severity::Error
-            && d.message.contains("text pool `remark` is defined twice")),
-        "{found:#?}"
-    );
+    let found = lighthouse_with(&[
+        ("texts/a.yaml", pool),
+        ("texts/b.yaml", pool),
+        ("texts/c.yaml", pool),
+    ]);
+    let twice: Vec<_> = found
+        .iter()
+        .filter(|d| {
+            d.severity == Severity::Error
+                && d.message.contains("text pool `remark` is defined twice")
+        })
+        .collect();
+    // One error, at the file that the id's origin names.
+    assert_eq!(twice.len(), 1, "{found:#?}");
+    assert_eq!(twice[0].file, "texts/c.yaml");
 }
 
 #[test]

@@ -103,3 +103,23 @@ fn two_rules_with_one_id_are_an_error() {
         "{found:#?}"
     );
 }
+
+#[test]
+fn three_rules_with_one_id_are_one_error() {
+    // The origin of an id is its last file: one error there, not one per
+    // copy at a file that is not its own.
+    let rule = "id: jump\non: { verb: [jump] }\nthen:\n  - say: \"Hop.\"\n";
+    let mut files = lighthouse_with("rules/a.yaml", rule);
+    for path in ["rules/b.yaml", "rules/c.yaml"] {
+        files.push(SourceFile {
+            path: path.into(),
+            text: rule.into(),
+        });
+    }
+    let found: Vec<_> = messages(files)
+        .into_iter()
+        .filter(|(_, _, m)| m.contains("rule `jump` is defined twice"))
+        .collect();
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert_eq!(found[0].1, "rules/c.yaml");
+}
