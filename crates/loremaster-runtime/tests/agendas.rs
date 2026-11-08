@@ -585,3 +585,29 @@ fn a_waiting_player_does_not_refuse_an_actor() {
         turn.log
     );
 }
+
+#[test]
+fn a_check_of_an_actor_that_waits_holds_its_command() {
+    let agenda = "actor: keeper\nsteps:\n  - do: [open, stove]\n";
+    let wait = "- { id: wait, on: { check: open, direct: stove, actor: keeper }, then: [{ await: { choice: [left, right] } }] }\n";
+    let mut f = files(agenda);
+    f.push(SourceFile {
+        path: "rules/wait.yaml".into(),
+        text: wait.into(),
+    });
+    let world = Arc::new(World::compile(load(f).unwrap().story).unwrap());
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    let turn = input(&mut game, "wait");
+    assert!(game.state().awaiting.is_some());
+    assert_eq!(game.state().facts["opened_by_keeper"], Value::Bool(false));
+    assert_eq!(
+        game.state().step_outcome("keeper", "1"),
+        Some(StepOutcome::Ran)
+    );
+    assert!(
+        !turn.log.iter().any(|l| l.text.contains("refused")),
+        "{:?}",
+        turn.log
+    );
+}

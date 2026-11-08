@@ -45,7 +45,8 @@
 			if (typeof s.value === 'number' && typeof before.value === 'number') {
 				const same = s.value === before.value;
 				const up = same ? (s.max ?? 0) > (before.max ?? 0) : s.value > before.value;
-				marks[s.var] = up ? 'up' : 'down';
+				// A maximum that is gone has no direction.
+				if (!same || s.max !== undefined) marks[s.var] = up ? 'up' : 'down';
 				said.push(
 					same
 						? s.max === undefined
