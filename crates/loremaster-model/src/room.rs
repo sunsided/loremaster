@@ -1,4 +1,4 @@
-use crate::{Fragment, Frames, Id, Note, Rule};
+use crate::{Fragment, Frames, Id, Media, Note, Rule};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -27,6 +27,9 @@ pub struct Room {
     /// Author text around the responses to verbs in this room.
     #[serde(default, skip_serializing_if = "Frames::is_empty")]
     pub frames: Frames,
+    /// Illustration, portrait, music and ambience (ME-1).
+    #[serde(default, skip_serializing_if = "Media::is_empty")]
+    pub media: Media,
     /// Rules that belong to this room. The loader moves them to the story's
     /// rules and sets their `within`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

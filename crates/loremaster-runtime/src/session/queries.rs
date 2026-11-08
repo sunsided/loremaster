@@ -55,6 +55,12 @@ impl Session {
             .collect()
     }
 
+    /// The active illustration, portrait, music and ambience. They come
+    /// from the state each time and are not saved (ME-2).
+    pub fn media(&self) -> crate::MediaView {
+        self.game.media()
+    }
+
     /// The talk in progress, or `None`.
     pub fn talk(&self) -> Option<&Talk> {
         self.game.talk()

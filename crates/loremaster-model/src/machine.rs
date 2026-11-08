@@ -1,4 +1,4 @@
-use crate::{Effect, EventPattern, Id, Line, Note};
+use crate::{Effect, EventPattern, Id, Line, Media, Note};
 use serde::{Deserialize, Serialize};
 
 /// A puzzle with named states and the steps between them, for example a dam
@@ -77,6 +77,9 @@ pub enum StateDef {
         /// The quest is finished in this state.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         done: bool,
+        /// Media of the story while the machine is in this state (ME-1).
+        #[serde(default, skip_serializing_if = "Media::is_empty")]
+        media: Media,
     },
 }
 
@@ -91,6 +94,8 @@ struct DescribedState {
     journal: Option<Line>,
     #[serde(default)]
     done: bool,
+    #[serde(default)]
+    media: Media,
 }
 
 impl<'de> Deserialize<'de> for StateDef {
@@ -104,6 +109,7 @@ impl<'de> Deserialize<'de> for StateDef {
                 description: s.description,
                 journal: s.journal,
                 done: s.done,
+                media: s.media,
             },
         )
     }
@@ -120,6 +126,14 @@ impl StateDef {
         match self {
             StateDef::Name(_) => None,
             StateDef::Described { description, .. } => description.as_deref(),
+        }
+    }
+
+    /// The media slots of this state.
+    pub fn media(&self) -> Option<&Media> {
+        match self {
+            StateDef::Name(_) => None,
+            StateDef::Described { media, .. } => Some(media),
         }
     }
 

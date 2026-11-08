@@ -1,6 +1,6 @@
 //! Walkthrough tests: play commands and check what shows and what holds.
 
-use crate::{Input, Session, State, World};
+use crate::{Effect, Input, Session, State, Step, World};
 use loremaster_model::{Expect, Pending, Walkthrough};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -56,7 +56,9 @@ impl WalkResult {
 pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> WalkResult {
     let seed = walk.seed.unwrap_or(world.story.seed);
     let mut session = Session::with_seed(world, seed);
-    let mut transcript = session.start().plain_text();
+    let first = session.start();
+    let mut transcript = first.plain_text();
+    let mut played = sounds(&first);
     let mut failures = Vec::new();
     for (i, step) in walk.steps.iter().enumerate() {
         let command = step.command();
@@ -71,20 +73,24 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
             ));
         }
         session.force_rolls(step.rolls());
-        let text = session.submit(Input::Text(command.into())).plain_text();
+        let step_result = session.submit(Input::Text(command.into()));
+        let text = step_result.plain_text();
+        let step_sounds = sounds(&step_result);
         transcript.push_str(&format!("\n\n> {command}\n{text}"));
         for why in session.forced_roll_errors() {
             failures.push(format!("step {} (`{command}`): {why}", i + 1));
         }
         if let Some(expect) = step.expect() {
             let at = format!("step {} (`{command}`)", i + 1);
-            failures.extend(check(session.state(), expect, &text, &at));
+            failures.extend(check(session.state(), expect, &text, &step_sounds, &at));
         }
+        played.extend(step_sounds);
     }
     failures.extend(check(
         session.state(),
         &walk.expect,
         &transcript,
+        &played,
         "at the end",
     ));
     WalkResult {
@@ -95,8 +101,23 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
     }
 }
 
-fn check(state: &State, expect: &Expect, text: &str, at: &str) -> Vec<String> {
+/// The ids of the sounds of a step.
+fn sounds(step: &Step) -> Vec<String> {
+    (step.effects.iter())
+        .filter_map(|e| match e {
+            Effect::Sound { sound } => Some(sound.id.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn check(state: &State, expect: &Expect, text: &str, sounds: &[String], at: &str) -> Vec<String> {
     let mut out = Vec::new();
+    for s in &expect.sound {
+        if !sounds.contains(s) {
+            out.push(format!("{at}: does not play the sound `{s}`"));
+        }
+    }
     for s in &expect.see {
         if !text.contains(s.as_str()) {
             out.push(format!("{at}: does not show \"{s}\""));

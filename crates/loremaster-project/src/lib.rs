@@ -43,4 +43,4 @@ pub use quality::{
 pub use scaffold::{START_TEXT, scaffold};
 
 #[cfg(not(target_family = "wasm"))]
-pub use load::read_dir;
+pub use load::{missing_asset_files, read_dir};

@@ -1,0 +1,6 @@
+name: bell rope
+aliases: [rope, bell]
+location: { room: road }
+listed: false
+description:
+  - "A frayed rope, up to a bell you cannot see."

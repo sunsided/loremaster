@@ -97,12 +97,31 @@ export interface CombatView {
 	log: string[];
 }
 
+/** An asset as the host needs it. */
+export interface MediaCue {
+	id: string;
+	/** Relative to the project folder. */
+	file: string;
+	/** The alt text of an image, or the caption of a sound. */
+	caption?: string;
+}
+
+/** The active media slots now. */
+export interface MediaView {
+	illustration?: MediaCue;
+	portrait?: MediaCue;
+	music?: MediaCue;
+	ambience?: MediaCue;
+}
+
 export interface Turn {
 	blocks: Block[];
 	ended: boolean;
 	log: LogEntry[];
 	/** The dice of this turn, in order. */
 	rolls?: RollDetail[];
+	/** The sounds of this turn, in order. */
+	sounds?: MediaCue[];
 	/** The talk in progress after this turn. Absent outside a talk. */
 	talk?: TalkInfo;
 	/** The answers the player can choose now, during a talk. */

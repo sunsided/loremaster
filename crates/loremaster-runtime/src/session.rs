@@ -62,6 +62,8 @@ pub enum Effect {
     /// A roll of the dice: the dice, the total and any test. A `roll` notice
     /// has the same total as text.
     Roll { roll: RollDetail },
+    /// Play this sound once. Show its caption when the sound is off.
+    Sound { sound: crate::MediaCue },
     /// The story has ended.
     Ending { ending: EndingInfo },
 }
@@ -538,6 +540,7 @@ impl Session {
                 .map(|entry| Effect::Notice { entry }),
         );
         effects.extend(turn.rolls.into_iter().map(|roll| Effect::Roll { roll }));
+        effects.extend(turn.sounds.into_iter().map(|sound| Effect::Sound { sound }));
         // While a rule waits, its answers come with `Status::Await`, not as
         // the choices of a talk.
         if let Some(talk) = turn.talk

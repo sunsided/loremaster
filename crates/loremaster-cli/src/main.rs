@@ -210,7 +210,10 @@ fn open(dir: &Path) -> Option<Project> {
     if checked.has_errors() {
         return None;
     }
-    checked.project
+    let project = checked.project?;
+    let missing = loremaster_project::missing_asset_files(&project, dir);
+    missing.iter().for_each(|d| eprintln!("{d}"));
+    missing.is_empty().then_some(project)
 }
 
 /// The quality report (CK-8): design findings, the puzzle width of each

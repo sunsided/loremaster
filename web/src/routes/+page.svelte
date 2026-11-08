@@ -36,6 +36,12 @@
 	import DiceDisplay from '#lib/design/molecules/DiceDisplay.svelte';
 	import CombatPanel from '#lib/design/organisms/CombatPanel.svelte';
 	import StatSheet from '#lib/design/organisms/StatSheet.svelte';
+	import MediaPanel from '#lib/design/organisms/MediaPanel.svelte';
+	import AudioControls from '#lib/design/molecules/AudioControls.svelte';
+	import CaptionLog from '#lib/design/molecules/CaptionLog.svelte';
+	import { AudioPlayer } from '#lib/player/audio.ts';
+	import { assetUrl } from '#lib/player/assets.ts';
+	import type { MediaCue } from '#lib/engine/types.ts';
 	import StatusLine from '#lib/design/organisms/StatusLine.svelte';
 	import AppHeader from '#lib/design/organisms/AppHeader.svelte';
 	import MapPanel from '#lib/design/organisms/MapPanel.svelte';
@@ -125,6 +131,27 @@
 		}
 	}
 	const problems = $derived(workspace?.problems ?? []);
+
+	const audio = new AudioPlayer();
+	const hasAssets = $derived(!!workspace?.project.files.some((f) => f.path.startsWith('assets/')));
+	const image = (cue?: MediaCue) => (cue ? { src: assetUrl(storyName, cue.file), alt: cue.caption ?? '' } : null);
+	const soundUrl = (cue?: MediaCue) => (cue && settings.sound ? assetUrl(storyName, cue.file) : null);
+	$effect(() => {
+		audio.volume('music', settings.musicVolume / 100);
+		audio.volume('ambience', settings.ambienceVolume / 100);
+		audio.volume('effects', settings.effectsVolume / 100);
+		audio.loop('music', soundUrl(session?.media.music));
+		audio.loop('ambience', soundUrl(session?.media.ambience));
+	});
+	$effect(() => {
+		if (!session) return;
+		const current = session;
+		current.onsound = (sound) => {
+			const url = soundUrl(sound);
+			if (url) audio.once(url);
+		};
+		return () => (current.onsound = null);
+	});
 	// In development, the workspace is on `window.loremaster` for experiments in the browser console.
 	$effect(() => {
 		if (import.meta.env.DEV) (window as unknown as { loremaster?: Workspace }).loremaster = workspace;
@@ -804,6 +831,13 @@
 	}
 
 	function onWindowKeydown(event: KeyboardEvent) {
+		audio.unlock();
+		if (event.altKey && !event.ctrlKey && !event.metaKey && event.code === 'KeyM') {
+			event.preventDefault();
+			if (event.repeat) return;
+			settings.sound = !settings.sound;
+			return;
+		}
 		if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
 			event.preventDefault();
 			if (!showSettings) showPalette = !showPalette;
@@ -1309,7 +1343,7 @@
 	);
 </script>
 
-<svelte:window onkeydown={onWindowKeydown} />
+<svelte:window onkeydown={onWindowKeydown} onpointerdown={() => audio.unlock()} />
 <svelte:document
 	onpointerover={(e) => (hovered = inspectKind(e.target))}
 	onfocusin={(e) => (hovered = inspectKind(e.target))}
@@ -1739,6 +1773,18 @@
 		{/snippet}
 		{#snippet player()}
 			{#if s.stats.length}<StatSheet stats={s.stats} inventory={s.scene.inventory} />{/if}
+			{#if hasAssets}
+				<MediaPanel illustration={image(s.media.illustration)} portrait={image(s.media.portrait)}>
+					<AudioControls
+						bind:sound={settings.sound}
+						bind:captions={settings.captions}
+						bind:music={settings.musicVolume}
+						bind:ambience={settings.ambienceVolume}
+						bind:effects={settings.effectsVolume}
+					/>
+					{#if !settings.sound || settings.captions}<CaptionLog captions={s.captions} />{/if}
+				</MediaPanel>
+			{/if}
 			<Transcript
 				entries={s.entries}
 				room={s.scene.room}

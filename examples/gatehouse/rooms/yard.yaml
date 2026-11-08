@@ -1,0 +1,9 @@
+name: The Yard
+position: [0, -1]
+description:
+  - "A cobbled yard, quiet under the wall."
+media:
+  illustration: yard
+  music: calm
+exits:
+  - { direction: south, to: road, door: iron_gate }

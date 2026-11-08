@@ -1,0 +1,10 @@
+name: Through the gate
+steps:
+  - { do: pull rope, sound: bell, see: "starts to toll" }
+  - { do: pull rope, see: "falls silent" }
+  - { do: open gate, sound: gate_creak }
+  - north
+  - talk to keeper
+expect:
+  sound: [bell, gate_creak]
+  room: yard

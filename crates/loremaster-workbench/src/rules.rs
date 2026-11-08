@@ -184,6 +184,7 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                             .join(", ")
                     ),
                     loremaster_model::Effect::Cancel(t) => format!("cancel {t}"),
+                    loremaster_model::Effect::PlaySound(s) => format!("play the sound {s}"),
                     loremaster_model::Effect::Call(b) if b.as_str().ends_with("#rust") => {
                         format!("run Rust ({b})")
                     }

@@ -101,7 +101,7 @@ impl Game {
         }
     }
 
-    fn living(&self, spec: &CombatSpec) -> Vec<Id> {
+    pub(super) fn living(&self, spec: &CombatSpec) -> Vec<Id> {
         (spec.enemies.iter())
             .filter(|e| self.int(&format!("{e}.stamina")) > 0)
             .cloned()

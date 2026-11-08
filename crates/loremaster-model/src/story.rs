@@ -1,6 +1,6 @@
 use crate::{
-    Agenda, ClockConfig, Dialogue, DialogueId, Ending, Fragment, Frames, Id, Machine, Note, Room,
-    Rule, Thing, Thread, Timer, Value, VerbDef,
+    Agenda, Asset, ClockConfig, Dialogue, DialogueId, Ending, Fragment, Frames, Id, Machine, Note,
+    Room, Rule, Thing, Thread, Timer, Value, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -190,6 +190,9 @@ pub struct Story {
     /// Relation axes between the player and the characters, such as `trust`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub relations: Vec<Id>,
+    /// The media files of the project, from `assets/` (ME-3).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<Asset>,
     /// Conversations with things, from `dialogues/`.
     #[serde(
         default,
@@ -229,6 +232,10 @@ fn is_true(b: &bool) -> bool {
 }
 
 impl Story {
+    pub fn asset(&self, id: &str) -> Option<&Asset> {
+        self.assets.iter().find(|a| a.id.as_str() == id)
+    }
+
     /// The named text pool `id`.
     pub fn text_pool(&self, id: &str) -> Option<&crate::TextPool> {
         self.texts.iter().find(|p| p.id.as_deref() == Some(id))
