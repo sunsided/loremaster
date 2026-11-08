@@ -173,12 +173,13 @@ impl Game {
             if !self.enter_node(turn, d, cursor.current) {
                 return entered > 0;
             }
-            // A world effect can end the talk or the story, or take the
-            // player away; then the talk does not go on.
-            let go_on = self.state.talk.is_some()
-                && !self.state.ended
-                && self.eval().present(d.with.as_str())
-                && self.available().is_empty();
+            // A world effect can end the story or take the player away from
+            // the thing: then the talk ends, also at a node with options.
+            if self.state.ended || !self.eval().present(d.with.as_str()) {
+                self.end_talk();
+                return true;
+            }
+            let go_on = self.state.talk.is_some() && self.available().is_empty();
             let next = (d.node(cursor.current))
                 .and_then(|n| n.next.as_ref())
                 .filter(|_| go_on);

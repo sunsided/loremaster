@@ -21,6 +21,11 @@ name: Kitchen
 description: ["A warm kitchen."]
 "#;
 
+const HALL: &str = r#"
+name: Hall
+description: ["A cold hall."]
+"#;
+
 const KEEPER: &str = r#"
 name: lock-keeper
 aliases: [keeper]
@@ -84,6 +89,7 @@ fn project(dialogue: &str) -> Project {
     let files = [
         ("story.yaml", STORY),
         ("rooms/kitchen.yaml", KITCHEN),
+        ("rooms/hall.yaml", HALL),
         ("things/keeper.yaml", KEEPER),
         ("things/dog.yaml", DOG),
         ("dialogues/keeper.yaml", dialogue),
@@ -165,6 +171,37 @@ fn a_line_with_when_shows_while_it_holds() {
     let talk = input(&mut game, "talk to keeper");
     let speech: Vec<String> = blocks(&talk).into_iter().map(|b| b.1).collect();
     assert_eq!(speech[3], "\"Late, then.\"", "{speech:#?}");
+}
+
+#[test]
+fn an_effect_that_takes_the_player_away_ends_the_talk() {
+    // The node with the choice moves the player out of the kitchen.
+    let dialogue = DIALOGUE.replace(
+        "    say: [{ says: \"Anything else?\" }]\n    add: { told: 1 }",
+        "    say: [{ says: \"Anything else?\" }]\n    then: [{ goto: hall }]",
+    );
+    assert_ne!(dialogue, DIALOGUE);
+    let mut game = play(project(&dialogue));
+    let talk = input(&mut game, "talk to keeper");
+    assert_eq!(game.state().room.as_str(), "hall");
+    assert!(game.state().talk.is_none(), "the keeper is not here");
+    assert!(talk.choices.is_empty(), "{:#?}", talk.choices);
+}
+
+#[test]
+fn check_names_an_unknown_speaker_of_a_line() {
+    let dialogue = DIALOGUE.replace("speaker: dog", "speaker: stranger");
+    let problems: Vec<(String, String)> = check(&project(&dialogue))
+        .into_iter()
+        .map(|d| (d.at, d.message))
+        .collect();
+    assert_eq!(
+        problems,
+        [(
+            "nodes.hi.lines[1]".into(),
+            "unknown thing `stranger`".into()
+        )]
+    );
 }
 
 #[test]
