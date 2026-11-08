@@ -20,7 +20,13 @@ steps:
       - set: { lock: empty, marsh_has_pages: true }
       - move: { pages: nowhere }
       - cancel: lock_drain
-      - say: "{in(lock_side) ? Marsh opens the lower paddles with a windlass from his coat, climbs down into the empty chamber and comes back with an oilcloth packet. | Far off, water roars at the lock.}"
+      - say:
+          - narrate: "Marsh opens the lower paddles with a windlass from his coat, climbs down into the empty chamber and comes back with an oilcloth packet."
+            when: in(lock_side)
+          - narrate: "Marsh climbs down the ladder, pushes past you to the gear housing and takes an oilcloth packet from it. He is back up the rungs before you can stop him."
+            when: in(lock_bottom)
+          - narrate: "Far off, water roars at the lock."
+            when: not in(lock_side) and not in(lock_bottom)
     closes: [committed]
     reason: "Marsh takes the true pages from the gear housing. A late player can still charge him, with a weaker case."
   - id: burn

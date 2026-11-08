@@ -24,8 +24,6 @@ Town boots, wet to the ankle, with canal mud in the welts. Marsh said he never l
 
 You write it in your notebook: Marsh was out in the wet.
 
-Hester Reed goes up.
-
 > e
 e
 
@@ -64,7 +62,11 @@ Towpath
 
 A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
 
+Hester Reed, Amos's daughter, is here.
+
 Exits: west, north, south.
+
+Hester Reed goes north.
 
 > w
 w
@@ -87,24 +89,22 @@ wait
 
 Time passes.
 
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
 Hester Reed comes in.
-
-> wait
-wait
-
-Time passes.
-
-Hester Reed goes east.
-
-> wait
-wait
-
-Time passes.
-
-> wait
-wait
-
-Time passes.
 
 Ivo Marsh comes in.
 
@@ -112,6 +112,8 @@ Ivo Marsh comes in.
 wait
 
 Time passes.
+
+Hester Reed goes up.
 
 Ivo Marsh goes east.
 
@@ -132,14 +134,10 @@ wait
 
 Time passes.
 
-Hester Reed comes in.
-
 > wait
 wait
 
 Time passes.
-
-Hester Reed goes up.
 
 Ivo Marsh comes in.
 
