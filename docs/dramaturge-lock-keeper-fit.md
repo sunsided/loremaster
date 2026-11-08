@@ -37,7 +37,7 @@ So the demo is a big test of loremaster (agendas, the ending checks, quests, hin
 | Piece | dramaturge | Where loremaster uses it | Glue |
 | --- | --- | --- | --- |
 | Text selection | `select`, `select_named`, `commit` (R9) | All texts: room, thing, presence, frame and intro texts are `Pick::All` pools; a `one_of` is an inline pool; `texts/*.yaml` are named pools (`crates/loremaster-runtime/src/text.rs:176`, `:197`, `:253`) | `text.rs` 323, `text/pool.rs` 138 |
-| Host types | `TextTypes`, `Judge`, `ProgressStore`, `TextRng` | `Lore`, `LoreJudge`, `impl ProgressStore for State`, `Rng` (`text/pool.rs:19`, `:59`, `:99`, `:130`) | in `pool.rs` |
+| Host types | `TextTypes`, `Judge`, `ProgressStore`, `TextRng` | `Lore`, `LoreJudge`, `impl ProgressStore for State`, `Rng` (`text/pool.rs:19`, `:59`, `:99`, `:130`) | in `text/pool.rs` |
 | A node that says a pool | `DialogText::Pool` | `say: { text: <id> }` lowers in 4 lines (`crates/loremaster-lang/src/dialogue.rs:173`); the talk shows it with `say_pool` (`talk.rs:268`) | small |
 | Pool checks | `validate_pools`, `validate_pool` (`PickTie`, `UnkeyedProgress`, `UnknownPool`) | `crates/loremaster-project/src/check.rs:419`, `:470` | `check.rs` about 270 lines |
 | Lines and auto-continue | `DialogueNode::all_lines`, `next`, `DialogCursor::follow`, `ADVANCE_LIMIT` | `talk.rs:167` (`enter`), `:243` (`show`) | `talk.rs` 339 |
