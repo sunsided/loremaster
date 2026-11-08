@@ -80,7 +80,7 @@ world! {
     test weighing "Weigh the gold" {
         "take gold";
         weigh sees "It reads 3.";
-        pull sees "Turn ";
+        pull sees "The sluice grinds open." sees "Turn ";
         expect scale.weight == 3, sluice == open;
     }
 }
