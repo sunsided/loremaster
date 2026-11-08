@@ -679,6 +679,9 @@ steps:
 
 - A step fires on its event when the machine is in one of its `from` states and `when` is true. Then the machine goes to `to`, shows `say` and runs `then`.
 - A machine takes one step for one event only.
+- A step with `on: next` needs no event. It runs by itself right after a step brings the machine to one of its `from` states, in the same turn, and when the game starts in that state. A change of the machine's variable with `set` does not run it. Of several such steps of one state, the first whose `when` holds runs, in file order. These steps chain, and they can go back to an earlier state, so they make a loop.
+- An `await` in such a step waits as in a rule. After the answer, the chain goes on. A save in the middle restores.
+- `step_limit: 100` in story.yaml is the most `on: next` steps in one turn (100 by default). At the limit, the turn ends with a note. A loop where no step has `when`, `await`, `end` or `stop` is an error of the checks: it can never stop. `on: next` is an error in a rule outside a machine.
 - The id of the machine is a variable with its state. Conditions read it: `exorcism == lit`.
 - Each step is a rule with the id `<machine>#<number>`. The rules view, the checks and the explorer show them.
 - Without `states`, the states are the start state and all states that the steps name.

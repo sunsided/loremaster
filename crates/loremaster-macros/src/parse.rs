@@ -1209,6 +1209,7 @@ fn event(input: ParseStream) -> Result<Event> {
     let kind = match word.value.as_str() {
         "start" => EventKind::Start,
         "turn" => EventKind::Turn,
+        "next" => EventKind::Next,
         "enter" => EventKind::Enter(one(input)?),
         "leave" => EventKind::Leave(one(input)?),
         "time" => {
@@ -1228,7 +1229,7 @@ fn event(input: ParseStream) -> Result<Event> {
         _ => {
             return Err(Error::new(
                 word.span,
-                "expected an event: `start`, `turn`, `enter(room)`, `leave(room)`, `time(\"HH:MM\")`, `verb(..)`, `check(..)`, `timer(id)`, `event(id)` or `talk(dialogue, node)`",
+                "expected an event: `start`, `turn`, `next`, `enter(room)`, `leave(room)`, `time(\"HH:MM\")`, `verb(..)`, `check(..)`, `timer(id)`, `event(id)` or `talk(dialogue, node)`",
             ));
         }
     };

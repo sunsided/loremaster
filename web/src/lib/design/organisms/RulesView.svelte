@@ -29,6 +29,7 @@
 		{ id: ['time', 'timer'], label: 'Time and timers' },
 		{ id: ['event', 'talk'], label: 'Events and talks' },
 		{ id: ['turn'], label: 'Every turn' },
+		{ id: ['next'], label: 'Machine steps by themselves' },
 		{ id: ['start'], label: 'Start' }
 	];
 

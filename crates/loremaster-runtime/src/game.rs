@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 mod agendas;
 mod awaits;
+mod machines;
 pub use awaits::{ARRIVED, REFUSED};
 mod narrative;
 mod talk;
@@ -393,6 +394,12 @@ impl Game {
         turn.push(BlockKind::Narration, runs);
         self.enter_room(&mut turn, 0);
         self.fire(&mut turn, &Event::Start, 0);
+        for machine in &world.story.machines {
+            // A paused chain goes on after its answer, not here.
+            if self.state.awaiting.is_none() {
+                self.run_next(&mut turn, &machine.id, 0);
+            }
+        }
         self.finish(turn)
     }
 
@@ -1475,19 +1482,11 @@ impl Game {
             self.state.fired.insert(rule.id.clone());
             out.instead |= rule.instead;
             stepped.extend(rule.machine.as_ref());
-            for (k, effect) in world.rules[i].then.iter().enumerate() {
-                if let CEffect::Await(spec) = effect {
-                    // The rule pauses; the other rules of the event still run.
-                    if self.begin_await(turn, &rule.id, k + 1, spec) != awaits::AwaitStep::Answered
-                    {
-                        break;
-                    }
-                    continue;
-                }
-                self.apply(turn, &rule.id, effect, depth + 1);
-                if self.stopped || self.state.ended {
-                    break;
-                }
+            // A paused rule waits; the other rules of the event still run.
+            if self.run_effects(turn, i, 0, depth + 1)
+                && let Some(m) = &rule.machine
+            {
+                self.run_next(turn, m, depth + 1);
             }
         }
         // Behaviors run after the rules of the event.

@@ -14,6 +14,9 @@ pub struct Turn {
     /// The answers the player can choose now, during a talk.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<Choice>,
+    /// `on: next` steps taken in this turn, for the step limit.
+    #[serde(skip)]
+    pub(crate) machine_steps: u32,
 }
 
 /// Who the player is talking to.

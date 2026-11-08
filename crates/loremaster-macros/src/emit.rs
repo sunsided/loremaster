@@ -452,6 +452,7 @@ fn event(e: &Event, span: Span) -> TokenStream {
     match &e.kind {
         EventKind::Start => quote_spanned!(span=> ::loremaster::dsl::on::start()),
         EventKind::Turn => quote_spanned!(span=> ::loremaster::dsl::on::turn()),
+        EventKind::Next => quote_spanned!(span=> ::loremaster::dsl::on::next()),
         EventKind::Enter(r) => {
             let r = name(r);
             quote_spanned!(span=> ::loremaster::dsl::on::enter(#r))
