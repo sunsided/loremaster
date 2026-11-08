@@ -85,13 +85,14 @@ impl LoreJudge<'_, '_> {
 
 /// Does a condition of a text hold for the player, `seen_by` too?
 pub(crate) fn holds_for_player(ev: &Eval, c: &Condition) -> bool {
-    LoreJudge(ev).holds(c, &seen_by_player())
+    LoreJudge(ev).holds(c, &seen_by_active(ev.state))
 }
 
-/// The query of a text that the player sees: the player is the perceiver
-/// until actors come (D6).
-pub(crate) fn seen_by_player() -> Query<Lore> {
-    Query::new().perceiver(Id::new(PLAYER_SPEAKER))
+/// The query of a text that the player sees: the perceiver is the active
+/// actor (TX-9), which is the player in a story without `playable`.
+pub(crate) fn seen_by_active(state: &State) -> Query<Lore> {
+    let actor = state.active.clone();
+    Query::new().perceiver(actor.unwrap_or_else(|| Id::new(PLAYER_SPEAKER)))
 }
 
 /// The progress of texts lives in the save state, keyed as dramaturge keys

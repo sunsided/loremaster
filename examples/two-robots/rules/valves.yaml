@@ -1,0 +1,20 @@
+- id: no_spanner
+  on: { check: [turn] }
+  when: not carried(spanner)
+  then:
+    - say: "The spindle is bare. It needs a valve spanner."
+    - stop
+
+- id: turn_port
+  on: { verb: [turn, port_valve] }
+  instead: true
+  then:
+    - say: "You fit the spanner and lean. The port main shudders, and the pumps take the water down."
+    - end: drained
+
+- id: turn_starboard
+  on: { verb: [turn, starboard_valve] }
+  instead: true
+  then:
+    - say: "You fit the spanner and lean. The starboard main was the dead one; the river comes up it instead."
+    - end: flooded

@@ -231,6 +231,15 @@ fn v1_to_v2(state: &mut Value) -> Result<(), SaveError> {
 /// Keep the progress of the agendas that the story still has: an actor
 /// without an agenda, and a step that its agenda no longer has, are dropped.
 /// Returns what it dropped, as `agenda:<actor>#<step>` (or `agenda:<actor>`).
+/// Forget active actors and orders that the story no longer has.
+pub(crate) fn keep_known_actors(world: &World, state: &mut State) {
+    let playable = &world.story.playable;
+    if state.active.as_ref().is_some_and(|a| !playable.contains(a)) {
+        state.active = playable.first().cloned();
+    }
+    state.orders.retain(|a, _| playable.contains(a));
+}
+
 pub(crate) fn keep_known_steps(
     world: &World,
     actors: &mut std::collections::BTreeMap<Id, crate::ActorState>,
@@ -339,6 +348,7 @@ fn reconcile(
             .or_insert_with(|| location.clone());
     }
 
+    keep_known_actors(world, &mut state);
     if !has_room(&state.room) {
         dropped.push(format!("room:{}", state.room));
         state.room = story.start.clone();

@@ -1,0 +1,6 @@
+name: starboard wheel
+aliases: [starboard valve, starboard]
+listed: false
+location: { room: hall }
+description:
+  - "A valve wheel on the starboard main, its square spindle bare."
