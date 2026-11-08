@@ -671,8 +671,12 @@ impl Checker<'_> {
             .map(|v| v.id.to_string())
             .collect();
         let emitted = emitted_events(&story);
+        let mut seen = BTreeSet::new();
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
+            if !seen.insert(rule.id.as_str()) {
+                self.error(&file, "id", format!("rule `{}` is defined twice", rule.id));
+            }
             self.closes(
                 &file,
                 "",

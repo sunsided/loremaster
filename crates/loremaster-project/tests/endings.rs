@@ -84,3 +84,22 @@ fn rank_zero_and_bad_markup_are_errors() {
     );
     assert_eq!(errors.len(), 2, "{found:#?}");
 }
+
+#[test]
+fn two_rules_with_one_id_are_an_error() {
+    // The explorer judges a rule's `closes` by its id: two rules with one id
+    // would share one list.
+    let rule = "id: jump\non: { verb: [jump] }\ncloses: [beacon_lit]\nthen:\n  - say: \"Hop.\"\n";
+    let mut files = lighthouse_with("rules/a.yaml", rule);
+    files.push(SourceFile {
+        path: "rules/b.yaml".into(),
+        text: rule.replace("closes: [beacon_lit]\n", ""),
+    });
+    let found = messages(files);
+    assert!(
+        found.iter().any(|(kind, file, m)| *kind == Severity::Error
+            && file == "rules/b.yaml"
+            && m.contains("rule `jump` is defined twice")),
+        "{found:#?}"
+    );
+}
