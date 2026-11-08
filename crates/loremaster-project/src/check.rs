@@ -992,6 +992,7 @@ impl Checker<'_> {
             match effect {
                 Effect::Say(line) => self.line(file, &at, line),
                 Effect::Await(spec) => self.await_spec(file, &at, spec),
+                Effect::Combat(spec) => self.combat_spec(file, &at, spec),
                 Effect::End(ending) => {
                     if self.story().ending(ending.as_str()).is_none() {
                         self.error(
@@ -1505,6 +1506,49 @@ impl Checker<'_> {
         }
     }
 
+    /// A combat names enemies with int `skill` and `stamina`, and rooms. The
+    /// player has `skill` and `stamina`; `luck` is optional, and a number.
+    fn combat_spec(&mut self, file: &str, at: &str, spec: &loremaster_model::CombatSpec) {
+        use loremaster_lang::Ty;
+        if spec.enemies.is_empty() {
+            self.error(file, at, "a `combat` needs at least one enemy");
+        }
+        for (i, e) in spec.enemies.iter().enumerate() {
+            if spec.enemies[..i].contains(e) {
+                self.error(file, at, format!("the enemy `{e}` is named twice"));
+            }
+            self.thing_ref(file, at, e.as_str());
+            for stat in ["skill", "stamina"] {
+                if !matches!(self.ty_of(&format!("{e}.{stat}")), Some(Ty::Int)) {
+                    self.error(file, at, format!("the enemy `{e}` needs a number `{stat}`"));
+                }
+            }
+        }
+        for room in [Some(&spec.win), Some(&spec.loss), spec.escape.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            self.room_ref(file, at, room.as_str());
+        }
+        for stat in ["skill", "stamina"] {
+            if !matches!(self.ty_of(stat), Some(Ty::Int)) {
+                self.error(
+                    file,
+                    at,
+                    format!("`combat` needs a number variable `{stat}`"),
+                );
+            }
+        }
+        // With a higher floor, `stamina` never reaches 0 and the combat has no loss.
+        let floor = self.story().var("stamina").and_then(|v| v.min.clone());
+        if !matches!(floor, None | Some(loremaster_model::Limit::Value(..=0))) {
+            self.error(file, at, "`combat` needs a `min` of `stamina` of 0 or less");
+        }
+        if self.ty_of("luck").is_some_and(|t| t != Ty::Int) {
+            self.error(file, at, "`luck` is not a number variable");
+        }
+    }
+
     /// An `await` asks exactly one thing, and its answer fits `into`.
     fn await_spec(&mut self, file: &str, at: &str, spec: &loremaster_model::AwaitSpec) {
         use loremaster_lang::Ty;
@@ -1567,8 +1611,12 @@ impl Checker<'_> {
     /// Only a rule can wait for the host: a timer or a dialogue has no place to go on from.
     fn no_await(&mut self, file: &str, at: &str, effects: &[Effect]) {
         for (i, e) in effects.iter().enumerate() {
-            if matches!(e, Effect::Await(_)) {
-                self.error(file, &format!("{at}[{i}]"), "`await` works only in rules");
+            if matches!(e, Effect::Await(_) | Effect::Combat(_)) {
+                self.error(
+                    file,
+                    &format!("{at}[{i}]"),
+                    "`await` and `combat` work only in rules",
+                );
             }
         }
     }
@@ -1716,10 +1764,12 @@ fn endless_loop(m: &loremaster_model::Machine) -> Option<String> {
             .iter()
             .find(|s| s.on == EventPattern::Next && s.from.list().contains(&state))?;
         let stops = step.when.is_some()
-            || step
-                .then
-                .iter()
-                .any(|e| matches!(e, Effect::Await(_) | Effect::End(_) | Effect::Stop));
+            || step.then.iter().any(|e| {
+                matches!(
+                    e,
+                    Effect::Await(_) | Effect::Combat(_) | Effect::End(_) | Effect::Stop
+                )
+            });
         (!stops).then_some(step.to.as_str())
     };
     // A state that no step reaches can not loop; the checks warn about it.

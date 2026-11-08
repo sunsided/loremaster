@@ -28,6 +28,12 @@ impl Session {
         self.game.journal()
     }
 
+    /// The combat in progress, or `None`: the enemies, the attack strengths
+    /// of the last round and the last lines of the log (P5-03).
+    pub fn combat(&self) -> Option<crate::CombatView> {
+        self.game.combat_view()
+    }
+
     /// The talk in progress, or `None`.
     pub fn talk(&self) -> Option<&Talk> {
         self.game.talk()

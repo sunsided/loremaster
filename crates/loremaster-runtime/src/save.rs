@@ -297,6 +297,7 @@ fn reconcile(
     if let Some(open) = state.awaiting.take() {
         dropped.push(format!("await:{}", open.id));
     }
+    state.combat = None;
 
     let old_facts = std::mem::take(&mut state.facts);
     for (key, value) in &old_facts {

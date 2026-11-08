@@ -2,12 +2,16 @@
 //! reach, with a budget. It answers "can this ever show?" and "can the player
 //! get stuck?" for the whole story, not only for the states the author tried.
 
+use crate::game::{ATTACK_TEXT, LUCK_TEXT};
 use crate::{BlockKind, Command, Game, Turn};
 use loremaster_model::{EventPattern, Id, Location, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
 mod endings;
+
+const WIN_ROUND: &str = " (win the round)";
+const LOSE_ROUND: &str = " (lose the round)";
 
 pub use endings::{DeadEnd, EndingCheck, NoReturn, StaleCloses};
 
@@ -113,7 +117,12 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         &s.talk,
         &s.relations,
         &s.memories,
-        &s.awaiting,
+        // Not the await's id: it counts the awaits, and equal states stay equal.
+        s.awaiting
+            .as_ref()
+            .map(|a| (&a.rule, a.next, &a.request, &a.into, &a.locals)),
+        // Only the hit that waits for its Luck test; round and log are history.
+        s.combat.as_ref().map(|c| (true, &c.pending)),
         &s.actors,
         game.agenda_waits(),
     ))
@@ -138,16 +147,23 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     let mut out: Vec<(String, Command)> = Vec::new();
     // A rule waits: only its answers run.
     if game.awaiting().is_some() {
-        return game
-            .choices()
-            .into_iter()
-            .map(|c| {
-                (
-                    format!("answer {}", c.text),
-                    Command::Choose { index: c.index },
-                )
-            })
-            .collect();
+        let combat = game.state().combat.is_some();
+        let mut out = Vec::new();
+        for c in game.choices() {
+            let cmd = Command::Choose { index: c.index };
+            // shortcut: the walk skips Luck tests. They only shift damage and
+            // multiply the states; win, loss and escape stay reachable.
+            if combat && c.text == LUCK_TEXT {
+                continue;
+            }
+            if combat && c.text == ATTACK_TEXT {
+                out.push((format!("answer {}{WIN_ROUND}", c.text), cmd.clone()));
+                out.push((format!("answer {}{LOSE_ROUND}", c.text), cmd));
+            } else {
+                out.push((format!("answer {}", c.text), cmd));
+            }
+        }
+        return out;
     }
     // In a talk, only the answers and leaving run.
     if game.talk().is_some() {
@@ -282,6 +298,26 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out.dedup_by(|a, b| a.0 == b.0);
     out
+}
+
+/// Force the rolls of a combat round for its label in [`commands`], so that
+/// the walk sees both outcomes. The extreme rolls keep impossible outcomes
+/// out: with a big gap in SKILL, a forced "win" still loses.
+fn force_round(game: &mut Game, label: &str) {
+    // Other labels hold text of the author, which can end in the same words.
+    if game.state().combat.is_none() {
+        return;
+    }
+    let (enemy, player) = if label.ends_with(WIN_ROUND) {
+        (2, 12)
+    } else if label.ends_with(LOSE_ROUND) {
+        (12, 2)
+    } else {
+        return;
+    };
+    let mut totals = vec![enemy; game.combat_fighters()];
+    totals.push(player);
+    game.forced.totals = totals.into();
 }
 
 /// A pattern that matches the player's commands: no `actor`, or the player.
@@ -438,6 +474,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         }
         for (c, (label, cmd)) in commands(&game).into_iter().enumerate() {
             let mut next = game.clone();
+            force_round(&mut next, &label);
             let turn = next.act(cmd);
             sources(&turn, &mut shown);
             let closing: Vec<u32> = endings::fired(&start.world().story, &turn)

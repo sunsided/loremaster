@@ -50,7 +50,8 @@ pub use session::{
     RESTORE, Session, Snapshot, Status, Step, UNDO,
 };
 pub use state::{
-    ActorState, AwaitOptionInfo, AwaitRequest, Awaiting, FragmentProgress, State, StepOutcome, Talk,
+    ActorState, AwaitOptionInfo, AwaitRequest, Awaiting, CombatState, CombatView, EnemyView,
+    FragmentProgress, LastRound, State, StepOutcome, Talk,
 };
 pub use text::{SourcePiece, SourceRole};
 pub use walkthrough::{Verdict, WalkResult, run_walkthrough};

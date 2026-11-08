@@ -143,6 +143,7 @@ pub(crate) fn describe(o: &Outcomes) -> Vec<String> {
     out.extend(o.remember.iter().map(|k| format!("remember {k}")));
     out.extend(o.then.iter().map(|e| match e {
         Effect::Await(_) => "wait for the host".into(),
+        Effect::Combat(c) => crate::authoring::describe_combat(c),
         Effect::Move(m) => format!(
             "move {}",
             m.iter()

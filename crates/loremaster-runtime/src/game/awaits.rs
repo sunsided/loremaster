@@ -51,23 +51,7 @@ impl Game {
             && (!self.host_rolls || !self.forced.totals.is_empty())
         {
             let roll = spec.roll.as_deref().unwrap_or_default();
-            // A forced total (a walkthrough's `rolls:`) comes before the RNG.
-            let total = match self.forced.totals.pop_front() {
-                Some(n) if (dice.min()..=dice.max()).contains(&n) => n,
-                Some(n) => {
-                    self.forced.misfits.push(format!(
-                        "the forced roll {n} is not in the range of {roll} ({} to {})",
-                        dice.min(),
-                        dice.max()
-                    ));
-                    self.roll_dice(dice)
-                }
-                None => self.roll_dice(dice),
-            };
-            turn.log.push(LogEntry {
-                kind: "roll".into(),
-                text: format!("{roll} = {total}"),
-            });
+            let total = self.take_roll(turn, dice, roll);
             if let Some(into) = &spec.into {
                 self.set_fact(turn, into, Value::Int(total));
             }
@@ -76,16 +60,52 @@ impl Game {
         let Some(request) = AwaitRequest::of(spec) else {
             return AwaitStep::Answered;
         };
+        self.open_await(turn, rule, next, request, spec.into.clone())
+    }
+
+    /// Roll, or take the next forced total, and log the roll.
+    pub(crate) fn take_roll(&mut self, turn: &mut Turn, dice: Dice, roll: &str) -> i64 {
+        // A forced total (a walkthrough's `rolls:`) comes before the RNG.
+        let total = match self.forced.totals.pop_front() {
+            Some(n) if (dice.min()..=dice.max()).contains(&n) => n,
+            Some(n) => {
+                self.forced.misfits.push(format!(
+                    "the forced roll {n} is not in the range of {roll} ({} to {})",
+                    dice.min(),
+                    dice.max()
+                ));
+                self.roll_dice(dice)
+            }
+            None => self.roll_dice(dice),
+        };
+        turn.log.push(LogEntry {
+            kind: "roll".into(),
+            text: format!("{roll} = {total}"),
+        });
+        total
+    }
+
+    /// Pause `rule` at effect `next - 1` with this request. Each await gets
+    /// its own id, so a repeated answer can not answer the next one.
+    pub(crate) fn open_await(
+        &mut self,
+        turn: &mut Turn,
+        rule: &Id,
+        next: usize,
+        request: AwaitRequest,
+        into: Option<String>,
+    ) -> AwaitStep {
         turn.log.push(LogEntry {
             kind: "await".into(),
             text: format!("{rule} waits: {}", request.describe()),
         });
+        self.state.await_seq += 1;
         self.state.awaiting = Some(Awaiting {
-            id: format!("{rule}#{}@{}", next - 1, self.state.turns),
+            id: format!("{rule}#{}@{}", next - 1, self.state.await_seq),
             rule: rule.clone(),
             next,
             request,
-            into: spec.into.clone(),
+            into,
             locals: BTreeMap::new(),
         });
         AwaitStep::Paused
@@ -115,6 +135,8 @@ impl Game {
         }
         let mut turn = Turn::default();
         self.state.awaiting = None;
+        // Before the walk below: its room can start a new combat.
+        let combat = self.state.combat.is_some();
         if let Some(into) = &open.into {
             self.set_fact(&mut turn, into, answer.clone());
         }
@@ -123,7 +145,11 @@ impl Game {
         {
             self.move_player(&mut turn, room.clone(), 1);
         }
-        self.continue_rule(&mut turn, &open.rule, open.next);
+        let go_on = !combat
+            || self.combat_answer(&mut turn, &open.rule, open.next, &answer) == AwaitStep::Answered;
+        if go_on && !self.state.ended {
+            self.continue_rule(&mut turn, &open.rule, open.next);
+        }
         Ok(self.finish(turn))
     }
 
@@ -161,7 +187,13 @@ impl Game {
                 }
                 continue;
             }
-            self.apply(turn, rule, effect, depth);
+            if let CEffect::Combat(spec) = effect {
+                if self.begin_combat(turn, rule, k + 1, spec, depth) != AwaitStep::Answered {
+                    return false;
+                }
+            } else {
+                self.apply(turn, rule, effect, depth);
+            }
             if self.stopped || self.state.ended {
                 break;
             }

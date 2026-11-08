@@ -503,9 +503,10 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
     // Replay one turn for the rules that fired on it.
     let replay = |i: usize, c: u32| -> Vec<String> {
         let mut game = g.nodes[i].0.clone();
-        let Some((_, cmd)) = commands(&game).into_iter().nth(c as usize) else {
+        let Some((label, cmd)) = commands(&game).into_iter().nth(c as usize) else {
             return Vec::new();
         };
+        super::force_round(&mut game, &label);
         fired(story, &game.act(cmd))
     };
     let changes = |id: &str| {
