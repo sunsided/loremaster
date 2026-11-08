@@ -48,12 +48,25 @@ impl Game {
             return AwaitStep::Skipped;
         }
         if let Some(dice) = spec.roll.as_deref().and_then(Dice::parse)
-            && !self.host_rolls
+            && (!self.host_rolls || !self.forced.totals.is_empty())
         {
-            let total = self.roll_dice(dice);
+            let roll = spec.roll.as_deref().unwrap_or_default();
+            // A forced total (a walkthrough's `rolls:`) comes before the RNG.
+            let total = match self.forced.totals.pop_front() {
+                Some(n) if (dice.min()..=dice.max()).contains(&n) => n,
+                Some(n) => {
+                    self.forced.misfits.push(format!(
+                        "the forced roll {n} is not in the range of {roll} ({} to {})",
+                        dice.min(),
+                        dice.max()
+                    ));
+                    self.roll_dice(dice)
+                }
+                None => self.roll_dice(dice),
+            };
             turn.log.push(LogEntry {
                 kind: "roll".into(),
-                text: format!("{} = {total}", spec.roll.as_deref().unwrap_or_default()),
+                text: format!("{roll} = {total}"),
             });
             if let Some(into) = &spec.into {
                 self.set_fact(turn, into, Value::Int(total));

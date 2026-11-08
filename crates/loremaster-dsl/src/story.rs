@@ -3,7 +3,9 @@
 use crate::convert::{IntoTime, IntoVarValue, id, strings};
 use crate::pack::register;
 use crate::{HasFrames, HasNotes, IntoFragment};
-use loremaster_model::{ClockConfig, Frames, Id, Note, Phase, Rank, Score, Value, VarDef, VarType};
+use loremaster_model::{
+    ClockConfig, Frames, Id, Limit, Note, Phase, Rank, Score, Value, VarDef, VarType,
+};
 use loremaster_project::{Pack, StoryHeader};
 
 /// The story header of a pack, from [`BuildPack::story`](crate::BuildPack::story).
@@ -115,8 +117,34 @@ impl<'a> StoryBuilder<'a> {
             id: id(var),
             ty,
             initial,
+            min: None,
+            max: None,
         });
         self
+    }
+
+    /// The lowest value of an `int` variable: a number, or the id of
+    /// another `int` variable. The engine clamps each write.
+    #[track_caller]
+    pub fn var_min(mut self, var: impl AsRef<str>, min: impl Into<Limit>) -> Self {
+        self.declared(var.as_ref()).min = Some(min.into());
+        self
+    }
+
+    /// The highest value of an `int` variable, for example
+    /// `.var_max("stamina", "stamina_initial")`. The engine clamps each write.
+    #[track_caller]
+    pub fn var_max(mut self, var: impl AsRef<str>, max: impl Into<Limit>) -> Self {
+        self.declared(var.as_ref()).max = Some(max.into());
+        self
+    }
+
+    #[track_caller]
+    fn declared(&mut self, var: &str) -> &mut VarDef {
+        let Some(v) = self.header().vars.iter_mut().find(|v| v.id.as_str() == var) else {
+            panic!("the variable `{var}` is not declared: call `var` first");
+        };
+        v
     }
 
     /// A variable of an enum type: its values and the initial one.
@@ -130,6 +158,8 @@ impl<'a> StoryBuilder<'a> {
             id: id(var),
             ty: VarType::Enum(strings(values)),
             initial: Value::Text(initial.into()),
+            min: None,
+            max: None,
         });
         self
     }

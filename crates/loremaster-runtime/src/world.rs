@@ -233,6 +233,8 @@ pub(crate) type COption = dramaturge_model::DialogueOption<Arc<[CEffect]>, Compi
 pub(crate) enum CEffect {
     Set(BTreeMap<String, Value>),
     Add(BTreeMap<String, i64>),
+    /// `calc`: each target with its signed terms.
+    Calc(Vec<(String, Vec<(i64, loremaster_model::Term)>)>),
     Say(loremaster_lang::CompiledLine),
     /// `say: { text: <id> }`: show a named text pool.
     SayPool(Id),
@@ -552,6 +554,18 @@ impl Compiler {
             }
             Effect::Set(m) => CEffect::Set(m.clone()),
             Effect::Add(m) => CEffect::Add(m.clone()),
+            Effect::Calc(m) => {
+                let mut sums = Vec::new();
+                for (name, sum) in m {
+                    let terms =
+                        loremaster_model::parse_sum(sum).map_err(|(why, span)| CompileError {
+                            at: format!("{at}.calc.{name}"),
+                            error: loremaster_lang::LangError::new(why, span),
+                        })?;
+                    sums.push((name.clone(), terms));
+                }
+                CEffect::Calc(sums)
+            }
             Effect::Say(line) => match &line.pool {
                 Some(pool) => CEffect::SayPool(pool.clone()),
                 None => CEffect::Say(self.line(at, line)?),

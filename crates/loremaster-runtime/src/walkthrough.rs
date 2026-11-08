@@ -54,7 +54,8 @@ impl WalkResult {
 
 /// Play a walkthrough from the start of the story, through the Session API.
 pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> WalkResult {
-    let mut session = Session::new(world);
+    let seed = walk.seed.unwrap_or(world.story.seed);
+    let mut session = Session::with_seed(world, seed);
     let mut transcript = session.start().plain_text();
     let mut failures = Vec::new();
     for (i, step) in walk.steps.iter().enumerate() {
@@ -69,8 +70,12 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
                 session.state().room
             ));
         }
+        session.force_rolls(step.rolls());
         let text = session.submit(Input::Text(command.into())).plain_text();
         transcript.push_str(&format!("\n\n> {command}\n{text}"));
+        for why in session.forced_roll_errors() {
+            failures.push(format!("step {} (`{command}`): {why}", i + 1));
+        }
         if let Some(expect) = step.expect() {
             let at = format!("step {} (`{command}`)", i + 1);
             failures.extend(check(session.state(), expect, &text, &at));
