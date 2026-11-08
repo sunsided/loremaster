@@ -322,3 +322,26 @@ fn a_save_from_before_playable_gets_an_active_actor() {
     );
     assert_eq!(state.location_of("spanner"), Some(&Location::Carried));
 }
+
+#[test]
+fn a_dropped_actor_fact_stays_dropped() {
+    let (_, world) = demo();
+    let s = session(world.clone());
+    let mut save = serde_json::to_value(s.save()).unwrap();
+    // As a save of a story whose active actor is gone.
+    save["story"]["hash"] = "older".into();
+    let state = save["state"].as_object_mut().unwrap();
+    state.insert("active".into(), "ghost".into());
+    state["facts"]
+        .as_object_mut()
+        .unwrap()
+        .insert("ghost.active".into(), true.into());
+    let (restored, loaded) = Session::load(world, save).unwrap();
+    assert!(!restored.state().facts.contains_key("ghost.active"));
+    assert!(
+        loaded.dropped.iter().any(|d| d == "fact:ghost.active"),
+        "{:?}",
+        loaded.dropped
+    );
+    assert_eq!(restored.state().active.as_ref().unwrap().as_str(), "wick");
+}
