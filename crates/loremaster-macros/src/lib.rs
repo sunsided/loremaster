@@ -149,7 +149,7 @@
 //! Also in the grammar:
 //!
 //! - `thread <id> "<name>" { status open; summary "…"; tracks <fact>; note "…"; }`
-//!   and `behavior <id>;`.
+//!   and `behavior <id>;` (the code comes from elsewhere).
 //! - In a room or a thing, `before <verb> <text>;`, `instead ..` and
 //!   `after ..`: the frames around the response to a verb. In a thing,
 //!   `name [when <cond> =>] "<text>" [aliases [..]] [proper];`: a stage of
@@ -164,12 +164,47 @@
 //!   properties of an extern thing (`bool`, `int` or `text`), so that
 //!   conditions on them check, and a relation of another pack's header.
 //!
+//! Rust behaviors (DSL step L5). All three forms make a normal `Behavior`:
+//!
+//! - `behavior <expr>;` (anything but a lone lowercase id, for example
+//!   `behavior Thief::zork();`): the pack keeps the instance, and
+//!   `Loremaster::build` names and registers it. The macro does not know its
+//!   id, so a `call` to it in the same block needs
+//!   `extern { behavior <id>; }`.
+//! - `#[behavior(on = turn)]` on a function: see [`macro@behavior`].
+//! - `rust |cx| { .. }` as an effect in a rule or a machine step, one per
+//!   rule or step: the macro makes the behavior `<rule>#rust` (`<machine>#<n>#rust`
+//!   for a step) and puts `call: <rule>#rust` at the place of the block. The
+//!   block gives a `Flow` or `()`.
+//!
+//! Rust code follows the determinism rules of the session: change the world
+//! only through `Cx`, take random numbers only from `Cx::roll`, and use no
+//! clock and no host state. The closure of a `rust` block can not capture
+//! local variables; the macro can not check the rest.
+//!
+//! ```
+//! use loremaster::prelude::*;
+//!
+//! world! {
+//!     story "Scale" { start: hall }
+//!     room hall "Hall" {}
+//!     verb weigh "Weigh" { words [weigh]; slots none; }
+//!     rule weigh on verb(weigh) instead {
+//!         line "The scale tips.";
+//!         rust |cx| { cx.say(format!("Turn {}.", cx.turns())); }
+//!     }
+//! }
+//! let world = Loremaster::new().pack(pack()).build().unwrap();
+//! assert!(world.missing_behaviors().is_empty());
+//! ```
+//!
 //! Not in the grammar yet: text pools and `one_of` groups (R9), agendas
 //! (D6), `extend`, a sealed mode `world!(yaml = "..")` that checks against
 //! a YAML folder, and `uses <pack>;` for the ids of another pack. The macro
 //! names the step or issue that brings each one it knows.
 
 mod ast;
+mod behavior;
 mod check;
 mod cond;
 mod emit;
@@ -186,4 +221,33 @@ pub fn world(input: TokenStream) -> TokenStream {
         return e.to_compile_error().into();
     }
     emit::expand(&world).into()
+}
+
+/// A behavior from a function: the macro keeps the function and adds a unit
+/// struct (`parrot` makes `Parrot`) with a `Behavior` impl. The id is the
+/// function name, `description()` is the doc comment, and `on` is the event
+/// filter of the manifest: `on = turn`, `on = [turn, enter]`, or nothing for
+/// every event. The function runs only for those kinds, also when a rule
+/// calls it (`call` is a kind). It takes `cx: &mut Cx<'_>` and returns a
+/// `Flow` or `()`.
+///
+/// ```
+/// use loremaster::prelude::*;
+///
+/// /// The parrot squawks now and then.
+/// #[behavior(on = turn)]
+/// fn parrot(cx: &mut Cx<'_>) {
+///     if cx.roll(4) == 0 {
+///         cx.say("\"Pieces of eight!\" squawks the parrot.");
+///     }
+/// }
+///
+/// assert_eq!(Parrot.id(), "parrot");
+/// assert_eq!(Parrot.description(), "The parrot squawks now and then.");
+/// ```
+#[proc_macro_attribute]
+pub fn behavior(attr: TokenStream, item: TokenStream) -> TokenStream {
+    behavior::expand(attr.into(), item.into())
+        .unwrap_or_else(|e| e.to_compile_error())
+        .into()
 }

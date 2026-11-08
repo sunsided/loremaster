@@ -55,6 +55,9 @@ pub enum Item {
     Thread(Thread),
     /// `behavior <id>;`: a behavior in Rust, by id.
     Behavior(Name),
+    /// `behavior <expr>;`: a behavior in Rust with its instance, for
+    /// example `behavior Thief::zork();`. The pack keeps the instance.
+    Register(syn::Expr),
 }
 
 /// An id from another pack, for the checks at compile time.
@@ -307,6 +310,24 @@ pub enum EffectKind {
     Start(Name, Option<u32>),
     Cancel(Name),
     Call(Name),
+    /// `rust |cx| { .. }`: Rust code at this place of a rule.
+    Rust(RustBlock),
+}
+
+/// A `rust |cx| { .. }` block. The macro makes the behavior
+/// `<owner>#rust` of it, and the effect `call: <owner>#rust`.
+pub struct RustBlock {
+    /// The rule: its id, or the rule of a machine step (`lock#1`). The
+    /// parser of the rule or machine sets it.
+    pub owner: String,
+    pub cx: proc_macro2::Ident,
+    pub body: syn::Block,
+}
+
+impl RustBlock {
+    pub fn id(&self) -> String {
+        format!("{}#rust", self.owner)
+    }
 }
 
 pub struct Machine {

@@ -8,6 +8,8 @@ use crate::{
 };
 use loremaster_model::{EndingKind, EventPattern, Fragment, Frames, Note};
 use loremaster_project::{Origin, Pack};
+use loremaster_runtime::Behavior;
+use std::sync::Arc;
 
 /// The builder methods of a [`Pack`]. Each method adds one entity to the pack
 /// and returns a builder for its fields. The entity gets an
@@ -69,6 +71,11 @@ pub trait BuildPack {
     /// A behavior in Rust, by id (`behaviors/<id>.yaml`).
     #[track_caller]
     fn behavior(&mut self, id: impl AsRef<str>) -> &mut Self;
+    /// A behavior in Rust, with its instance: the pack names its id, as
+    /// [`behavior`](Self::behavior) does, and [`Loremaster::build`](crate::Loremaster::build)
+    /// registers it in the world.
+    #[track_caller]
+    fn register(&mut self, behavior: impl Behavior + 'static) -> &mut Self;
 }
 
 impl BuildPack for Pack {
@@ -138,6 +145,20 @@ impl BuildPack for Pack {
         let origin = here(self);
         self.origins.insert(format!("behavior:{behavior}"), origin);
         self.behaviors.push(behavior);
+        self
+    }
+
+    #[track_caller]
+    fn register(&mut self, behavior: impl Behavior + 'static) -> &mut Self {
+        let shared: Arc<dyn Behavior> = Arc::new(behavior);
+        // A `rust` block belongs to its rule, which may be replaced: it has no
+        // origin of its own, so `assemble` does not call it a duplicate.
+        if shared.id().ends_with("#rust") {
+            self.behaviors.push(id(shared.id()));
+        } else {
+            self.behavior(shared.id());
+        }
+        self.instances.push(Arc::new(shared));
         self
     }
 }

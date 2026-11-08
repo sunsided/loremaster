@@ -1,0 +1,17 @@
+error: a rule has one `rust` block at most; put the code into the first one
+ --> tests/ui/fail/rust_blocks.rs:9:15
+  |
+9 |         rust |cx| { cx.say("two"); }
+  |               ^^
+
+error: a `rust` block goes in a rule or a machine step
+  --> tests/ui/fail/rust_blocks.rs:18:22
+   |
+18 |         at 0 { rust |cx| { cx.say("x"); } }
+   |                      ^^
+
+error: expected `|`
+  --> tests/ui/fail/rust_blocks.rs:27:14
+   |
+27 |         rust { }
+   |              ^

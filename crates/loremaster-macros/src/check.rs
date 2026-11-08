@@ -85,6 +85,8 @@ pub fn validate(world: &World) -> Result<(), Error> {
             Item::Behavior(b) => {
                 defined.insert(("behavior".into(), b.value.clone()));
             }
+            // Its id is known only at run time (`Behavior::id`).
+            Item::Register(_) => {}
             Item::Test(t) => {
                 if !tests.insert(t.id.value.clone()) {
                     errors.push(Error::new(
@@ -510,6 +512,7 @@ fn build(world: &World, spans: &mut Spans) -> Pack {
                 p.behavior(id.value.as_str());
                 spans.add(&format!("behavior:{}", id.value), "", name_tokens(id));
             }
+            Item::Register(_) => {}
         }
     }
     p
@@ -901,6 +904,7 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans
             EffectKind::Call(c) => {
                 b.effect(loremaster_model::Effect::Call(Id::new(c.value.as_str())))
             }
+            EffectKind::Rust(r) => b.effect(loremaster_model::Effect::Call(Id::new(r.id()))),
         };
         let i = then.offset + b.effects_mut().len().saturating_sub(1);
         let tokens = match &e.kind {
@@ -942,7 +946,17 @@ fn rule(p: &mut Pack, r: &Rule, spans: &mut Spans) {
         offset: 0,
     };
     effects(b, &r.effects, &then, spans);
+    rust_behaviors(p, &r.effects);
     spans.add(&key, "", name_tokens(&r.id));
+}
+
+/// The behaviors of the `rust` blocks of a list of effects.
+fn rust_behaviors(p: &mut Pack, list: &[Effect]) {
+    for e in list {
+        if let EffectKind::Rust(r) = &e.kind {
+            p.behavior(r.id());
+        }
+    }
 }
 
 fn machine(p: &mut Pack, m: &Machine, spans: &mut Spans) {
@@ -1001,6 +1015,9 @@ fn machine(p: &mut Pack, m: &Machine, spans: &mut Spans) {
     }
     if m.replace {
         b.replace();
+    }
+    for step in &m.steps {
+        rust_behaviors(p, &step.effects);
     }
     if let Some((first, _)) = m.states.first() {
         spans.add(&key, format!("{at}.states"), name_tokens(first));

@@ -112,9 +112,28 @@ fn item(input: ParseStream) -> Result<Item> {
         }),
         "behavior" => {
             name(input)?;
-            let id = name(input)?;
+            let expr: syn::Expr = input.parse()?;
             semi(input)?;
-            Item::Behavior(id)
+            // A lone lowercase word is an id; anything else is the instance.
+            match &expr {
+                syn::Expr::Path(p)
+                    if p.qself.is_none()
+                        && p.path.leading_colon.is_none()
+                        && p.path.segments.len() == 1
+                        && p.path.segments[0].arguments.is_none()
+                        && p.path.segments[0]
+                            .ident
+                            .to_string()
+                            .starts_with(|c: char| c.is_ascii_lowercase() || c == '_') =>
+                {
+                    let ident = &p.path.segments[0].ident;
+                    Item::Behavior(Name {
+                        value: unraw(ident),
+                        span: ident.span(),
+                    })
+                }
+                _ => Item::Register(expr),
+            }
         }
         "texts" => {
             return Err(unsupported(
@@ -1284,7 +1303,33 @@ fn rule(input: ParseStream) -> Result<Rule> {
         ));
     }
     rule.effects = effects(input)?;
+    own_rust(&mut rule.effects, Some(&rule.id.value))?;
     Ok(rule)
+}
+
+/// Give the `rust` block of a list of effects its owner, the rule. A rule
+/// has one block at most. Without an owner (a timer), a block is an error.
+fn own_rust(effects: &mut [Effect], owner: Option<&str>) -> Result<()> {
+    let mut seen = false;
+    for e in effects {
+        if let EffectKind::Rust(block) = &mut e.kind {
+            let Some(owner) = owner else {
+                return Err(Error::new(
+                    block.cx.span(),
+                    "a `rust` block goes in a rule or a machine step",
+                ));
+            };
+            if seen {
+                return Err(Error::new(
+                    block.cx.span(),
+                    "a rule has one `rust` block at most; put the code into the first one",
+                ));
+            }
+            seen = true;
+            block.owner = owner.to_string();
+        }
+    }
+    Ok(())
 }
 
 /// A `{ ... }` body of effects.
@@ -1295,7 +1340,10 @@ fn effects(input: ParseStream) -> Result<Vec<Effect>> {
 fn effect(input: ParseStream) -> Result<Effect> {
     let start = input.cursor();
     let kind = effect_body(input, false)?.kind;
-    semi(input)?;
+    // A `rust` block ends with its `}`; a `;` after it is fine.
+    if !matches!(kind, EffectKind::Rust(_)) || input.peek(Token![;]) {
+        semi(input)?;
+    }
     Ok(Effect {
         kind,
         tokens: since(start, input),
@@ -1406,6 +1454,22 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
         }
         "cancel" => EffectKind::Cancel(name(input)?),
         "call" => EffectKind::Call(name(input)?),
+        "rust" if dialogue => {
+            return Err(Error::new(
+                word.span,
+                "a `rust` block goes in a rule or a machine step, not in a dialogue",
+            ));
+        }
+        "rust" => {
+            input.parse::<Token![|]>()?;
+            let cx: Ident = input.parse()?;
+            input.parse::<Token![|]>()?;
+            EffectKind::Rust(RustBlock {
+                owner: String::new(),
+                cx,
+                body: input.parse()?,
+            })
+        }
         "say" => {
             return Err(Error::new(
                 word.span,
@@ -1415,7 +1479,7 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
         _ => {
             return Err(Error::new(
                 word.span,
-                "expected an effect: `line`, `set`, `add`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel` or `call`",
+                "expected an effect: `line`, `set`, `add`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel`, `call` or `rust`",
             ));
         }
     };
@@ -1453,7 +1517,13 @@ fn machine(input: ParseStream) -> Result<Machine> {
             states.push((state, description));
             continue;
         }
-        steps.push(step(&content)?);
+        let mut s = step(&content)?;
+        // The rule of the step, as `Machine::step_rule` names it.
+        own_rust(
+            &mut s.effects,
+            Some(&format!("{}#{}", id.value, steps.len() + 1)),
+        )?;
+        steps.push(s);
     }
     Ok(Machine {
         replace: false,
@@ -1565,7 +1635,9 @@ fn timer(input: ParseStream) -> Result<Timer> {
             }
             "at" => {
                 let n = int(&content)?;
-                timer.at.push((n, effects(&content)?));
+                let mut list = effects(&content)?;
+                own_rust(&mut list, None)?;
+                timer.at.push((n, list));
             }
             "note" | "todo" => {
                 timer.notes.push(Note {
