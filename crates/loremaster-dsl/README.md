@@ -33,7 +33,7 @@ let world = Loremaster::new()
 
 - Each source makes a `Pack`. `Loremaster` joins the packs in their order. An id that two packs define is an error, unless the later entity calls `replace()`.
 - Each entity gets an `Origin::Rust` with the file, line and column of the call that made it. A diagnostic about the entity names that place.
-- `p.register(behavior)` adds a Rust behavior with its instance: the pack names its id, and `Loremaster::build` registers it in the world. Two packs can not name the same behavior.
+- `p.register(behavior)` adds a Rust behavior with its instance: the pack names its id, and `Loremaster::build` registers it in the world. Two packs can not name the same behavior. A `rust` block of `world!` belongs to its rule: when a later pack replaces the machine, the later block runs.
 - The test `tests/lighthouse.rs` writes `examples/lighthouse` with the builder and compares the story with the YAML story, value by value and by `model_hash`.
 
 The crate `loremaster` gives this API as `loremaster::dsl` and `loremaster::prelude` with the cargo feature `dsl`. The `world!` macro of `loremaster-macros` expands to calls of this API.

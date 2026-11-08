@@ -42,14 +42,16 @@ fn the_attribute_makes_a_behavior() {
 #[test]
 fn the_walkthrough_passes() {
     let project = Loremaster::new().pack(cove::pack()).assemble().unwrap();
-    let (id, walk) = &project.walkthroughs[0];
-    let result = run_walkthrough(world(), walk, id);
-    assert!(
-        result.passed(),
-        "{:#?}\n{}",
-        result.failures,
-        result.transcript
-    );
+    assert!(!project.walkthroughs.is_empty());
+    for (id, walk) in &project.walkthroughs {
+        let result = run_walkthrough(world(), walk, id);
+        assert!(
+            result.passed(),
+            "{:#?}\n{}",
+            result.failures,
+            result.transcript
+        );
+    }
 }
 
 #[test]
@@ -107,16 +109,35 @@ fn the_later_pack_gives_the_instance() {
     first
         .rule("a", on::start())
         .effect(Effect::Call(loremaster::dsl::model::Id::new("a#rust")));
-    first.register(RustBlock::new("a", |cx: &mut Cx<'_>| {
+    first.register_block(RustBlock::new("a", |cx: &mut Cx<'_>| {
         cx.say("one");
         Flow::Continue
     }));
     let mut second = Pack::new("second");
-    second.register(RustBlock::new("a", |cx: &mut Cx<'_>| {
+    second.register_block(RustBlock::new("a", |cx: &mut Cx<'_>| {
         cx.say("two");
         Flow::Continue
     }));
     let world = Loremaster::new().pack(first).pack(second).build().unwrap();
     let text = Session::new(Arc::new(world)).start().plain_text();
     assert!(text.contains("two") && !text.contains("one"), "{text}");
+}
+
+#[behavior(on = turn)]
+fn ping(cx: &mut Cx<'_>) {
+    cx.say("ping");
+}
+
+/// A `call` runs a behavior whatever its event filter says.
+#[test]
+fn a_call_ignores_the_filter() {
+    let mut p = Pack::new("p");
+    p.story("Ping", "hall");
+    p.room("hall", "Hall").text("A hall.");
+    p.rule("a", on::start())
+        .effect(Effect::Call(loremaster::dsl::model::Id::new("ping")));
+    p.register(Ping);
+    let world = Loremaster::new().pack(p).build().unwrap();
+    let text = Session::new(Arc::new(world)).start().plain_text();
+    assert!(text.contains("ping"), "{text}");
 }

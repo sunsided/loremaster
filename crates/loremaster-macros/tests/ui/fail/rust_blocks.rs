@@ -28,4 +28,25 @@ world! {
     }
 }
 
+world! {
+    pack two_in_a_step;
+    story "T" { start: a }
+    room a "A" {}
+    machine m starts x {
+        state x;
+        state y;
+        x -> y on turn {
+            rust |cx| { cx.say("one"); }
+            rust |cx| { cx.say("two"); }
+        }
+    }
+}
+
+world! {
+    pack call_an_instance;
+    story "T" { start: a }
+    room a "A" {}
+    rule r on turn { call bell; }
+}
+
 fn main() {}

@@ -152,7 +152,9 @@ pub struct Pack {
     pub warnings: Vec<Diagnostic>,
     /// Rust values that the pack hands to the runtime: loremaster-dsl keeps
     /// the instance of each Rust behavior here, as an
-    /// `Arc<dyn loremaster_runtime::Behavior>`. The project does not read them.
+    /// `Arc<dyn loremaster_runtime::Behavior>`. Add them with its
+    /// `BuildPack::register`; `Loremaster::build` ignores any other value.
+    /// The project does not read them.
     pub instances: Vec<std::sync::Arc<dyn std::any::Any + Send + Sync>>,
 }
 

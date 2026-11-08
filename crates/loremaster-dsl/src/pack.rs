@@ -3,12 +3,12 @@
 
 use crate::convert::id;
 use crate::{
-    DialogueBuilder, EndingBuilder, MachineBuilder, RoomBuilder, RuleBuilder, StoryBuilder,
-    ThingBuilder, ThreadBuilder, TimerBuilder, VerbBuilder, WalkthroughBuilder,
+    DialogueBuilder, EndingBuilder, MachineBuilder, RoomBuilder, RuleBuilder, RustBlock,
+    StoryBuilder, ThingBuilder, ThreadBuilder, TimerBuilder, VerbBuilder, WalkthroughBuilder,
 };
 use loremaster_model::{EndingKind, EventPattern, Fragment, Frames, Note};
 use loremaster_project::{Origin, Pack};
-use loremaster_runtime::Behavior;
+use loremaster_runtime::{Behavior, Cx, Flow};
 use std::sync::Arc;
 
 /// The builder methods of a [`Pack`]. Each method adds one entity to the pack
@@ -76,6 +76,12 @@ pub trait BuildPack {
     /// registers it in the world.
     #[track_caller]
     fn register(&mut self, behavior: impl Behavior + 'static) -> &mut Self;
+    /// The behavior of a `rust` block. It belongs to its rule, which a later
+    /// pack may replace, so it has no origin and `assemble` does not call it
+    /// a duplicate. The later pack's block runs.
+    fn register_block<F>(&mut self, block: RustBlock<F>) -> &mut Self
+    where
+        F: Fn(&mut Cx<'_>) -> Flow + Send + Sync + 'static;
 }
 
 impl BuildPack for Pack {
@@ -151,13 +157,17 @@ impl BuildPack for Pack {
     #[track_caller]
     fn register(&mut self, behavior: impl Behavior + 'static) -> &mut Self {
         let shared: Arc<dyn Behavior> = Arc::new(behavior);
-        // A `rust` block belongs to its rule, which may be replaced: it has no
-        // origin of its own, so `assemble` does not call it a duplicate.
-        if shared.id().ends_with("#rust") {
-            self.behaviors.push(id(shared.id()));
-        } else {
-            self.behavior(shared.id());
-        }
+        self.behavior(shared.id());
+        self.instances.push(Arc::new(shared));
+        self
+    }
+
+    fn register_block<F>(&mut self, block: RustBlock<F>) -> &mut Self
+    where
+        F: Fn(&mut Cx<'_>) -> Flow + Send + Sync + 'static,
+    {
+        self.behaviors.push(id(block.id()));
+        let shared: Arc<dyn Behavior> = Arc::new(block);
         self.instances.push(Arc::new(shared));
         self
     }

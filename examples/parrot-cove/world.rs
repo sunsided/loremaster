@@ -32,7 +32,9 @@ impl Behavior for Bell {
     }
 
     fn manifest(&self) -> Manifest {
-        Manifest::new().events([loremaster::dsl::runtime::EventKind::Turn])
+        Manifest::new()
+            .events([loremaster::dsl::runtime::EventKind::Turn])
+            .reads(["turns"])
     }
 
     fn handle(&self, _: &Event, cx: &mut Cx<'_>) -> Flow {
@@ -78,7 +80,7 @@ world! {
     test weighing "Weigh the gold" {
         "take gold";
         weigh sees "It reads 3.";
-        pull sees "The sluice grinds open.";
+        pull sees "Turn ";
         expect scale.weight == 3, sluice == open;
     }
 }

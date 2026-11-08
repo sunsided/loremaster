@@ -672,7 +672,7 @@ fn rust_blocks(list: &[Effect]) -> TokenStream {
         let owner = s(&r.owner, span);
         let (cx, body) = (&r.cx, &r.body);
         out.extend(quote_spanned!(span=>
-            #p.register(::loremaster::dsl::RustBlock::new(
+            #p.register_block(::loremaster::dsl::RustBlock::new(
                 #owner,
                 |#cx: &mut ::loremaster::dsl::runtime::Cx<'_>| -> ::loremaster::dsl::runtime::Flow {
                     ::loremaster::dsl::IntoFlow::into_flow(#body)

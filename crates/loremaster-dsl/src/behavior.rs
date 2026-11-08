@@ -21,9 +21,10 @@ impl IntoFlow for () {
     }
 }
 
-/// The behavior of a `rust |cx| { .. }` block in a rule. Its id is
-/// `<rule>#rust`, and the rule calls it with `call: <rule>#rust` at the
-/// place of the block. It handles only that call.
+/// The behavior of a `rust |cx| { .. }` block in a rule or a machine step.
+/// Its id is `<rule>#rust` (`<machine>#<n>#rust` for a step), and the rule
+/// calls it with a `call` effect at the place of the block. It handles only
+/// the call of its own rule; a call from another rule does nothing.
 pub struct RustBlock<F> {
     id: String,
     owner: String,

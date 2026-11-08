@@ -112,28 +112,19 @@ fn item(input: ParseStream) -> Result<Item> {
         }),
         "behavior" => {
             name(input)?;
-            let expr: syn::Expr = input.parse()?;
-            semi(input)?;
             // A lone lowercase word is an id; anything else is the instance.
-            match &expr {
-                syn::Expr::Path(p)
-                    if p.qself.is_none()
-                        && p.path.leading_colon.is_none()
-                        && p.path.segments.len() == 1
-                        && p.path.segments[0].arguments.is_none()
-                        && p.path.segments[0]
-                            .ident
-                            .to_string()
-                            .starts_with(|c: char| c.is_ascii_lowercase() || c == '_') =>
-                {
-                    let ident = &p.path.segments[0].ident;
-                    Item::Behavior(Name {
-                        value: unraw(ident),
-                        span: ident.span(),
-                    })
-                }
-                _ => Item::Register(expr),
-            }
+            let fork = input.fork();
+            let lone = name(&fork).is_ok_and(|n| {
+                n.value
+                    .starts_with(|c: char| c.is_ascii_lowercase() || c == '_')
+            }) && fork.peek(Token![;]);
+            let item = if lone {
+                Item::Behavior(name(input)?)
+            } else {
+                Item::Register(input.parse()?)
+            };
+            semi(input)?;
+            item
         }
         "texts" => {
             return Err(unsupported(
@@ -1343,7 +1334,7 @@ fn own_rust(effects: &mut [Effect], owner: Option<&str>) -> Result<()> {
             if seen {
                 return Err(Error::new(
                     block.cx.span(),
-                    "a rule has one `rust` block at most; put the code into the first one",
+                    "a rule or machine step has one `rust` block at most; put the code into the first one",
                 ));
             }
             seen = true;
@@ -1524,9 +1515,16 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
             ));
         }
         _ => {
+            let last = if dialogue {
+                " or `call`"
+            } else {
+                ", `call` or `rust`"
+            };
             return Err(Error::new(
                 word.span,
-                "expected an effect: `line`, `set`, `add`, `calc`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel`, `call` or `rust`",
+                format!(
+                    "expected an effect: `line`, `set`, `add`, `calc`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel`{last}"
+                ),
             ));
         }
     };

@@ -262,6 +262,13 @@ fn rust_hint(message: &str, has_story: bool) -> String {
             )
         };
     }
+    if let Some(rest) = message.strip_prefix("`call: ")
+        && let Some((id, _)) = rest.split_once("` names no behavior")
+    {
+        return format!(
+            "`call: {id}` names no behavior of this block; `behavior <expr>;` does not tell the macro its id, so write `extern {{ behavior {id}; }}` for that or for one of another pack"
+        );
+    }
     for kind in ["room", "thing", "timer", "ending", "verb"] {
         if let Some(rest) = message.strip_prefix(&format!("unknown {kind} `"))
             && let Some(id) = rest.strip_suffix('`')

@@ -180,7 +180,8 @@
 //! - `rust |cx| { .. }` as an effect in a rule or a machine step, one per
 //!   rule or step: the macro makes the behavior `<rule>#rust` (`<machine>#<n>#rust`
 //!   for a step) and puts `call: <rule>#rust` at the place of the block. The
-//!   block gives a `Flow` or `()`.
+//!   block's last expression gives a `Flow` or `()`; an early `return` gives
+//!   a `Flow`.
 //!
 //! Rust code follows the determinism rules of the session: change the world
 //! only through `Cx`, take random numbers only from `Cx::roll`, and use no
@@ -232,9 +233,9 @@ pub fn world(input: TokenStream) -> TokenStream {
 /// struct (`parrot` makes `Parrot`) with a `Behavior` impl. The id is the
 /// function name, `description()` is the doc comment, and `on` is the event
 /// filter of the manifest: `on = turn`, `on = [turn, enter]`, or nothing for
-/// every event. The function runs only for those kinds, also when a rule
-/// calls it (`call` is a kind). It takes `cx: &mut Cx<'_>` and returns a
-/// `Flow` or `()`.
+/// every event. A `call` effect runs it whatever the filter says. It takes
+/// `cx: &mut Cx<'_>` and returns a `Flow` or `()`. The attribute registers
+/// nothing: name the struct in a block with `behavior Parrot;`.
 ///
 /// ```
 /// use loremaster::prelude::*;
