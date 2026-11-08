@@ -22,7 +22,7 @@ export class Project {
 	files = $state<SourceFile[]>([]);
 	/** The file of each entity, from the last good build of the game. */
 	origins = $state<Record<string, string>>({});
-	/** The parts made in Rust (from `packs/*.json`), from the last good build. */
+	/** The parts made in Rust (from `packs/*.yaml`), from the last good build. */
 	rustParts = $state.raw<Record<string, RustPart>>({});
 	storage = $state<Storage>('memory');
 	/** The name of the linked folder. */

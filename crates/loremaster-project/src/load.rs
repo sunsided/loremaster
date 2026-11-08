@@ -158,15 +158,26 @@ pub fn load(files: Vec<SourceFile>) -> Result<Project, Vec<Diagnostic>> {
     assemble(packs_of(files)?)
 }
 
-/// The packs of a folder: each exported Rust pack (`packs/*.json`) in path
+/// The packs of a folder: each exported Rust pack (`packs/*.yaml`) in path
 /// order, then the YAML files.
 pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diagnostic>> {
     files.sort_by(|a, b| a.path.cmp(&b.path));
     let mut packs = Vec::new();
     let mut errors = Vec::new();
+    // A file in `packs/` that is not read would drop Rust parts without a word.
+    for f in files.iter().filter(|f| f.path.starts_with("packs/")) {
+        let message = if is_exported_pack(&f.path) {
+            continue;
+        } else if is_old_json_pack(&f.path) {
+            "an old JSON pack: packs are YAML now; run `loremaster export-pack` again, which removes this file"
+        } else {
+            "not read: an exported pack is `packs/<name>.yaml`, at the top of `packs/`; move or delete this file"
+        };
+        errors.push(Diagnostic::error(&f.path, "", message.to_string()));
+    }
     for f in files.iter().filter(|f| is_exported_pack(&f.path)) {
-        // Every export has a name, so `{}` is not one.
-        match serde_json::from_str::<Pack>(&f.text) {
+        // Every export has a name, so an empty file is not one.
+        match serde_saphyr::from_str::<Pack>(&f.text) {
             Ok(pack) if !pack.name.is_empty() => packs.push(pack),
             found => errors.push(Diagnostic::error(
                 &f.path,
@@ -191,14 +202,21 @@ pub(crate) fn packs_of(mut files: Vec<SourceFile>) -> Result<Vec<Pack>, Vec<Diag
     Ok(packs)
 }
 
+/// Only the top level of `packs/`, which `export_packs` writes and cleans.
 fn is_exported_pack(path: &str) -> bool {
-    path.starts_with("packs/") && path.ends_with(".json")
+    path.strip_prefix("packs/")
+        .is_some_and(|name| !name.contains('/') && yaml_stem(name).is_some())
+}
+
+fn is_old_json_pack(path: &str) -> bool {
+    path.strip_prefix("packs/")
+        .is_some_and(|name| !name.contains('/') && name.ends_with(".json"))
 }
 
 /// The parts of a project that one source gives (DS-1): a YAML folder, and
 /// later a `world!` block or a builder function. [`assemble`] joins packs.
 ///
-/// As JSON it is the file that `loremaster export-pack` writes. The parts
+/// As YAML it is the file that `loremaster export-pack` writes. The parts
 /// that only a running program can have (`files`, `warnings`, `overrides`,
 /// `instances`) are not in it.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -314,11 +332,11 @@ impl Pack {
         }
     }
 
-    /// The pack as the JSON of `loremaster export-pack`, with its hashes.
-    pub fn to_json(&mut self) -> String {
+    /// The pack as the YAML of `loremaster export-pack`, with its hashes.
+    pub fn to_yaml(&mut self) -> String {
         self.stamp_hashes();
         // A pack is plain data with string keys, as in `model_hash`.
-        serde_json::to_string_pretty(self).expect("a pack always serializes to JSON")
+        serde_saphyr::to_string(self).expect("a pack always serializes to YAML")
     }
 
     /// A pack from the files of a YAML folder. Paths use `/` and are relative
@@ -358,6 +376,10 @@ impl Pack {
                 continue;
             };
             let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
+            // Exported Rust packs, read by `packs_of`.
+            if dir == "packs" || dir.starts_with("packs/") {
+                continue;
+            }
             if dir.is_empty() && stem != "story" {
                 errors.push(unknown_file(path));
                 continue;
@@ -604,19 +626,20 @@ impl Pack {
                 }
                 _ => {}
             }
-        }
-        // An `id:` in the body that is not the overridden one would leave the
-        // Rust part in place.
-        for o in &overrides {
-            let defined = origins.get(&o.base.entity).and_then(Origin::yaml_path);
-            if defined != Some(o.path.as_str()) && !errors.iter().any(|d| d.file == o.path) {
-                errors.push(parse_diagnostic(
-                    &o.path,
-                    &format!(
-                        "this file overrides `{}`, but does not define it",
-                        o.base.entity
-                    ),
-                ));
+            // An `id:` in the body that is not the overridden one would leave
+            // the Rust part in place. Checked now, before a later file with
+            // the same entity takes its origin.
+            if let Some(o) = overrides.last().filter(|o| o.path == path) {
+                let defined = origins.get(&o.base.entity).and_then(Origin::yaml_path);
+                if defined != Some(path) && !errors.iter().any(|d| d.file == path) {
+                    errors.push(parse_diagnostic(
+                        path,
+                        &format!(
+                            "this file overrides `{}`, but does not define it",
+                            o.base.entity
+                        ),
+                    ));
+                }
             }
         }
 
@@ -1311,7 +1334,8 @@ pub(crate) fn safe_asset_path(path: &str) -> bool {
         })
 }
 
-/// Read every YAML file under a project folder.
+/// Read every YAML file under a project folder, and old JSON packs under
+/// `packs/`, so that loading can say to export them again.
 #[cfg(not(target_family = "wasm"))]
 pub fn read_dir(root: &std::path::Path) -> std::io::Result<Vec<SourceFile>> {
     fn walk(

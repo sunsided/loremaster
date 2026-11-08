@@ -79,10 +79,11 @@ impl Loremaster {
         self
     }
 
-    /// Write each Rust pack to `<dir>/packs/<name>.json`, for the generic
+    /// Write each Rust pack to `<dir>/packs/<name>.yaml`, for the generic
     /// editor (`loremaster export-pack`), with the git commit of `dir` when
-    /// there is one. Other `.json` files in `packs/` are removed: the loader
-    /// reads every one. Returns the paths.
+    /// there is one. `packs/` belongs to this export: after the new packs are
+    /// written, the other `.yaml` and `.yml` files there are removed, because
+    /// the loader reads every one, and old `.json` packs too. Returns the paths.
     #[cfg(not(target_family = "wasm"))]
     pub fn export_packs(
         &self,
@@ -105,7 +106,7 @@ impl Loremaster {
             let mut pack = pack.as_ref().clone();
             pack.commit.clone_from(&commit);
             // A world! pack is named after its module path.
-            let path = out.join(format!("{}.json", pack.name.replace("::", "-")));
+            let path = out.join(format!("{}.yaml", pack.name.replace("::", "-")));
             if packs.iter().any(|(p, _)| *p == path) {
                 return Err(std::io::Error::other(format!(
                     "two packs are named `{}`",
@@ -115,18 +116,27 @@ impl Loremaster {
             packs.push((path, pack));
         }
         std::fs::create_dir_all(&out)?;
-        for entry in std::fs::read_dir(&out)? {
-            let path = entry?.path();
-            let stale = path.extension().is_some_and(|e| e == "json")
-                && !packs.iter().any(|(p, _)| *p == path);
-            if stale {
-                std::fs::remove_file(&path)?;
-            }
-        }
+        // Each pack goes to a temporary file first and is renamed into place,
+        // so a failed export never leaves a half-written pack.
         let mut paths = Vec::new();
         for (path, mut pack) in packs {
-            std::fs::write(&path, pack.to_json())?;
+            let tmp = path.with_extension("yaml.tmp");
+            let written =
+                std::fs::write(&tmp, pack.to_yaml()).and_then(|()| std::fs::rename(&tmp, &path));
+            if let Err(e) = written {
+                let _ = std::fs::remove_file(&tmp);
+                return Err(e);
+            }
             paths.push(path);
+        }
+        for entry in std::fs::read_dir(&out)? {
+            let path = entry?.path();
+            let pack = path
+                .extension()
+                .is_some_and(|e| e == "yaml" || e == "yml" || e == "json");
+            if pack && !paths.contains(&path) {
+                std::fs::remove_file(&path)?;
+            }
         }
         Ok(paths)
     }

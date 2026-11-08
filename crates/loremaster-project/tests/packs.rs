@@ -275,13 +275,26 @@ fn the_model_hash_does_not_depend_on_the_order_of_files_or_packs() {
 }
 
 #[test]
-fn a_json_file_that_is_not_an_export_is_an_error() {
-    for text in ["{}", r#"{ "name": "w", "roomz": [] }"#] {
+fn a_yaml_file_that_is_not_an_export_is_an_error() {
+    for text in ["rooms: []\n", "name: w\nroomz: []\n"] {
         let files = vec![SourceFile {
-            path: "packs/w.json".into(),
+            path: "packs/w.yaml".into(),
             text: text.into(),
         }];
         let found = messages(load(files));
         assert!(found[0].starts_with("not an exported pack"), "{found:?}");
     }
+}
+
+#[test]
+fn an_old_json_pack_says_to_export_again() {
+    let files = vec![SourceFile {
+        path: "packs/w.json".into(),
+        text: r#"{ "name": "w" }"#.into(),
+    }];
+    let found = messages(load(files));
+    assert!(
+        found[0].contains("run `loremaster export-pack` again"),
+        "{found:?}"
+    );
 }

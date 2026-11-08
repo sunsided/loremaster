@@ -172,9 +172,9 @@ fn a_yaml_only_load_keeps_the_override_with_a_warning() {
 fn the_exported_pack_gives_the_same_model() {
     let mut pack = world::pack();
     let hash = hash_of(&pack, "room:shore");
-    let exported = pack.to_json();
+    let exported = pack.to_yaml();
     let files = vec![SourceFile {
-        path: "packs/world.json".into(),
+        path: "packs/world.yaml".into(),
         text: exported,
     }];
     let project = load(files).expect("loads");
@@ -240,17 +240,108 @@ fn an_override_whose_body_has_another_id_is_an_error() {
 
 #[test]
 fn an_export_removes_stale_packs() {
-    let dir = std::env::temp_dir().join(format!("loremaster-export-{}", std::process::id()));
-    std::fs::create_dir_all(dir.join("packs")).unwrap();
-    std::fs::write(dir.join("packs/old.json"), "{}").unwrap();
+    /// Removes the folder also when an assert fails.
+    struct Gone(std::path::PathBuf);
+    impl Drop for Gone {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let dir = Gone(std::env::temp_dir().join(format!("loremaster-export-{}", std::process::id())));
+    let _ = std::fs::remove_dir_all(&dir.0);
+    std::fs::create_dir_all(dir.0.join("packs")).unwrap();
+    std::fs::write(dir.0.join("packs/old.yaml"), "name: old\n").unwrap();
+    std::fs::write(dir.0.join("packs/older.json"), "{}").unwrap();
     let paths = Loremaster::new()
         .pack(world::pack())
-        .export_packs(&dir)
+        .export_packs(&dir.0)
         .unwrap();
-    let left: Vec<_> = std::fs::read_dir(dir.join("packs"))
+    let left: Vec<_> = std::fs::read_dir(dir.0.join("packs"))
         .unwrap()
         .map(|e| e.unwrap().path())
         .collect();
-    std::fs::remove_dir_all(&dir).unwrap();
     assert_eq!(left, paths);
+}
+
+#[test]
+fn a_second_file_of_the_overridden_entity_does_not_blame_the_override() {
+    let mut files = override_files();
+    let shore = files.iter().find(|f| f.path == "rooms/shore.yaml").unwrap();
+    // Sorted after the override, so its origin is the last one.
+    files.push(SourceFile {
+        path: "rooms/shore.yml".into(),
+        text: shore
+            .text
+            .lines()
+            .skip_while(|l| !l.starts_with("id:"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    });
+    let found = Loremaster::new()
+        .pack(world::pack())
+        .yaml_files(files)
+        .check()
+        .err()
+        .unwrap_or_default();
+    assert!(
+        !found
+            .iter()
+            .any(|d| d.message.contains("but does not define it")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_file_in_packs_that_is_not_read_is_an_error() {
+    for path in [
+        "packs/backup/old.yaml",
+        "packs/backup/old.json",
+        "packs/notes.txt",
+    ] {
+        let files = vec![
+            SourceFile {
+                path: "packs/world.yaml".into(),
+                text: world::pack().to_yaml(),
+            },
+            SourceFile {
+                path: path.into(),
+                text: "{}".into(),
+            },
+        ];
+        let found = load(files).expect_err(path);
+        assert!(
+            found
+                .iter()
+                .any(|d| d.file == path && d.message.starts_with("not read")),
+            "{found:?}"
+        );
+    }
+    // A `.yml` export is read like a `.yaml` one.
+    let files = vec![SourceFile {
+        path: "packs/world.yml".into(),
+        text: world::pack().to_yaml(),
+    }];
+    load(files).expect("loads");
+}
+
+#[test]
+fn words_that_yaml_1_1_reads_as_booleans_come_back_as_text() {
+    let mut pack = world::pack();
+    pack.rooms[0].name = "on".into();
+    pack.rooms[0].tags = vec!["n".into(), "y".into(), "yes".into(), "off".into()];
+    let walk: loremaster::dsl::model::Walkthrough = serde_json::from_value(serde_json::json!({
+        "steps": ["n", "y", "no", "on"]
+    }))
+    .unwrap();
+    pack.walkthroughs
+        .push(("tests/walk.yaml".into(), walk.clone()));
+    let files = vec![SourceFile {
+        path: "packs/world.yaml".into(),
+        text: pack.to_yaml(),
+    }];
+    let project = load(files).expect("loads");
+    let room = project.story.room("shore").unwrap();
+    assert_eq!(room.name, "on");
+    assert_eq!(room.tags, ["n", "y", "yes", "off"]);
+    assert_eq!(project.walkthroughs[0].1, walk);
 }

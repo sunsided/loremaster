@@ -15,11 +15,12 @@ use std::fmt::Write;
 pub fn world_snippet(pack: &Pack, key: &str) -> Option<String> {
     let (kind, id) = key.split_once(':')?;
     // `world!` reads an id as a Rust identifier and has no quoted form.
+    // shortcut: ASCII only, so a non-ASCII identifier is ported by hand too.
     let ident = id
         .chars()
         .next()
-        .is_some_and(|c| c.is_alphabetic() || c == '_')
-        && id.chars().all(|c| c.is_alphanumeric() || c == '_');
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
     let body = match kind {
         _ if !ident => format!("    // port by hand: {key}: {}\n", pack.entity_value(key)?),
         "room" => room(pack.rooms.iter().find(|e| e.id.as_str() == id)?),
@@ -271,6 +272,11 @@ mod tests {
             serde_json::from_value(serde_json::json!({ "id": "front-door", "name": "Door" }))
                 .unwrap();
         let s = world_snippet(&pack_with(room), "room:front-door").unwrap();
+        // Alphanumeric, but no Rust identifier.
+        let odd: Room =
+            serde_json::from_value(serde_json::json!({ "id": "a\u{b2}", "name": "A" })).unwrap();
+        let odd = world_snippet(&pack_with(odd), "room:a\u{b2}").unwrap();
+        assert!(odd.contains("// port by hand"), "{odd}");
         assert!(
             s.starts_with("world! {\n    // port by hand: room:front-door:"),
             "{s}"

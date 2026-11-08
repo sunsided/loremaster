@@ -105,6 +105,35 @@ fn two_rules_with_one_id_are_an_error() {
 }
 
 #[test]
+fn two_dialogues_or_verbs_with_one_id_are_an_error() {
+    let talk = "id: talk\nwith: lens\nstart: hello\nnodes:\n  hello:\n    say: Hi.\n";
+    let verb = "id: polish\nlabel: Polish\nwords: [polish]\ndefault: \"Nothing happens.\"\n";
+    let mut files = lighthouse_with("dialogues/a.yaml", talk);
+    for (path, text) in [
+        ("dialogues/b.yaml", talk),
+        ("verbs/a.yaml", verb),
+        ("verbs/b.yaml", verb),
+    ] {
+        files.push(SourceFile {
+            path: path.into(),
+            text: text.into(),
+        });
+    }
+    let found = messages(files);
+    for twice in [
+        "dialogue `talk` is defined twice",
+        "verb `polish` is defined twice",
+    ] {
+        assert!(
+            found
+                .iter()
+                .any(|(kind, _, m)| *kind == Severity::Error && m.contains(twice)),
+            "{twice}: {found:#?}"
+        );
+    }
+}
+
+#[test]
 fn three_rules_with_one_id_are_one_error() {
     // The origin of an id is its last file: one error there, not one per
     // copy at a file that is not its own.

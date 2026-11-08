@@ -22,7 +22,9 @@ export function yamlPath(key: string): string | null {
 	const at = key.indexOf(':');
 	const folder = at > 0 ? FOLDERS[key.slice(0, at)] : undefined;
 	const id = key.slice(at + 1);
-	return folder && id && !/[/\\]/.test(id) && !id.startsWith('.') ? `${folder}/${id}.yaml` : null;
+	// A file name on every system: no `:` or `/`, no leading or trailing dot, no reserved Windows name.
+	const safe = /^[\w-]([\w.-]*[\w-])?$/.test(id) && !/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(id);
+	return folder && safe ? `${folder}/${id}.yaml` : null;
 }
 
 /** Eject works in the folders of `replace: true`, which rules do not have. */
