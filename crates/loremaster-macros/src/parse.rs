@@ -788,7 +788,7 @@ fn when_then(input: ParseStream) -> bool {
     let mut after_dot = false;
     while !fork.is_empty() {
         // `x.then` is a property, not the marker.
-        if peek_kw(&fork, "then") && !after_dot {
+        if !after_dot && peek_marker(&fork) {
             return true;
         }
         after_dot = fork.peek(Token![.]);
@@ -800,6 +800,22 @@ fn when_then(input: ParseStream) -> bool {
         }
     }
     false
+}
+
+/// The `then` of a segment condition: a segment follows it. Any other
+/// `then` is an operand, the id of a room, an enum value or a state
+/// (`when in then then "…"`). Of two in a row, the second is the marker,
+/// so a speaker `then` needs a condition that does not end in `then`.
+fn peek_marker(input: ParseStream) -> bool {
+    let fork = input.fork();
+    peek_kw(&fork, "then")
+        && fork.call(Ident::parse_any).is_ok()
+        && !peek_marker(&fork)
+        && (fork.peek(LitStr)
+            || peek_kw(&fork, "narrate")
+            || peek_kw(&fork, "says")
+            || peek_kw(&fork, "when")
+            || peek_speaker(&fork))
 }
 
 fn segment(input: ParseStream) -> Result<Segment> {
@@ -831,7 +847,7 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
         let after_dot = std::cell::Cell::new(false);
         let cond = parse_until(input, |i| {
             let dot = after_dot.replace(i.peek(Token![.]));
-            (!dot && peek_kw(i, "then")) || i.peek(Token![;])
+            (!dot && peek_marker(i)) || i.peek(Token![;])
         })?;
         keyword(input, "then").map_err(|e| {
             Error::new(
