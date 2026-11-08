@@ -1,0 +1,108 @@
+The county sent you to look at the toll books. The lock-keeper did not expect you before morning.
+
+Kitchen
+
+A low room under the lock house, with a black iron stove against the wall. Water knocks against the lock gate.
+
+The lock-keeper sits by the stove and does not look up.
+
+Exits: up, east.
+
+> examine stove
+examine stove
+
+The stove is cold.
+
+"Do not touch the stove," the lock-keeper says.
+
+> up
+up
+
+Keeper's Room
+
+A narrow room under the roof. A cot, a chair, and an iron hook by the door.
+
+A windlass hangs on the hook by the door.
+
+Exits: down.
+
+> take windlass
+take windlass
+
+Taken.
+
+> down
+down
+
+Kitchen
+
+A low room under the lock house, with a black iron stove against the wall. Somewhere a rope creaks.
+
+The lock-keeper sits by the stove and does not look up.
+
+Exits: up, east.
+
+> e
+e
+
+Lock Chamber
+
+Stone walls drop into the lock. Black water fills the chamber to the brim.
+
+Exits: west.
+
+> open lower paddles
+open lower paddles
+
+You fit the windlass and turn. Water roars out under the lower gate.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+The chamber is empty. Wet ladder rungs go down into the dark.
+
+> open gear housing
+open gear housing
+
+You open the gear housing. The gear housing contains an oilcloth packet.
+
+> take pages
+take pages
+
+Taken.
+
+> w
+w
+
+Kitchen
+
+A low room under the lock house, with a black iron stove against the wall. Water knocks against the lock gate.
+
+The lock-keeper sits by the stove and does not look up.
+
+Exits: up, east.
+
+> examine stove
+examine stove
+
+The stove is cold.
+
+"Do not touch the stove," the lock-keeper says.
+
+> accuse keeper
+accuse keeper
+
+You have no reason to accuse that.
+
+You lay the pages on the table. The lock-keeper looks at them for a long time.
+
+Committed for trial
+
+At dawn the county takes the lock-keeper to town. The pages go with him, in your coat.

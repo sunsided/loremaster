@@ -70,7 +70,7 @@ tasks:
   walkthroughs:
     desc: Run the walkthrough tests (tests/*.yaml) of every example
     cmds:
-      - for: [cantina, lighthouse, tower, zork1]
+      - for: [cantina, lighthouse, tower, zork1, lock-keeper-slice/demo]
         cmd: "{{.CARGO}} run -q -p loremaster --no-default-features -- test examples/{{.ITEM}}"
 
   explore:

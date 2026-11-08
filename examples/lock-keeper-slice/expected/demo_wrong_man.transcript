@@ -1,0 +1,49 @@
+Autumn 1923. At half past nine they found Amos Reed, the lock-keeper, drowned in his own lock. It looks like a fall from the gate in the dark. You are the county constable. The coroner comes at three. By then you need a case, or it goes down as an accident.
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
+
+Exits: west, north, south.
+
+> n
+n
+
+Lock Side
+
+The lock gates stand black against the sky, and a gangplank leads east to a barge. Black water fills the chamber to the brim.
+
+Exits: south, east.
+
+> e
+e
+
+Barge Cabin
+
+The cabin of the *Kestrel*: a bunk, a stove the size of a hatbox, the smell of coal and wet rope. A tarpaulin covers something in the corner.
+
+Silas Crane, master of the *Kestrel*, is here, with a mug of something.
+
+Exits: west.
+
+> examine casks
+examine casks
+
+Six small casks of brandy under a tarpaulin, with no duty stamp. Amos would have known.
+
+> talk to crane
+talk to crane
+
+"Constable. I wait for the dawn and the lock, same as every man here."
+
+> 2
+"What is under the tarpaulin?"
+
+"Brandy. Amos knew, and he said nothing for a bottle at Christmas. I did not kill him for it."
+
+> accuse crane
+accuse crane
+
+The wrong person
+
+The coroner hears your case, and the real killer hears it too. Ivo Marsh catches the morning coach. The brandy on the *Kestrel* was a crime, but not this one.
