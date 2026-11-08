@@ -10,7 +10,7 @@ steps:
       - end: committed
   - id: charged
     at: "03:00"
-    when: means == proven and opportunity == proven and motive != open and not (motive == strong and carried(pages))
+    when: means == proven and opportunity == proven and (motive == weak or (motive == strong and not carried(pages)))
     then:
       - say: "The coroner's trap stops on the towpath. He reads your notebook, frowns, and sends for the county."
       - end: charged
