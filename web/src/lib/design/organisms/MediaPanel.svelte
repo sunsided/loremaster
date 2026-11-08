@@ -110,6 +110,8 @@
 	}
 	.hotspot {
 		position: absolute;
+		/* The thicker border on hover and focus stays inside the `rect`. */
+		box-sizing: border-box;
 		display: flex;
 		align-items: flex-end;
 		justify-content: center;
