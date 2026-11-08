@@ -576,7 +576,7 @@ A door can be concealed too: the player can not name it, but the exit stays. Goi
 
 ### Carry limit
 
-`carry_limit: 4` in story.yaml is the number of things that the player can hold. A `take` beyond it says "Your hands are full." Things in a carried bag do not count, so a bag lets the player carry more. A rule that moves a thing to `carried` does not check the limit. In a story with a limit, the explorer drops what the player holds when the hands are full, and it tries a `take` with full hands only when a rule listens to `take`.
+`carry_limit: 4` in story.yaml is the number of things that the player can hold. A `take` beyond it says "Your hands are full." Things in a carried bag do not count, so a bag lets the player carry more. A concealed thing in the hands does not count either, since the player can not name it to drop it. A rule that moves a thing to `carried` does not check the limit. In a story with a limit, the explorer drops what the player holds when the hands are full, and it tries a `take` with full hands only when a rule listens to `take`.
 
 ## Action cost
 

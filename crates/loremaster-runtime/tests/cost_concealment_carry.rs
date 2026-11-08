@@ -405,6 +405,9 @@ fn a_concealed_thing_in_the_hands_does_not_fill_them() {
     authoring::start(&mut game);
     input(&mut game, "pull rug");
     assert_eq!(game.state().locations["key"].to_word(), "carried");
+    assert!(game.state().is_concealed("key"));
+    let drop = input(&mut game, "drop key");
+    assert!(!drop.contains("Dropped"), "{drop}");
     let coin = input(&mut game, "take coin");
     assert!(coin.contains("Taken"), "{coin}");
 }

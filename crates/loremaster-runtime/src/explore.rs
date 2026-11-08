@@ -131,6 +131,11 @@ fn reads_counters(game: &Game) -> bool {
 /// commands that can not change the state (examine with no rule, wait in a
 /// story without time rules) are left out, so the walk stays small. With a
 /// carry limit and full hands, `drop` frees a hand, so it is tried then.
+/// A pattern that matches the player's commands: no `actor`, or the player.
+fn for_player(p: &loremaster_model::CommandPattern) -> bool {
+    p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
+}
+
 fn commands(game: &Game) -> Vec<(String, Command)> {
     let world = game.world();
     let story = &world.story;
@@ -177,7 +182,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     // of the player, and an indirect object needs a direct one.
     for rule in &story.rules {
         if let EventPattern::Verb(p) = &rule.on
-            && p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
+            && for_player(p)
             && (p.direct.is_some() || p.indirect.is_none())
         {
             let objects: Vec<Id> = p.objects().cloned().collect();
@@ -208,7 +213,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     let take_rules = story.rules.iter().any(|r| {
         matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
             if p.verb.as_str() == "take"
-                && p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER))
+                && for_player(p))
     });
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();
