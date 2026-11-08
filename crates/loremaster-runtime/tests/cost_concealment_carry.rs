@@ -237,6 +237,71 @@ fn a_concealed_door_can_not_be_named() {
     assert!(!game.scene().things.iter().any(|t| t.id == "hatch"));
     let open = input(&mut game, "open hatch");
     assert!(!open.contains("You open"), "{open}");
+    // The exit stays, and going through does not name the door.
+    let go = input(&mut game, "go north");
+    assert_eq!(game.state().room.as_str(), "yard");
+    assert!(!go.contains("hatch"), "{go}");
+}
+
+#[test]
+fn a_locked_concealed_door_is_no_way() {
+    let hall = "name: Hall\ndescription: [\"A hall.\"]\nexits:\n  - { direction: north, to: yard, door: hatch }\n";
+    let mut game = play(world_with(
+        STORY,
+        &[
+            ("rooms/hall.yaml", hall),
+            (
+                "rooms/yard.yaml",
+                "name: Yard\ndescription: [\"A yard.\"]\n",
+            ),
+            (
+                "things/hatch.yaml",
+                "name: hatch\nlocation: { room: hall }\nlisted: false\nprops: { open: false, locked: true, concealed: true }\n",
+            ),
+        ],
+    ));
+    let go = input(&mut game, "go north");
+    assert!(go.contains("You can't go that way."), "{go}");
+    assert_eq!(game.state().room.as_str(), "hall");
+}
+
+#[test]
+fn the_explorer_takes_with_full_hands_when_a_rule_listens_to_take() {
+    // A check rule puts the coin down for any take, so `take gem` works with
+    // the coin in hand. The win rule names no thing either.
+    let rules = r#"
+- id: paid
+  on: { verb: [take, coin] }
+  then:
+    - set: { paid: true }
+- id: free_a_hand
+  on: { check: [take] }
+  when: carried(coin)
+  then:
+    - move: { coin: hall }
+- id: win
+  on: { verb: [take] }
+  when: paid and carried(gem)
+  then:
+    - end: won
+"#;
+    let story = format!("{STORY}vars:\n  - {{ id: paid, type: bool, initial: false }}\n");
+    let world = world_with(
+        &story,
+        &[
+            ("rules/rules.yaml", rules),
+            (
+                "things/gem.yaml",
+                "name: gem\nlocation: { room: hall }\nportable: true\n",
+            ),
+        ],
+    );
+    let found = explore(world, Budget::default());
+    assert_eq!(
+        found.endings[0].path,
+        ["take coin", "take gem"],
+        "{found:#?}"
+    );
 }
 
 #[test]

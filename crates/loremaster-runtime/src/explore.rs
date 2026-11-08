@@ -129,7 +129,8 @@ fn reads_counters(game: &Game) -> bool {
 /// The commands worth trying in a state: the actions that can move the story
 /// forward. Commands that only undo or repeat (drop, close, turn off, lock) and
 /// commands that can not change the state (examine with no rule, wait in a
-/// story without time rules) are left out, so the walk stays small.
+/// story without time rules) are left out, so the walk stays small. With a
+/// carry limit and full hands, `drop` frees a hand, so it is tried then.
 fn commands(game: &Game) -> Vec<(String, Command)> {
     let world = game.world();
     let story = &world.story;
@@ -196,6 +197,9 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         }
     }
     // The standard verbs that change state.
+    let take_rules = story.rules.iter().any(|r| {
+        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p) if p.verb.as_str() == "take")
+    });
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();
         if story.dialogue_with(id.as_str()).is_some() {
@@ -208,18 +212,19 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             game.state().location_of(id.as_str()),
             Some(Location::Carried)
         );
-        // With a carry limit, a full pair of hands refuses a take, and a drop
-        // frees a hand: it is no longer only an undo.
+        // With a carry limit, full hands refuse the default take, and a drop
+        // frees a hand: it is no longer only an undo. A rule on `take` can
+        // still handle a take with full hands.
         let full = story
             .carry_limit
             .is_some_and(|limit| game.state().held_count() >= limit);
-        if story.carry_limit.is_some() && carried {
+        if full && carried {
             out.push((
                 label("drop", std::slice::from_ref(&id)),
                 verb("drop", vec![id.clone()]),
             ));
         }
-        if t.portable && !carried && !full {
+        if t.portable && !carried && (!full || take_rules) {
             out.push((
                 label("take", std::slice::from_ref(&id)),
                 verb("take", vec![id.clone()]),

@@ -570,11 +570,11 @@ portable: true
 props: { concealed: true }
 ```
 
-A door can be concealed too: the player can not name it, but the exit stays. The explorer searches each thing that hides something it can find.
+A door can be concealed too: the player can not name it, but the exit stays. Going through it opens it without a note; while it is locked, the way is not there. To hide the exit as well, give it a `visible` condition. The explorer searches each thing that hides something it can find.
 
 ### Carry limit
 
-`carry_limit: 4` in story.yaml is the number of things that the player can hold. A `take` beyond it says "Your hands are full." Things in a carried bag do not count, so a bag lets the player carry more. A rule that moves a thing to `carried` does not check the limit. In a story with a limit, the explorer also tries to drop what the player holds, and it does not try a `take` with full hands.
+`carry_limit: 4` in story.yaml is the number of things that the player can hold. A `take` beyond it says "Your hands are full." Things in a carried bag do not count, so a bag lets the player carry more. A rule that moves a thing to `carried` does not check the limit. In a story with a limit, the explorer drops what the player holds when the hands are full, and it tries a `take` with full hands only when a rule listens to `take`.
 
 ## Action cost
 

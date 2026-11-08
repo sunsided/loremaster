@@ -1852,13 +1852,23 @@ impl Game {
         if let Some(door) = &exit.door {
             let the = self.the(door, false);
             let the_cap = self.the(door, true);
+            // A concealed door is not named: it opens without a note, and a
+            // locked one is no way at all.
+            let concealed = self.state.is_concealed(door.as_str());
             if !self.state.flag(&format!("{door}.open")) {
                 if self.state.flag(&format!("{door}.locked")) {
-                    turn.say(BlockKind::Response, format!("{the_cap} is locked."));
+                    let text = if concealed {
+                        "You can't go that way.".to_string()
+                    } else {
+                        format!("{the_cap} is locked.")
+                    };
+                    turn.say(BlockKind::Response, text);
                     return;
                 }
                 self.set_fact(turn, &format!("{door}.open"), Value::Bool(true));
-                turn.say(BlockKind::Note, format!("(first opening {the})"));
+                if !concealed {
+                    turn.say(BlockKind::Note, format!("(first opening {the})"));
+                }
             }
         }
         if !self.eval().holds_opt(&compiled.passable) {
