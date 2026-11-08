@@ -375,7 +375,9 @@ impl Session {
         let Some(before) = before else {
             return;
         };
-        if &before == self.game.state() {
+        // Hints change no state: a restart from the start state still
+        // has levels to bring back.
+        if &before == self.game.state() && revealed.as_ref().is_none_or(BTreeMap::is_empty) {
             return;
         }
         self.history.push_back((before, revealed));
