@@ -105,12 +105,13 @@ export class Workspace {
 	async importZip(file: File) {
 		const files = fromZip(new Uint8Array(await file.arrayBuffer()));
 		const game = await this.#build(files);
+		// The import replaces the story also when it does not build: the page then shows its problems
+		// (for example a drifted override), and export and reset work on the imported files.
+		await this.project.replaceAll(files);
 		if (!game) {
-			// No session: the page then shows the problems, for example a drifted override.
 			this.session = null;
 			return;
 		}
-		await this.project.replaceAll(files);
 		this.#adopt(game);
 		this.session = new Session(game);
 	}

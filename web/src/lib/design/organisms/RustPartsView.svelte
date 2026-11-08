@@ -27,8 +27,13 @@
 	let failure = $state<string | null>(null);
 
 	async function run(action: () => Promise<string | null>) {
-		failure = await action();
-		confirming = null;
+		try {
+			failure = await action();
+		} catch (e) {
+			failure = String(e instanceof Error ? e.message : e);
+		} finally {
+			confirming = null;
+		}
 	}
 
 	const entries = $derived(Object.entries(parts));
@@ -64,20 +69,20 @@ Override writes a YAML file that `assemble` compares with Rust, and asks first. 
 						{state === 'active' ? `Override in ${path}. Port it to the DSL with "loremaster codegen".` : `${path} is the same as Rust now, so it is no longer needed.`}
 					</p>
 					{#if state === 'no_longer_needed'}
-						<Button size="compact" onclick={() => run(() => ondelete(path))}>Delete the override</Button>
+						<Button size="compact" aria-label="Delete the override: {key}" onclick={() => run(() => ondelete(path))}>Delete the override</Button>
 					{/if}
 				{:else if !yaml && canOverride(key)}
 					{#if confirming === key}
-						<div class="confirm" role="group" aria-label="Confirm the override">
+						<div class="confirm" role="group" aria-label="Confirm the override of {key}">
 							<p>Override this Rust part with a YAML file? The file keeps the Rust value, and a check fails when Rust changes later.</p>
 							<Button size="compact" variant="primary" onclick={() => run(() => onoverride(key))}>Yes, override</Button>
 							<Button size="compact" variant="quiet" onclick={() => (confirming = null)}>Cancel</Button>
 						</div>
 					{:else}
 						<div class="actions">
-							<Button size="compact" onclick={() => (confirming = key)}>Override</Button>
+							<Button size="compact" aria-label="Override: {key}" onclick={() => (confirming = key)}>Override</Button>
 							{#if canEject(key)}
-								<Button size="compact" variant="quiet" onclick={() => run(() => oneject(key))}>Eject to YAML</Button>
+								<Button size="compact" variant="quiet" aria-label="Eject to YAML: {key}" onclick={() => run(() => oneject(key))}>Eject to YAML</Button>
 							{/if}
 						</div>
 					{/if}

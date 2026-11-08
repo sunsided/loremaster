@@ -12,8 +12,8 @@ const ROOT = 'loremaster';
 // The copy from the old folder name runs once per page load.
 let migrated: Promise<void> | undefined;
 const isYaml = (name: string) => /\.ya?ml$/.test(name);
-/** A Rust pack that a game build exported. */
-const isExportedPack = (path: string) => /(^|\/)packs\/[^/]+\.json$/.test(path);
+/** A Rust pack that a game build exported: top-level `packs/*.json`, as the Rust loader reads. */
+const isExportedPack = (path: string) => /^packs\/[^/]+\.json$/.test(path);
 
 async function root(): Promise<FileSystemDirectoryHandle | null> {
 	try {
@@ -212,11 +212,12 @@ export function toZip(files: SourceFile[]): Uint8Array {
 /** The YAML files and exported packs in a zip archive. A single top folder (as made by "compress folder") is removed. */
 export function fromZip(data: Uint8Array): SourceFile[] {
 	const entries = Object.entries(unzipSync(data))
-		.filter(([path]) => (isYaml(path) || isExportedPack(path)) && !path.startsWith('__MACOSX/'))
+		.filter(([path]) => (isYaml(path) || /(^|\/)packs\/[^/]+\.json$/.test(path)) && !path.startsWith('__MACOSX/'))
 		.map(([path, bytes]) => ({ path, text: strFromU8(bytes) }));
 	const tops = new Set(entries.map((e) => e.path.split('/')[0]));
 	const single = tops.size === 1 && entries.every((e) => e.path.includes('/')) && !entries.some((e) => ['story.yaml', 'packs'].includes(e.path.split('/')[0]));
 	return entries
 		.map((e) => (single ? { ...e, path: e.path.split('/').slice(1).join('/') } : e))
+		.filter((e) => isYaml(e.path) || isExportedPack(e.path))
 		.sort((a, b) => a.path.localeCompare(b.path));
 }

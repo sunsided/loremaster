@@ -16,11 +16,13 @@ const FOLDERS: Record<string, string> = {
 	rule: 'rules'
 };
 
-/** Where a YAML file for this entity goes. Null for what YAML cannot take over: the story header, behaviors and text pools. */
+/** Where a YAML file for this entity goes. Null for what YAML cannot take over: the story header, behaviors and text pools, and an id that is no file name. */
 export function yamlPath(key: string): string | null {
-	const [kind, id] = key.split(':');
-	const folder = FOLDERS[kind];
-	return folder && id ? `${folder}/${id}.yaml` : null;
+	// At the first colon, as the Rust loader splits.
+	const at = key.indexOf(':');
+	const folder = at > 0 ? FOLDERS[key.slice(0, at)] : undefined;
+	const id = key.slice(at + 1);
+	return folder && id && !/[/\\]/.test(id) && !id.startsWith('.') ? `${folder}/${id}.yaml` : null;
 }
 
 /** Eject works in the folders of `replace: true`, which rules do not have. */

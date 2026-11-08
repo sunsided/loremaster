@@ -398,6 +398,7 @@
 		if (atlasTab === 'ai' && !ai.reachable) atlasTab = 'map';
 		if (atlasTab === 'machines' && !session?.machines.length) atlasTab = 'map';
 		if (atlasTab === 'steps' && !session?.charts.length) atlasTab = 'map';
+		if (atlasTab === 'rust' && !rustParts.length) atlasTab = 'map';
 	});
 
 	let proposalProblems = $state<Record<string, string>>({});
@@ -1147,7 +1148,9 @@
 		const ws = workspace;
 		const where = ws?.project.listOf(at.owner);
 		const file = where && ws?.project.file(where.file);
-		if (where && !file && ws?.project.rustParts[at.owner.split('/')[0]]) return `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
+		// The story intro is in the header, whose key is `story`.
+		const key = at.owner.startsWith('story:') ? 'story' : at.owner.split('/')[0];
+		if (where && !file && ws?.project.rustParts[key]) return `This part is made in Rust and is read-only. Override or eject it in Atlas › Rust (${where.file}).`;
 		if (!ws || !where || !file) return 'The editor does not know the file of this text.';
 		let text: string;
 		try {
