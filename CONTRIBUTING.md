@@ -34,7 +34,7 @@ loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.3 (`drama
 
 | Part | dramaturge | loremaster |
 | --- | --- | --- |
-| Conditions | Each `when:` compiles to a dramaturge `Condition` tree | `loremaster-lang` parses the condition language and compiles it. Derived values (time of day, room, visits, carried things, the action) are one `Condition::Custom` with the key `loremaster.derived` |
+| Conditions | Each `when:` compiles to a dramaturge `Condition` tree | `loremaster-lang` parses the condition language and compiles it. dramaturge's `DefaultConditionEvaluator` evaluates the tree at run time, with a custom handler from `crates/loremaster-runtime/src/eval.rs`. Derived values (time of day, room, visits, carried things, the action) are one `Condition::Custom` with the key `loremaster.derived` |
 | Stored state | Reads and writes through `NarrativeState` | `State.facts`, `State.relations` and `State.memories`, the only copy, also in the save |
 | Dialogues | The dialogue AST of `dramaturge-syntax` and the runtime that selects answers and applies outcomes. `dramaturge-authoring` examines each graph in `loremaster check` | `dialogues/*.yaml` and `world!` read into the AST. The text stays loremaster markup |
 | Text pools | The selection core: pools, `select`, `commit`, the trace | Markup, layers and room assembly on top (`crates/loremaster-runtime/src/text.rs`) |
@@ -127,7 +127,7 @@ Run these commands before you open a pull request:
 
 loremaster takes the dramaturge crates from crates.io, with an exact version (`=0.3.0-alpha.N` in `Cargo.toml`). CI builds with `--locked`, so it tests exactly the version in `Cargo.lock`.
 
-- When loremaster needs a change in dramaturge, make the change in dramaturge first and release a dramaturge alpha. Then change the version in `Cargo.toml` and run `cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring` in the same pull request.
+- When loremaster needs a change in dramaturge, make the change in dramaturge first and release a dramaturge alpha. Then change the version in `Cargo.toml` and run `cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring -p dramaturge-syntax` in the same pull request.
 - The CI job "dramaturge feature/0.3 (not required)" tests loremaster against the newest dramaturge on `feature/0.3`. When it is red, the next bump needs changes in loremaster.
 - To work on both repositories at once, put a patch into `.cargo/config.toml` (git does not track it):
 
@@ -136,6 +136,7 @@ loremaster takes the dramaturge crates from crates.io, with an exact version (`=
   dramaturge-model = { path = "../dramaturge/crates/dramaturge-model" }
   dramaturge-runtime = { path = "../dramaturge/crates/dramaturge-runtime" }
   dramaturge-authoring = { path = "../dramaturge/crates/dramaturge-authoring" }
+  dramaturge-syntax = { path = "../dramaturge/crates/dramaturge-syntax" }
   ```
 
   Cargo uses a patch only when its version satisfies the requirement in `Cargo.toml`, which pins the released alpha exactly. Between releases, dramaturge keeps the released version on `feature/0.3` (cargo-release sets the version at the release), so the patch applies. If `../dramaturge` has another version, cargo prints "Patch ... was not used" and builds the crates.io alpha: then relax the pin in `Cargo.toml` locally, and do not commit that change.
