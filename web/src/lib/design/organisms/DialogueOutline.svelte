@@ -61,6 +61,9 @@
 					</h3>
 					{#if node.when}<p class="when"><span class="label">when</span> <code>{node.when}</code></p>{/if}
 					<p class="say">{#each pieces(node.say) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</p>
+					{#each node.lines ?? [] as l, i (i)}
+						<p class="say"><span class="label">{l.speaker}</span> {#each pieces(l.say) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</p>
+					{/each}
 					{#if node.outcomes.length}
 						<ul class="outcomes" aria-label="Changes on entering {node.key}">
 							{#each node.outcomes as o, i (i)}<li>{o}</li>{/each}
@@ -90,7 +93,12 @@
 								</li>
 							{/each}
 						</ol>
-					{:else}
+					{/if}
+					{#if node.next === 'end' || node.next === 'back'}
+						<p class="go muted">Without an answer: {node.next === 'end' ? '→ ends the talk' : '→ back to the node before'}</p>
+					{:else if node.next}
+						<p class="go"><span class="muted">Without an answer:</span> <button type="button" class="link" onclick={() => goTo(node.next ?? '')}>→ {node.next}</button></p>
+					{:else if !node.options.length}
 						<p class="muted">No answers: the talk ends after this line.</p>
 					{/if}
 				</li>

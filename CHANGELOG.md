@@ -10,6 +10,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Talks play a node's `lines` and `next` (dramaturge R2, #155): the lines show in order after `say`, each by its `speaker` (a line of the player shows like an answer), and a node without an answer to choose goes on to its `next` node in the same turn, with the outcomes of each node. A loop of `next` without a choice is a check error, and in the game it stops after 1024 nodes and ends the talk. `loremaster check` no longer reports `lines` and `next`; the Atlas dialogue outline shows them.
 - Quests (decision D8): a machine with `quest: true` and `title`; its states give the journal with `journal:` text and `done: true`. `Session::journal()` (and `journal()` in the web engine) lists the quests whose state has journal text, open ones first, without a step; the player types `journal`. Steps and `set` move a quest. The builder gets `quest` and `journal`.
 - Action phases: `check` rules run before a verb, and the new `stop` effect refuses the action.
 - Rules in thing and room files, `within:` for a thing, room or region, and `priority`. More specific rules run first.

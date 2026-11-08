@@ -23,10 +23,23 @@ pub struct OutlineNode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
     pub say: String,
+    /// The lines after `say`, each with its speaker.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lines: Vec<OutlineLine>,
+    /// Where the talk goes on without a choice: a node key, `end` or `back`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
     pub outcomes: Vec<String>,
     pub options: Vec<OutlineOption>,
     /// No start node leads here.
     pub unreachable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutlineLine {
+    /// A thing id or `player`.
+    pub speaker: String,
+    pub say: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,7 +69,8 @@ impl DialogueOutline {
                 continue;
             }
             if let Some(n) = d.node(key) {
-                queue.extend(n.options.iter().filter_map(|o| match &o.go {
+                let targets = n.options.iter().map(|o| &o.go).chain(&n.next);
+                queue.extend(targets.filter_map(|go| match go {
                     DialogueTarget::Node(g) if keys.contains(g.as_str()) => Some(g.as_str()),
                     _ => None,
                 }));
@@ -74,6 +88,13 @@ impl DialogueOutline {
                     start: d.start.iter().position(|s| *s == n.key),
                     when: n.when.clone(),
                     say: n.say.source(),
+                    lines: (n.lines.iter())
+                        .map(|l| OutlineLine {
+                            speaker: l.speaker.clone(),
+                            say: l.say.source(),
+                        })
+                        .collect(),
+                    next: n.next.as_ref().map(|t| t.as_key().to_string()),
                     outcomes: describe(&n.outcomes),
                     options: n
                         .options

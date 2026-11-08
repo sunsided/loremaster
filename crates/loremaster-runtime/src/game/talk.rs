@@ -5,7 +5,8 @@
 //! game's `NarrativeState` (see `narrative.rs`). The runtime keeps everything
 //! else: it renders the lines (they are loremaster markup), runs the world
 //! effects in `then`, logs what changed, and keeps the talk open until the
-//! player leaves.
+//! player leaves. A node without an option to choose goes on to its `next`
+//! node in the same turn (auto-continue, dramaturge R2).
 //!
 //! Next to this module: `turned` (the game as dramaturge's state during a
 //! turn, with the log of each change), `view` (the talk for the inspector)
@@ -23,10 +24,10 @@ use crate::state::Talk;
 use crate::text;
 use crate::world::{CEffect, COption, CompiledDialogue};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
-use dramaturge_model::{DialogTarget, DialogText, DialogueNodeId};
+use dramaturge_model::{DialogTarget, DialogText, DialogueNodeId, SymbolTable};
 use dramaturge_runtime::{
-    AvailableOptionsIter, DefaultConditionEvaluator, DefaultOutcomeApplier, DefaultRuntime,
-    DialogCursor, DialogueRuntime, select_entry,
+    ADVANCE_LIMIT, AvailableOptionsIter, DefaultConditionEvaluator, DefaultOutcomeApplier,
+    DefaultRuntime, DialogCursor, DialogueRuntime, select_entry,
 };
 use loremaster_lang::CompiledLine;
 use loremaster_model::{Id, Layer};
@@ -158,10 +159,58 @@ impl Game {
         entered
     }
 
-    /// Enter a node through dramaturge: show its line, apply its outcomes
+    /// Enter a node, then the nodes that `next` leads to while a node has no
+    /// option to choose (auto-continue). Like dramaturge's `advance`, but each
+    /// node shows its lines before its outcomes apply, and a loop of `next`
+    /// stops after [`ADVANCE_LIMIT`] nodes and ends the talk. True when the
+    /// first node was entered.
+    fn enter(&mut self, turn: &mut Turn, d: &Arc<CompiledDialogue>, id: DialogueNodeId) -> bool {
+        let mut cursor = (self.state.talk.as_ref())
+            .and_then(|t| cursor(d, t))
+            .unwrap_or_else(|| DialogCursor::new(id));
+        cursor.current = id;
+        for entered in 0..ADVANCE_LIMIT {
+            if !self.enter_node(turn, d, cursor.current) {
+                return entered > 0;
+            }
+            // A world effect can end the talk or the story, or take the
+            // player away; then the talk does not go on.
+            let go_on = self.state.talk.is_some()
+                && !self.state.ended
+                && self.eval().present(d.with.as_str())
+                && self.available().is_empty();
+            let next = (d.node(cursor.current))
+                .and_then(|n| n.next.as_ref())
+                .filter(|_| go_on);
+            if next.and_then(|t| cursor.follow(t)).is_none() {
+                self.end_without_options();
+                return true;
+            }
+            if let Some(talk) = &mut self.state.talk {
+                keep(d, &cursor, talk);
+            }
+        }
+        turn.log.push(LogEntry {
+            kind: "author".into(),
+            text: format!(
+                "{}: {ADVANCE_LIMIT} nodes in a row go on by `next` without a choice \
+                 (a loop?); the talk ends",
+                d.id
+            ),
+        });
+        self.end_talk();
+        true
+    }
+
+    /// Enter one node through dramaturge: show its lines, apply its outcomes
     /// and let world rules hear about it. A node whose `when` does not hold
     /// can not be entered, and the talk ends. True when the node was entered.
-    fn enter(&mut self, turn: &mut Turn, d: &Arc<CompiledDialogue>, id: DialogueNodeId) -> bool {
+    fn enter_node(
+        &mut self,
+        turn: &mut Turn,
+        d: &Arc<CompiledDialogue>,
+        id: DialogueNodeId,
+    ) -> bool {
         let Some(node) = d.node(id) else {
             self.end_talk();
             return false;
@@ -181,11 +230,11 @@ impl Game {
             node: d.key_of(id).unwrap_or_default().to_string(),
         };
         self.fire(turn, &event, 1);
-        self.end_without_options();
         true
     }
 
-    /// Show a node's line.
+    /// Show a node's lines, in order: its `say`, then its `lines`. A line
+    /// of the player is said (like an answer), the others are speech.
     fn show(&mut self, turn: &mut Turn, d: &CompiledDialogue, id: DialogueNodeId) {
         let Some(node) = d.node(id) else { return };
         let key = d.key_of(id).unwrap_or_default();
@@ -202,8 +251,16 @@ impl Game {
             link: None,
             speaker: None,
         };
-        let runs = self.line(&node.text, &base);
-        turn.push(BlockKind::Speech, runs);
+        for (speaker, text) in node.all_lines() {
+            let player = self.world.symbols.entity_key(speaker.0) == Some(SymbolTable::PLAYER_KEY);
+            let kind = if player {
+                BlockKind::Said
+            } else {
+                BlockKind::Speech
+            };
+            let runs = self.line(text, &base);
+            turn.push(kind, runs);
+        }
     }
 
     /// A node with no option to choose ends the talk.

@@ -121,10 +121,20 @@ export interface OutlineNode {
 	start?: number;
 	when?: string;
 	say: string;
+	/** The lines after `say`, each with its speaker. */
+	lines?: OutlineLine[];
+	/** Where the talk goes on without a choice: a node key, `end` or `back`. */
+	next?: string;
 	outcomes: string[];
 	options: OutlineOption[];
 	/** No start node leads here. */
 	unreachable: boolean;
+}
+
+export interface OutlineLine {
+	/** A thing id or `player`. */
+	speaker: string;
+	say: string;
 }
 
 export interface OutlineOption {
