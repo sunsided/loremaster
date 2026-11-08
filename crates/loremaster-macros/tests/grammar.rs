@@ -476,6 +476,34 @@ fn a_then_operand_is_not_the_marker() {
     );
 }
 
+/// A speaker `then` after a condition that ends in a word: the first
+/// `then` is the marker there.
+mod then_speaker {
+    use loremaster::prelude::*;
+
+    world! {
+        story "Then" { start: hall }
+        var calm: bool = false;
+        room hall "Hall" {}
+        thing then "Then" in hall {}
+        rule hm on turn {
+            line when calm then then says "Hm.";
+        }
+    }
+}
+
+#[test]
+fn a_speaker_then_follows_the_marker() {
+    use loremaster::dsl::model::{Line, LineSegment};
+    let p = then_speaker::pack();
+    assert_eq!(
+        p.rules[0].then[0],
+        Effect::Say(Line::new(vec![
+            LineSegment::says("Hm.").by("then").when("calm"),
+        ]))
+    );
+}
+
 /// Dialogues (DSL step L4): dramaturge's token form, with the conditions,
 /// lines and effects of `world!`. Two blocks share a module with `pack`.
 mod talks {

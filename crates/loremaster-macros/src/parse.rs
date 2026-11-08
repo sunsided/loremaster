@@ -785,16 +785,15 @@ fn when_then(input: ParseStream) -> bool {
     if fork.call(Ident::parse_any).is_err() {
         return false;
     }
-    let mut after_dot = false;
+    let mut operand = true;
     while !fork.is_empty() {
-        // `x.then` is a property, not the marker.
-        if !after_dot && peek_marker(&fork) {
+        if !operand && peek_marker(&fork) {
             return true;
         }
-        after_dot = fork.peek(Token![.]);
         if fork.peek(Token![;]) || fork.peek(Token![=>]) || fork.peek(syn::token::Brace) {
             return false;
         }
+        operand = wants_operand(&fork);
         if fork.parse::<proc_macro2::TokenTree>().is_err() {
             return false;
         }
@@ -802,20 +801,27 @@ fn when_then(input: ParseStream) -> bool {
     false
 }
 
-/// The `then` of a segment condition: a segment follows it. Any other
-/// `then` is an operand, the id of a room, an enum value or a state
-/// (`when in then then "…"`). Of two in a row, the second is the marker,
-/// so a speaker `then` needs a condition that does not end in `then`.
+/// The `then` of a segment condition: a segment follows it. The callers
+/// ask only where the condition needs no operand: a `then` at the start,
+/// after an operator, a `.`, `in`, `and`, `or` or `not` is an id (a room,
+/// an enum value, a state, a property: `when in then then "…"`).
 fn peek_marker(input: ParseStream) -> bool {
     let fork = input.fork();
     peek_kw(&fork, "then")
         && fork.call(Ident::parse_any).is_ok()
-        && !peek_marker(&fork)
         && (fork.peek(LitStr)
             || peek_kw(&fork, "narrate")
             || peek_kw(&fork, "says")
             || peek_kw(&fork, "when")
             || peek_speaker(&fork))
+}
+
+/// The token here leaves the condition waiting for an operand.
+fn wants_operand(input: ParseStream) -> bool {
+    matches!(
+        input.fork().parse::<proc_macro2::TokenTree>(),
+        Ok(proc_macro2::TokenTree::Punct(_))
+    ) || ["in", "and", "or", "not"].iter().any(|k| peek_kw(input, k))
 }
 
 fn segment(input: ParseStream) -> Result<Segment> {
@@ -843,11 +849,11 @@ fn segment_body(input: ParseStream) -> Result<Segment> {
     }
     if peek_kw(input, "when") {
         keyword(input, "when")?;
-        // `x.then` is a property, not the marker: `stop` runs once per token.
-        let after_dot = std::cell::Cell::new(false);
+        // A `then` where an operand goes is an id: `stop` runs once per token.
+        let operand = std::cell::Cell::new(true);
         let cond = parse_until(input, |i| {
-            let dot = after_dot.replace(i.peek(Token![.]));
-            (!dot && peek_marker(i)) || i.peek(Token![;])
+            let wanted = operand.replace(wants_operand(i));
+            (!wanted && peek_marker(i)) || i.peek(Token![;])
         })?;
         keyword(input, "then").map_err(|e| {
             Error::new(
