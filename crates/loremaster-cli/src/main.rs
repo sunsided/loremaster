@@ -3,8 +3,8 @@
 
 use loremaster_project::{Diagnostic, Project, check_files, open_todos, read_dir};
 use loremaster_runtime::{
-    AwaitRequest, BlockKind, Effect, HintBook, Input, RESTORE, Session, Status, Step, Verdict,
-    World,
+    AwaitRequest, Block, BlockKind, Effect, HintBook, Input, LinkKind, RESTORE, Session, Status,
+    Step, Verdict, World,
 };
 use loremaster_workbench::Budget;
 use std::io::{BufRead, IsTerminal, Write};
@@ -506,7 +506,7 @@ fn print_step(step: &Step, style: bool) {
             println!();
         }
         first = false;
-        let text = emphasis(&block.plain_text(), style);
+        let text = emphasis(&things_in_color(block, style), style);
         match block.kind {
             BlockKind::Title => println!("{}", bold(&text, style)),
             BlockKind::Said => println!("{}", wrap(&format!("> {text}"), 78)),
@@ -540,6 +540,18 @@ fn bold(text: &str, style: bool) -> String {
     }
 }
 
+/// The block's text, with each mention of a thing in scope in cyan.
+fn things_in_color(block: &Block, style: bool) -> String {
+    block
+        .runs
+        .iter()
+        .map(|r| match &r.link {
+            Some(l) if style && l.kind == LinkKind::Thing => format!("\x1b[36m{}\x1b[0m", r.text),
+            _ => r.text.clone(),
+        })
+        .collect()
+}
+
 /// `*word*` in story text is emphasis.
 fn emphasis(text: &str, style: bool) -> String {
     let mut out = String::new();
@@ -553,11 +565,26 @@ fn emphasis(text: &str, style: bool) -> String {
     out
 }
 
+/// The width of a word on screen: ANSI color codes take none.
+fn visible_len(word: &str) -> usize {
+    let mut len = 0;
+    let mut in_escape = false;
+    for c in word.chars() {
+        match c {
+            '\x1b' => in_escape = true,
+            'm' if in_escape => in_escape = false,
+            _ if !in_escape && !c.is_control() => len += 1,
+            _ => {}
+        }
+    }
+    len
+}
+
 fn wrap(text: &str, width: usize) -> String {
     let mut out = String::new();
     let mut col = 0;
     for word in text.split(' ') {
-        let len = word.chars().filter(|c| !c.is_control()).count();
+        let len = visible_len(word);
         if col > 0 && col + 1 + len > width {
             out.push('\n');
             col = 0;
@@ -569,4 +596,15 @@ fn wrap(text: &str, width: usize) -> String {
         col += len;
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_codes_take_no_width() {
+        assert_eq!(visible_len("\x1b[36mlantern\x1b[0m,"), 8);
+        assert_eq!(wrap("a \x1b[36mbb\x1b[0m c", 6), "a \x1b[36mbb\x1b[0m c");
+    }
 }
