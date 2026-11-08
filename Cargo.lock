@@ -462,6 +462,14 @@ dependencies = [
  "loremaster-project",
  "loremaster-runtime",
  "loremaster-workbench",
+ "serde_json",
+]
+
+[[package]]
+name = "loremaster-build"
+version = "0.1.0"
+dependencies = [
+ "loremaster-project",
 ]
 
 [[package]]
@@ -497,6 +505,7 @@ dependencies = [
  "loremaster-project",
  "proc-macro2",
  "quote",
+ "serde_json",
  "syn 2.0.119",
  "trybuild",
 ]
@@ -507,6 +516,7 @@ version = "0.1.0"
 dependencies = [
  "include_dir",
  "loremaster-project",
+ "loremaster-runtime",
  "loremaster-tools",
  "serde",
  "serde_json",
@@ -521,6 +531,7 @@ dependencies = [
  "dramaturge-syntax",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]

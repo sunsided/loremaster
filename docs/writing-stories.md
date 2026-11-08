@@ -416,6 +416,33 @@ A `verb` or `check` event can name the slots:
 
 While a rule waits, the player can only answer. The answer is not a new turn: the clock and the timers do not move. A save game keeps the waiting rule. `await` works only in rules, not in dialogues or timers.
 
+### The interface: a contract with the host
+
+A story that a game engine hosts can declare everything it asks of the host and everything the host can report, in one section of story.yaml:
+
+```yaml
+interface:
+  actions:
+    - { id: lockpick, args: { difficulty: int }, results: [success, failure, broken_pick] }
+  events:
+    - { id: killed, args: { boss: text }, when: "not game_over" }
+```
+
+An argument type is `bool`, `int`, `text` or `{ enum: [a, b] }`. An `await` of a declared action can leave out `results`.
+
+With the section, `loremaster check` fails when:
+
+- a rule calls an action that is not declared, or gives an argument of the wrong type;
+- the `results` of an `await` are not the declared ones;
+- an action with two or more results has no `into`, or no condition or text names `into` and a result (`lock == broken_pick`). Each result needs a branch;
+- a rule listens for an event that nothing emits and that is not declared, or emits one that no rule hears and that is not declared. An event that the story both emits and hears is its own and needs no declaration.
+
+Rules hear a host event with `on: { event: killed }`. Its arguments read as `killed.boss`: the last reported value. The host reports it with `Session::host_event`. The session refuses an undeclared event, a wrong argument, a false `when`, and an event while a rule waits. An event is not a turn: the clock does not move.
+
+`Session::for_host` refuses to start when the host was built for another interface: the message names the added, removed and changed entries. In a walkthrough, an `await` of an action takes only a declared result, by name, and a step `{ event: killed, args: { boss: ogre } }` reports an event.
+
+A Rust host gets its types from the `loremaster-build` crate in `build.rs`, or from `world!`, which writes the module `interface`. `loremaster interface <project> --ts` or `--json-schema` writes them for other languages. `loremaster protocol <project>` plays the story as a JSON-RPC 2.0 server on stdio, one message per line, for hosts in any language.
+
 ### Combat
 
 The effect `combat` runs a fight by built-in rules. The player needs the number variables `skill` and `stamina`, and can have `luck`. An enemy is a thing with the number properties `skill` and `stamina`.

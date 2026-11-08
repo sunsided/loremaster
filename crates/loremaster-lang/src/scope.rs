@@ -22,6 +22,16 @@ impl Ty {
         }
     }
 
+    pub fn of_arg(ty: &loremaster_model::ArgType) -> Self {
+        use loremaster_model::ArgType;
+        match ty {
+            ArgType::Bool => Ty::Bool,
+            ArgType::Int => Ty::Int,
+            ArgType::Text => Ty::Text,
+            ArgType::Enum(values) => Ty::Enum(values.clone()),
+        }
+    }
+
     pub fn describe(&self) -> String {
         match self {
             Ty::Bool => "a flag".into(),
@@ -72,7 +82,7 @@ impl Scope {
             })
             .collect();
         let rooms = story.rooms.iter().map(|r| r.id.to_string()).collect();
-        let things = story
+        let mut things: BTreeMap<String, BTreeMap<String, Ty>> = story
             .things
             .iter()
             .map(|t| {
@@ -84,6 +94,11 @@ impl Scope {
                 (t.id.to_string(), props)
             })
             .collect();
+        // Conditions read the last arguments of a host event as `event.arg`.
+        for e in story.interface.iter().flat_map(|i| &i.events) {
+            let args = e.args.iter().map(|(k, t)| (k.clone(), Ty::of_arg(t)));
+            things.entry(e.id.to_string()).or_default().extend(args);
+        }
         let phases = story
             .clock
             .phase_names()

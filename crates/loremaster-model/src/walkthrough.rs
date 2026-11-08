@@ -90,6 +90,13 @@ pub struct StepPlan {
     /// one, the hint ladder shows the command.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hints: Vec<String>,
+    /// The step reports this host event instead of a command (IF-6):
+    /// `{ event: killed, args: { boss: ogre } }`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<Id>,
+    /// The arguments of `event`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub args: BTreeMap<String, Value>,
 }
 
 impl StepPlan {
@@ -104,8 +111,12 @@ impl StepPlan {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CheckedStep {
-    #[serde(rename = "do")]
-    command: String,
+    #[serde(default, rename = "do")]
+    command: Option<String>,
+    #[serde(default)]
+    event: Option<Id>,
+    #[serde(default)]
+    args: BTreeMap<String, Value>,
     #[serde(default, deserialize_with = "one_or_many")]
     see: Vec<String>,
     #[serde(default, deserialize_with = "one_or_many")]
@@ -139,7 +150,13 @@ impl<'de> Deserialize<'de> for WalkStep {
             "a command, or a map with `do` and what the response must show",
             WalkStep::Command,
             |s: CheckedStep| WalkStep::Checked {
-                command: s.command,
+                // An event step needs no command; the report shows this text.
+                command: s.command.unwrap_or_else(|| {
+                    s.event
+                        .as_ref()
+                        .map(|e| format!("event {e}"))
+                        .unwrap_or_default()
+                }),
                 expect: Expect {
                     see: s.see,
                     not_see: s.not_see,
@@ -154,6 +171,8 @@ impl<'de> Deserialize<'de> for WalkStep {
                     needs: s.needs.into_iter().map(Id::new).collect(),
                     before: s.before.into_iter().map(Id::new).collect(),
                     hints: s.hints,
+                    event: s.event,
+                    args: s.args,
                 }),
                 rolls: s.rolls,
             },

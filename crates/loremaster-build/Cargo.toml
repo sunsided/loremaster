@@ -1,0 +1,18 @@
+[package]
+name = "loremaster-build"
+description = "build.rs helper: generate the host types of a loremaster YAML project."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords = ["text-adventure", "interactive-fiction", "build"]
+categories = ["game-development", "development-tools::build-utils"]
+
+[dependencies]
+loremaster-project.workspace = true
+
+[lints]
+workspace = true

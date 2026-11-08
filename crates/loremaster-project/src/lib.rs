@@ -20,6 +20,7 @@
 //! runs it through [`check_files`], and the `world!` macro runs it on its
 //! packs at compile time.
 
+mod bindings;
 mod check;
 mod hash;
 mod load;
@@ -29,6 +30,7 @@ mod origin;
 mod quality;
 mod scaffold;
 
+pub use bindings::{json_schema, rust_bindings, typescript};
 pub use check::{Checked, MAX_HINTS, check, check_files, check_packs};
 pub use hash::model_hash;
 pub use load::{FOLDERS, Pack, Project, SourceFile, StoryHeader, assemble, load};

@@ -186,6 +186,9 @@ pub struct Story {
     /// Long-range threads: promises to the reader, with their beats in notes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub threads: Vec<Thread>,
+    /// The contract with the host (IF-1). Without it, no contract checks run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<crate::Interface>,
 }
 
 fn yes() -> bool {

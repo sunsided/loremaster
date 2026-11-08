@@ -9,6 +9,7 @@ use loremaster_model::{
 };
 use std::collections::BTreeSet;
 
+mod contract;
 mod walkthroughs;
 
 pub use walkthroughs::MAX_HINTS;
@@ -88,6 +89,7 @@ pub fn check(project: &Project) -> Vec<Diagnostic> {
         out: project.assembly.clone(),
         place: None,
         named: None,
+        contract: contract::Seen::default(),
     };
     c.run();
     c.out
@@ -103,6 +105,8 @@ struct Checker<'a> {
     place: Option<(String, u32, u32)>,
     /// The named pools of `texts/` for dramaturge's checks, built once.
     named: Option<Pools<CheckTypes>>,
+    /// What the host contract check needs, gathered during the run (IF-2).
+    contract: contract::Seen,
 }
 
 impl Checker<'_> {
@@ -167,6 +171,7 @@ impl Checker<'_> {
 
     /// A condition outside a text: `seen_by` has no perceiver there.
     fn condition(&mut self, file: &str, at: &str, source: &str) {
+        self.contract.tests.push(source.to_string());
         match compile_condition(source, &self.scope) {
             Ok(c) if has_seen_by(&c) => self.error(file, at, SEEN_BY_ELSEWHERE),
             Ok(_) => {}
@@ -177,6 +182,7 @@ impl Checker<'_> {
     /// The `when` of a fragment or a candidate: `seen_by` asks for the
     /// perceiver of the text.
     fn text_condition(&mut self, file: &str, at: &str, source: &str) {
+        self.contract.tests.push(source.to_string());
         if let Err(e) = compile_condition(source, &self.scope) {
             self.lang_error(file, at, source, e);
         }
@@ -197,6 +203,7 @@ impl Checker<'_> {
     }
 
     fn markup(&mut self, file: &str, at: &str, source: &str) {
+        self.contract.tests.push(source.to_string());
         if let Err(e) = compile_markup(source, &self.scope) {
             self.lang_error(file, at, source, e);
         }
@@ -746,6 +753,7 @@ impl Checker<'_> {
             self.effects(&file, "then", &rule.then);
         }
         self.walkthroughs();
+        self.contract();
     }
 
     /// Variables, machines, rooms and things must not take a built-in name
@@ -990,6 +998,11 @@ impl Checker<'_> {
     fn effects(&mut self, file: &str, at: &str, effects: &[Effect]) {
         for (i, effect) in effects.iter().enumerate() {
             let at = format!("{at}[{i}]");
+            if let Effect::Emit(name) = effect {
+                self.contract
+                    .emits
+                    .push((file.to_string(), at.clone(), name.clone()));
+            }
             match effect {
                 Effect::Say(line) => self.line(file, &at, line),
                 Effect::Await(spec) => self.await_spec(file, &at, spec),
@@ -1596,6 +1609,9 @@ impl Checker<'_> {
             );
             return;
         }
+        self.contract
+            .awaits
+            .push((file.to_string(), at.to_string(), spec.clone()));
         if let Some(room) = &spec.walk_to {
             self.room_ref(file, at, room.as_str());
         }

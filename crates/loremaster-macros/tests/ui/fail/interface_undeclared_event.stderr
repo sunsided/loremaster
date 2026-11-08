@@ -1,0 +1,5 @@
+error: the rule listens for `kiled`, which is not in `interface:` and nothing emits
+ --> tests/ui/fail/interface_undeclared_event.rs:6:18
+  |
+6 |     rule hear on event(kiled) { line "Dead."; }
+  |                  ^^^^^^^^^^^^

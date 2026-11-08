@@ -20,6 +20,8 @@ pub struct World {
     pub story: Story,
     pub verbs: Vec<VerbDef>,
     pub(crate) intro: CompiledText,
+    /// The preconditions of the host events, by event id (IF-1).
+    pub(crate) event_when: BTreeMap<String, Condition>,
     pub(crate) rooms: Vec<CompiledRoom>,
     pub(crate) things: Vec<CompiledThing>,
     pub(crate) rules: Vec<CompiledRule>,
@@ -633,6 +635,12 @@ impl World {
                 .collect(),
         };
         let intro = c.fragments("story:intro", &story.intro)?;
+        let mut event_when = BTreeMap::new();
+        for e in story.interface.iter().flat_map(|i| &i.events) {
+            if let Some(when) = c.cond(&format!("interface:{}", e.id), &e.when)? {
+                event_when.insert(e.id.to_string(), when);
+            }
+        }
         let rooms = story
             .rooms
             .iter()
@@ -859,6 +867,7 @@ impl World {
         Ok(Self {
             levels,
             scope,
+            event_when,
             story,
             verbs,
             intro,

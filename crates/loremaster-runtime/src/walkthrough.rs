@@ -1,6 +1,6 @@
 //! Walkthrough tests: play commands and check what shows and what holds.
 
-use crate::{Input, Session, State, World};
+use crate::{AwaitRequest, Input, Session, State, Status, World};
 use loremaster_model::{Expect, Pending, Walkthrough};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -71,7 +71,20 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
             ));
         }
         session.force_rolls(step.rolls());
-        let text = session.submit(Input::Text(command.into())).plain_text();
+        if let Some(why) = undeclared_result(&session, command) {
+            failures.push(format!("step {} (`{command}`): {why}", i + 1));
+        }
+        let host_event = step.plan().and_then(|p| Some((p.event.as_ref()?, &p.args)));
+        let text = match host_event {
+            Some((event, args)) => match session.host_event(event.as_str(), args.clone()) {
+                Ok(step) => step.plain_text(),
+                Err(why) => {
+                    failures.push(format!("step {} (`{command}`): {why}", i + 1));
+                    String::new()
+                }
+            },
+            None => session.submit(Input::Text(command.into())).plain_text(),
+        };
         transcript.push_str(&format!("\n\n> {command}\n{text}"));
         for why in session.forced_roll_errors() {
             failures.push(format!("step {} (`{command}`): {why}", i + 1));
@@ -93,6 +106,25 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
         transcript,
         pending: walk.pending.clone(),
     }
+}
+
+/// In a story with an interface, the answer to an action must be one of its
+/// declared results by name (IF-6): a number or a label is not.
+fn undeclared_result(session: &Session, command: &str) -> Option<String> {
+    let interface = session.world().story.interface.as_ref()?;
+    let Status::Await { awaiting } = session.status() else {
+        return None;
+    };
+    let AwaitRequest::Action { name, results, .. } = awaiting.request else {
+        return None;
+    };
+    interface.action(name.as_str())?;
+    let answer = command.trim();
+    (!results.is_empty()
+        && !results
+            .iter()
+            .any(|r| r.as_str().eq_ignore_ascii_case(answer)))
+    .then(|| format!("`{answer}` is not a declared result of the action `{name}`"))
 }
 
 fn check(state: &State, expect: &Expect, text: &str, at: &str) -> Vec<String> {

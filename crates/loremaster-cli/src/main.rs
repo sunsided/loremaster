@@ -2,6 +2,7 @@
 //! `loremaster explore <dir>`, `loremaster test <dir>`, `loremaster mcp <dir>` and `loremaster serve <dir | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]`.
 
 use loremaster_project::{Diagnostic, Project, check_files, open_todos, read_dir};
+use loremaster_project::{json_schema, rust_bindings, typescript};
 use loremaster_runtime::{
     AwaitRequest, Block, BlockKind, Effect, HintBook, Input, LinkKind, RESTORE, Session, Status,
     Step, Verdict, World,
@@ -12,7 +13,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-const USAGE: &str = "usage: loremaster <play|check|quality|explore|test|mcp> <project-folder>\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
+const USAGE: &str = "usage: loremaster <play|check|quality|explore|test|mcp|protocol> <project-folder>\n       loremaster interface <project-folder> [--rust|--ts|--json-schema]\n       loremaster new <project-folder> [--title \"The Title\"] [--idea \"An idea for the AI\"]\n       loremaster check <project-folder> --todos\n       loremaster serve <project-folder | --bootstrap> [--port N] [--allow-origin URL]... [--no-open]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -37,6 +38,16 @@ fn main() -> ExitCode {
         return match idea {
             Some(idea) if made == ExitCode::SUCCESS => seed(Path::new(dir), idea),
             _ => made,
+        };
+    }
+    // Protocol mode also owns stdout: only JSON-RPC goes there.
+    if cmd == "protocol" {
+        return match loremaster_mcp::protocol::serve_stdio(Path::new(dir)) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::FAILURE
+            }
         };
     }
     // The MCP server owns stdout and also serves a project with errors, so it skips `open`.
@@ -103,6 +114,27 @@ fn main() -> ExitCode {
     let Some(project) = open(Path::new(dir)) else {
         return ExitCode::FAILURE;
     };
+    if cmd == "interface" {
+        let interface = project.story.interface.clone().unwrap_or_default();
+        match args.get(2).map(String::as_str) {
+            None => println!(
+                "{}\n{}",
+                interface.hash(),
+                serde_json::to_string_pretty(&interface).expect("plain data")
+            ),
+            Some("--rust") => print!("{}", rust_bindings(&interface, "::loremaster_runtime")),
+            Some("--ts") => print!("{}", typescript(&interface)),
+            Some("--json-schema") => println!(
+                "{}",
+                serde_json::to_string_pretty(&json_schema(&interface)).expect("plain data")
+            ),
+            Some(_) => {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
     match cmd.as_str() {
         "check" if args.get(2).is_some_and(|a| a == "--todos") => {
             let todos = open_todos(&project);

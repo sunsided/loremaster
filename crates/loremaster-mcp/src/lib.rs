@@ -13,6 +13,7 @@
 
 pub mod http;
 pub mod jobs;
+pub mod protocol;
 #[cfg(feature = "embed-ui")]
 mod ui;
 
