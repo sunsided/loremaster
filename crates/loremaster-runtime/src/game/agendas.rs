@@ -218,6 +218,8 @@ impl Game {
         if self
             .fire(turn, &Event::of_command(Phase::Check, c), 1)
             .stopped
+            // A check rule that waits holds the action, as for the player.
+            || self.state.awaiting.is_some()
         {
             return false;
         }

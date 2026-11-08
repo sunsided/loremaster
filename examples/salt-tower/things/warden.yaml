@@ -1,4 +1,5 @@
 name: GATE WARDEN
+aliases: [warden]
 listed: false
 location: { room: section_5 }
 props: { skill: 7, stamina: 8 }
