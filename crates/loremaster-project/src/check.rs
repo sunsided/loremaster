@@ -366,6 +366,7 @@ impl Checker<'_> {
         let emitted = emitted_events(&story);
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
+            self.closes(&file, rule);
             match &rule.on {
                 EventPattern::Enter(r) | EventPattern::Leave(r) => {
                     self.room_ref(&file, "on", r.as_str())
@@ -644,6 +645,39 @@ impl Checker<'_> {
                     }
                 }
             }
+        }
+    }
+
+    /// `closes` and `reason` of a rule or machine step: each id is an
+    /// ending, and a list needs a reason. The ending checks of the explorer
+    /// compare the list with the endings that really drop out.
+    fn closes(&mut self, file: &str, rule: &loremaster_model::Rule) {
+        for (i, ending) in rule.closes.iter().enumerate() {
+            if self.story().ending(ending.as_str()).is_none() {
+                self.error(
+                    file,
+                    &format!("closes[{i}]"),
+                    format!("unknown ending `{ending}` in `closes`"),
+                );
+            }
+        }
+        let reason = rule.reason.as_deref().is_some_and(|r| !r.trim().is_empty());
+        if !rule.closes.is_empty() && !reason {
+            self.error(
+                file,
+                "closes",
+                format!(
+                    "`closes` of `{}` needs a `reason`: why the endings close on purpose",
+                    rule.id
+                ),
+            );
+        }
+        if rule.closes.is_empty() && reason {
+            self.warning(
+                file,
+                "reason",
+                format!("`reason` of `{}` without `closes`", rule.id),
+            );
         }
     }
 
