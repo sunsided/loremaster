@@ -183,12 +183,16 @@ impl Game {
             let next = (d.node(cursor.current))
                 .and_then(|n| n.next.as_ref())
                 .filter(|_| go_on);
-            if next.and_then(|t| cursor.follow(t)).is_none() {
+            let Some(next) = next.filter(|t| cursor.follow(t).is_some()) else {
                 self.end_without_options();
                 return true;
-            }
+            };
             if let Some(talk) = &mut self.state.talk {
                 keep(d, &cursor, talk);
+            }
+            if *next == DialogTarget::Return {
+                self.back_to(turn, d, cursor.current);
+                return true;
             }
         }
         turn.log.push(LogEntry {
@@ -264,6 +268,14 @@ impl Game {
         }
     }
 
+    /// Back to a node the talk was at (`go: back`, `next: back`): its lines
+    /// show again, its `when` is not checked and its outcomes do not apply
+    /// again. Without an option to choose, the talk ends there.
+    fn back_to(&mut self, turn: &mut Turn, d: &CompiledDialogue, id: DialogueNodeId) {
+        self.show(turn, d, id);
+        self.end_without_options();
+    }
+
     /// A node with no option to choose ends the talk.
     fn end_without_options(&mut self) {
         if self.state.talk.is_some() && self.available().is_empty() {
@@ -311,10 +323,7 @@ impl Game {
                     keep(&d, &cursor, talk);
                 }
                 if target == DialogTarget::Return {
-                    // Back to a node the talk was at: its line shows again,
-                    // its outcomes do not apply again.
-                    self.show(turn, &d, next);
-                    self.end_without_options();
+                    self.back_to(turn, &d, next);
                 } else {
                     self.enter(turn, &d, next);
                 }

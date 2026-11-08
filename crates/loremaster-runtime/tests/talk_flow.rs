@@ -174,6 +174,45 @@ fn a_line_with_when_shows_while_it_holds() {
 }
 
 #[test]
+fn next_back_returns_like_go_back() {
+    let dialogue = DIALOGUE.replace(
+        "      - { say: \"Bye.\", go: end }",
+        "      - { say: \"Tell me.\", go: tale }\n      - { say: \"Bye.\", go: end }",
+    ) + "  tale:\n    say: \"A tale.\"\n    add: { told: 10 }\n    next: back\n";
+    let mut game = play(project(&dialogue));
+    input(&mut game, "talk to keeper");
+    assert_eq!(fact(&game, "told"), "2");
+    let turn = input(&mut game, "1");
+    let text = turn.plain_text();
+    assert!(
+        text.contains("A tale.") && text.contains("Anything else?"),
+        "{text}"
+    );
+    // Back at `ask`: its `add` does not apply again.
+    assert_eq!(fact(&game, "told"), "12");
+    assert_eq!(game.state().talk.as_ref().unwrap().node, "ask");
+    let choices: Vec<&str> = turn.choices.iter().map(|c| c.text.as_str()).collect();
+    assert_eq!(choices, ["Tell me.", "Bye."]);
+}
+
+#[test]
+fn the_outline_shows_lines_and_next_and_a_missing_next() {
+    use loremaster_runtime::DialogueOutline;
+    let outline = DialogueOutline::of(&project(DIALOGUE).story.dialogues[0]);
+    let hi = &outline.nodes[0];
+    let speakers: Vec<&str> = hi.lines.iter().map(|l| l.speaker.as_str()).collect();
+    assert_eq!(speakers, ["player", "dog", "keeper"]);
+    assert_eq!(hi.next.as_deref(), Some("story"));
+    assert!(!hi.next_missing);
+    // `story` is reached only through `next`.
+    assert!(outline.nodes.iter().all(|n| !n.unreachable));
+
+    let broken = DIALOGUE.replace("next: story", "next: nowhere");
+    let outline = DialogueOutline::of(&project(&broken).story.dialogues[0]);
+    assert!(outline.nodes[0].next_missing);
+}
+
+#[test]
 fn an_effect_that_takes_the_player_away_ends_the_talk() {
     // The node with the choice moves the player out of the kitchen.
     let dialogue = DIALOGUE.replace(
