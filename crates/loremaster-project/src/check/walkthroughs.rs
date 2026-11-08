@@ -22,29 +22,38 @@ impl Checker<'_> {
 
     /// The hint ladder has one step per id across the walkthroughs that are
     /// not pending, the first in file order. A later step with the same id
-    /// and another command or room would never get its own hints.
+    /// and another command, room, hints or `needs` would never get its own.
+    /// A step without `at` gets its room from the replay, which the checks
+    /// do not run, so a room is compared only when both steps give one.
     fn shared_ids(&mut self, walks: &[(String, Walkthrough)]) {
-        let mut first: BTreeMap<&Id, (&str, &str, Option<&Id>)> = BTreeMap::new();
+        let mut first: BTreeMap<&Id, (&str, &str, &loremaster_model::StepPlan)> = BTreeMap::new();
         let mut found = Vec::new();
         for (key, walk) in walks.iter().filter(|(_, w)| w.pending.is_none()) {
             for (i, step) in walk.steps.iter().enumerate() {
                 let (Some(id), Some(plan)) = (step.id(), step.plan()) else {
                     continue;
                 };
-                let this = (key.as_str(), step.command(), plan.at.as_ref());
-                match first.get(id) {
-                    None => {
-                        first.insert(id, this);
-                    }
-                    Some(&(other, command, at))
-                        if other != key && (command != this.1 || at != this.2) =>
-                    {
-                        found.push((key.clone(), i, format!(
-                            "the step id `{id}` is also in {other} with `{command}`: the hint ladder keeps only the first, so give this step another id"
-                        )));
-                    }
-                    Some(_) => {}
+                let Some(&(other, command, was)) = first.get(id) else {
+                    first.insert(id, (key.as_str(), step.command(), plan));
+                    continue;
+                };
+                if other == key {
+                    continue;
                 }
+                let differs = if command != step.command() {
+                    format!("with `{command}`")
+                } else if was.at.is_some() && plan.at.is_some() && was.at != plan.at {
+                    "in another room".to_string()
+                } else if was.hints != plan.hints {
+                    "with other hints".to_string()
+                } else if was.needs != plan.needs {
+                    "with other `needs`".to_string()
+                } else {
+                    continue;
+                };
+                found.push((key.clone(), i, format!(
+                    "the step id `{id}` is also in {other} {differs}: the hint ladder keeps only the first, so give this step another id"
+                )));
             }
         }
         for (key, i, message) in found {
@@ -499,6 +508,47 @@ mod tests {
             .collect();
         check!(m.len() == 1, "{m:?}");
         check!(m[0].contains("is also in tests/win.yaml"), "{m:?}");
+    }
+
+    /// The diagnostics of tests/zz.yaml, next to tests/win.yaml.
+    fn shared(win: &str, zz: &str) -> Vec<String> {
+        let mut f = files(win);
+        f.push(SourceFile {
+            path: "tests/zz.yaml".into(),
+            text: zz.into(),
+        });
+        check_files(f)
+            .diagnostics
+            .into_iter()
+            .filter(|d| d.file == "tests/zz.yaml")
+            .map(|d| d.message)
+            .collect()
+    }
+
+    #[test]
+    fn a_shared_step_id_with_other_hints_or_needs_is_a_warning() {
+        let m = shared(
+            "steps:\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: d, do: open drawer, hints: [\"Look.\"] }\n",
+        );
+        check!(m.len() == 1, "{m:?}");
+        check!(m[0].contains("other hints"), "{m:?}");
+        let m = shared(
+            "steps:\n  - { id: s, do: s }\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: s, do: s }\n  - { id: d, do: open drawer, needs: s }\n",
+        );
+        check!(m.len() == 1, "{m:?}");
+        check!(m[0].contains("other `needs`"), "{m:?}");
+    }
+
+    #[test]
+    fn a_shared_step_id_with_one_room_given_is_no_warning() {
+        // The replay finds the room of the step without `at`.
+        let m = shared(
+            "steps:\n  - { id: d, do: open drawer }\n",
+            "steps:\n  - { id: d, do: open drawer, at: cottage }\n",
+        );
+        check!(m.is_empty(), "{m:?}");
     }
 
     #[test]
