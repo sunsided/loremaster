@@ -23,17 +23,18 @@
 		portrait?: Image | null;
 		/** The hotspots on the illustration, in reading order. */
 		hotspots?: Hotspot[];
-		onhotspot?: (index: number) => void;
+		/** A click on a hotspot, with its button: the host can check later whether it is still there. */
+		onhotspot?: (index: number, button: HTMLButtonElement) => void;
 		/** Shown beside the images: the sound controls and captions. */
 		children?: Snippet;
 	}
 
 	let { illustration = null, portrait = null, hotspots = [], onhotspot, children }: Props = $props();
 
-	/** A key per hotspot that stays when other hotspots come and go: its target, and which one of that target. */
 	/** Width by height of the scene image, once it loaded. The scene keeps it, so the hotspots in percent fit. */
 	let ratio = $state(1.6);
 
+	/** A key per hotspot that stays when other hotspots come and go: its target, and which one of that target. */
 	const keys = $derived(hotspots.map((s, i) => `${s.inspect ?? ''}#${hotspots.slice(0, i).filter((o) => o.inspect === s.inspect).length}`));
 </script>
 
@@ -58,7 +59,7 @@
 						style:width="{spot.rect[2]}%"
 						style:height="{spot.rect[3]}%"
 						data-inspect={spot.inspect}
-						onclick={() => onhotspot?.(i)}><span class="name">{spot.label}</span></button
+						onclick={(e) => onhotspot?.(i, e.currentTarget)}><span class="name">{spot.label}</span></button
 					>
 				{/each}
 			</div>
@@ -144,7 +145,8 @@
 	}
 	/* The name shows on hover and focus; it is the button's name for screen readers all the time. */
 	.name {
-		/* A long name is cut, so it stays inside the hotspot and its rect. */
+		/* A long name is cut, so it stays inside the hotspot and its rect, padding included. */
+		box-sizing: border-box;
 		max-width: 100%;
 		overflow: hidden;
 		text-overflow: ellipsis;

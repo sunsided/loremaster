@@ -1783,13 +1783,13 @@
 						rect: r.rect,
 						inspect: r.thing ? `thing:${r.thing}` : `exit:${r.exit}`
 					}))}
-					onhotspot={async (i) => {
+					onhotspot={async (i, button) => {
 						const r = regions[i];
 						if (r?.thing) s.pickThing(r.thing, r.name);
 						else if (r?.exit) s.pickExit(r.exit);
 						// The hotspot is gone, for example after "take": the focus goes to the prompt, not to the page.
 						await tick();
-						if (document.activeElement === document.body) prompt?.focus();
+						if (!button.isConnected) prompt?.focus();
 					}}
 				>
 					<AudioControls
