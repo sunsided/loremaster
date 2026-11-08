@@ -569,6 +569,9 @@ impl Checker<'_> {
             for n in &d.nodes {
                 let at = format!("nodes.{}", n.key);
                 self.line(&file, &at, &n.say);
+                for (i, l) in n.lines.iter().enumerate() {
+                    self.line(&file, &format!("{at}.lines[{i}]"), &l.say);
+                }
                 for (i, o) in n.options.iter().enumerate() {
                     if let Some(say) = &o.say {
                         self.line(&file, &format!("{at}.options[{i}]"), say);
@@ -620,16 +623,10 @@ impl Checker<'_> {
     }
 
     /// Fields of the dialogue shape that the talks of loremaster do not
-    /// play yet: more lines and `next` (auto-continue), and the option
-    /// fields `hint`, `tags` and `intentions`.
+    /// play yet: the option fields `hint`, `tags` and `intentions`.
     fn not_played_yet(&mut self, file: &str, d: &loremaster_model::Dialogue) {
         for n in &d.nodes {
             let at = format!("nodes.{}", n.key);
-            for (field, used) in [("lines", !n.lines.is_empty()), ("next", n.next.is_some())] {
-                if used {
-                    self.error(file, &format!("{at}.{field}"), not_yet(field));
-                }
-            }
             for (i, o) in n.options.iter().enumerate() {
                 let at = format!("{at}.options[{i}]");
                 for (field, used) in [

@@ -168,6 +168,8 @@ nodes:
 - `with` is the id of the thing.
 - `start` is a list of node keys. The talk starts at the first node whose `when` holds.
 - A node is one line of the thing (`say`). Its `options` are the answers of the player.
+- More `lines` after `say` play in order, each with its `speaker`: a thing id, or `player` for a line of the player (it shows like an answer). A segment with `when` shows only while it holds, as in any line.
+- `next` is where the talk goes on when the node has no answer that shows: a node key, `end` or `back`. The talk goes on in the same turn, and each node on the way shows its lines and applies its outcomes. `next: back` returns like `go: back`: the node before shows its lines again, without a check and without its outcomes. A node without answers and without `next` ends the talk. A loop of `next` without an answer in it is a check error; should one play anyway, the talk ends after 1024 nodes.
 - A node with a `when` can only be entered while its `when` holds. When a `go` leads to a node whose `when` does not hold, the talk ends. `go: back` is no new entry: it returns to the node before and shows its line again, without a check and without its outcomes.
 - An option has a `say` (the line of the player, and the text of the choice), an optional `when`, and `go`. `go` is a node key, `end` or `back` (the node before). Without `go`, the option ends the talk.
 - A node or an option can change the state when it applies:
@@ -189,9 +191,9 @@ During a talk:
 - In the terminal, the answers show as a numbered list after the text. Type a number, or the first word of an answer.
 - Each answer takes one turn.
 - Other commands do not run. To leave the talk, type `bye` or `leave`, or push Escape.
-- A talk ends when the player chooses an answer that ends it, when a node has no answer that shows, or when an effect takes the player away.
+- A talk ends when the player chooses an answer that ends it, when a node has no answer that shows and no `next`, or when an effect takes the player away.
 
-The shape of a dialogue is the one of dramaturge's `dramaturge-syntax` (decision D3). Options can have an `id` (the key of the option), and the dialogue, nodes and options can have `notes`. The shape also has `lines`, `next`, and the option fields `hint`, `tags` and `intentions`; loremaster's talks do not play them yet, and `loremaster check` reports them as errors.
+The shape of a dialogue is the one of dramaturge's `dramaturge-syntax` (decision D3). Options can have an `id` (the key of the option), and the dialogue, nodes and options can have `notes`. The shape also has the option fields `hint`, `tags` and `intentions`; loremaster's talks do not play them yet, and `loremaster check` reports them as errors.
 
 `loremaster check` examines each dialogue: keys, `start`, targets of `go`, conditions, markup, speakers, and nodes that no start node leads to.
 

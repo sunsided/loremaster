@@ -491,6 +491,67 @@ mod talks {
     }
 }
 
+/// More lines of a node and `-> <node>` (`next`): the same dialogue as
+/// the YAML form.
+mod flow {
+    use loremaster::prelude::*;
+
+    world! {
+        pack flow;
+
+        extern { thing keeper; thing dog; var late; }
+
+        dialogue with keeper start [hi] {
+            hi: "He looks up." {
+                player: says "Evening.";
+                dog: says "Woof." when late then narrate "It is late.";
+                -> ask;
+            }
+            ask {
+                keeper: says "Anything else?";
+                says "Again." => back;
+                says "Bye." => end;
+            }
+            story: "He tells a story." {
+                -> end;
+            }
+        }
+    }
+}
+
+const FLOW_YAML: &str = r#"
+id: keeper
+with: keeper
+start: [hi]
+nodes:
+  hi:
+    say: "He looks up."
+    lines:
+      - { speaker: player, say: [{ says: "Evening." }] }
+      - { speaker: dog, say: [{ says: "Woof." }, { narrate: "It is late.", when: late }] }
+    next: ask
+  ask:
+    speaker: keeper
+    say: [{ says: "Anything else?" }]
+    options:
+      - { say: [{ says: "Again." }], go: back }
+      - { say: [{ says: "Bye." }], go: end }
+  story:
+    say: "He tells a story."
+    next: end
+"#;
+
+#[test]
+fn lines_and_next_are_the_yaml_dialogue() {
+    use loremaster::dsl::project::SourceFile;
+    let yaml = Pack::from_files(vec![SourceFile {
+        path: "dialogues/keeper.yaml".into(),
+        text: FLOW_YAML.into(),
+    }])
+    .unwrap();
+    assert_eq!(flow::flow().dialogues, yaml.dialogues);
+}
+
 const BLACKBEARD_YAML: &str = r#"
 id: blackbeard_talk
 with: blackbeard

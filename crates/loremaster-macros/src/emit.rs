@@ -873,6 +873,15 @@ fn dialogue(d: &Dialogue) -> TokenStream {
             let sp = s(sp, span);
             chain.extend(quote_spanned!(span=> .speaker(#sp)));
         }
+        for l in &node.lines {
+            let sp = s(&l.speaker, span);
+            let say = line(&l.say.segments, span);
+            chain.extend(quote_spanned!(span=> .line(#sp, #say)));
+        }
+        if let Some(next) = &node.next {
+            let next = s(next.as_key(), span);
+            chain.extend(quote_spanned!(span=> .next(#next)));
+        }
         chain.extend(when(&node.when));
         chain.extend(outcomes(&node.outcomes, span));
         for option in &node.options {

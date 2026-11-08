@@ -141,9 +141,10 @@
 //! ```
 //!
 //! An option can not start with a segment condition (`when .. then ..`):
-//! there, `when` is the node's condition. More lines of a node
-//! (`<speaker>: "…";`) and `-> <node>` are in the token form, but
-//! loremaster's talks do not play them yet; they are compile errors.
+//! there, `when` is the node's condition. More lines of a node are
+//! `<speaker>: "…";` in its body (the speaker is a thing or `player`), and
+//! `-> <node>` (or `-> end`, `-> back`) is where the talk goes on when the
+//! node has no answer to choose (`next`).
 //!
 //! Also in the grammar:
 //!

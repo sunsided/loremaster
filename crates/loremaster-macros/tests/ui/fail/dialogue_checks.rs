@@ -13,14 +13,15 @@ mod structure {
     }
 }
 
-mod not_played_yet {
+// More lines and `next` play; their speakers and targets are checked.
+mod lines_and_next {
     use loremaster::prelude::*;
     world! {
         extern { thing keeper; }
         dialogue with keeper start [stove] {
             stove {
                 keeper: "He nods.";
-                player: "Hm.";
+                stranger: "Hm.";
                 -> end;
             }
         }
