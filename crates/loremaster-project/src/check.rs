@@ -1,10 +1,23 @@
 use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
+use dramaturge_model::{Candidate, Condition, Entry, FragmentMode, Pick, Pool, Pools, TextTypes};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
     DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
     ThreadStatus, standard_verbs,
 };
 use std::collections::BTreeSet;
+
+/// The host types of a pool in the checks: only what dramaturge's checks
+/// read (conditions for the score, the tuple keys, the named pools).
+struct CheckTypes;
+
+impl TextTypes for CheckTypes {
+    type Leaf = ();
+    type Cond = Condition;
+    type Learn = ();
+    type Actor = String;
+    type Topic = String;
+}
 
 /// The result of the schema checks: the project, when the packs join, and
 /// every error and warning, also the ones of joining the packs.
@@ -159,6 +172,16 @@ impl Checker<'_> {
     /// `at` is the place of the effect, node or option; a segment is at
     /// `<at>.say[i]`.
     fn line(&mut self, file: &str, at: &str, line: &Line) {
+        if let Some(pool) = &line.pool {
+            if self.story().text_pool(pool.as_str()).is_none() {
+                self.error(
+                    file,
+                    at,
+                    format!("unknown text pool `{pool}`; add texts/{pool}.yaml"),
+                );
+            }
+            return;
+        }
         // YAML cannot write an empty line; a builder or `world!` can.
         if line.segments.is_empty() {
             self.error(
@@ -201,9 +224,197 @@ impl Checker<'_> {
             for v in &f.variants {
                 self.markup(file, &format!("{at}[{i}]"), v);
             }
-            if f.variants.is_empty() {
+            self.learn(file, &format!("{at}[{i}].learn"), &f.learn);
+            if !f.one_of.is_empty() {
+                let at = format!("{at}[{i}]");
+                if !f.variants.is_empty() {
+                    self.error(
+                        file,
+                        &at,
+                        "a group has `one_of` in place of `text` or `variants`",
+                    );
+                }
+                self.candidates(file, &at, &f.one_of, &mut |c, at, text| {
+                    c.markup(file, at, text)
+                });
+                let index = i.to_string();
+                let id = f.id.as_ref().map_or(index.as_str(), |id| id.as_str());
+                let pick = match f.pick {
+                    loremaster_model::Pick::All => Pick::All,
+                    loremaster_model::Pick::First => Pick::First,
+                    loremaster_model::Pick::Best => Pick::Best,
+                };
+                let pool = self.pool(id, pick, &f.one_of, &|_: &String| None);
+                self.pool_issues(file, &at, &pool);
+            } else if f.variants.is_empty() {
                 self.error(file, &format!("{at}[{i}]"), "fragment has no text");
             }
+        }
+    }
+
+    /// `learn` names story variables of type bool: they become true.
+    fn learn(&mut self, file: &str, at: &str, learn: &[impl AsRef<str>]) {
+        for var in learn {
+            let var = var.as_ref();
+            if self.ty_of(var) != Some(loremaster_lang::Ty::Bool) {
+                self.error(
+                    file,
+                    at,
+                    format!("`learn` names a story variable of type bool, and `{var}` is none"),
+                );
+            }
+        }
+    }
+
+    /// The candidates of a `one_of` list: conditions, texts (`text` checks
+    /// one), `learn`, and the speaker, a thing or `player`.
+    fn candidates<T>(
+        &mut self,
+        file: &str,
+        at: &str,
+        one_of: &[loremaster_model::Candidate<T>],
+        text: &mut dyn FnMut(&mut Self, &str, &T),
+    ) {
+        use dramaturge_syntax::Variant;
+        for (i, c) in one_of.iter().enumerate() {
+            let at = format!("{at}.one_of[{i}]");
+            if let Some(when) = &c.when {
+                self.condition(file, &format!("{at}.when"), when);
+            }
+            if let Some(by) = &c.speaker
+                && let Err(e) = loremaster_lang::check_speaker(by, &self.scope)
+            {
+                self.error(file, &format!("{at}.speaker"), e.message);
+            }
+            self.learn(file, &format!("{at}.learn"), &c.learn);
+            for v in &c.variants {
+                match v {
+                    Variant::Text(t) => text(self, &at, t),
+                    Variant::Pool(p) => self.candidates(file, &at, &p.one_of, text),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// A pool for dramaturge's checks: the conditions, keys, modes, speaker
+    /// and topic of the candidates, and the named pools that its texts name.
+    fn pool<T>(
+        &self,
+        id: &str,
+        pick: Pick,
+        one_of: &[loremaster_model::Candidate<T>],
+        named: &dyn Fn(&T) -> Option<String>,
+    ) -> Pool<CheckTypes> {
+        use dramaturge_syntax::{FragmentMode as SMode, Pick as SPick, Variant};
+        let mut pool = Pool::new(id, pick);
+        for (i, c) in one_of.iter().enumerate() {
+            let variants = c
+                .variants
+                .iter()
+                .filter_map(|v| match v {
+                    Variant::Text(t) => Some(named(t).map_or(Entry::Leaf(()), Entry::named)),
+                    Variant::Pool(p) => {
+                        let index = i.to_string();
+                        let id = p.id.as_deref().or(c.key.as_deref()).unwrap_or(&index);
+                        let pick = match p.pick.unwrap_or_default() {
+                            SPick::All => Pick::All,
+                            SPick::Best => Pick::Best,
+                            _ => Pick::First,
+                        };
+                        Some(Entry::Pool(self.pool(id, pick, &p.one_of, named)))
+                    }
+                    _ => None,
+                })
+                .collect();
+            let mut candidate = Candidate::new(variants).mode(match c.mode {
+                SMode::FirstTime => FragmentMode::FirstTime,
+                SMode::Once => FragmentMode::Once,
+                SMode::Cycle => FragmentMode::Cycle,
+                SMode::Shuffle => FragmentMode::Shuffle,
+                SMode::Sticky => FragmentMode::Sticky,
+                _ => FragmentMode::Always,
+            });
+            candidate.key = c.key.as_deref().map(Into::into);
+            candidate.speaker = c.speaker.clone();
+            candidate.topic = c.topic.clone();
+            candidate.when = c
+                .when
+                .as_deref()
+                .and_then(|w| compile_condition(w, &self.scope).ok());
+            pool.candidates.push(candidate);
+        }
+        pool
+    }
+
+    /// dramaturge's checks of a pool (ties of `pick: best`, progress
+    /// without a key, unknown pools) as diagnostics at `at`.
+    fn pool_issues(&mut self, file: &str, at: &str, pool: &Pool<CheckTypes>) {
+        let pools = self.named_pools();
+        let issues = dramaturge_authoring::GraphValidator::new().validate_pool(pool, &pools);
+        self.report_pool_issues(file, at, issues);
+    }
+
+    fn report_pool_issues(
+        &mut self,
+        file: &str,
+        at: &str,
+        issues: Vec<dramaturge_authoring::ValidationIssue>,
+    ) {
+        use dramaturge_authoring::{ValidationIssueKind as K, ValidationSeverity};
+        for issue in issues {
+            if !matches!(issue.kind, K::PickTie | K::UnkeyedProgress | K::UnknownPool) {
+                continue;
+            }
+            let at = match issue.path.as_deref() {
+                Some(path) if at.is_empty() => path.to_string(),
+                Some(path) => format!("{at} ({path})"),
+                None => at.to_string(),
+            };
+            match issue.severity {
+                ValidationSeverity::Error => self.error(file, &at, issue.message),
+                _ => self.warning(file, &at, issue.message),
+            }
+        }
+    }
+
+    fn named_pools(&self) -> Pools<CheckTypes> {
+        let mut pools = Pools::new();
+        for p in &self.story().texts {
+            let id = p.id.clone().unwrap_or_default();
+            let pick = match p.pick.unwrap_or_default() {
+                dramaturge_syntax::Pick::All => Pick::All,
+                dramaturge_syntax::Pick::Best => Pick::Best,
+                _ => Pick::First,
+            };
+            let named = |l: &Line| l.pool.as_ref().map(|p| p.to_string());
+            pools.insert(self.pool(&id, pick, &p.one_of, &named));
+        }
+        pools
+    }
+
+    /// The named text pools of `texts/`: their candidates, and dramaturge's
+    /// checks of all of them.
+    fn texts(&mut self) {
+        let story = self.story().clone();
+        for p in &story.texts {
+            let id = p.id.clone().unwrap_or_default();
+            let file = self.file_of(&format!("text:{id}"));
+            self.candidates(&file, "", &p.one_of, &mut |c, at, line| {
+                c.line(&file, at.trim_start_matches('.'), line)
+            });
+        }
+        let pools = self.named_pools();
+        let issues = dramaturge_authoring::GraphValidator::new().validate_pools(&pools);
+        for issue in issues {
+            // The path starts with the pool id: the file of that pool.
+            let id = issue
+                .path
+                .as_deref()
+                .and_then(|p| p.split('/').next())
+                .unwrap_or("");
+            let file = self.file_of(&format!("text:{id}"));
+            self.report_pool_issues(&file, "", vec![issue]);
         }
     }
 
@@ -352,6 +563,7 @@ impl Checker<'_> {
         self.reserved_names();
         self.threads();
         self.dialogues();
+        self.texts();
         self.player_thing();
         self.timers();
         self.endings();

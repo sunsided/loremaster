@@ -6,8 +6,10 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FragmentProgress {
     pub shown: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sticky: Option<u32>,
+    /// The variant shown last (`shuffle`) or the chosen one (`sticky`).
+    /// Saves before the text core call it `sticky`.
+    #[serde(default, alias = "sticky", skip_serializing_if = "Option::is_none")]
+    pub pick: Option<u32>,
 }
 
 /// Everything that changes during play. This is the save game: small, plain
@@ -22,7 +24,9 @@ pub struct State {
     /// Minutes since midnight of day one.
     pub minutes: u32,
     pub turns: u32,
-    /// Keyed by fragment key, e.g. `room:shore#2`.
+    /// Keyed by the progress key of a text candidate: `room:shore/2`, the
+    /// pool id and the fragment's id or index. A named pool's keys start
+    /// with its id: `keeper_remark/1`.
     pub progress: BTreeMap<String, FragmentProgress>,
     pub fired: BTreeSet<Id>,
     pub rng: u64,

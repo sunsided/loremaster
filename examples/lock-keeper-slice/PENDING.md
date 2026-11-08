@@ -15,15 +15,15 @@ The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine 
 
 ## Which file needs which phase
 
-Files in today's syntax load now. The other files use syntax that the model does not know yet. Today's loader rejects them (`things/stove.yaml`, `rules/keeper.yaml`, `dialogues/`) or skips their folder with a warning (`texts/`, `agendas/`; any other unknown folder is an error since P2-14). `endings/` loads since P1-03.
+Files in today's syntax load now. The other files use syntax that the model does not know yet. Today's loader rejects them (`rules/keeper.yaml`) or skips their folder with a warning (`agendas/`; any other unknown folder is an error since P2-14). `endings/` loads since P1-03; `things/stove.yaml`, `texts/` and `dialogues/` load since P4-01 (#78), with dramaturge's text selection core (R9).
 
 | Part | Files | New syntax | Phase |
 | --- | --- | --- | --- |
 | Today | `story.yaml`, `rooms/`, `things/` (not the stove), `machines/`, `timers/`, `rules/lock.yaml`, `rules/accuse.yaml`, `verbs/` | None | Now |
 | Endings | `endings/` | Ending entities with `kind`, `rank`, `title`; `end: <ending id>` | Today (since P1-03, #44) |
-| Dialogue | `dialogues/keeper.yaml` | A node says a text pool: `say: { text: keeper_remark }`. The speech segments (`{ says: … }`) load since P3-15 (#111) | 4 (R9) |
-| Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky`. The speech segments with a speaker (`{ says: …, by: keeper }`) are lines as in P3-15 (#111) | 4 (R9) |
-| Stove | `things/stove.yaml` | `one_of`, `pick: best`, `seen_by(player)`, `learn` | 4 (R9) |
+| Dialogue | `dialogues/keeper.yaml` | A node says a text pool: `say: { text: keeper_remark }`. The speech segments (`{ says: … }`) load since P3-15 (#111) | Loads since P4-01 (#78) |
+| Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky`. The speech segments with a speaker (`{ says: …, by: keeper }`) are lines as in P3-15 (#111) | Loads since P4-01 (#78) |
+| Stove | `things/stove.yaml` | `one_of`, `pick: best`, `seen_by(player)`, `learn` | Loads since P4-01 (#78) |
 | Keeper rule | `rules/keeper.yaml` | `on: { verb: examine, direct: stove }` (Command record), `say: { text: … }` | 4 (D6, R9) |
 | Agenda | `agendas/keeper.yaml` | `actor`, `steps` with `at`, `place`, `when`, `then`, `closes`, `reason` | 4 (D6, CK) |
 
@@ -33,15 +33,15 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`, and the ones o
 
 | Test | It proves | Loads | Passes after | Issue |
 | --- | --- | --- | --- | --- |
-| `slice_baseline` | Rooms, things and the lock machine load and play in today's syntax; every walkthrough without a pending mark passes (`slice_baseline`, `slice_drowning`) | Today | Phase 0 (passes now) | #37 |
+| `slice_baseline` | Rooms, things and the lock machine load and play in today's syntax; every walkthrough without a pending mark passes (`slice_baseline`, `slice_drowning`), except the ones that need a new part and run in their own test | Today | Phase 0 (passes now) | #37 |
 | `slice_endings` | Endings are entities with id, kind and rank | Today | Passes (P1-03) | #44 |
 | `slice_save_envelope` | A save from the middle of `slice_best` has an envelope and restores | Today | Passes (P1-04) | #45 |
 | `slice_model_hash` | The YAML form gives the model hash in `expected/model.hash` | Today | Passes (P1-06) | #47 |
 | `slice_equivalence` | YAML, DSL and mixed give one model hash, for the part in today's syntax with the endings | Today, per form | Passes (L3, P3-03 #66). In `crates/loremaster-cli/tests/slice_dsl.rs`, with the feature `dsl` | #66 |
 | `slice_equivalence_all_parts` | The same for the whole slice, with all new-syntax parts | All, per form | Phase 4: world! L4 (dialogue), R9 (texts, `one_of`), D6 (agenda, command slots) | P4-08 #85 |
 | `slice_undo_after_death` | The death prompt, and undo after it | Today | Passes (P2-03) | #54 |
-| `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Phase 4 (R9, the text pool); the speech segments work since P3-15 | P4-01 #78 |
-| `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
+| `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Passes (P4-01, the text core of R9); the speech segments work since P3-15 | #78 |
+| `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, and a rule that stands in for the agenda step until D6 | Passes (P4-01); loads the agenda with P4-02 | #78 |
 | `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Phase 4 | P4-02 #79 |
 | `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 2 (talk as an await), then phase 4 (and R9 for the text pool) | P4-02 #79, P4-01 #78 |
 | `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Phase 4 | P4-04 #81 |
@@ -87,4 +87,6 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-07 | DSL | L3: the rules of `today.rs` were in another order than the YAML loader reads them (`rules/accuse.yaml` before `rules/lock.yaml`), so the model hash differed. Rules keep their order in the model. | The accuse rules come first in `today.rs`. A note for authors: in a mixed project, the order of rules across forms is the order of the packs and of the files. |
 | 2026-11-07 | DSL | L3: `slice_drowning` in `dsl/tests.rs` had drifted from the YAML walkthrough (no `"Drowned"`, no `ending drowned`). | Fixed; `the_dsl_tests_equal_the_yaml_tests` compares the test blocks with `yaml/tests/` step by step. |
 | 2026-11-07 | DSL | L3: in a machine step, YAML has `say:` and `then:`; the draft writes `line` and then the effects. | The first `line` of a step is its `say`; the next ones are effects. Both forms give the same model. |
+| 2026-11-08 | YAML | P4-01 (#78): the sticky candidate of `texts/keeper_remark.yaml` had no `key`, so `loremaster check` warned that a candidate inserted before it moves its progress. | Done: `key: midnight`, in the YAML and the mixed form. |
+| 2026-11-08 | YAML | P4-01 (#78): `slice_stove_text` needs the stove to be hot at midnight, which is the agenda step (D6). | The test adds a rule `on: { time: "00:00" }` with the step's effects in place of `agendas/`, until P4-02 (#79). |
 | 2026-11-07 | DSL | L3: an `extern` thing has no properties, and an `extern` machine no states, so a condition such as `stove.hot` or `lock == empty` on them does not check at compile time. | `extern { machine lock [full, emptying, empty]; var n: int; }` exists in L3. Properties of extern things are an open item for L4. |

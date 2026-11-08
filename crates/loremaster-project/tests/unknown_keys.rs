@@ -240,7 +240,7 @@ fn an_unknown_file_at_the_top_is_an_error() {
 
 #[test]
 fn the_folders_of_planned_parts_are_skipped_with_a_warning() {
-    // The golden slice keeps drafts in `agendas/` and `texts/`.
+    // The golden slice keeps drafts in `agendas/`.
     let project = load(lighthouse_with(
         "agendas/keeper.yaml",
         "actor: keeper\nsteps: []\n",

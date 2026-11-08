@@ -193,7 +193,25 @@ fn migrate(save: Value) -> Result<(Migrated, u32), SaveError> {
             }
         }
     };
+    let mut migrated = migrated;
+    progress_keys(&mut migrated.state);
     Ok((migrated, version))
+}
+
+/// Text progress before the text core was keyed `room:shore#2`; the core
+/// keys it `room:shore/2`, as dramaturge does. A fragment with an `id` is
+/// keyed by its id now, so its progress starts over.
+fn progress_keys(state: &mut State) {
+    let old = std::mem::take(&mut state.progress);
+    for (key, p) in old {
+        let key = match key.rsplit_once('#') {
+            Some((owner, i)) if !i.is_empty() && i.bytes().all(|b| b.is_ascii_digit()) => {
+                format!("{owner}/{i}")
+            }
+            _ => key,
+        };
+        state.progress.insert(key, p);
+    }
 }
 
 /// Keep what is still valid in a changed story (ST-6). New values start at

@@ -526,6 +526,7 @@ version = "0.1.0"
 dependencies = [
  "assert2",
  "dramaturge-authoring",
+ "dramaturge-model",
  "dramaturge-syntax",
  "loremaster-lang",
  "loremaster-model",

@@ -202,7 +202,11 @@ impl Game {
             link: None,
             speaker: None,
         };
-        let runs = self.line(&node.text, &base);
+        // `say: { text: <id> }`: the core chooses the line of the pool.
+        let runs = match &node.text {
+            DialogText::Pool(id) => self.say_pool(turn, id, &base),
+            text => self.line(text, &base),
+        };
         turn.push(BlockKind::Speech, runs);
     }
 

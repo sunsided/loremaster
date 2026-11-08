@@ -1,7 +1,7 @@
 use crate::eval::Eval;
 use crate::parser::{ParseScope, parse};
 use crate::text::{self, article};
-use crate::world::{CEffect, CFragment, Within};
+use crate::world::{CEffect, CText, Within};
 use crate::{Block, BlockKind, Command, Link, LinkKind, LogEntry, Run, State, Turn, World};
 use crate::{Event, Phase};
 use loremaster_model::{Id, Location, TimeOfDay, Value, VerbSlots};
@@ -355,8 +355,8 @@ impl Game {
     /// The intro, start rules and the first room description.
     pub fn start(&mut self) -> Turn {
         let mut turn = Turn::default();
-        let intro = self.world.intro.clone();
-        let runs = self.assemble(&intro, true);
+        let world = self.world.clone();
+        let runs = self.assemble(&mut turn, &world.intro);
         turn.push(BlockKind::Narration, runs);
         self.enter_room(&mut turn, 0);
         self.fire(&mut turn, &Event::Start, 0);
@@ -654,8 +654,8 @@ impl Game {
     fn frame_use(&self, verb: &Id, scope: &str, frame: &crate::world::CFrame) -> FrameUse {
         let ev = self.eval();
         let s = &self.state;
-        let part = |name: &str, fragments: &[CFragment]| {
-            let visible = text::visible(&ev, fragments, false);
+        let part = |name: &str, fragments: &CText| {
+            let visible = text::visible(&ev, fragments);
             FramePart {
                 part: name.to_string(),
                 fragments: fragments
@@ -718,11 +718,11 @@ impl Game {
     }
 
     /// Show frame fragments as one response block. Returns true if any showed.
-    fn frame_text(&mut self, turn: &mut Turn, fragments: Option<&Vec<CFragment>>) -> bool {
+    fn frame_text(&mut self, turn: &mut Turn, fragments: Option<&CText>) -> bool {
         let Some(fragments) = fragments.filter(|f| !f.is_empty()) else {
             return false;
         };
-        let runs = self.assemble(fragments, false);
+        let runs = self.assemble(turn, fragments);
         if runs.is_empty() {
             return false;
         }
@@ -904,7 +904,7 @@ impl Game {
         let fragments = &self.world.rooms[ri].description;
         let ev = self.eval();
         let first = self.state.visits_to(room.id.as_str()) <= 1;
-        let mut shown = text::visible(&ev, fragments, first);
+        let mut shown = text::visible(&ev, fragments);
         // Text on screen counts as shown, even when it was once-only and is used up now.
         if let Some((last_room, last)) = &self.last_shown
             && *last_room == room.id
@@ -978,11 +978,10 @@ impl Game {
         let room = &story.rooms[ri];
         let ev = self.eval();
         let dark = self.is_dark();
-        let first = self.state.visits_to(room.id.as_str()) <= 1;
 
         // The room text as it reads now, to check which things it mentions.
         let fragments = &self.world.rooms[ri].description;
-        let room_text = text::visible(&ev, fragments, first)
+        let room_text = text::visible(&ev, fragments)
             .iter()
             .flat_map(|&i| fragments[i].variants.iter().map(|v| text::render(&ev, v)))
             .collect::<Vec<_>>()
@@ -1018,7 +1017,7 @@ impl Game {
                     })
                 } else if dark {
                     Some("the room is dark".to_string())
-                } else if !t.presence.is_empty() && text::visible(&ev, presence, first).is_empty() {
+                } else if !t.presence.is_empty() && text::visible(&ev, presence).is_empty() {
                     Some("no presence text applies now".to_string())
                 } else {
                     None
@@ -1175,18 +1174,51 @@ impl Game {
 
     // ---- text -----------------------------------------------------------
 
-    fn assemble(&mut self, fragments: &[CFragment], first_visit: bool) -> Vec<Run> {
-        self.assemble_with_picks(fragments, first_visit).0
+    fn assemble(&mut self, turn: &mut Turn, fragments: &CText) -> Vec<Run> {
+        self.assemble_with_picks(turn, fragments).0
     }
 
+    /// Show a text in play: the core chooses, the game records the progress
+    /// and sets what the player learned. Also the fragments that showed.
     fn assemble_with_picks(
         &mut self,
-        fragments: &[CFragment],
-        first_visit: bool,
+        turn: &mut Turn,
+        fragments: &CText,
     ) -> (Vec<Run>, Vec<usize>) {
-        let visible = text::visible(&self.eval(), fragments, first_visit);
-        let picks = text::pick(&mut self.state, fragments, &visible);
-        (text::runs(&self.eval(), fragments, &picks), visible)
+        let world = self.world.clone();
+        let mut rng = self.state.rng;
+        let chosen = text::choose(&self.eval(), &fragments.pool, &world.pools, &mut rng);
+        let runs = text::runs(&self.eval(), &chosen, &fragments.pool.id, &Run::plain(""));
+        let mut shown: Vec<usize> = Vec::new();
+        for &i in &chosen.order {
+            let f = chosen.selection.shown[i].leaf.fragment;
+            if !shown.contains(&f) {
+                shown.push(f);
+            }
+        }
+        self.state.rng = rng;
+        let learned = text::commit(&mut self.state, &chosen);
+        self.learn(turn, learned);
+        (runs, shown)
+    }
+
+    /// Show the named text pool `id` in play, its lines like `base`.
+    pub(crate) fn say_pool(&mut self, turn: &mut Turn, id: &str, base: &Run) -> Vec<Run> {
+        let world = self.world.clone();
+        let mut rng = self.state.rng;
+        let chosen = text::choose_named(&self.eval(), id, &world.pools, &mut rng);
+        let runs = text::runs(&self.eval(), &chosen, &format!("text:{id}"), base);
+        self.state.rng = rng;
+        let learned = text::commit(&mut self.state, &chosen);
+        self.learn(turn, learned);
+        runs
+    }
+
+    /// The player learned these story variables from a text: they become true.
+    fn learn(&mut self, turn: &mut Turn, vars: Vec<String>) {
+        for var in vars {
+            self.set_fact(turn, &var, Value::Bool(true));
+        }
     }
 
     fn render(&self, segments: &[loremaster_lang::Segment]) -> String {
@@ -1203,8 +1235,7 @@ impl Game {
         if self.is_dark() {
             turn.say(BlockKind::Prose, "It is pitch dark. You can't see a thing.");
         } else {
-            let first = self.state.visits_to(room.id.as_str()) <= 1;
-            let (runs, shown) = self.assemble_with_picks(&world.rooms[ri].description, first);
+            let (runs, shown) = self.assemble_with_picks(turn, &world.rooms[ri].description);
             self.last_shown = Some((room.id.clone(), shown));
             turn.push(BlockKind::Prose, runs);
             let mut objects = Vec::new();
@@ -1227,7 +1258,7 @@ impl Game {
                     }
                     continue;
                 }
-                let mut runs = self.assemble(&world.things[ti].presence, first);
+                let mut runs = self.assemble(turn, &world.things[ti].presence);
                 if runs.is_empty() {
                     let a = self
                         .eval()
@@ -1550,6 +1581,10 @@ impl Game {
                 let runs = text::line_runs(&self.eval(), line, &rule_run(String::new(), rule));
                 turn.push(BlockKind::Narration, runs);
             }
+            CEffect::SayPool(id) => {
+                let runs = self.say_pool(turn, id.as_str(), &rule_run(String::new(), rule));
+                turn.push(BlockKind::Narration, runs);
+            }
             CEffect::Move(moves) => {
                 for (thing, to) in moves {
                     let loc = Location::from_word(to.as_str());
@@ -1853,7 +1888,7 @@ impl Game {
                     return;
                 };
                 let world = self.world.clone();
-                let runs = self.assemble(&world.things[ti].description, true);
+                let runs = self.assemble(turn, &world.things[ti].description);
                 let contents = self.contents_text(&world.story.things[ti]);
                 if runs.is_empty() && contents.is_none() {
                     say(turn, format!("You see nothing special about {the}."));

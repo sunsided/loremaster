@@ -27,6 +27,12 @@ const STOVE: &str = "things/stove.yaml";
 const KEEPER_RULE: &str = "rules/keeper.yaml";
 const NEW_SYNTAX: &[&str] = &[AGENDA, DIALOGUE, TEXTS, STOVE, KEEPER_RULE];
 
+/// Walkthroughs without a pending mark that need new-syntax parts.
+const NEEDS_PARTS: &[&str] = &[
+    "tests/slice_keeper_dialogue.yaml",
+    "tests/slice_stove_text.yaml",
+];
+
 fn form(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/lock-keeper-slice")
@@ -86,13 +92,14 @@ fn slice_baseline() {
         .collect();
     assert!(errors.is_empty(), "{errors:#?}");
 
-    // Every walkthrough without a `pending:` mark passes on today's files.
+    // Every walkthrough without a `pending:` mark passes on today's files,
+    // except the ones that need a new part: their own tests load it.
     let world = Arc::new(World::compile(project.story).unwrap());
     let mut ran = Vec::new();
     for (path, walk) in project
         .walkthroughs
         .iter()
-        .filter(|(_, w)| w.pending.is_none())
+        .filter(|(p, w)| w.pending.is_none() && !NEEDS_PARTS.contains(&p.as_str()))
     {
         let result = run_walkthrough(world.clone(), walk, path);
         assert!(
@@ -203,14 +210,43 @@ fn slice_talk_pauses_agenda() {
     assert_passes("slice_talk_pauses_agenda", &[AGENDA, DIALOGUE, TEXTS]);
 }
 
+/// The keeper's agenda step at midnight as a rule: agendas wait for D6
+/// (P4-02 #79), and the stove text needs only what the step changes.
+const AGENDA_STAND_IN: &str = r#"
+- id: keeper_feeds_the_stove
+  on: { time: "00:00" }
+  when: in(pages, gear_housing)
+  then:
+    - move: { pages: nowhere }
+    - set: { stove.hot: true, pages_burned: true }
+"#;
+
 #[test]
-#[ignore = "pending: phase 4, TX, D2, P4-01 #78"]
 fn slice_stove_text() {
-    assert_passes("slice_stove_text", &[STOVE, AGENDA]);
+    // TODO(P4-02 #79): load AGENDA in place of the stand-in once agendas play.
+    let mut files = with("yaml", &[STOVE]);
+    files.push(SourceFile {
+        path: "rules/agenda_stand_in.yaml".into(),
+        text: AGENDA_STAND_IN.into(),
+    });
+    let project = project(files);
+    let walk = project
+        .walkthroughs
+        .iter()
+        .find(|(p, _)| p == "tests/slice_stove_text.yaml")
+        .map(|(_, w)| w.clone())
+        .expect("no walkthrough tests/slice_stove_text.yaml");
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let result = run_walkthrough(world, &walk, "slice_stove_text");
+    assert!(
+        result.passed(),
+        "{:#?}\n\n{}",
+        result.failures,
+        result.transcript
+    );
 }
 
 #[test]
-#[ignore = "pending: phase 4, R9 (text pools), P4-01 #78"]
 fn slice_keeper_dialogue() {
     assert_passes("slice_keeper_dialogue", &[DIALOGUE, TEXTS]);
 }

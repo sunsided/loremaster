@@ -346,7 +346,7 @@ fn warnings(game: &Game, room: &Id, prose: &str) -> Vec<String> {
     if let Some(ri) = game.world().room_idx(room.as_str()) {
         let ev = game.eval();
         let mut layers: BTreeMap<loremaster_model::Layer, usize> = BTreeMap::new();
-        for f in &game.world().rooms[ri].description {
+        for f in game.world().rooms[ri].description.iter() {
             if f.replaces && ev.holds_opt(&f.when) {
                 *layers.entry(f.layer).or_default() += 1;
             }
@@ -357,12 +357,11 @@ fn warnings(game: &Game, room: &Id, prose: &str) -> Vec<String> {
             }
         }
         // A thing with more than one presence text at the same time usually says the same thing twice.
-        let first = game.state().visits_to(room.as_str()) <= 1;
         for (ti, t) in game.world().story.things.iter().enumerate() {
             if !game.state().is_in_room(t.id.as_str(), room.as_str()) {
                 continue;
             }
-            let n = crate::text::visible(&ev, &game.world().things[ti].presence, first).len();
+            let n = crate::text::visible(&ev, &game.world().things[ti].presence).len();
             if n > 1 {
                 out.push(format!("{n} presence texts of {} show", t.id));
             }

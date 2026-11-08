@@ -2,7 +2,7 @@ use crate::merge::{Extension, MergeMode, extend_entity, merge_mode};
 use crate::{Diagnostic, Origin, Severity};
 use loremaster_model::{
     ClockConfig, Dialogue, DialogueId, Effect, Ending, Fragment, Id, Machine, Note, Room, Rule,
-    Story, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
+    Story, TextPool, Thing, Thread, Timer, VarDef, VerbDef, Walkthrough,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -121,6 +121,8 @@ pub struct Pack {
     pub verbs: Vec<VerbDef>,
     pub timers: Vec<Timer>,
     pub endings: Vec<Ending>,
+    /// Named text pools, from `texts/`.
+    pub texts: Vec<TextPool>,
     /// The source files, for diagnostics with lines.
     pub files: Vec<SourceFile>,
     /// Entity key such as `room:cellar` to where it is defined. The key
@@ -162,6 +164,7 @@ impl Pack {
         let mut verbs: Vec<VerbDef> = Vec::new();
         let mut timers: Vec<Timer> = Vec::new();
         let mut endings: Vec<Ending> = Vec::new();
+        let mut texts: Vec<TextPool> = Vec::new();
         let mut replaces = BTreeSet::new();
         let mut extensions = Vec::new();
 
@@ -316,6 +319,15 @@ impl Pack {
                         Err(e) => errors.push(parse_err(e)),
                     }
                 }
+                // The id is the file name; rules and dialogue lines name it.
+                "texts" => match serde_saphyr::from_str::<TextPool>(&file_text) {
+                    Ok(mut t) => {
+                        t.id = Some(stem.to_string());
+                        origins.insert(format!("text:{stem}"), Origin::yaml(path));
+                        texts.push(t);
+                    }
+                    Err(e) => errors.push(parse_err(e)),
+                },
                 "timers" => {
                     match serde_saphyr::from_str::<Timer>(&with_default_id(&file_text, stem)) {
                         Ok(t) => {
@@ -393,6 +405,7 @@ impl Pack {
             verbs,
             timers,
             endings,
+            texts,
             files,
             origins,
             replaces,
@@ -416,6 +429,7 @@ pub const FOLDERS: &[&str] = &[
     "timers",
     "verbs",
     "machines",
+    "texts",
     "behaviors",
     "tests",
 ];
@@ -423,10 +437,7 @@ pub const FOLDERS: &[&str] = &[
 /// Folders of planned features. The golden slice (`examples/lock-keeper-slice`)
 /// has drafts in them. The loader skips them with a warning instead of an
 /// error, so that their drafts can wait in a project.
-const PLANNED_FOLDERS: &[(&str, &str)] = &[
-    ("agendas", "agendas of characters are planned"),
-    ("texts", "named text pools are planned"),
-];
+const PLANNED_FOLDERS: &[(&str, &str)] = &[("agendas", "agendas of characters are planned")];
 
 fn unknown_folder(path: &str, dir: &str) -> Diagnostic {
     let hint = match loremaster_lang::closest(dir, FOLDERS.iter().copied()) {
@@ -521,6 +532,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
     let mut verbs: Vec<VerbDef> = Vec::new();
     let mut timers: Vec<Timer> = Vec::new();
     let mut endings: Vec<Ending> = Vec::new();
+    let mut texts: Vec<TextPool> = Vec::new();
     for (i, mut pack) in packs.into_iter().enumerate() {
         assembly.append(&mut pack.warnings);
         // A replaced room or thing takes its nested rules with it: they come
@@ -617,6 +629,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         verbs.extend(pack.verbs);
         timers.extend(pack.timers);
         endings.extend(pack.endings);
+        texts.extend(pack.texts);
         files.extend(pack.files);
         for ext in pack.extensions {
             let found = extend_with(
@@ -710,6 +723,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
             }),
         relations: header.relations,
         dialogues,
+        texts,
         frames: header.frames,
         seed: header.seed,
         death_prompt: header.death_prompt,

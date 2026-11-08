@@ -20,10 +20,11 @@ A story is a folder of YAML files. Each entity has its own file.
 | `tests/*.yaml` | One walkthrough test in each file. Read [Walkthrough tests](#walkthrough-tests). |
 | `threads/*.yaml` | One long-range thread in each file. Read [Author notes and threads](#author-notes-and-threads). |
 | `dialogues/*.yaml` | One talk with a thing in each file. Read [Dialogues](#dialogues). |
+| `texts/*.yaml` | One named text pool in each file. Read [Named text pools](#named-text-pools). |
 
 The id of an entity is its file name. You can set `id:` to use a different id.
 
-The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folders `agendas/` and `texts/` are for planned parts: the loader skips them with a warning.
+The loader reads only these files and folders, and only the fields that it knows. An unknown field, an unknown folder (also a folder inside a folder, such as `rooms/old/`) or another YAML file next to `story.yaml` is an error, so that a typo does not load as nothing. The error names the nearest known field or folder: ``unknown field `descripton`: did you mean `description`?``. Files that are not YAML, such as notes in Markdown, are not read. The folder `agendas/` is for a planned part: the loader skips it with a warning.
 
 To examine a story for problems, run `task check:story` or `cargo run -p loremaster --no-default-features -- check <folder>`.
 
@@ -44,9 +45,55 @@ A text is a list of fragments. A fragment is a plain string, or a map with these
 | `text` | The text, with inline markup. |
 | `variants` | More texts for the modes `cycle`, `shuffle` and `sticky`. |
 | `when` | A condition. The fragment shows only when the condition is true. |
-| `mode` | `always`, `first_visit`, `once`, `cycle`, `shuffle` or `sticky`. |
+| `mode` | `always`, `first_visit` (or `first_time`), `once`, `cycle`, `shuffle` or `sticky`. |
 | `layer` | `base`, `ambient`, `event`, `objects`, `characters` or `exits`. |
 | `replaces` | `true` hides the fragments before it in the same layer. |
+| `id` | A stable name. The game keeps the progress of `once`, `cycle`, `shuffle` and `sticky` under it, so an inserted fragment does not move it. |
+| `learn` | Story variables of type bool that become true when the fragment shows. |
+| `pick`, `one_of` | A group in place of `text`: see below. |
+
+`first_visit` shows on the first visit of the room, for a room and the presence text of a thing. For an examined thing, the intro and a frame it shows the first time the text would show. `shuffle` never shows the same variant twice in a row. `sticky` chooses a variant once and keeps it.
+
+### Groups: one of several texts
+
+A fragment with `one_of` shows one line of a group. dramaturge's text core chooses it; the fragment keeps its place, `layer` and `replaces` in the description.
+
+```yaml
+# things/stove.yaml
+description:
+  - id: stove_state
+    pick: best
+    one_of:
+      - "The stove is cold."
+      - when: stove.hot
+        text: "The stove is still too hot to touch."
+      - when: stove.hot and seen_by(player)
+        text: "Someone fed the stove after midnight. The ash on the grate is fresh."
+        learn: [ash_is_fresh]
+```
+
+`pick` is `first` (the default: the first candidate whose condition holds), `best` (the candidate with the most tests: each test in `when` counts 1, `a and b` the sum, `a or b` the smaller side, and `speaker` and `topic` 1 each; a tie goes to the file order) or `all` (every candidate that holds, as a plain fragment list). A candidate is a text, or a map with `key`, `when`, `mode`, `text` or `variants`, `learn`, `speaker` and `topic`, or an inner group (`id`, `pick`, `one_of`). `seen_by(x)` is true when `x` sees the text: today the player always does, so the slice writes `seen_by(player)`.
+
+### Named text pools
+
+A file in `texts/` is a pool that rules and dialogues show by its id, the file name:
+
+```yaml
+# texts/keeper_remark.yaml
+pick: best
+one_of:
+  - "Mind your step."
+  - when: in(kitchen)
+    text: [{ says: "Do not touch the stove,", by: keeper }, { narrate: "the lock-keeper says." }]
+  - when: in(kitchen) and ash_is_fresh
+    key: midnight
+    mode: sticky
+    variants:
+      - [{ says: "I let it go out at midnight,", by: keeper }, { narrate: "he says." }]
+      - [{ says: "Cold stove, cold supper,", by: keeper }, { narrate: "he says." }]
+```
+
+A pool's texts are lines with speech segments. `say: { text: keeper_remark }` in a rule or a dialogue node shows the pool. A `sticky` line stays the same in every rule and dialogue that shows the pool. In a pool, `first_time` means the first visit of the current room. `loremaster check` warns about two `best` candidates with the same score that can both hold, and about a candidate with progress (`once`, `cycle`, `shuffle`, `sticky`) in a group or a pool that has no `key`; a pool that names an unknown pool is an error.
 
 ## Inline markup
 
@@ -69,12 +116,13 @@ Conditions use variables, thing properties and values that the runtime calculate
 - Containers: `in(coin, trophy_case)` is true when the coin is in or on the trophy case, also deeper inside.
 - Timers: `timer.fuse` is the number of turns left, 0 when the timer does not run. `timer.fuse.running` is true while it runs.
 - Machines: `exorcism == lit`. The id of a machine is a variable with its state.
+- The perceiver of a text: `seen_by(player)`, `seen_by(keeper)`. Only in fragments and text pools.
 - Chance: `chance(30)` is true in about 30 of 100 turns. In one state, the result is always the same, so a game replays.
 - The current action: `action.repeat`, `action.count`, `action.total`, `action.verb`.
 
 Use `and`, `or`, `not` and parentheses to join conditions.
 
-These names are built-ins of conditions: `and`, `or`, `not`, `true`, `false`, `here`, `turns`, `level`, `first_visit`, `time`, `action`, `timer`, `in`, `carried`, `present`, `visited`, `visits`, `chance`, `remembers` and `seen_by` (planned). A variable, machine, room or thing must not use one of them as its id: a condition cannot name a keyword, it reads the built-in value instead of a `here` or `turns` of the story, and the function names are kept for the functions. The checker reports such an id as an error at its declaration. A variable or machine must not use the name of a phase of the clock (`night`, `dawn`, `day`, `dusk` by default) either: a bare `dusk` would read the variable instead of the phase.
+These names are built-ins of conditions: `and`, `or`, `not`, `true`, `false`, `here`, `turns`, `level`, `first_visit`, `time`, `action`, `timer`, `in`, `carried`, `present`, `visited`, `visits`, `chance`, `remembers` and `seen_by`. A variable, machine, room or thing must not use one of them as its id: a condition cannot name a keyword, it reads the built-in value instead of a `here` or `turns` of the story, and the function names are kept for the functions. The checker reports such an id as an error at its declaration. A variable or machine must not use the name of a phase of the clock (`night`, `dawn`, `day`, `dusk` by default) either: a bare `dusk` would read the variable instead of the phase.
 
 ## Action frames
 
