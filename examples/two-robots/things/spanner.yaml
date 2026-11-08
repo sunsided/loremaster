@@ -1,0 +1,6 @@
+name: valve spanner
+aliases: [spanner]
+portable: true
+location: { room: gallery }
+description:
+  - "It fits the square spindle of a valve wheel."

@@ -115,9 +115,18 @@ impl Scope {
                         .remember
                         .iter()
                         .chain(n.options.iter().flat_map(|o| o.outcomes.remember.iter()))
+                        .map(String::as_str)
                 })
             })
-            .cloned()
+            // An imported memory has its key from the story before.
+            .chain(
+                story
+                    .import
+                    .memories
+                    .iter()
+                    .filter_map(|m| Some(m.split_once('.')?.1)),
+            )
+            .map(String::from)
             .collect();
         let mut symbols = SymbolTable::new();
         // The player first, so it gets the same id in every story; saves and

@@ -1,0 +1,10 @@
+name: Wick
+aliases: [robot]
+proper: true
+container: true
+location: { room: gallery }
+props: { active: true }
+description:
+  - "A tall maintenance robot with one camera on a stalk, and two good hands."
+presence:
+  - "Wick waits here on its treads."

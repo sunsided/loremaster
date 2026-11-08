@@ -1,0 +1,11 @@
+# Switch between the robots: Bilge holds the lever, Wick goes through with
+# the spanner. The panel shows Wick that the port main is live.
+name: The station holds
+steps:
+  - { do: look, see: "port main shakes in the red", not_see: "drums on the far side" }
+  - take spanner
+  - { do: switch to bilge, see: "You are Bilge now", not_see: "shakes in the red" }
+  - hold lever
+  - { do: switch to wick, facts: { bilge_holds: true } }
+  - { do: s, see: "look exactly alike" }
+  - { do: turn port wheel, see: "pumps take the water down", facts: { wick_holds: false } }

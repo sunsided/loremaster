@@ -94,6 +94,8 @@ pub struct StoryHeader {
     /// How many things the player can hold (WO-3).
     #[serde(default)]
     pub carry_limit: Option<u32>,
+    #[serde(default)]
+    pub playable: Vec<Id>,
     /// The most `on: next` machine steps in one turn (P5-02).
     #[serde(default)]
     pub step_limit: Option<u32>,
@@ -113,6 +115,12 @@ pub struct StoryHeader {
     /// The contract with the host (IF-1).
     #[serde(default)]
     pub interface: Option<loremaster_model::Interface>,
+    /// What the episode of this story carries to the next story (TX-12).
+    #[serde(default)]
+    pub export: loremaster_model::EpisodeItems,
+    /// What this story takes from the episode of the story before (TX-12).
+    #[serde(default)]
+    pub import: loremaster_model::EpisodeItems,
 }
 /// Load a project from its files: one YAML pack, assembled. Paths use `/` and
 /// are relative to the project folder.
@@ -769,11 +777,14 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         seed: header.seed,
         death_prompt: header.death_prompt,
         carry_limit: header.carry_limit,
+        playable: header.playable,
         step_limit: header.step_limit,
         stats: header.stats,
         notes: header.notes,
         threads,
         interface: header.interface,
+        export: header.export,
+        import: header.import,
     };
     inherit_results(&mut story);
     Ok(Project {

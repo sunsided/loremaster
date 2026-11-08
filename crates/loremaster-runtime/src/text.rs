@@ -8,7 +8,7 @@ use dramaturge_runtime::{Selection, select, select_named};
 use loremaster_lang::{CompiledLine, Segment};
 use loremaster_model::Id;
 pub(crate) use pool::holds_for_player;
-use pool::{LeafText, Lore, LoreJudge, LorePool, Rng, seen_by_player};
+use pool::{LeafText, Lore, LoreJudge, LorePool, Rng, seen_by_active};
 use serde::{Deserialize, Serialize};
 
 /// Render compiled markup to text.
@@ -185,7 +185,7 @@ pub(crate) fn choose<'w>(
         pool,
         pools,
         caller,
-        &seen_by_player(),
+        &seen_by_active(ev.state),
         &LoreJudge(ev),
         ev.state,
         &mut Rng(rng),
@@ -206,7 +206,7 @@ pub(crate) fn choose_named<'w>(
         id,
         pools,
         caller,
-        &seen_by_player(),
+        &seen_by_active(ev.state),
         &LoreJudge(ev),
         ev.state,
         &mut Rng(rng),
@@ -257,12 +257,12 @@ pub(crate) fn commit(state: &mut State, chosen: &Chosen) -> Vec<String> {
         .steps
         .retain(|s| s.leaves.is_empty() || s.leaves.clone().any(|i| chosen.order.contains(&i)));
     let mut learned = Vec::new();
-    dramaturge_runtime::commit(&selection, &seen_by_player(), state, &mut |var: &String,
-                                                                           _: Option<
-        &Id,
-    >| {
-        learned.push(var.clone())
-    });
+    dramaturge_runtime::commit(
+        &selection,
+        &seen_by_active(state),
+        state,
+        &mut |var: &String, _: Option<&Id>| learned.push(var.clone()),
+    );
     learned
 }
 

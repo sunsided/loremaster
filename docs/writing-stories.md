@@ -73,7 +73,7 @@ description:
         learn: [ash_is_fresh]
 ```
 
-`pick` is `first` (the default: the first candidate whose condition holds), `best` (the candidate with the most tests: each test in `when` counts 1, `a and b` the sum, `a or b` the smaller side, and `speaker` and `topic` 1 each; a tie goes to the file order) or `all` (every candidate that holds, as a plain fragment list). A candidate is a text, or a map with `key`, `when`, `mode`, `text` or `variants`, `learn`, `speaker` and `topic`, or an inner group (`id`, `pick`, `one_of`). `seen_by(x)` is true when `x` sees the text: today the player always does, so the slice writes `seen_by(player)`.
+`pick` is `first` (the default: the first candidate whose condition holds), `best` (the candidate with the most tests: each test in `when` counts 1, `a and b` the sum, `a or b` the smaller side, and `speaker` and `topic` 1 each; a tie goes to the file order) or `all` (every candidate that holds, as a plain fragment list). A candidate is a text, or a map with `key`, `when`, `mode`, `text` or `variants`, `learn`, `speaker` and `topic`, or an inner group (`id`, `pick`, `one_of`). `seen_by(x)` is true when `x` sees the text: the active actor (the player, unless the story has `playable` actors; see [Several player actors](#several-player-actors)).
 
 ### Named text pools
 
@@ -678,6 +678,33 @@ How a turn goes for an actor, after the clock moved and the timers and time rule
 
 The explorer (`loremaster explore`) waits in a story with agendas, as it does for timers. It tells states apart by the minutes until each agenda's next step, so it reaches a step also in the middle of a phase. The ending checks treat a step's `closes` as they treat a rule's; their findings name the step as `agenda:<id>/steps[<i>]`.
 
+## Several player actors
+
+A story can give the player more than one body. List the actors in story.yaml; each is a thing in a room, with `container: true`. The first one starts the story and must be in the `start` room.
+
+```yaml
+# story.yaml
+playable: [wick, bilge]
+```
+
+```yaml
+# things/wick.yaml
+name: Wick
+proper: true
+container: true
+location: { room: gallery }
+props: { active: true }
+```
+
+- `switch to bilge` (also `become`, `control`) makes Bilge the active actor. It takes no turn and shows Bilge's view of its room. A switch is no entry: Bilge stood there already, so no `enter` rule runs and no visit counts. Only a story with `playable` has this verb.
+- The active actor is the player's body: `State.room`, the carried things and the default actions are its own. The active actor is not listed in the room. The things another playable actor carries are `in` it, so they are out of reach and do not count for `carried`.
+- `seen_by(bilge)` shows text only to Bilge. The perceiver of a text is the active actor.
+- `bilge.active` is true while the player steers Bilge, for rule conditions. Declare it as a property to use it in a rule.
+- An order to another actor: `bilge, take spanner` or `bilge, s then turn port wheel`, or a `Command` record with `actor: bilge`. An order takes the player's turn; each step then runs in one turn, after the agendas, as that actor. The player reads what the actor perceives as it acts, and the actor reports when it is done. A new order replaces the old one. A switch to the actor cancels its orders. A step that the parser cannot read ends the order.
+- `loremaster check` wants each playable actor in a room, `container: true`, not `portable`, and without an agenda.
+
+The active actor is in the save (`State.active`, `State.orders`). The state explorer tries a `switch`, but not orders: they reach the same states. Read `examples/two-robots`.
+
 ## Containers and scenery
 
 A thing with `container: true` can hold things. A thing with `supporter: true` can have things on it. Put a thing in or on another one with `location: { in: box }` or `location: { on: table }`.
@@ -1060,6 +1087,32 @@ A save game keeps the state of a game, together with the version of its format a
 - The save keeps what each actor has done of its agenda. A step that the story no longer has is dropped, for example `agenda:keeper#1`. A save from before agendas (version 1) starts each agenda at its first step.
 
 Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
+
+## Episodes
+
+A series of stories can carry facts, relations and memories from one story to the next, as Zork II starts with what the player did in Zork I. The first story lists in `export:` what its episode carries. The next story lists in `import:` what it takes:
+
+```yaml
+# story.yaml of the first story
+relations: [trust]
+export:
+  facts: [gold, lamp.lit]         # story variables and thing properties
+  relations: [keeper.trust]       # thing.axis
+  memories: [keeper.asked]        # thing.key
+
+# story.yaml of the next story
+relations: [trust]
+vars:
+  - { id: gold, type: int, initial: 0, max: 10 }
+import:
+  facts: [gold]
+  relations: [keeper.trust]
+  memories: [keeper.asked]
+```
+
+`loremaster check` examines both lists. A fact must be a story variable or a thing property. A relation needs a thing and an axis in `relations`. A memory needs a thing, and in `export` a dialogue of that thing that remembers the key, or an import of it. An imported memory declares its key, so `remembers(keeper, asked)` works in the next story without a dialogue that gives it.
+
+The host writes the episode with `Session::episode()`, at the end or at any time. It is a small value with a format, a version and the id of the story. `Session::from_episode(world, episode)` starts a new game of the next story with it; call `start` next, as for a new game. The new game takes only what `import` lists. The report says what it took (`applied`), what the story does not import (`skipped`) and what does not fit (`misfits`): a value of another type, or a state that the enum does not have. A number takes the limits of the next story. A relation that no dialogue changed and a memory that the thing does not keep are not in the episode.
 
 ## Write in the game
 

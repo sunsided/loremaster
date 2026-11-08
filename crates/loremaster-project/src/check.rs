@@ -659,11 +659,13 @@ impl Checker<'_> {
         self.texts();
         self.player_thing();
         self.timers();
+        self.playable();
         self.agendas();
         self.endings();
         self.machines();
         self.score();
         self.stats();
+        self.episodes();
 
         let verbs: BTreeSet<String> = standard_verbs()
             .iter()
@@ -1230,6 +1232,71 @@ impl Checker<'_> {
         }
     }
 
+    /// `export:` and `import:` (TX-12): each fact is a variable or a thing
+    /// property, each relation a thing and a declared axis, and each memory
+    /// a thing and a key. An exported memory needs a dialogue of that thing
+    /// that gives it, or an import; an imported one declares its key.
+    fn episodes(&mut self) {
+        let story = self.story().clone();
+        let file = &self.file_of("story");
+        for (list, items) in [("export", &story.export), ("import", &story.import)] {
+            for (i, name) in items.facts.iter().enumerate() {
+                use loremaster_lang::Ty;
+                if !matches!(
+                    self.ty_of(name),
+                    Some(Ty::Bool | Ty::Int | Ty::Text | Ty::Enum(_))
+                ) {
+                    self.error(
+                        file,
+                        &format!("{list}.facts[{i}]"),
+                        format!("`{name}` is not a story variable or a thing property"),
+                    );
+                }
+            }
+            for (i, name) in items.relations.iter().enumerate() {
+                let at = format!("{list}.relations[{i}]");
+                match name.split_once('.') {
+                    Some((thing, axis)) if story.thing(thing).is_some() => {
+                        if !self.scope.relations.contains(axis) {
+                            self.error(file, &at, format!("unknown relation axis `{axis}`"));
+                        }
+                    }
+                    Some((thing, _)) => self.error(file, &at, format!("unknown thing `{thing}`")),
+                    None => self.error(file, &at, format!("`{name}` is not `thing.axis`")),
+                }
+            }
+            for (i, name) in items.memories.iter().enumerate() {
+                let at = format!("{list}.memories[{i}]");
+                match name.split_once('.') {
+                    Some((thing, key)) if story.thing(thing).is_some() => {
+                        let given = story.import.memories.contains(name)
+                            || story
+                                .dialogues
+                                .iter()
+                                .filter(|d| d.with.as_str() == thing)
+                                .any(|d| {
+                                    d.nodes.iter().any(|n| {
+                                        n.outcomes.remember.iter().any(|m| m == key)
+                                            || n.options.iter().any(|o| {
+                                                o.outcomes.remember.iter().any(|m| m == key)
+                                            })
+                                    })
+                                });
+                        if !given {
+                            self.error(
+                                file,
+                                &at,
+                                format!("no dialogue of `{thing}` remembers `{key}`"),
+                            );
+                        }
+                    }
+                    Some((thing, _)) => self.error(file, &at, format!("unknown thing `{thing}`")),
+                    None => self.error(file, &at, format!("`{name}` is not `thing.key`")),
+                }
+            }
+        }
+    }
+
     /// The score: a number variable, a positive maximum, and ranks in reach.
     fn score(&mut self) {
         let Some(score) = self.story().score.clone() else {
@@ -1484,6 +1551,57 @@ impl Checker<'_> {
                 format!("unknown actor `{actor}`: an actor is `player` or a thing with an agenda")
             };
             self.error(file, &format!("{at}.actor"), message);
+        }
+    }
+
+    /// Each playable actor (WO-5): a thing in a room, that can hold what the
+    /// actor carries while the player steers another one, and that no agenda
+    /// moves behind the player's back. The first one starts the story.
+    fn playable(&mut self) {
+        let story = self.story();
+        let playable = story.playable.clone();
+        let start = story.start.clone();
+        let file = self.file_of("story");
+        let mut seen = BTreeSet::new();
+        for (i, id) in playable.iter().enumerate() {
+            let at = format!("playable[{i}]");
+            if !seen.insert(id) {
+                self.error(&file, &at, format!("`{id}` is playable twice"));
+                continue;
+            }
+            let story = self.story();
+            let Some(thing) = story.thing(id.as_str()) else {
+                self.error(
+                    &file,
+                    &at,
+                    format!("unknown thing `{id}`: a playable actor is a thing"),
+                );
+                continue;
+            };
+            let mut problems = Vec::new();
+            match &thing.location {
+                Location::Room(r) if i == 0 && *r != start => problems.push(format!(
+                    "the first playable actor starts the story: put `{id}` in `{start}`"
+                )),
+                Location::Room(_) => {}
+                _ => problems.push(format!("`{id}` needs a room as its location")),
+            }
+            if !thing.container {
+                problems.push(format!(
+                    "`{id}` needs `container: true`: it holds what it carries"
+                ));
+            }
+            if thing.portable {
+                problems.push(format!("`{id}` is portable; a playable actor is not"));
+            }
+            if story.agenda_of(id.as_str()).is_some() {
+                problems.push(format!(
+                    "`{id}` has an agenda; the player steers a playable actor"
+                ));
+            }
+            for message in problems {
+                self.error(&file, &at, message);
+            }
         }
     }
 
