@@ -26,9 +26,10 @@ mod load;
 mod merge;
 mod notes;
 mod origin;
+mod quality;
 mod scaffold;
 
-pub use check::{Checked, check, check_files, check_packs};
+pub use check::{Checked, MAX_HINTS, check, check_files, check_packs};
 pub use hash::model_hash;
 pub use load::{FOLDERS, Pack, Project, SourceFile, StoryHeader, assemble, load};
 /// The one diagnostic form of loremaster (XP-6). It lives in `loremaster-model`.
@@ -36,6 +37,9 @@ pub use loremaster_model::{Diagnostic, Severity};
 pub use merge::{Extension, MergeMode};
 pub use notes::{NoteRef, ThreadView, notes, open_todos, threads};
 pub use origin::Origin;
+pub use quality::{
+    Deferred, Finding, PuzzleWidth, QualityCheck, QualityReport, VerbCoverage, quality,
+};
 pub use scaffold::{START_TEXT, scaffold};
 
 #[cfg(not(target_family = "wasm"))]

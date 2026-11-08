@@ -6,6 +6,11 @@ use loremaster_model::{
 };
 use std::collections::BTreeSet;
 
+mod walkthroughs;
+
+pub use walkthroughs::MAX_HINTS;
+pub(crate) use walkthroughs::mentions;
+
 /// The result of the schema checks: the project, when the packs join, and
 /// every error and warning, also the ones of joining the packs.
 #[derive(Debug, Clone)]
@@ -453,6 +458,7 @@ impl Checker<'_> {
             }
             self.effects(&file, "then", &rule.then);
         }
+        self.walkthroughs();
     }
 
     /// Variables, machines, rooms and things must not take a built-in name
@@ -1076,6 +1082,14 @@ impl Checker<'_> {
         } else if !verbs.contains(verb) {
             self.error(file, at, format!("unknown verb `{verb}`"));
         }
+        if pattern.indirect.is_some() && pattern.direct.is_none() {
+            // A command has its objects in order; a rule could never match it.
+            self.error(
+                file,
+                &format!("{at}.indirect"),
+                "`indirect` needs a `direct` object: the indirect one is the second",
+            );
+        }
         for (i, o) in pattern.objects().enumerate() {
             let direction = verb == "go" && i == 0;
             if !direction
@@ -1157,7 +1171,10 @@ impl Checker<'_> {
                             "the agenda's actor runs the command; leave `actor` out",
                         );
                     }
-                    self.command(&file, &at, cmd, &verbs);
+                    // The actor is reported above; check the other slots.
+                    let mut cmd = cmd.clone();
+                    cmd.actor = None;
+                    self.command(&file, &at, &cmd, &verbs);
                 }
                 self.effects(&file, &format!("{at}.then"), &step.then);
                 self.no_await(&file, &format!("{at}.then"), &step.then);

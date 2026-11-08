@@ -674,3 +674,65 @@ export interface Loaded {
 
 /** The state of a running game, to put back with `restore`. Opaque to the host. */
 export type Snapshot = { readonly story: string; readonly state: unknown };
+
+/**
+ * A step of the hint ladder in the current room (CK-6): a walkthrough step that the player has not done and
+ * whose needs are done, with the levels shown so far.
+ */
+export interface Hint {
+	/** The key of the step: its id, or `<walkthrough>#<n>`. */
+	step: string;
+	/** The hints shown so far, the first one first. */
+	shown: string[];
+	/** The command, once all hints are shown and the player asked once more. */
+	command?: string;
+	/** How many levels the ladder has: the hints and the command. */
+	levels: number;
+}
+
+/** A step of a dependency chart (CK-7). */
+export interface ChartStep {
+	id: string;
+	command: string;
+	/** The index of the step in the walkthrough, from 0. */
+	index: number;
+	/** The room of the step, when the step names it with `at`. */
+	at?: string;
+	/** The steps that this one needs. */
+	needs: string[];
+	/** The longest chain of needs before this step: 0 for a step that needs nothing. */
+	depth: number;
+	/** How many steps the player can work on when this step comes up. */
+	width: number;
+	/** How many hints the step has. */
+	hints: number;
+}
+
+/** The dependency chart of one walkthrough with step ids. */
+export interface StepChart {
+	/** The key of the walkthrough: its file, or its Rust place. */
+	walkthrough: string;
+	name: string;
+	steps: ChartStep[];
+	max_width: number;
+}
+
+/** A check of the quality report (CK-8). */
+export type QualityCheck =
+	| 'one_way_exit'
+	| 'same_room_text'
+	| 'unused_thing'
+	| 'puzzle_width'
+	| 'verb_coverage'
+	| 'no_warning_before_death'
+	| 'death_off_winning_path'
+	| 'far_change_without_signal'
+	| 'gift_coverage';
+
+/** The quality report of a project: findings, puzzle widths, verb coverage and the checks that do not run yet. */
+export interface QualityReport {
+	findings: { check: QualityCheck; diagnostic: Diagnostic }[];
+	widths: { walkthrough: string; name: string; steps: number; max: number; mean: number }[];
+	verbs: { story_used: string[]; story_unused: string[]; standard_used: string[] };
+	deferred: { check: QualityCheck; reason: string }[];
+}

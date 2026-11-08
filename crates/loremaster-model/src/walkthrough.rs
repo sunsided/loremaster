@@ -38,6 +38,10 @@ impl std::fmt::Display for Pending {
 }
 
 /// One command: `"open drawer"`, or `{ do: "open drawer", see: "an iron key" }`.
+///
+/// A step with an `id` is a node of the dependency chart and can have hints
+/// (CK-4): `{ id: key, do: "open drawer", at: cottage, needs: [lamp],
+/// hints: ["…", "…"] }`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum WalkStep {
@@ -47,7 +51,42 @@ pub enum WalkStep {
         command: String,
         #[serde(flatten)]
         expect: Expect,
+        /// Boxed: most steps have no plan, and the enum stays small.
+        #[serde(flatten)]
+        plan: Box<StepPlan>,
     },
+}
+
+/// Where a step stands in the solution: its id, its room, the steps it
+/// needs, and the hints that lead to it (CK-4). All fields are optional. The
+/// hint ladder (CK-6) and the dependency chart (CK-7) come from them.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepPlan {
+    /// The name of the step, for `needs`, `before` and the chart.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Id>,
+    /// The room where the player does the step. Without it, the room that
+    /// the walkthrough is in before the step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<Id>,
+    /// Steps of this walkthrough that must be done first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub needs: Vec<Id>,
+    /// Later steps of this walkthrough that need this one: `needs` written
+    /// on the other side.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub before: Vec<Id>,
+    /// Up to three hints, from a nudge to almost the command. After the last
+    /// one, the hint ladder shows the command.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hints: Vec<String>,
+}
+
+impl StepPlan {
+    pub fn is_empty(&self) -> bool {
+        self == &StepPlan::default()
+    }
 }
 
 /// A step with checks, as written in the file. The fields of [`Expect`] are
@@ -70,6 +109,16 @@ struct CheckedStep {
     ended: Option<bool>,
     #[serde(default)]
     ending: Option<Id>,
+    #[serde(default)]
+    id: Option<Id>,
+    #[serde(default)]
+    at: Option<Id>,
+    #[serde(default, deserialize_with = "one_or_many")]
+    needs: Vec<String>,
+    #[serde(default, deserialize_with = "one_or_many")]
+    before: Vec<String>,
+    #[serde(default, deserialize_with = "one_or_many")]
+    hints: Vec<String>,
 }
 
 impl<'de> Deserialize<'de> for WalkStep {
@@ -88,6 +137,13 @@ impl<'de> Deserialize<'de> for WalkStep {
                     ended: s.ended,
                     ending: s.ending,
                 },
+                plan: Box::new(StepPlan {
+                    id: s.id,
+                    at: s.at,
+                    needs: s.needs.into_iter().map(Id::new).collect(),
+                    before: s.before.into_iter().map(Id::new).collect(),
+                    hints: s.hints,
+                }),
             },
         )
     }
@@ -105,6 +161,30 @@ impl WalkStep {
             WalkStep::Command(_) => None,
             WalkStep::Checked { expect, .. } => Some(expect),
         }
+    }
+
+    /// The id, room, needs and hints of the step, if it has any.
+    pub fn plan(&self) -> Option<&StepPlan> {
+        match self {
+            WalkStep::Command(_) => None,
+            WalkStep::Checked { plan, .. } => Some(plan.as_ref()),
+        }
+    }
+
+    /// The id of the step, for `needs` and the chart.
+    pub fn id(&self) -> Option<&Id> {
+        self.plan()?.id.as_ref()
+    }
+}
+
+impl Walkthrough {
+    /// Some step has an id or hints: the walkthrough feeds the hint ladder
+    /// and the dependency chart.
+    pub fn is_planned(&self) -> bool {
+        self.steps.iter().any(|s| {
+            s.plan()
+                .is_some_and(|p| p.id.is_some() || !p.hints.is_empty())
+        })
     }
 }
 
@@ -166,6 +246,26 @@ mod tests {
         check!(read[0] == WalkStep::Command("look".into()));
         check!(read[1].expect().unwrap().see == ["a key"]);
         check!(serde_json::to_value(&read).unwrap() == steps);
+    }
+
+    #[test]
+    fn a_planned_step_reads_its_id_room_needs_and_hints() {
+        let step = json!({
+            "id": "key", "do": "open drawer", "at": "cottage", "needs": "lamp",
+            "before": ["door"], "hints": ["Look around.", "The drawer."], "see": "a key"
+        });
+        let read: WalkStep = serde_json::from_value(step.clone()).unwrap();
+        let plan = read.plan().unwrap();
+        check!(read.id() == Some(&Id::new("key")));
+        check!(plan.at == Some(Id::new("cottage")));
+        check!(plan.needs == [Id::new("lamp")]);
+        check!(plan.before == [Id::new("door")]);
+        check!(plan.hints.len() == 2);
+        check!(read.expect().unwrap().see == ["a key"]);
+        // One value reads as a list and writes back as one.
+        let back = serde_json::to_value(&read).unwrap();
+        check!(back["needs"] == json!(["lamp"]));
+        check!(back["see"] == json!(["a key"]));
     }
 
     #[test]

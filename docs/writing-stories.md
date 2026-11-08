@@ -518,11 +518,11 @@ The fields of a step:
 | --- | --- |
 | `at` | The time of day from which the step is due. The first step is due the first time the clock reaches it; each later step the first time the clock reaches it after the step before was due. A step without `at` is due as soon as the step before it is over. |
 | `place` | The room where the step happens. The actor walks there along the exits, one room per turn. Doors and conditions on exits do not stop it. When no exits lead there, it goes there in one turn. |
-| `when` | A condition. A step with `at` whose condition does not hold when it is due is skipped. A step without `at` waits until its condition holds. |
+| `when` | A condition. The actor tests it in each turn while the step is due, also while it walks to the `place`. A step with `at` is skipped in the first turn in which its condition does not hold, also when that is on the way. A step without `at` waits until its condition holds. |
 | `do` | A command of the actor: `{ verb: open, direct: stove }` or `[open, stove]`. Its `check` and verb rules fire with the actor in the [Command record](#the-command-record). The default responses of the standard verbs are the player's and do not run, so a rule with `actor:` makes the command do something. A `check` rule with `stop` refuses it; then the step is skipped and its `then` does not run. The refused try takes the actor's turn. |
 | `then` | Effects, as in a rule. `await` does not work here. |
 | `closes` | The endings that the step closes on purpose: after it, the story can no longer reach them. Read below. |
-| `reason` | Why the step closes them. `loremaster check` warns about `closes` without a `reason`. |
+| `reason` | Why the step closes them. `closes` without a `reason` is an error of `loremaster check`. |
 | `id` | The step's name in the save game. Without it, the step's place in the list, from 1. |
 
 How a turn goes for an actor, after the clock moved and the timers and time rules ran:
@@ -854,10 +854,39 @@ expect:
   ended: true
 ```
 
-- A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room`, `ended` and `ending`.
+- A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room`, `ended` and `ending`, and `id`, `at`, `needs`, `before` and `hints` (see below).
 - `expect` says what must be true after the last step. `see` there looks at the whole transcript.
 
 Run `cargo run -p loremaster --no-default-features -- test <folder>`, or `task walkthroughs` for all examples. The command names each step that failed. The Rust tests run the walkthroughs of all examples, so CI runs them too.
+
+### Hints and the dependency chart
+
+One walkthrough can also give the hint ladder of the player and the dependency chart of the Atlas. Give a step an `id`, and the steps that must come first in `needs`:
+
+```yaml
+steps:
+  - n
+  - id: drawer
+    do: open drawer
+    at: cottage
+    hints:
+      - "Hal kept his few things in the cottage. Look at the furniture."
+      - "The dresser has a deep drawer."
+  - { id: key, do: take key, needs: drawer, hints: ["What lay under the oilcloth may be useful."] }
+  - { id: lamp, do: take lamp, before: [lit] }
+  - { id: lit, do: light lamp }
+```
+
+- `id` names the step. `needs` lists earlier steps that must be done first. `before` lists later steps that need this one: it is `needs`, written on the other side.
+- `at` is the room where the player does the step. The walkthrough fails when the player is in another room there. Without `at`, the hint ladder takes the room that the walkthrough is in before the step.
+- `hints` has up to three hints, from a nudge to almost the command. After the last hint, the ladder shows the command.
+- A player gets hints with the word `hint`, or in the Hints section of the Here panel. The ladder shows only the steps of the current room that the player has not done and whose `needs` are done, one level at a time. A step is done when the player gives its command in its room (in any words that mean the same command) and its `facts` hold after it, or when its `facts` come to hold. A walkthrough with a `pending:` mark gives no hints.
+- `loremaster check` warns when a hint names a later step: its id, its command, or a thing that only a later step brings up. It also warns when five steps or more in a row have width 1.
+- Atlas › Steps draws the chart: one column for each depth of `needs`, and bars for the puzzle width, that is how many steps the player can work on when each step comes up.
+
+### The quality report
+
+`loremaster quality <folder>` lists design findings that players trip over: exits with no way back, rooms with the same text, things that can be carried but that nothing uses (mark a decoy `red_herring: true`), long runs of steps in series only, and verbs of the story that no walkthrough uses. It also gives the puzzle width of each walkthrough with step ids, and names the checks that do not run yet. Findings are not errors.
 
 A walkthrough for a feature that the engine does not have yet is pending. Mark it with the roadmap phase and the requirement or issue that it waits for:
 

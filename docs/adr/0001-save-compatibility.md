@@ -59,3 +59,5 @@ from the version before. A step may give up; then the restore refuses the save.
   0004). The step from 1 to 2 adds an empty `actors` map: no actor of an old
   save has done anything, so each agenda starts at its first step, and a step
   whose time has passed runs in the next turn.
+  Version 2 also carries `state.steps_done` (the hint ladder, P4-05): it
+  defaults to empty, so an older save needs no step for it.

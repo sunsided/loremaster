@@ -110,10 +110,11 @@ impl Game {
         // A `stop` ends the step's effects, as in a timer.
         let outer = std::mem::replace(&mut self.stopped, false);
         for effect in &step.then {
-            self.apply(turn, &owner, effect, 1);
+            // Also after `do`: a rule of the command can end the story.
             if self.stopped || self.state.ended {
                 break;
             }
+            self.apply(turn, &owner, effect, 1);
         }
         self.stopped = outer;
         self.end_step(actor, &step.key, StepOutcome::Ran);

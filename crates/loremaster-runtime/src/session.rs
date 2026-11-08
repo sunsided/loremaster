@@ -15,7 +15,10 @@ use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 
 mod engine;
+mod hints;
 mod queries;
+
+pub use hints::{HINT, Hint, HintBook};
 
 /// How many inputs `undo` can go back, until the host sets another depth.
 pub const DEFAULT_UNDO_DEPTH: usize = 20;
@@ -144,6 +147,10 @@ pub struct Session {
     undo_depth: usize,
     /// `start` ran, or the game came from a save.
     started: bool,
+    /// The hint ladder, from the walkthroughs (CK-6).
+    hints: Arc<hints::HintBook>,
+    /// How many levels of each step's hint ladder the player has seen.
+    revealed: BTreeMap<String, usize>,
 }
 
 /// The kinds of log entries that are changes of state, which hosts get as
@@ -173,6 +180,8 @@ impl Session {
             history: VecDeque::new(),
             undo_depth: DEFAULT_UNDO_DEPTH,
             started: false,
+            hints: Arc::default(),
+            revealed: BTreeMap::new(),
         }
     }
 
@@ -209,7 +218,8 @@ impl Session {
         self.step(turn)
     }
 
-    /// Handle one input (SE-2). The text `undo` undoes the last input, unless
+    /// Handle one input (SE-2). The text `undo` undoes the last input, and
+    /// the text `hint` shows the next hint (see [`Session::hint`]), unless
     /// the story has a verb with that word. While the death prompt waits, the
     /// text `undo` or `restart` answers it.
     pub fn submit(&mut self, input: Input) -> Step {
@@ -229,6 +239,9 @@ impl Session {
         let word = text.trim().to_lowercase();
         if self.death_prompt().is_some() && [UNDO, RESTART, RESTORE].contains(&word.as_str()) {
             return Some(self.death_turn(&word).unwrap_or_else(Self::note_turn));
+        }
+        if self.is_hint_word(&word) {
+            return Some(self.hint_turn(None));
         }
         let free = self.game.awaiting().is_none() && self.game.talk().is_none();
         if word == JOURNAL && free && !self.parser_knows(JOURNAL) {

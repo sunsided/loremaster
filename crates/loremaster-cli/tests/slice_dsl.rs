@@ -60,7 +60,6 @@ fn sorted(story: &loremaster::dsl::model::Story) -> loremaster::dsl::model::Stor
     s.vars.sort_by(|a, b| a.id.cmp(&b.id));
     s.threads.sort_by(|a, b| a.id.cmp(&b.id));
     s.dialogues.sort_by(|a, b| a.id.cmp(&b.id));
-    s.agendas.sort_by(|a, b| a.id.cmp(&b.id));
     s.relations.sort();
     s
 }
@@ -166,8 +165,55 @@ fn the_dsl_tests_equal_the_yaml_tests() {
     }
 }
 
+/// dsl/dialogue.rs with an inline line in place of the text pool
+/// keeper_remark (R9), which world! does not have yet. Remove it when
+/// dsl/dialogue.rs compiles.
+mod keeper_dialogue_inline {
+    use loremaster::prelude::*;
+
+    world! {
+        extern {
+            thing keeper;
+            var ash_is_fresh;
+        }
+
+        dialogue with keeper start [stove] {
+            stove: "Mind your step." {
+                says "Who fed it?" when ash_is_fresh => who_fed_it;
+                says "What do you burn at night?" => what_burns;
+                says "Good night." => end;
+            }
+            what_burns: says "Coal, when the company sends it. Driftwood, when it does not." {
+                says "And paper?" => who_fed_it;
+                says "Good night." => end;
+            }
+            who_fed_it: "He turns the poker in his hands." says "Nobody. The stove was cold all night." {
+                says "Good night." => end;
+            }
+        }
+    }
+}
+
+/// The keeper's dialogue in world! is the one of dialogues/keeper.yaml, with
+/// the same inline line in place of the text pool in both forms.
 #[test]
-#[ignore = "pending: phase 4, P4-08 #85 (world! L4: dialogue), R9 P4-01 #78 (texts, one_of), D6 P4-02 #79 (agenda, command slots)"]
+fn the_dsl_dialogue_equals_the_yaml_dialogue() {
+    let path = "dialogues/keeper.yaml";
+    let mut file = read_dir(&form("yaml"))
+        .unwrap()
+        .into_iter()
+        .find(|f| f.path == path)
+        .unwrap_or_else(|| panic!("no {path}"));
+    let pool = "say: { text: keeper_remark }";
+    assert!(file.text.contains(pool), "{}", file.text);
+    file.text = file.text.replace(pool, "say: \"Mind your step.\"");
+    let yaml = loremaster::dsl::Pack::from_files(vec![file]).unwrap_or_else(|e| panic!("{e:#?}"));
+    let dsl = keeper_dialogue_inline::pack();
+    assert_eq!(dsl.dialogues, yaml.dialogues);
+}
+
+#[test]
+#[ignore = "pending: phase 4, R9 P4-01 #78 (texts, one_of, the text pool of the keeper dialogue), D6 P4-02 #79 (agenda, command slots)"]
 fn slice_equivalence_all_parts() {
     // The whole slice, with the parts in new syntax: the YAML form loads only
     // when the model knows that syntax, and the world! forms compile only

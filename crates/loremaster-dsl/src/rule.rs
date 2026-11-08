@@ -150,6 +150,12 @@ pub mod on {
         EventPattern::Verb(pattern)
     }
 
+    /// `{ check: …, direct: …, actor: … }`: before a verb, with any slot of
+    /// the Command record.
+    pub fn check_command(pattern: CommandPattern) -> EventPattern {
+        EventPattern::Check(pattern)
+    }
+
     /// `timer: id`: a timer runs out.
     pub fn timer(timer: impl AsRef<str>) -> EventPattern {
         EventPattern::Timer(id(timer))
@@ -274,5 +280,13 @@ pub trait Effects: Sized {
     /// `cancel:` a timer.
     fn cancel(self, timer: impl AsRef<str>) -> Self {
         self.effect(Effect::Cancel(id(timer)))
+    }
+}
+
+/// A plain list of effects, for a dialogue's `then:`
+/// ([`DialogueBuilder::then_effects`](crate::DialogueBuilder::then_effects)).
+impl Effects for Vec<Effect> {
+    fn effects_mut(&mut self) -> &mut Vec<Effect> {
+        self
     }
 }

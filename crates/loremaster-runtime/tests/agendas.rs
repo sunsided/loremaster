@@ -421,6 +421,81 @@ steps:
     ] {
         assert!(found.iter().any(|f| f == want), "{want}\n{found:#?}");
     }
+    // One message for the actor of a `do`.
+    let at_actor = found
+        .iter()
+        .filter(|f| f.starts_with("agendas/keeper.yaml steps[0].do.actor:"))
+        .count();
+    assert_eq!(at_actor, 1, "{found:#?}");
+}
+
+#[test]
+fn an_indirect_object_needs_a_direct_one() {
+    let agenda = "actor: keeper\nsteps:\n  - do: { verb: use, indirect: stove }\n";
+    let found: Vec<String> = check(&load(files(agenda)).unwrap())
+        .into_iter()
+        .map(|d| format!("{} {}: {}", d.file, d.at, d.message))
+        .collect();
+    let want = "agendas/keeper.yaml steps[0].do.indirect: `indirect` needs a `direct` object: the indirect one is the second";
+    assert!(found.iter().any(|f| f == want), "{found:#?}");
+}
+
+#[test]
+fn a_step_whose_command_ends_the_story_runs_no_effects() {
+    let agenda = r#"
+actor: keeper
+steps:
+  - at: "22:10"
+    place: shed
+    do: [open, stove]
+    then:
+      - set: { burned: true }
+"#;
+    let mut files = files(agenda);
+    let rules = &mut files
+        .iter_mut()
+        .find(|f| f.path == "rules/rules.yaml")
+        .unwrap()
+        .text;
+    *rules = rules.replace(
+        "    - set: { opened_by_keeper: true }",
+        "    - set: { opened_by_keeper: true }\n    - end: won",
+    );
+    let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    input(&mut game, "wait");
+    let state = game.state();
+    assert!(state.ended);
+    assert_eq!(state.ending.as_ref().map(|e| e.as_str()), Some("won"));
+    assert_eq!(state.facts["opened_by_keeper"], Value::Bool(true));
+    assert_eq!(state.facts["burned"], Value::Bool(false));
+}
+
+#[test]
+fn the_explorer_tries_each_preposition_of_a_rule() {
+    let rules = r#"
+- id: put_in
+  on: { verb: put, direct: pages, indirect: stove, preposition: in }
+  then: [{ set: { burned: true } }]
+- id: put_on
+  on: { verb: put, direct: pages, indirect: stove, preposition: on }
+  then: [{ set: { opened_by_player: true } }]
+"#;
+    let mut files = files(AGENDA);
+    files
+        .iter_mut()
+        .find(|f| f.path == "rules/rules.yaml")
+        .unwrap()
+        .text = rules.into();
+    let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
+    let found = explore(world, Budget::default());
+    for rule in ["put_in", "put_on"] {
+        assert!(
+            !found.never_fired.iter().any(|r| r == rule),
+            "{rule}: {found:#?}"
+        );
+    }
 }
 
 /// The keeper burns the pages in the first turn. Taking them is the best

@@ -112,3 +112,13 @@ fn a_pending_mark_needs_a_phase_and_a_requirement() {
     });
     assert!(load(files).is_err());
 }
+
+#[test]
+fn a_step_at_another_room_fails() {
+    let (world, walk) = lighthouse_with("steps:\n  - { do: open drawer, at: cottage }\n");
+    let result = run_walkthrough(world, &walk, "t");
+    assert_eq!(
+        result.failures,
+        ["step 1 (`open drawer`): the player is in `shore`, not at `cottage`"]
+    );
+}

@@ -184,8 +184,16 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             if !objects.iter().all(|o| scope.contains(o)) {
                 continue;
             }
+            // The label is the dedup key: keep the slots that tell rules apart.
+            let mut text = label(p.verb.as_str(), &objects);
+            if let Some(prep) = &p.preposition {
+                text.push_str(&format!(" ({prep})"));
+            }
+            if let Some(topic) = &p.topic {
+                text.push_str(&format!(" about {topic}"));
+            }
             out.push((
-                label(p.verb.as_str(), &objects),
+                text,
                 Command::Verb {
                     verb: p.verb.clone(),
                     objects,

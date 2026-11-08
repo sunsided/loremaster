@@ -98,6 +98,10 @@ pub struct Thing {
     /// The name is a proper name, such as "Blackbeard": no article.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub proper: bool,
+    /// The thing is there on purpose and no puzzle needs it: the quality
+    /// report does not count it as never used (CK-8).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub red_herring: bool,
     /// Names that change with the state. The last stage whose condition holds
     /// is the current name; without stages, `name` and `aliases` apply.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
