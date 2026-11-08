@@ -2,12 +2,33 @@
 //! sources and the places of diagnostics.
 
 use loremaster_dsl::prelude::*;
-use loremaster_model::{Expect, StartTimers, WalkStep};
+use loremaster_model::{Expect, Limit, StartTimers, WalkStep};
 use loremaster_project::{SourceFile, read_dir};
 use std::path::Path;
 
 fn lighthouse_files() -> Vec<SourceFile> {
     read_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse")).unwrap()
+}
+
+#[test]
+fn limits_calc_seed_and_rolls() {
+    let mut p = Pack::new("stats");
+    p.story("Stats", "hall")
+        .var("stamina", 10)
+        .var_min("stamina", 0)
+        .var_max("stamina", "stamina_initial");
+    p.rule("r", on::turn()).calc("total", "r + skill");
+    p.test("t").seed(42).step("pull").rolls([4, 11]);
+    let vars = &p.header.as_ref().unwrap().vars;
+    assert_eq!(vars[0].min, Some(Limit::Value(0)));
+    assert_eq!(vars[0].max, Some(Limit::Var("stamina_initial".into())));
+    assert_eq!(
+        p.rules[0].then,
+        [Effect::Calc([("total".into(), "r + skill".into())].into())]
+    );
+    let walk = &p.walkthroughs[0].1;
+    assert_eq!(walk.seed, Some(42));
+    assert_eq!(walk.steps[0].rolls(), [4, 11]);
 }
 
 #[test]

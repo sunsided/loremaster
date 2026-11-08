@@ -555,6 +555,7 @@ impl Checker<'_> {
                     "initial value does not match the type",
                 );
             }
+            self.limits(&header, v);
         }
 
         let mut seen = BTreeSet::new();
@@ -1025,6 +1026,30 @@ impl Checker<'_> {
                     for name in values.keys() {
                         if !matches!(self.ty_of(name), Some(loremaster_lang::Ty::Int)) {
                             self.error(file, &at, format!("`{name}` is not a number variable"));
+                        }
+                    }
+                }
+                Effect::Calc(sums) => {
+                    for (name, sum) in sums {
+                        let at = format!("{at}.calc.{name}");
+                        if !matches!(self.ty_of(name), Some(loremaster_lang::Ty::Int)) {
+                            self.error(file, &at, format!("`{name}` is not a number variable"));
+                        }
+                        match loremaster_model::parse_sum(sum) {
+                            Err((why, _)) => self.error(file, &at, format!("`{sum}`: {why}")),
+                            Ok(terms) => {
+                                for (_, term) in terms {
+                                    if let loremaster_model::Term::Name(n) = term
+                                        && !matches!(self.ty_of(&n), Some(loremaster_lang::Ty::Int))
+                                    {
+                                        self.error(
+                                            file,
+                                            &at,
+                                            format!("`{sum}`: `{n}` is not a number variable or property"),
+                                        );
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1545,6 +1570,39 @@ impl Checker<'_> {
             if matches!(e, Effect::Await(_)) {
                 self.error(file, &format!("{at}[{i}]"), "`await` works only in rules");
             }
+        }
+    }
+
+    /// `min` and `max` of a variable: only on an `int`, a number or another
+    /// `int` variable, and a constant `min` not above a constant `max`.
+    fn limits(&mut self, file: &str, v: &loremaster_model::VarDef) {
+        use loremaster_model::{Limit, VarType};
+        for (key, limit) in [("min", &v.min), ("max", &v.max)] {
+            let Some(limit) = limit else { continue };
+            let at = format!("vars.{}.{key}", v.id);
+            if v.ty != VarType::Int {
+                self.error(file, &at, format!("`{key}` needs an `int` variable"));
+            } else if let Limit::Var(other) = limit
+                && self
+                    .story()
+                    .var(other.as_str())
+                    .is_none_or(|o| o.ty != VarType::Int)
+            {
+                self.error(
+                    file,
+                    &at,
+                    format!("`{key}: {other}` names no `int` variable"),
+                );
+            }
+        }
+        if let (Some(Limit::Value(min)), Some(Limit::Value(max))) = (&v.min, &v.max)
+            && min > max
+        {
+            self.error(
+                file,
+                &format!("vars.{}.min", v.id),
+                format!("`min` {min} is above `max` {max}"),
+            );
         }
     }
 

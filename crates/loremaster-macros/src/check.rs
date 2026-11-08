@@ -350,6 +350,8 @@ fn stubs(world: &World, pack: &mut Pack, spans: &mut Spans) -> Pack {
                         id: Id::new(id),
                         ty,
                         initial,
+                        min: None,
+                        max: None,
                     });
                     spans.add("story", format!("vars.{id}"), e.tokens.clone());
                 }
@@ -730,6 +732,19 @@ fn story(p: &mut Pack, s: &Story, vars: &[&Var], spans: &mut Spans) {
             (_, Value::Text(_)) => b,
         };
         spans.add("story", format!("vars.{id}"), name_tokens(&v.id));
+        let as_limit = |n: &Name| {
+            n.value
+                .parse::<i64>()
+                .map_or_else(|_| n.value.as_str().into(), loremaster_model::Limit::Value)
+        };
+        if let Some(min) = &v.min {
+            b = b.var_min(id, as_limit(min));
+            spans.add("story", format!("vars.{id}.min"), name_tokens(min));
+        }
+        if let Some(max) = &v.max {
+            b = b.var_max(id, as_limit(max));
+            spans.add("story", format!("vars.{id}.max"), name_tokens(max));
+        }
     }
     spans.add("story", "", s.tokens.clone());
     spans.add("story", "start", name_tokens(start));
@@ -889,6 +904,7 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans
             EffectKind::Add(pairs) => pairs
                 .iter()
                 .fold(b, |b, (n, v)| b.add(n.value.as_str(), *v)),
+            EffectKind::Calc(target, sum) => b.calc(target.value.as_str(), sum.as_str()),
             EffectKind::Move(pairs) => pairs
                 .iter()
                 .fold(b, |b, (n, to)| b.move_to(n.value.as_str(), to.as_str())),

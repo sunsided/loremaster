@@ -21,6 +21,33 @@ pub struct VarDef {
     #[serde(rename = "type")]
     pub ty: VarType,
     pub initial: Value,
+    /// The lowest value of an `int` variable. The engine clamps each write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<Limit>,
+    /// The highest value of an `int` variable. The engine clamps each write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<Limit>,
+}
+
+/// A limit of an `int` variable: a number, or the id of another `int`
+/// variable, for example `max: stamina_initial`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Limit {
+    Value(i64),
+    Var(Id),
+}
+
+impl From<i64> for Limit {
+    fn from(n: i64) -> Self {
+        Limit::Value(n)
+    }
+}
+
+impl From<&str> for Limit {
+    fn from(var: &str) -> Self {
+        Limit::Var(Id::new(var))
+    }
 }
 
 /// The score of the story: a number variable, its maximum and the ranks.

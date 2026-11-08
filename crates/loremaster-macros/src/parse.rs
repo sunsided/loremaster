@@ -587,6 +587,20 @@ fn var(input: ParseStream) -> Result<Var> {
     input.parse::<Token![=]>()?;
     let at = input.span();
     let initial = value(input)?;
+    let (mut min, mut max) = (None, None);
+    while let Some(word) = peek_word(input).filter(|w| w == "min" || w == "max") {
+        name(input)?;
+        let limit = if input.peek(LitInt) || input.peek(Token![-]) {
+            let at = input.span();
+            Name {
+                value: int::<i64>(input)?.to_string(),
+                span: at,
+            }
+        } else {
+            name(input)?
+        };
+        *if word == "min" { &mut min } else { &mut max } = Some(limit);
+    }
     semi(input)?;
     let ty = match (ty, &initial) {
         (Some(ty), _) => ty,
@@ -606,7 +620,13 @@ fn var(input: ParseStream) -> Result<Var> {
     if !fits {
         return Err(Error::new(at, "the initial value does not match the type"));
     }
-    Ok(Var { id, ty, initial })
+    Ok(Var {
+        id,
+        ty,
+        initial,
+        min,
+        max,
+    })
 }
 
 const LAYERS: &[&str] = &["base", "ambient", "event", "objects", "characters", "exits"];
@@ -1366,6 +1386,32 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
             }
             EffectKind::Add(list)
         }
+        "calc" => {
+            let target = path(input)?;
+            input.parse::<Token![=]>()?;
+            let mut sum = String::new();
+            if input.peek(Token![-]) {
+                input.parse::<Token![-]>()?;
+                sum.push('-');
+            }
+            loop {
+                if input.peek(LitInt) {
+                    sum.push_str(input.parse::<LitInt>()?.base10_digits());
+                } else {
+                    sum.push_str(&path(input)?.value);
+                }
+                if input.peek(Token![+]) {
+                    input.parse::<Token![+]>()?;
+                    sum.push_str(" + ");
+                } else if input.peek(Token![-]) {
+                    input.parse::<Token![-]>()?;
+                    sum.push_str(" - ");
+                } else {
+                    break;
+                }
+            }
+            EffectKind::Calc(target, sum)
+        }
         "move" => {
             let mut list = Vec::new();
             loop {
@@ -1416,7 +1462,7 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
         _ => {
             return Err(Error::new(
                 word.span,
-                "expected an effect: `line`, `set`, `add`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel` or `call`",
+                "expected an effect: `line`, `set`, `add`, `calc`, `move`, `goto`, `end`, `stop`, `emit`, `start`, `cancel` or `call`",
             ));
         }
     };
@@ -1706,6 +1752,7 @@ fn test(input: ParseStream) -> Result<Test> {
         id,
         name: test_name,
         pending: None,
+        seed: None,
         steps: Vec::new(),
         expect: Vec::new(),
     };
@@ -1723,14 +1770,24 @@ fn test(input: ParseStream) -> Result<Test> {
             test.pending = Some((phase, needs));
             continue;
         }
+        if peek_kw(&content, "seed") {
+            name(&content)?;
+            test.seed = Some(int(&content)?);
+            semi(&content)?;
+            continue;
+        }
         if peek_kw(&content, "expect") {
             name(&content)?;
             test.expect.extend(expectations(&content)?);
             semi(&content)?;
             continue;
         }
-        let command = word_or_text(&content)
-            .map_err(|e| Error::new(e.span(), "expected a command, `expect` or `pending`"))?;
+        let command = word_or_text(&content).map_err(|e| {
+            Error::new(
+                e.span(),
+                "expected a command, `expect`, `seed` or `pending`",
+            )
+        })?;
         let times = if content.peek(Token![*]) {
             content.parse::<Token![*]>()?;
             let at = content.span();
@@ -1746,8 +1803,19 @@ fn test(input: ParseStream) -> Result<Test> {
             1
         };
         let mut checks = Vec::new();
+        let mut rolls = Vec::new();
         while !content.peek(Token![;]) {
             match peek_word(&content).as_deref() {
+                Some("rolls") => {
+                    name(&content)?;
+                    loop {
+                        rolls.push(int(&content)?);
+                        if !content.peek(Token![,]) {
+                            break;
+                        }
+                        content.parse::<Token![,]>()?;
+                    }
+                }
                 Some("sees") => {
                     name(&content)?;
                     checks.push(Expectation::Sees(texts(&content)?));
@@ -1761,13 +1829,14 @@ fn test(input: ParseStream) -> Result<Test> {
                     checks.extend(expectations(&content)?);
                 }
                 _ => {
-                    return Err(content
-                        .error("expected `sees`, `not_sees`, `expect` or `;` after the command"));
+                    return Err(content.error(
+                        "expected `sees`, `not_sees`, `expect`, `rolls` or `;` after the command",
+                    ));
                 }
             }
         }
         semi(&content)?;
-        if times == 0 || (times > 1 && !checks.is_empty()) {
+        if times == 0 || (times > 1 && (!checks.is_empty() || !rolls.is_empty())) {
             return Err(Error::new(
                 command.span,
                 "`<command> * <n>` repeats a step without checks, n at least 1",
@@ -1777,6 +1846,7 @@ fn test(input: ParseStream) -> Result<Test> {
             command,
             times,
             checks,
+            rolls,
         });
     }
     Ok(test)

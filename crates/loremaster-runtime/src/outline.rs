@@ -158,6 +158,10 @@ pub(crate) fn describe(o: &Outcomes) -> Vec<String> {
             "add to {}",
             m.keys().cloned().collect::<Vec<_>>().join(", ")
         ),
+        Effect::Calc(m) => format!(
+            "calculate {}",
+            m.keys().cloned().collect::<Vec<_>>().join(", ")
+        ),
         Effect::Stop => "stop".into(),
         Effect::Emit(e) => format!("send {e}"),
         Effect::Call(b) => format!("run the behavior {b}"),

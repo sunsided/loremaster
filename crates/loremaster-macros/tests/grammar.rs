@@ -858,3 +858,42 @@ fn then_lists_and_then_properties() {
         ]
     );
 }
+
+mod stats {
+    use loremaster::prelude::*;
+    world! {
+        story "Stats" { start: hall }
+        var stamina_initial: int = 12;
+        var stamina = 10 min -1 max stamina_initial;
+        var total = 0;
+        room hall "Hall" {
+            before look "A hall.";
+        }
+        rule on_turn on turn {
+            calc total = stamina + 2 - stamina_initial;
+        }
+        test luck "Luck" {
+            seed 42;
+            wait rolls 4, 11 sees "x";
+        }
+    }
+}
+
+#[test]
+fn stats_limits_calc_seed_and_rolls() {
+    use loremaster::dsl::model::{Effect, Limit};
+    let p = stats::pack();
+    let vars = &p.header.as_ref().unwrap().vars;
+    let stamina = vars.iter().find(|v| v.id.as_str() == "stamina").unwrap();
+    assert_eq!(stamina.min, Some(Limit::Value(-1)));
+    assert_eq!(stamina.max, Some(Limit::Var("stamina_initial".into())));
+    assert_eq!(
+        p.rules[0].then,
+        [Effect::Calc(
+            [("total".into(), "stamina + 2 - stamina_initial".into())].into()
+        )]
+    );
+    let walk = &p.walkthroughs[0].1;
+    assert_eq!(walk.seed, Some(42));
+    assert_eq!(walk.steps[0].rolls(), [4, 11]);
+}

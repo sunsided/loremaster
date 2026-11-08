@@ -353,6 +353,7 @@ The effects:
 | --- | --- |
 | `set: { name: value }` | Sets variables and properties. |
 | `add: { name: 1 }` | Adds to number variables. |
+| `calc: { total: "r + skill - 1" }` | Sets a number variable or property to a sum of whole numbers and number variables or properties, with `+` and `-`. The sum reads the values from before the effect. |
 | `say: "text"` | Shows the text. Inline markup is permitted. The text can also be a list of narration and speech: read [Lines and speech](#lines-and-speech). `line:` is the same key. |
 | `move: { thing: place }` | Moves things. The place is a room, `carried`, `nowhere`, `in:box` or `on:table`. |
 | `goto: room` | Moves the player. Leave and enter rules fire. |
@@ -414,6 +415,27 @@ A `verb` or `check` event can name the slots:
 ```
 
 While a rule waits, the player can only answer. The answer is not a new turn: the clock and the timers do not move. A save game keeps the waiting rule. `await` works only in rules, not in dialogues or timers.
+
+### Number limits and sums
+
+A number variable can have limits, written as `min` and `max` in `story.yaml`: a number, or the id of another number variable.
+
+```yaml
+vars:
+  - { id: stamina_initial, type: int, initial: 20 }
+  - { id: stamina, type: int, initial: 20, min: 0, max: stamina_initial }
+```
+
+The engine clamps the variable after each write: `set`, `add`, `calc`, the `into` of an `await`, a behavior and the outcomes of a talk. A limit that names a variable reads its value at the write.
+
+Conditions compare a variable with a constant. For `$r + skill >= 9`, write the sum into a variable first:
+
+```yaml
+- await: { roll: 2d6, into: r }
+- calc: { total: "r + skill" }
+```
+
+Then a later rule tests `total >= 9`.
 
 ### Action phases
 
@@ -909,6 +931,8 @@ expect:
 
 - A step is a command. A step in the map form can also say what its response must show: `see` and `not_see`, with one text or a list. It can also have `facts`, `room`, `ended` and `ending`, and `id`, `at`, `needs`, `before` and `hints` (see below).
 - `expect` says what must be true after the last step. `see` there looks at the whole transcript.
+- `seed: 42` next to `steps` starts the RNG of this test from this seed, not the seed of the story.
+- `rolls: [4, 11]` on a step gives the totals of the rolls during that step, in order. A total outside the range of the dice fails the test. A forced total that no roll takes fails the step. A roll after the last forced total uses the RNG.
 
 Run `cargo run -p loremaster --no-default-features -- test <folder>`, or `task walkthroughs` for all examples. The command names each step that failed. The Rust tests run the walkthroughs of all examples, so CI runs them too.
 

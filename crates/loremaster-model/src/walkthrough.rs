@@ -12,6 +12,9 @@ pub struct Walkthrough {
     pub name: Option<String>,
     /// Commands, in order. A step can also say what its response must show.
     pub steps: Vec<WalkStep>,
+    /// The seed of the RNG for this test, instead of the story's seed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
     /// What must hold after the last step.
     #[serde(default)]
     pub expect: Expect,
@@ -39,6 +42,9 @@ impl std::fmt::Display for Pending {
 
 /// One command: `"open drawer"`, or `{ do: "open drawer", see: "an iron key" }`.
 ///
+/// `rolls: [4, 11]` gives the totals of the rolls in this step, in order. A
+/// roll without a forced total takes one from the RNG.
+///
 /// A step with an `id` is a node of the dependency chart and can have hints
 /// (CK-4): `{ id: key, do: "open drawer", at: cottage, needs: [lamp],
 /// hints: ["…", "…"] }`.
@@ -54,6 +60,9 @@ pub enum WalkStep {
         /// Boxed: most steps have no plan, and the enum stays small.
         #[serde(flatten)]
         plan: Box<StepPlan>,
+        /// The totals of the rolls in this step, in order.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        rolls: Vec<i64>,
     },
 }
 
@@ -119,6 +128,8 @@ struct CheckedStep {
     before: Vec<String>,
     #[serde(default, deserialize_with = "one_or_many")]
     hints: Vec<String>,
+    #[serde(default)]
+    rolls: Vec<i64>,
 }
 
 impl<'de> Deserialize<'de> for WalkStep {
@@ -144,6 +155,7 @@ impl<'de> Deserialize<'de> for WalkStep {
                     before: s.before.into_iter().map(Id::new).collect(),
                     hints: s.hints,
                 }),
+                rolls: s.rolls,
             },
         )
     }
@@ -168,6 +180,14 @@ impl WalkStep {
         match self {
             WalkStep::Command(_) => None,
             WalkStep::Checked { plan, .. } => Some(plan.as_ref()),
+        }
+    }
+
+    /// The forced totals of the rolls in this step.
+    pub fn rolls(&self) -> &[i64] {
+        match self {
+            WalkStep::Command(_) => &[],
+            WalkStep::Checked { rolls, .. } => rolls,
         }
     }
 
@@ -266,6 +286,14 @@ mod tests {
         let back = serde_json::to_value(&read).unwrap();
         check!(back["needs"] == json!(["lamp"]));
         check!(back["see"] == json!(["a key"]));
+    }
+
+    #[test]
+    fn a_step_reads_its_forced_rolls() {
+        let step = json!({ "do": "test luck", "rolls": [4, 11] });
+        let read: WalkStep = serde_json::from_value(step.clone()).unwrap();
+        check!(read.rolls() == [4, 11]);
+        check!(serde_json::to_value(&read).unwrap() == step);
     }
 
     #[test]

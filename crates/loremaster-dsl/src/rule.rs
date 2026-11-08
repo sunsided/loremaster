@@ -224,6 +224,13 @@ pub trait Effects: Sized {
         self
     }
 
+    /// `calc:` an integer variable or property from a sum, for example
+    /// `.calc("total", "r + skill")`. Each call is its own effect, so a
+    /// later sum reads the result of an earlier one.
+    fn calc(self, name: impl Into<String>, sum: impl Into<String>) -> Self {
+        self.effect(Effect::Calc([(name.into(), sum.into())].into()))
+    }
+
     /// `say:` a line: a text, or a [`Line`](loremaster_model::Line) of segments.
     fn say(self, text: impl Into<loremaster_model::Line>) -> Self {
         self.effect(Effect::Say(text.into()))

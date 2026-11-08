@@ -56,6 +56,7 @@ impl NarrativeState for Game {
             // loremaster values have no floats, entities or sets.
             _ => return,
         };
+        let value = self.clamped(fact.id.0.as_ref(), value);
         self.state.facts.insert(fact.id.0.to_string(), value);
     }
 
@@ -189,6 +190,23 @@ mod tests {
         check!(game.fact(&FactScope::Party, &id).is_none());
         check!(game.remove_fact(&FactScope::World, &id));
         check!(!game.state.facts.contains_key("asked"));
+    }
+
+    #[test]
+    fn a_narrative_write_is_clamped() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/cantina");
+        let mut project =
+            loremaster_project::load(loremaster_project::read_dir(&root).unwrap()).unwrap();
+        project.story.vars.push(loremaster_model::VarDef {
+            id: "hp".into(),
+            ty: loremaster_model::VarType::Int,
+            initial: Value::Int(1),
+            min: None,
+            max: Some(loremaster_model::Limit::Value(5)),
+        });
+        let mut game = Game::new(Arc::new(World::compile(project.story).unwrap()));
+        NarrativeState::set_fact(&mut game, FactScope::World, Fact::int("hp", 9));
+        check!(game.state.facts.get("hp") == Some(&Value::Int(5)));
     }
 
     #[test]
