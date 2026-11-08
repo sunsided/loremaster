@@ -55,7 +55,12 @@ fn a_save_file_carries_the_game_to_another_process() {
     let file = Path::new(env!("CARGO_TARGET_TMPDIR")).join("terminal-host.save.json");
     let file = file.to_str().unwrap();
     let mut lines = lighthouse_walkthrough();
-    let rest = lines.split_off(5);
+    // Save after the matches, before the beacon is lit.
+    let at = lines
+        .iter()
+        .position(|c| c == "take matches")
+        .expect("the walkthrough takes the matches");
+    let rest = lines.split_off(at + 1);
 
     lines.push(format!(":save {file}"));
     let first = host("lighthouse", &[], &lines);

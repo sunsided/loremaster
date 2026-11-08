@@ -16,6 +16,13 @@ use std::sync::Arc;
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let own_dice = args.iter().any(|a| a == "--own-dice");
+    if let Some(flag) = args
+        .iter()
+        .find(|a| a.starts_with("--") && *a != "--own-dice")
+    {
+        eprintln!("unknown option {flag}");
+        return ExitCode::FAILURE;
+    }
     let Some(dir) = args.iter().find(|a| !a.starts_with("--")) else {
         eprintln!("usage: terminal-host <story folder> [--own-dice]");
         return ExitCode::FAILURE;
@@ -27,8 +34,11 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    play(world, own_dice);
-    ExitCode::SUCCESS
+    if play(world, own_dice) {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 fn open(dir: &Path) -> Result<Arc<World>, String> {
@@ -39,7 +49,8 @@ fn open(dir: &Path) -> Result<Arc<World>, String> {
 }
 
 /// The loop of a host: show the step, ask what its status asks, send the answer.
-fn play(world: Arc<World>, own_dice: bool) {
+/// False when the host met something it can not handle.
+fn play(world: Arc<World>, own_dice: bool) -> bool {
     let mut session = Session::new(world.clone());
     session.set_host_rolls(own_dice);
     let mut step = session.start();
@@ -53,27 +64,39 @@ fn play(world: Arc<World>, own_dice: bool) {
                 Some(awaiting.clone())
             }
             Status::Ended { ending } => {
-                if ending.is_none() {
-                    println!("The story ended in a way it no longer knows.");
+                // A restored step has no ending effect: show the ending here.
+                let shown = step
+                    .effects
+                    .iter()
+                    .any(|e| matches!(e, Effect::Ending { .. }));
+                match ending {
+                    None => println!("The story ended in a way it no longer knows."),
+                    Some(e) if !shown => println!("\n*** {} ({:?}) ***", e.title, e.kind),
+                    Some(_) => {}
                 }
-                return;
+                return true;
             }
             // Status is non_exhaustive: a newer runtime can add a variant.
             other => {
                 eprintln!("this host does not know the status {other:?}");
-                return;
+                return false;
             }
         };
         print!("\n> ");
         std::io::stdout().flush().ok();
         let mut line = String::new();
-        if std::io::stdin().read_line(&mut line).unwrap_or(0) == 0 {
-            return;
+        match std::io::stdin().read_line(&mut line) {
+            Ok(0) => return true,
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("can not read the input: {e}");
+                return false;
+            }
         }
         let line = line.trim();
         let next = match line.split_once(' ').unwrap_or((line, "")) {
             ("", _) => continue,
-            (":quit", _) => return,
+            (":quit", _) => return true,
             (":save", file) => {
                 match save(&session, file) {
                     Ok(()) => println!("Saved."),
@@ -82,15 +105,28 @@ fn play(world: Arc<World>, own_dice: bool) {
                 continue;
             }
             (":load", file) => match restore_file(world.clone(), own_dice, file) {
-                Ok((restored, step)) => {
+                Ok((restored, first)) => {
                     session = restored;
-                    step
+                    show(&first);
+                    // A save made in a talk: the restored step does not list the answers.
+                    if let Some(talk) = session.talk() {
+                        println!("\n(Still talking: {}. Type a number.)", talk.dialogue);
+                        for choice in session.choices() {
+                            println!("{}. {}", choice.index + 1, choice.text);
+                        }
+                    }
+                    step = first;
+                    continue;
                 }
                 Err(e) => {
                     println!("Can not load: {e}");
                     continue;
                 }
             },
+            (word, _) if word.starts_with(':') => {
+                println!("Unknown host command {word}. Use :save, :load or :quit.");
+                continue;
+            }
             _ => match awaiting {
                 Some(awaiting) => match answer_await(&mut session, &awaiting, line) {
                     Ok(step) => step,
@@ -224,9 +260,10 @@ fn show_block(block: &Block) {
     for run in &block.runs {
         // Runs of speech name their speaker. The text has the quotes already.
         if run.speaker.is_some() && run.speaker != speaker {
-            speaker.clone_from(&run.speaker);
             text.push_str(&format!("{}: ", run.speaker.as_deref().unwrap_or_default()));
         }
+        // Narration between two lines of one speaker names the speaker again.
+        speaker.clone_from(&run.speaker);
         text.push_str(&run.text);
     }
     match block.kind {
