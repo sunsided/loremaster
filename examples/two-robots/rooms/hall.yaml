@@ -1,0 +1,9 @@
+name: Pump Hall
+description:
+  - "Waist-deep water, and two valve wheels side by side on the far wall, one to port and one to starboard."
+  - when: seen_by(bilge)
+    text: "Behind the port wheel, the main sings under pressure. Behind the starboard wheel, nothing."
+  - when: seen_by(wick)
+    text: "The two wheels look exactly alike under the rust. The paint that named them is gone."
+exits:
+  - { direction: north, to: gallery, passable: wick_holds or bilge_holds, blocked: "The north door is shut. It opens only while someone holds the lever down." }

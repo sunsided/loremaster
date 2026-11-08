@@ -1,0 +1,13 @@
+title: Two Robots in the Pump Station
+author: loremaster example
+start: gallery
+seed: 3
+
+playable: [wick, bilge]
+
+intro:
+  - "Night shift at the Haddon Lees pump station. The river is over the wall, the staff went home hours ago, and the pumps are drowning. Two maintenance robots still have power: Wick, who has a camera and no ears, and Bilge, who has a microphone and no eyes. You steer them from the depot, one at a time."
+
+vars:
+  - { id: wick_holds, type: bool, initial: false }
+  - { id: bilge_holds, type: bool, initial: false }

@@ -170,6 +170,10 @@ pub struct Story {
     /// Without it, any number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub carry_limit: Option<u32>,
+    /// The actors the player steers (WO-5), each a thing; the first is the
+    /// active one at the start. Empty: the player is the active actor.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub playable: Vec<Id>,
     /// The most `on: next` machine steps in one turn. Without it, 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step_limit: Option<u32>,

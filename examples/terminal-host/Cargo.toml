@@ -1,0 +1,32 @@
+[package]
+name = "loremaster-terminal-host"
+description = "A small terminal host of the loremaster Session API. An example, not on crates.io."
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "terminal-host"
+path = "src/main.rs"
+
+[dependencies]
+# Loads the story from its folder.
+loremaster-project.workspace = true
+# The Session API.
+loremaster-runtime.workspace = true
+# `Value`, the type of the answer that `Session::resume` takes.
+loremaster-model.workspace = true
+# The save file.
+serde_json.workspace = true
+
+[package.metadata.release]
+# Not on crates.io. cargo-release does not release this crate.
+release = false
+
+[lints]
+workspace = true

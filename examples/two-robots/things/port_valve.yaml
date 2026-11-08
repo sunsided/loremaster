@@ -1,0 +1,6 @@
+name: port wheel
+aliases: [port valve, port]
+listed: false
+location: { room: hall }
+description:
+  - "A valve wheel on the port main, its square spindle bare."
