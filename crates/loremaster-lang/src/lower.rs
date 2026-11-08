@@ -49,6 +49,7 @@ pub(crate) fn lower_bool(expr: &Expr, scope: &Scope) -> Result<Condition, LangEr
                 .collect::<Result<_, _>>()?,
         )),
         Expr::Call(name, args, span) if name == "remembers" => remembers(args, span, scope),
+        Expr::Call(name, args, span) if name == "seen_by" => seen_by(args, span, scope),
         Expr::Call(name, args, span) if name == "chance" => {
             let n = match args.as_slice() {
                 [Expr::Int(n, _)] if (0..=100).contains(n) => *n as u8,
@@ -200,7 +201,7 @@ pub(crate) fn resolve(expr: &Expr, scope: &Scope) -> Result<(Operand, Ty), LangE
                 other => {
                     return Err(LangError::new(
                         format!(
-                            "unknown function `{other}`; try visited, visits, carried, present, in, remembers or chance"
+                            "unknown function `{other}`; try visited, visits, carried, present, in, remembers, chance or seen_by"
                         ),
                         span.clone(),
                     ));
@@ -344,6 +345,29 @@ fn remembers(args: &[Expr], span: &Span, scope: &Scope) -> Result<Condition, Lan
     })
 }
 
+/// `seen_by(x)`: the perceiver of a text is `x`, the player or a thing.
+fn seen_by(args: &[Expr], span: &Span, scope: &Scope) -> Result<Condition, LangError> {
+    let who = single_ident(args, span)?;
+    let entity = if who == loremaster_model::PLAYER_SPEAKER {
+        Some(scope.player())
+    } else {
+        scope
+            .things
+            .contains_key(who)
+            .then(|| scope.entity(who))
+            .flatten()
+    };
+    let entity = entity.ok_or_else(|| {
+        LangError::new(
+            format!("unknown perceiver `{who}`: `seen_by` names a thing or `player`"),
+            args[0].span(),
+        )
+    })?;
+    Ok(Condition::SeenBy(dramaturge_model::CharacterId::new(
+        entity,
+    )))
+}
+
 fn single_ident<'a>(args: &'a [Expr], span: &Span) -> Result<&'a str, LangError> {
     match args {
         [Expr::Path(parts, _)] if parts.len() == 1 => Ok(&parts[0]),
@@ -453,6 +477,21 @@ mod tests {
                 }
         );
         check!(matches!(&items[1], Condition::Not(_)));
+    }
+
+    #[test]
+    fn seen_by_names_the_player_or_a_thing() {
+        let s = scope();
+        let c = compile_condition("seen_by(player)", &s).unwrap();
+        check!(c == Condition::SeenBy(dramaturge_model::CharacterId::new(s.player())));
+        let c = compile_condition("seen_by(lamp)", &s).unwrap();
+        check!(
+            c == Condition::SeenBy(dramaturge_model::CharacterId::new(
+                s.entity("lamp").unwrap()
+            ))
+        );
+        let e = compile_condition("seen_by(ghost)", &s).unwrap_err();
+        check!(e.message.contains("unknown perceiver `ghost`"));
     }
 
     #[test]

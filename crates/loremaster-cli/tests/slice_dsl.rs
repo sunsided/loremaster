@@ -115,13 +115,24 @@ fn slice_dsl_walkthroughs() {
         .unwrap_or_else(|e| panic!("{e:#?}"));
     let world = Arc::new(World::compile(project.story).unwrap());
     let mut ran = Vec::new();
-    // `slice_keeper_agenda` passes on the YAML form since D6 (P4-02 #79); it
-    // needs the agenda, which world! does not have yet (dsl/agenda.rs).
-    let needs_agenda = |id: &str| id == "slice_keeper_agenda";
+    // These pass on the YAML form (D6 P4-02 #79, P4-01 #78); they need parts
+    // that world! does not have yet: the agenda (dsl/agenda.rs), the text
+    // pool of the dialogue and the stove's `one_of` (dsl/texts.rs, dsl/stove.rs).
+    let needs_parts = |id: &str| {
+        [
+            "slice_keeper_agenda",
+            "slice_keeper_dialogue",
+            "slice_stove_text",
+            "slice_talk_pauses_agenda",
+            "slice_best",
+            "slice_ashes",
+        ]
+        .contains(&id)
+    };
     for (id, walk) in project
         .walkthroughs
         .iter()
-        .filter(|(id, w)| w.pending.is_none() && !needs_agenda(id))
+        .filter(|(id, w)| w.pending.is_none() && !needs_parts(id))
     {
         let result = run_walkthrough(world.clone(), walk, id);
         assert!(
@@ -213,7 +224,7 @@ fn the_dsl_dialogue_equals_the_yaml_dialogue() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, R9 P4-01 #78 (texts, one_of, the text pool of the keeper dialogue), D6 P4-02 #79 (agenda, command slots)"]
+#[ignore = "pending: phase 4, world! texts and one_of after P4-01 #78 (dsl/texts.rs, dsl/stove.rs, the pool of dsl/dialogue.rs), agendas in world! after P4-02 #79"]
 fn slice_equivalence_all_parts() {
     // The whole slice, with the parts in new syntax: the YAML form loads only
     // when the model knows that syntax, and the world! forms compile only

@@ -1,6 +1,5 @@
 # The stove text: one_of with pick: best, seen_by and learn (the D2 sketch).
 name: The stove after midnight
-pending: { phase: 4, needs: "TX, D2, P4-01 #78" }
 steps:
   - { do: examine stove, see: "The stove is cold.", not_see: "too hot" }
   - wait

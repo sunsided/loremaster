@@ -121,6 +121,9 @@ pub struct Story {
         serialize_with = "crate::dialogue::story_form"
     )]
     pub dialogues: Vec<Dialogue>,
+    /// Named text pools, from `texts/`. Each has its file name as id.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub texts: Vec<crate::TextPool>,
     /// Author text around the responses to verbs, for the whole story.
     #[serde(default, skip_serializing_if = "Frames::is_empty")]
     pub frames: Frames,
@@ -144,6 +147,11 @@ fn is_true(b: &bool) -> bool {
 }
 
 impl Story {
+    /// The named text pool `id`.
+    pub fn text_pool(&self, id: &str) -> Option<&crate::TextPool> {
+        self.texts.iter().find(|p| p.id.as_deref() == Some(id))
+    }
+
     pub fn room(&self, id: &str) -> Option<&Room> {
         self.rooms.iter().find(|r| r.id.as_str() == id)
     }

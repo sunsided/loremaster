@@ -169,6 +169,10 @@ impl Lower<String, Line, Effect> for Host<'_> {
         cx: &mut Cx<'_>,
         say: &Line,
     ) -> Result<DialogText<CompiledLine>, DialogueError> {
+        // `say: { text: <id> }`: the runtime shows the named text pool.
+        if let Some(pool) = &say.pool {
+            return Ok(DialogText::Pool(pool.as_str().into()));
+        }
         let speaker = self.speaker(&cx.place);
         compile_line(say, Some(speaker), self.scope)
             .map(DialogText::Host)

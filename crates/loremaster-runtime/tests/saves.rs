@@ -283,3 +283,37 @@ fn the_back_stack_of_a_talk_keeps_only_nodes_that_still_exist() {
     assert!(talk.back.is_empty(), "{:?}", talk.back);
     assert_eq!(loaded.dropped, ["dialogue:blackbeard#meet"]);
 }
+
+#[test]
+fn text_progress_of_old_saves_carries_over() {
+    // Before the text core (P4-01): keys `owner#index` and the field `sticky`.
+    let (world, game, mut save) = played();
+    let progress = save["state"]["progress"].as_object().unwrap().clone();
+    assert!(progress.contains_key("room:cottage/0"), "{progress:#?}");
+    let old: serde_json::Map<String, Value> = progress
+        .iter()
+        .map(|(k, v)| {
+            let (owner, i) = k.rsplit_once('/').unwrap();
+            let mut v = v.clone();
+            v["sticky"] = json!(1);
+            (format!("{owner}#{i}"), v)
+        })
+        .collect();
+    save["state"]["progress"] = Value::Object(old);
+    save["version"] = json!(2);
+    let (restored, _) = Session::load(world.clone(), save.clone()).unwrap();
+    let keys: Vec<_> = restored.state().progress.keys().collect();
+    assert_eq!(keys, game.state().progress.keys().collect::<Vec<_>>());
+    assert!(
+        restored
+            .state()
+            .progress
+            .values()
+            .all(|p| p.pick == Some(1))
+    );
+
+    // A save of the current version keeps its keys, also an id with `#`.
+    save["version"] = json!(SAVE_VERSION);
+    let (restored, _) = Session::load(world, save).unwrap();
+    assert!(restored.state().progress.contains_key("room:cottage#0"));
+}

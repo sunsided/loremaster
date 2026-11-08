@@ -2,7 +2,6 @@
 # but only the ashes ending is left (a point of no return, marked with
 # `closes` in the agenda).
 name: Too late for the pages
-pending: { phase: 4, needs: "P4-07 #84" }
 steps:
   - { do: examine stove, see: "The stove is cold." }
   - wait

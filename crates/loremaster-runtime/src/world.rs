@@ -1,4 +1,8 @@
-use dramaturge_model::{Condition, DialogueGraph, DialogueNodeId, SymbolTable};
+use crate::text::pool::{Leaf, LeafText, Lore, LorePool};
+use dramaturge_model::{
+    Candidate, Condition, DialogueGraph, DialogueNodeId, Entry, FragmentMode as DMode, Pick, Pools,
+    SymbolTable,
+};
 use loremaster_lang::{
     CompiledLine, LangError, Scope, Segment, compile_condition, compile_dialogue, compile_markup,
 };
@@ -15,7 +19,7 @@ use std::sync::Arc;
 pub struct World {
     pub story: Story,
     pub verbs: Vec<VerbDef>,
-    pub(crate) intro: Vec<CFragment>,
+    pub(crate) intro: CText,
     pub(crate) rooms: Vec<CRoom>,
     pub(crate) things: Vec<CThing>,
     pub(crate) rules: Vec<CRule>,
@@ -35,6 +39,8 @@ pub struct World {
     pub(crate) dialogues: Vec<std::sync::Arc<CompiledDialogue>>,
     /// The machines with `quest: true`, with the journal text of their states.
     pub(crate) quests: Vec<CQuest>,
+    /// The named text pools of `texts/`.
+    pub(crate) pools: Pools<Lore>,
     /// dramaturge ids of the player, things, memories, dialogue nodes and options.
     pub symbols: SymbolTable,
     room_index: BTreeMap<Id, usize>,
@@ -49,20 +55,47 @@ pub struct World {
 pub(crate) struct CFragment {
     pub key: String,
     pub owner: String,
-    pub index: usize,
     pub variants: Vec<Vec<Segment>>,
     /// The variants as written, for the editor.
     pub sources: Vec<String>,
     pub when: Option<Condition>,
     pub when_src: Option<String>,
+    /// The conditions of a group's candidates (`one_of`), for the views.
+    pub inner_when: Vec<Condition>,
     pub mode: FragmentMode,
     pub layer: Layer,
     pub replaces: bool,
 }
 
+/// A list of fragments (a description, a presence text, a part of a frame)
+/// and the pool that dramaturge's core chooses from. The pool id is the
+/// owner (`room:shore`); each fragment is a candidate of a `pick: all` pool.
+#[derive(Debug, Clone)]
+pub(crate) struct CText {
+    pub fragments: Vec<CFragment>,
+    pub pool: LorePool,
+}
+
+impl Default for CText {
+    fn default() -> Self {
+        Self {
+            fragments: Vec::new(),
+            pool: LorePool::new("", Pick::All),
+        }
+    }
+}
+
+impl std::ops::Deref for CText {
+    type Target = [CFragment];
+
+    fn deref(&self) -> &[CFragment] {
+        &self.fragments
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct CRoom {
-    pub description: Vec<CFragment>,
+    pub description: CText,
     pub frames: BTreeMap<Id, CFrame>,
     pub exits: Vec<CExit>,
 }
@@ -77,8 +110,8 @@ pub(crate) struct CExit {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CThing {
-    pub description: Vec<CFragment>,
-    pub presence: Vec<CFragment>,
+    pub description: CText,
+    pub presence: CText,
     /// The condition of each name stage.
     pub names: Vec<Option<Condition>>,
     pub frames: BTreeMap<Id, CFrame>,
@@ -87,9 +120,9 @@ pub(crate) struct CThing {
 /// A compiled action frame.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct CFrame {
-    pub before: Vec<CFragment>,
-    pub instead: Vec<CFragment>,
-    pub after: Vec<CFragment>,
+    pub before: CText,
+    pub instead: CText,
+    pub after: CText,
 }
 
 #[derive(Debug, Clone)]
@@ -198,6 +231,8 @@ pub(crate) enum CEffect {
     Set(BTreeMap<String, Value>),
     Add(BTreeMap<String, i64>),
     Say(loremaster_lang::CompiledLine),
+    /// `say: { text: <id> }`: show a named text pool.
+    SayPool(Id),
     Move(BTreeMap<Id, Id>),
     Goto(Id),
     /// End the game with an ending: its id, title and text.
@@ -237,6 +272,28 @@ impl From<&CompileError> for loremaster_model::Diagnostic {
         loremaster_model::Diagnostic::error("", e.at.clone(), e.error.message.clone())
     }
 }
+
+/// The texts and conditions of the candidates of a group, nested groups too.
+fn group_texts(
+    one_of: &[loremaster_model::Candidate],
+    texts: &mut Vec<String>,
+    whens: &mut Vec<String>,
+) {
+    use loremaster_model::dramaturge_syntax::Variant;
+    for c in one_of {
+        whens.extend(c.when.iter().cloned());
+        for v in &c.variants {
+            match v {
+                Variant::Text(t) => texts.push(t.clone()),
+                Variant::Pool(p) => group_texts(&p.one_of, texts, whens),
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Compiles a text of a candidate, with its place and its `when` as written.
+type LeafFn<'a, T> = dyn Fn(&str, &T, Option<&String>) -> Result<Entry<Lore>, CompileError> + 'a;
 
 struct Compiler {
     scope: Scope,
@@ -278,29 +335,171 @@ impl Compiler {
         })
     }
 
-    fn fragments(&self, owner: &str, list: &[Fragment]) -> Result<Vec<CFragment>, CompileError> {
-        list.iter()
+    fn fragments(&self, owner: &str, list: &[Fragment]) -> Result<CText, CompileError> {
+        // `first_visit` is the first visit of a room, for a room and the
+        // things in it; for a thing that is examined, the intro and a frame
+        // it means the first time the text shows.
+        let rooms =
+            (owner.starts_with("room:") && !owner.contains('/')) || owner.ends_with("/presence");
+        let mut pool = LorePool::new(owner, Pick::All);
+        let fragments = list
+            .iter()
             .enumerate()
             .map(|(i, f)| {
                 let at = format!("{owner}#{i}");
+                let when = self.cond(&at, &f.when)?;
+                let leaf = |text| Leaf {
+                    text,
+                    layer: f.layer,
+                    replaces: f.replaces,
+                    fragment: i,
+                    when_src: f.when.clone(),
+                };
+                let variants = if f.one_of.is_empty() {
+                    f.variants
+                        .iter()
+                        .map(|v| Ok(Entry::Leaf(leaf(LeafText::Markup(self.markup(&at, v)?)))))
+                        .collect::<Result<_, CompileError>>()?
+                } else {
+                    let index = i.to_string();
+                    let id = f.id.as_ref().map_or(index.as_str(), Id::as_str);
+                    let markup = |at: &str, text: &String, when: Option<&String>| {
+                        Ok(Entry::Leaf(Leaf {
+                            when_src: when.or(f.when.as_ref()).cloned(),
+                            ..leaf(LeafText::Markup(self.markup(at, text)?))
+                        }))
+                    };
+                    let pick = match f.pick {
+                        loremaster_model::Pick::All => Pick::All,
+                        loremaster_model::Pick::First => Pick::First,
+                        loremaster_model::Pick::Best => Pick::Best,
+                    };
+                    vec![Entry::Pool(self.pool(&at, id, pick, &f.one_of, &markup)?)]
+                };
+                let mut candidate = Candidate::new(variants).mode(match f.mode {
+                    FragmentMode::Always => DMode::Always,
+                    FragmentMode::FirstVisit if rooms => DMode::FirstTime,
+                    FragmentMode::FirstVisit | FragmentMode::Once => DMode::Once,
+                    FragmentMode::Cycle => DMode::Cycle,
+                    FragmentMode::Shuffle => DMode::Shuffle,
+                    FragmentMode::Sticky => DMode::Sticky,
+                });
+                candidate.key = f.id.as_ref().map(|id| id.as_str().into());
+                candidate.when = when.clone();
+                candidate.learn = f.learn.iter().map(|v| v.to_string()).collect();
+                pool.candidates.push(candidate);
+                // A group shows the texts of its candidates: the views (the
+                // things that a room text mentions, the matrix) read them all.
+                let (mut sources, mut whens) = (f.variants.clone(), Vec::new());
+                group_texts(&f.one_of, &mut sources, &mut whens);
                 Ok(CFragment {
-                    key: at.clone(),
+                    key: format!(
+                        "{owner}/{}",
+                        f.id.as_ref().map_or(i.to_string(), Id::to_string)
+                    ),
                     owner: owner.to_string(),
-                    index: i,
-                    variants: f
-                        .variants
+                    variants: sources
                         .iter()
                         .map(|v| self.markup(&at, v))
                         .collect::<Result<_, _>>()?,
-                    sources: f.variants.clone(),
-                    when: self.cond(&at, &f.when)?,
+                    sources,
+                    when,
                     when_src: f.when.clone(),
+                    inner_when: whens
+                        .iter()
+                        .map(|w| compile_condition(w, &self.scope))
+                        .collect::<Result<_, _>>()
+                        .map_err(|error| CompileError {
+                            at: at.clone(),
+                            error,
+                        })?,
                     mode: f.mode,
                     layer: f.layer,
                     replaces: f.replaces,
                 })
             })
-            .collect()
+            .collect::<Result<_, CompileError>>()?;
+        Ok(CText { fragments, pool })
+    }
+
+    /// A pool of `one_of` candidates: a group in a description, or a named
+    /// pool of `texts/`. `leaf` compiles a text of a candidate, with its place
+    /// and its condition as written.
+    fn pool<T>(
+        &self,
+        at: &str,
+        id: &str,
+        pick: Pick,
+        one_of: &[loremaster_model::Candidate<T>],
+        leaf: &LeafFn<'_, T>,
+    ) -> Result<LorePool, CompileError> {
+        use loremaster_model::dramaturge_syntax::{FragmentMode as SMode, Pick as SPick, Variant};
+        let mut pool = LorePool::new(id, pick);
+        for (i, c) in one_of.iter().enumerate() {
+            let at = format!("{at}/one_of[{i}]");
+            let mut variants = Vec::new();
+            for v in &c.variants {
+                variants.push(match v {
+                    Variant::Text(text) => leaf(&at, text, c.when.as_ref())?,
+                    Variant::Pool(inner) => {
+                        let index = i.to_string();
+                        let id = inner.id.as_deref().or(c.key.as_deref()).unwrap_or(&index);
+                        let pick = match inner.pick.unwrap_or_default() {
+                            SPick::All => Pick::All,
+                            SPick::Best => Pick::Best,
+                            _ => Pick::First,
+                        };
+                        Entry::Pool(self.pool(&at, id, pick, &inner.one_of, leaf)?)
+                    }
+                    // A kind of variant that a later dramaturge adds.
+                    _ => continue,
+                });
+            }
+            let mut candidate = Candidate::new(variants).mode(match c.mode {
+                SMode::FirstTime => DMode::FirstTime,
+                SMode::Once => DMode::Once,
+                SMode::Cycle => DMode::Cycle,
+                SMode::Shuffle => DMode::Shuffle,
+                SMode::Sticky => DMode::Sticky,
+                _ => DMode::Always,
+            });
+            candidate.key = c.key.as_deref().map(Into::into);
+            candidate.speaker = c.speaker.as_deref().map(Id::new);
+            candidate.topic = c.topic.as_deref().map(Id::new);
+            candidate.when = self.cond(&format!("{at}.when"), &c.when)?;
+            candidate.learn = c.learn.clone();
+            pool.candidates.push(candidate);
+        }
+        Ok(pool)
+    }
+
+    /// The named pools of `texts/`. A line that says `{ text: <id> }` names
+    /// another pool.
+    fn pools(&self, story: &Story) -> Result<Pools<Lore>, CompileError> {
+        let mut pools = Pools::new();
+        for (n, p) in story.texts.iter().enumerate() {
+            let id = p.id.clone().unwrap_or_default();
+            let at = format!("text:{id}");
+            let line = |at: &str, line: &loremaster_model::Line, when: Option<&String>| {
+                if let Some(pool) = &line.pool {
+                    return Ok(Entry::Named(pool.as_str().into()));
+                }
+                Ok(Entry::Leaf(Leaf {
+                    text: LeafText::Line(self.line(at, line)?),
+                    layer: Layer::Base,
+                    replaces: false,
+                    fragment: n,
+                    when_src: when.cloned(),
+                }))
+            };
+            let pick = match p.pick.unwrap_or_default() {
+                loremaster_model::dramaturge_syntax::Pick::All => Pick::All,
+                loremaster_model::dramaturge_syntax::Pick::Best => Pick::Best,
+                _ => Pick::First,
+            };
+            pools.insert(self.pool(&at, &id, pick, &p.one_of, &line)?);
+        }
+        Ok(pools)
     }
 }
 
@@ -339,7 +538,10 @@ impl Compiler {
             }
             Effect::Set(m) => CEffect::Set(m.clone()),
             Effect::Add(m) => CEffect::Add(m.clone()),
-            Effect::Say(line) => CEffect::Say(self.line(at, line)?),
+            Effect::Say(line) => match &line.pool {
+                Some(pool) => CEffect::SayPool(pool.clone()),
+                None => CEffect::Say(self.line(at, line)?),
+            },
             Effect::Move(m) => CEffect::Move(m.clone()),
             Effect::Goto(r) => CEffect::Goto(r.clone()),
             Effect::End(id) => {
@@ -542,6 +744,7 @@ impl World {
             })
             .collect::<Result<Vec<_>, CompileError>>()?;
         let frames = c.frames("story", &story.frames)?;
+        let pools = c.pools(&story)?;
         let mut symbols = c.scope.symbols.clone();
         let dialogues = story
             .dialogues
@@ -638,6 +841,7 @@ impl World {
             registered: Vec::new(),
             frames,
             dialogues,
+            pools,
             quests,
             symbols,
             room_index,

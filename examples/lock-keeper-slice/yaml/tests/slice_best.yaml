@@ -1,6 +1,5 @@
 # The best path: take the pages before midnight and accuse the keeper.
 name: The pages before midnight
-pending: { phase: 4, needs: "P4-07 #84" }
 steps:
   - { do: examine stove, see: "The stove is cold." }
   - up

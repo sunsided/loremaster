@@ -33,7 +33,14 @@ const NEW_SYNTAX: &[&str] = &[AGENDA, DIALOGUE, TEXTS, STOVE, KEEPER_RULE];
 /// own test with it. The agenda loads since D6 (P4-02 #79), but it stays a
 /// part: `slice_model_hash` and `slice_equivalence` compare today's syntax,
 /// and world! has no agendas yet.
-const WITH_PARTS: &[&str] = &["tests/slice_keeper_agenda.yaml"];
+const WITH_PARTS: &[&str] = &[
+    "tests/slice_keeper_agenda.yaml",
+    "tests/slice_keeper_dialogue.yaml",
+    "tests/slice_stove_text.yaml",
+    "tests/slice_talk_pauses_agenda.yaml",
+    "tests/slice_best.yaml",
+    "tests/slice_ashes.yaml",
+];
 
 fn form(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -94,7 +101,8 @@ fn slice_baseline() {
         .collect();
     assert!(errors.is_empty(), "{errors:#?}");
 
-    // Every walkthrough without a `pending:` mark passes on today's files.
+    // Every walkthrough without a `pending:` mark passes on today's files,
+    // except the ones that need a new part: their own tests load it.
     let world = Arc::new(World::compile(project.story).unwrap());
     let mut ran = Vec::new();
     for (path, walk) in project
@@ -206,52 +214,16 @@ fn slice_undo_after_death() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, R9 (text pools), P4-01 #78"]
 fn slice_talk_pauses_agenda() {
     assert_passes("slice_talk_pauses_agenda", &[AGENDA, DIALOGUE, TEXTS]);
 }
 
-/// `slice_talk_pauses_agenda` without the text pool (R9): the first node of
-/// the dialogue says the line of the pool that shows in the kitchen. The
-/// rest is the slice as it is: the talk holds the agenda step back, and the
-/// step runs late, in the turn that ends the talk.
 #[test]
-fn slice_talk_pauses_agenda_without_the_text_pool() {
-    let mut files = with("yaml", &[AGENDA, DIALOGUE]);
-    let dialogue = files
-        .iter_mut()
-        .find(|f| f.path == "dialogues/keeper.yaml")
-        .unwrap();
-    let pool = "say: { text: keeper_remark }";
-    assert!(dialogue.text.contains(pool), "{}", dialogue.text);
-    dialogue.text = dialogue.text.replace(
-        pool,
-        r#"say: [{ says: "Do not touch the stove," }, { narrate: "the lock-keeper says." }]"#,
-    );
-    let project = project(files);
-    let (_, walk) = project
-        .walkthroughs
-        .iter()
-        .find(|(p, _)| p == "tests/slice_talk_pauses_agenda.yaml")
-        .unwrap();
-    let world = Arc::new(World::compile(project.story.clone()).unwrap());
-    let result = run_walkthrough(world, walk, "slice_talk_pauses_agenda");
-    assert!(
-        result.passed(),
-        "{:#?}\n\n{}",
-        result.failures,
-        result.transcript
-    );
-}
-
-#[test]
-#[ignore = "pending: phase 4, TX, D2, P4-01 #78"]
 fn slice_stove_text() {
     assert_passes("slice_stove_text", &[STOVE, AGENDA]);
 }
 
 #[test]
-#[ignore = "pending: phase 4, R9 (text pools), P4-01 #78"]
 fn slice_keeper_dialogue() {
     assert_passes("slice_keeper_dialogue", &[DIALOGUE, TEXTS]);
 }
@@ -287,7 +259,13 @@ fn slice_keeper_agenda() {
 /// The schema checks plus the ending checks of the explorer, with files.
 fn ending_checks(project: &Project) -> Vec<Diagnostic> {
     let world = Arc::new(World::compile(project.story.clone()).unwrap());
-    let explored = authoring::explore(world, authoring::Budget::default());
+    // The whole slice (the talk, the stove, the keeper rule) has more states
+    // than the default budget of 2000 walks; the checks need the walk done.
+    let budget = authoring::Budget {
+        max_states: 5000,
+        ..Default::default()
+    };
+    let explored = authoring::explore(world, budget);
     let mut out = check(project);
     out.extend(
         explored
@@ -300,7 +278,6 @@ fn ending_checks(project: &Project) -> Vec<Diagnostic> {
 }
 
 #[test]
-#[ignore = "pending: phase 4, R9 text pools P4-01 #78 (the dialogue, texts and stove of NEW_SYNTAX; the agenda and the ending checks work)"]
 fn slice_endings_reachable() {
     // Two checks on the endings. A dead end (a state from which no ending can
     // be reached) is an error. A point of no return (a step after which the
@@ -341,13 +318,11 @@ fn slice_endings_reachable() {
 }
 
 #[test]
-#[ignore = "pending: phase 4, P4-07 #84"]
 fn slice_best() {
     assert_passes("slice_best", NEW_SYNTAX);
 }
 
 #[test]
-#[ignore = "pending: phase 4, P4-07 #84"]
 fn slice_ashes() {
     assert_passes("slice_ashes", NEW_SYNTAX);
 }

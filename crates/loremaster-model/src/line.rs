@@ -26,9 +26,14 @@ pub const PLAYER_SPEAKER: &str = "player";
 ///
 /// A line that is one plain string is written out as that string, so stories
 /// without segments keep their model hash.
+///
+/// `say: { text: <id> }` shows the named text pool `texts/<id>.yaml` in
+/// place of segments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Line {
     pub segments: Vec<LineSegment>,
+    /// The named text pool that this line shows. Then `segments` is empty.
+    pub pool: Option<Id>,
 }
 
 /// One piece of a [`Line`].
@@ -59,7 +64,18 @@ impl Line {
     /// an empty list, and `loremaster check` reports an empty line that a
     /// builder made.
     pub fn new(segments: Vec<LineSegment>) -> Self {
-        Self { segments }
+        Self {
+            segments,
+            pool: None,
+        }
+    }
+
+    /// `{ text: <id> }`: a line that shows the named text pool `id`.
+    pub fn pool(id: impl Into<Id>) -> Self {
+        Self {
+            segments: Vec::new(),
+            pool: Some(id.into()),
+        }
     }
 
     /// A line of one bare string.
@@ -81,6 +97,9 @@ impl Line {
     /// conditions are left out, and so a segment shows here even when its
     /// condition would hide it in the game.
     pub fn source(&self) -> String {
+        if let Some(pool) = &self.pool {
+            return format!("{{ text: {pool} }}");
+        }
         if let Some(text) = self.as_plain() {
             return text.to_string();
         }
@@ -186,6 +205,11 @@ impl LineSegment {
 
 impl Serialize for Line {
     fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        if let Some(pool) = &self.pool {
+            let mut map = s.serialize_map(Some(1))?;
+            map.serialize_entry("text", pool)?;
+            return map.end();
+        }
         if let Some(text) = self.as_plain() {
             return s.serialize_str(text);
         }
@@ -249,10 +273,21 @@ impl<'de> Deserialize<'de> for Line {
                 Ok(Line::new(segments))
             }
 
-            fn visit_map<A: MapAccess<'de>>(self, _map: A) -> Result<Line, A::Error> {
-                Err(A::Error::custom(
-                    "a line is a text or a list of segments; put one segment in a list: `[{ says: … }]`",
-                ))
+            fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Line, A::Error> {
+                // `{ text: <pool id> }` names a text pool; any other map is an error
+                // that asks for a list of segments.
+                #[derive(Deserialize)]
+                #[serde(deny_unknown_fields)]
+                struct PoolRef {
+                    text: Id,
+                }
+                PoolRef::deserialize(MapAccessDeserializer::new(map))
+                    .map(|p| Line::pool(p.text))
+                    .map_err(|_| {
+                        A::Error::custom(
+                            "a line is a text, a list of segments or `{ text: <text pool> }`; put one segment in a list: `[{ says: … }]`",
+                        )
+                    })
             }
         }
         d.deserialize_any(LineVisitor)
@@ -380,6 +415,13 @@ mod tests {
         check!(err(json!([{ "when": "x" }])).contains("`narrate` or `says`"));
         check!(err(json!([{ "say": "a" }])).contains("unknown field `say`"));
         check!(err(json!({ "says": "a" })).contains("in a list"));
+    }
+
+    #[test]
+    fn a_text_map_names_a_pool() {
+        let l = line(json!({ "text": "keeper_remark" }));
+        check!(l == Line::pool("keeper_remark"));
+        check!(serde_json::to_value(&l).unwrap() == json!({ "text": "keeper_remark" }));
     }
 
     #[test]

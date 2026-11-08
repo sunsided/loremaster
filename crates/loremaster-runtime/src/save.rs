@@ -19,7 +19,9 @@ pub const SAVE_FORMAT: &str = "loremaster-save";
 /// The newest save version. Version 0 is the bare [`State`] of loremaster
 /// 0.1, before the envelope. Version 1 is the envelope (P1-04). Version 2
 /// adds the state of the actors and their agendas (`state.actors`, D6).
-pub const SAVE_VERSION: u32 = 2;
+/// Version 3 keys the text progress as dramaturge's text core does
+/// (`room:shore/2`, P4-01).
+pub const SAVE_VERSION: u32 = 3;
 
 /// A save game: the state, and the story it was made with.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -204,6 +206,7 @@ fn migrate(save: Value) -> Result<(Migrated, u32), SaveError> {
     for from in version.max(1)..SAVE_VERSION {
         match from {
             1 => v1_to_v2(&mut state)?,
+            2 => v2_to_v3(&mut state)?,
             _ => unreachable!("a step for each version below SAVE_VERSION"),
         }
     }
@@ -250,6 +253,32 @@ pub(crate) fn keep_known_steps(
         true
     });
     dropped
+}
+
+/// Version 2 to 3: text progress before the text core was keyed
+/// `room:shore#2`; the core keys it `room:shore/2`, as dramaturge does. A
+/// fragment with an `id` is keyed by its id now, so its progress starts
+/// over. The field `sticky` reads as `pick` through a serde alias.
+fn v2_to_v3(state: &mut Value) -> Result<(), SaveError> {
+    let Some(progress) = state.get_mut("progress") else {
+        return Ok(());
+    };
+    let Some(progress) = progress.as_object_mut() else {
+        return Err(SaveError::Invalid(
+            "the text progress is not an object".into(),
+        ));
+    };
+    let old = std::mem::take(progress);
+    for (key, p) in old {
+        let key = match key.rsplit_once('#') {
+            Some((owner, i)) if !i.is_empty() && i.bytes().all(|b| b.is_ascii_digit()) => {
+                format!("{owner}/{i}")
+            }
+            _ => key,
+        };
+        progress.insert(key, p);
+    }
+    Ok(())
 }
 
 /// Keep what is still valid in a changed story (ST-6). New values start at

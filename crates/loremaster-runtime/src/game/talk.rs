@@ -263,7 +263,11 @@ impl Game {
             } else {
                 BlockKind::Speech
             };
-            let runs = self.line(text, &base);
+            // `say: { text: <id> }`: the core chooses the line of the pool.
+            let runs = match text {
+                DialogText::Pool(id) => self.say_pool(turn, id, &base),
+                text => self.line(text, &base),
+            };
             turn.push(kind, runs);
         }
     }

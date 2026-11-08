@@ -1,4 +1,5 @@
 use crate::{Diagnostic, Origin, Pack, Project, Severity, SourceFile, assemble};
+use dramaturge_model::{Candidate, Condition, Entry, FragmentMode, Pick, Pool, Pools, TextTypes};
 use loremaster_lang::{LangError, Scope, compile_condition, compile_markup};
 use loremaster_model::{
     DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
@@ -10,6 +11,28 @@ mod walkthroughs;
 
 pub use walkthroughs::MAX_HINTS;
 pub(crate) use walkthroughs::mentions;
+
+/// The condition tests the perceiver of a text somewhere.
+fn has_seen_by(c: &Condition) -> bool {
+    match c {
+        Condition::SeenBy(_) => true,
+        Condition::All(cs) | Condition::Any(cs) => cs.iter().any(has_seen_by),
+        Condition::Not(inner) => has_seen_by(inner),
+        _ => false,
+    }
+}
+
+/// The host types of a pool in the checks: only what dramaturge's checks
+/// read (conditions for the score, the tuple keys, the named pools).
+struct CheckTypes;
+
+impl TextTypes for CheckTypes {
+    type Leaf = ();
+    type Cond = Condition;
+    type Learn = ();
+    type Actor = String;
+    type Topic = String;
+}
 
 /// The result of the schema checks: the project, when the packs join, and
 /// every error and warning, also the ones of joining the packs.
@@ -72,6 +95,7 @@ pub fn check(project: &Project) -> Vec<Diagnostic> {
         scope: Scope::from_story(&project.story),
         out: project.assembly.clone(),
         place: None,
+        named: None,
     };
     c.run();
     c.out
@@ -85,6 +109,8 @@ struct Checker<'a> {
     /// it comes from Rust. Its diagnostics get the line and column, which a
     /// YAML entity gets from the text of its file.
     place: Option<(String, u32, u32)>,
+    /// The named pools of `texts/` for dramaturge's checks, built once.
+    named: Option<Pools<CheckTypes>>,
 }
 
 impl Checker<'_> {
@@ -147,10 +173,39 @@ impl Checker<'_> {
         });
     }
 
+    /// A condition outside a text: `seen_by` has no perceiver there.
     fn condition(&mut self, file: &str, at: &str, source: &str) {
+        match compile_condition(source, &self.scope) {
+            Ok(c) if has_seen_by(&c) => self.error(
+                file,
+                at,
+                "`seen_by` works only in the `when` of a fragment or of a candidate in `one_of`: elsewhere nobody perceives",
+            ),
+            Ok(_) => {}
+            Err(e) => self.lang_error(file, at, source, e),
+        }
+    }
+
+    /// The `when` of a fragment or a candidate: `seen_by` asks for the
+    /// perceiver of the text.
+    fn text_condition(&mut self, file: &str, at: &str, source: &str) {
         if let Err(e) = compile_condition(source, &self.scope) {
             self.lang_error(file, at, source, e);
         }
+    }
+
+    /// A line that cannot show a text pool: an option's `say` and a
+    /// journal line render without the core.
+    fn line_without_pool(&mut self, file: &str, at: &str, line: &Line) {
+        if line.pool.is_some() {
+            self.error(
+                file,
+                at,
+                "`{ text: <pool> }` works in a rule's `say` and in a dialogue node's lines, not here",
+            );
+            return;
+        }
+        self.line(file, at, line);
     }
 
     fn markup(&mut self, file: &str, at: &str, source: &str) {
@@ -164,6 +219,16 @@ impl Checker<'_> {
     /// `at` is the place of the effect, node or option; a segment is at
     /// `<at>.say[i]`.
     fn line(&mut self, file: &str, at: &str, line: &Line) {
+        if let Some(pool) = &line.pool {
+            if self.story().text_pool(pool.as_str()).is_none() {
+                self.error(
+                    file,
+                    at,
+                    format!("unknown text pool `{pool}`; add texts/{pool}.yaml"),
+                );
+            }
+            return;
+        }
         // YAML cannot write an empty line; a builder or `world!` can.
         if line.segments.is_empty() {
             self.error(
@@ -199,16 +264,229 @@ impl Checker<'_> {
     }
 
     fn fragments(&mut self, file: &str, at: &str, fragments: &[Fragment]) {
+        let mut ids = BTreeSet::new();
         for (i, f) in fragments.iter().enumerate() {
+            if let Some(id) = &f.id
+                && !ids.insert(id.as_str())
+            {
+                self.error(
+                    file,
+                    &format!("{at}[{i}].id"),
+                    format!("two fragments of this text have the id `{id}`; they would share their progress"),
+                );
+            }
             if let Some(when) = &f.when {
-                self.condition(file, &format!("{at}[{i}].when"), when);
+                self.text_condition(file, &format!("{at}[{i}].when"), when);
             }
             for v in &f.variants {
                 self.markup(file, &format!("{at}[{i}]"), v);
             }
-            if f.variants.is_empty() {
+            self.learn(file, &format!("{at}[{i}].learn"), &f.learn);
+            if !f.one_of.is_empty() {
+                let at = format!("{at}[{i}]");
+                if !f.variants.is_empty() {
+                    self.error(
+                        file,
+                        &at,
+                        "a group has `one_of` in place of `text` or `variants`",
+                    );
+                }
+                self.candidates(file, &at, &f.one_of, &mut |c, at, text| {
+                    c.markup(file, at, text)
+                });
+                let index = i.to_string();
+                let id = f.id.as_ref().map_or(index.as_str(), |id| id.as_str());
+                let pick = match f.pick {
+                    loremaster_model::Pick::All => Pick::All,
+                    loremaster_model::Pick::First => Pick::First,
+                    loremaster_model::Pick::Best => Pick::Best,
+                };
+                let pool = self.pool(id, pick, &f.one_of, &|_: &String| None);
+                self.pool_issues(file, &at, &pool);
+            } else if f.variants.is_empty() {
                 self.error(file, &format!("{at}[{i}]"), "fragment has no text");
             }
+        }
+    }
+
+    /// `learn` names story variables of type bool: they become true.
+    fn learn(&mut self, file: &str, at: &str, learn: &[impl AsRef<str>]) {
+        for var in learn {
+            let var = var.as_ref();
+            if self.ty_of(var) != Some(loremaster_lang::Ty::Bool) {
+                self.error(
+                    file,
+                    at,
+                    format!("`learn` needs a story variable of type bool; `{var}` is not one"),
+                );
+            }
+        }
+    }
+
+    /// The candidates of a `one_of` list: conditions, texts (`text` checks
+    /// one), `learn`, and the speaker, a thing or `player`.
+    fn candidates<T>(
+        &mut self,
+        file: &str,
+        at: &str,
+        one_of: &[loremaster_model::Candidate<T>],
+        text: &mut dyn FnMut(&mut Self, &str, &T),
+    ) {
+        use dramaturge_syntax::Variant;
+        let mut keys = BTreeSet::new();
+        for (i, c) in one_of.iter().enumerate() {
+            let at = format!("{at}.one_of[{i}]");
+            if let Some(key) = &c.key
+                && !keys.insert(key.as_str())
+            {
+                self.error(
+                    file,
+                    &format!("{at}.key"),
+                    format!("two candidates of this `one_of` have the key `{key}`; they would share their progress"),
+                );
+            }
+            if let Some(when) = &c.when {
+                self.text_condition(file, &format!("{at}.when"), when);
+            }
+            if let Some(by) = &c.speaker
+                && let Err(e) = loremaster_lang::check_speaker(by, &self.scope)
+            {
+                self.error(file, &format!("{at}.speaker"), e.message);
+            }
+            self.learn(file, &format!("{at}.learn"), &c.learn);
+            for v in &c.variants {
+                match v {
+                    Variant::Text(t) => text(self, &at, t),
+                    Variant::Pool(p) => self.candidates(file, &at, &p.one_of, text),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// A pool for dramaturge's checks: the conditions, keys, modes, speaker
+    /// and topic of the candidates, and the named pools that its texts name.
+    fn pool<T>(
+        &self,
+        id: &str,
+        pick: Pick,
+        one_of: &[loremaster_model::Candidate<T>],
+        named: &dyn Fn(&T) -> Option<String>,
+    ) -> Pool<CheckTypes> {
+        use dramaturge_syntax::{FragmentMode as SMode, Pick as SPick, Variant};
+        let mut pool = Pool::new(id, pick);
+        for (i, c) in one_of.iter().enumerate() {
+            let variants = c
+                .variants
+                .iter()
+                .filter_map(|v| match v {
+                    Variant::Text(t) => Some(named(t).map_or(Entry::Leaf(()), Entry::named)),
+                    Variant::Pool(p) => {
+                        let index = i.to_string();
+                        let id = p.id.as_deref().or(c.key.as_deref()).unwrap_or(&index);
+                        let pick = match p.pick.unwrap_or_default() {
+                            SPick::All => Pick::All,
+                            SPick::Best => Pick::Best,
+                            _ => Pick::First,
+                        };
+                        Some(Entry::Pool(self.pool(id, pick, &p.one_of, named)))
+                    }
+                    _ => None,
+                })
+                .collect();
+            let mut candidate = Candidate::new(variants).mode(match c.mode {
+                SMode::FirstTime => FragmentMode::FirstTime,
+                SMode::Once => FragmentMode::Once,
+                SMode::Cycle => FragmentMode::Cycle,
+                SMode::Shuffle => FragmentMode::Shuffle,
+                SMode::Sticky => FragmentMode::Sticky,
+                _ => FragmentMode::Always,
+            });
+            candidate.key = c.key.as_deref().map(Into::into);
+            candidate.speaker = c.speaker.clone();
+            candidate.topic = c.topic.clone();
+            candidate.when = c
+                .when
+                .as_deref()
+                .and_then(|w| compile_condition(w, &self.scope).ok());
+            pool.candidates.push(candidate);
+        }
+        pool
+    }
+
+    /// dramaturge's checks of a pool (ties of `pick: best`, progress
+    /// without a key, unknown pools) as diagnostics at `at`.
+    fn pool_issues(&mut self, file: &str, at: &str, pool: &Pool<CheckTypes>) {
+        if self.named.is_none() {
+            self.named = Some(self.named_pools());
+        }
+        let pools = self.named.as_ref().expect("built above");
+        let issues = dramaturge_authoring::GraphValidator::new().validate_pool(pool, pools);
+        self.report_pool_issues(file, at, issues);
+    }
+
+    fn report_pool_issues(
+        &mut self,
+        file: &str,
+        at: &str,
+        issues: Vec<dramaturge_authoring::ValidationIssue>,
+    ) {
+        use dramaturge_authoring::{ValidationIssueKind as K, ValidationSeverity};
+        for issue in issues {
+            // The pool checks; an error of another kind fails closed.
+            let pool_kind = matches!(issue.kind, K::PickTie | K::UnkeyedProgress | K::UnknownPool);
+            if !pool_kind && issue.severity != ValidationSeverity::Error {
+                continue;
+            }
+            let at = match issue.path.as_deref() {
+                Some(path) if at.is_empty() => path.to_string(),
+                Some(path) => format!("{at} ({path})"),
+                None => at.to_string(),
+            };
+            match issue.severity {
+                ValidationSeverity::Error => self.error(file, &at, issue.message),
+                _ => self.warning(file, &at, issue.message),
+            }
+        }
+    }
+
+    fn named_pools(&self) -> Pools<CheckTypes> {
+        let mut pools = Pools::new();
+        for p in &self.story().texts {
+            let id = p.id.clone().unwrap_or_default();
+            let pick = match p.pick.unwrap_or_default() {
+                dramaturge_syntax::Pick::All => Pick::All,
+                dramaturge_syntax::Pick::Best => Pick::Best,
+                _ => Pick::First,
+            };
+            let named = |l: &Line| l.pool.as_ref().map(|p| p.to_string());
+            pools.insert(self.pool(&id, pick, &p.one_of, &named));
+        }
+        pools
+    }
+
+    /// The named text pools of `texts/`: their candidates, and dramaturge's
+    /// checks of all of them.
+    fn texts(&mut self) {
+        let story = self.story().clone();
+        for p in &story.texts {
+            let id = p.id.clone().unwrap_or_default();
+            let file = self.file_of(&format!("text:{id}"));
+            self.candidates(&file, "", &p.one_of, &mut |c, at, line| {
+                c.line(&file, at.trim_start_matches('.'), line)
+            });
+        }
+        let pools = self.named_pools();
+        let issues = dramaturge_authoring::GraphValidator::new().validate_pools(&pools);
+        for issue in issues {
+            // The path starts with the pool id: the file of that pool.
+            let id = issue
+                .path
+                .as_deref()
+                .and_then(|p| p.split('/').next())
+                .unwrap_or("");
+            let file = self.file_of(&format!("text:{id}"));
+            self.report_pool_issues(&file, "", vec![issue]);
         }
     }
 
@@ -375,6 +653,7 @@ impl Checker<'_> {
         self.reserved_names();
         self.threads();
         self.dialogues();
+        self.texts();
         self.player_thing();
         self.timers();
         self.agendas();
@@ -592,7 +871,7 @@ impl Checker<'_> {
                 }
                 for (i, o) in n.options.iter().enumerate() {
                     if let Some(say) = &o.say {
-                        self.line(&file, &format!("{at}.options[{i}]"), say);
+                        self.line_without_pool(&file, &format!("{at}.options[{i}]"), say);
                     }
                 }
             }
@@ -953,7 +1232,7 @@ impl Checker<'_> {
                     );
                 }
                 if let Some(line) = s.journal() {
-                    self.line(&file, &format!("{place}.journal"), line);
+                    self.line_without_pool(&file, &format!("{place}.journal"), line);
                 } else if m.quest && s.done() {
                     self.warning(
                         &file,

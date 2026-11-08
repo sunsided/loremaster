@@ -10,6 +10,7 @@ one_of:
   - when: in(kitchen)
     text: [{ says: "Do not touch the stove,", by: keeper }, { narrate: "the lock-keeper says." }]
   - when: in(kitchen) and ash_is_fresh
+    key: midnight
     mode: sticky
     variants:
       - [{ says: "I let it go out at midnight,", by: keeper }, { narrate: "he says. He does not look at you." }]

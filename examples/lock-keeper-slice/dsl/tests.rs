@@ -37,7 +37,6 @@ world! {
     // draft: `wait * 16` is 16 `wait` steps. It expands to 16 steps, so the
     // model is the same as in YAML.
     test slice_ashes "Too late for the pages" {
-        pending phase 4, needs "P4-07 #84";
         "examine stove" sees "The stove is cold.";
         wait * 16;
         wait sees "He opens the stove and feeds it in." expect pages_burned == true;
@@ -72,7 +71,6 @@ world! {
 
     // The best path: take the pages before midnight and accuse the keeper.
     test slice_best "The pages before midnight" {
-        pending phase 4, needs "P4-07 #84";
         "examine stove" sees "The stove is cold.";
         up;
         "take windlass";
@@ -107,7 +105,6 @@ world! {
     // One dialogue format: a dialogue node says a named text pool, and an
     // option shows only after the player learned a fact.
     test slice_keeper_dialogue "Ask the keeper about the stove" {
-        pending phase 4, needs "R9 (text pools), P4-01 #78";
         "talk to keeper" sees r#""Do not touch the stove," the lock-keeper says."# not_sees "Who fed it?";
         "1" sees "Coal, when the company sends it.";
         "2" expect not ended;
@@ -117,7 +114,6 @@ world! {
     // The stove text: one_of with pick best, seen_by and learn (the D2
     // sketch).
     test slice_stove_text "The stove after midnight" {
-        pending phase 4, needs "TX, D2, P4-01 #78";
         "examine stove" sees "The stove is cold." not_sees "too hot";
         wait * 18;
         "examine stove" sees "The ash on the grate is fresh."
@@ -131,7 +127,6 @@ world! {
     // Midnight is after command 18 (22:30 + 18 × 5 minutes): the talk starts
     // then.
     test slice_talk_pauses_agenda "Talk through midnight" {
-        pending phase 4, needs "R9 (text pools), P4-01 #78";
         wait * 17;
         "talk to keeper" sees r#""Do not touch the stove," the lock-keeper says."#;
         "1" sees "Coal, when the company sends it." not_sees "feeds it in";

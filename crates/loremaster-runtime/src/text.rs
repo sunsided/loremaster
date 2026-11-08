@@ -1,8 +1,13 @@
+pub(crate) mod pool;
+
 use crate::eval::Eval;
-use crate::world::CFragment;
-use crate::{Run, Source, rng};
+use crate::world::CText;
+use crate::{Run, Source, State};
+use dramaturge_model::Pools;
+use dramaturge_runtime::{Selection, select, select_named};
 use loremaster_lang::{CompiledLine, Segment};
-use loremaster_model::FragmentMode;
+use loremaster_model::Id;
+use pool::{LeafText, Lore, LoreJudge, LorePool, Rng, seen_by_player};
 use serde::{Deserialize, Serialize};
 
 /// Render compiled markup to text.
@@ -158,89 +163,145 @@ impl SourcePiece {
     }
 }
 
-/// A fragment chosen for display, and which of its variants.
-pub(crate) struct Pick {
-    pub index: usize,
-    pub variant: usize,
+/// A text as the core chose it, in the order loremaster shows it.
+pub(crate) struct Chosen<'w> {
+    pub selection: Selection<'w, Lore>,
+    /// Indexes into `selection.shown`, in the order they show: sorted by
+    /// layer, without the leaves that a later fragment `replaces`.
+    pub order: Vec<usize>,
 }
 
-/// Decide which fragments are visible, in assembly order, without touching
-/// progress. `first_visit` applies to rooms; elsewhere it means "first showing".
-pub(crate) fn visible(ev: &Eval, fragments: &[CFragment], first_visit: bool) -> Vec<usize> {
-    let mut shown: Vec<usize> = Vec::new();
-    for (i, f) in fragments.iter().enumerate() {
-        let seen = ev.state.progress.get(&f.key).map_or(0, |p| p.shown);
-        let eligible = match f.mode {
-            FragmentMode::FirstVisit => first_visit && (f.owner.starts_with("room:") || seen == 0),
-            FragmentMode::Once => seen == 0,
-            _ => true,
-        };
-        if !eligible || f.variants.is_empty() || !ev.holds_opt(&f.when) {
-            continue;
+/// Choose the text of a pool now, for the player, without a change to the
+/// state. `rng` is a copy of the game's: a preview drops it, play keeps it.
+pub(crate) fn choose<'w>(
+    ev: &Eval,
+    pool: &'w LorePool,
+    pools: &'w Pools<Lore>,
+    rng: &mut u64,
+) -> Chosen<'w> {
+    let caller = ev.state.room.as_str();
+    let selection = select(
+        pool,
+        pools,
+        caller,
+        &seen_by_player(),
+        &LoreJudge(ev),
+        ev.state,
+        &mut Rng(rng),
+    );
+    arrange(selection)
+}
+
+/// [`choose`] for the named pool `id` of `texts/`. The caller is the
+/// current room, so its `first_time` texts show on the first visit.
+pub(crate) fn choose_named<'w>(
+    ev: &Eval,
+    id: &str,
+    pools: &'w Pools<Lore>,
+    rng: &mut u64,
+) -> Chosen<'w> {
+    let caller = ev.state.room.as_str();
+    let selection = select_named(
+        id,
+        pools,
+        caller,
+        &seen_by_player(),
+        &LoreJudge(ev),
+        ev.state,
+        &mut Rng(rng),
+    );
+    arrange(selection)
+}
+
+/// Layers and `replaces`: a leaf of a fragment that replaces hides the
+/// leaves of the other fragments before it in its layer; then the layers
+/// sort in order.
+fn arrange(selection: Selection<'_, Lore>) -> Chosen<'_> {
+    let mut order: Vec<usize> = Vec::new();
+    for (i, shown) in selection.shown.iter().enumerate() {
+        let leaf = shown.leaf;
+        if leaf.replaces {
+            order.retain(|&j| {
+                let other = selection.shown[j].leaf;
+                other.layer != leaf.layer || other.fragment == leaf.fragment
+            });
         }
-        if f.replaces {
-            shown.retain(|&j| fragments[j].layer != f.layer);
-        }
-        shown.push(i);
+        order.push(i);
     }
-    shown.sort_by_key(|&i| fragments[i].layer);
-    shown
+    order.sort_by_key(|&i| selection.shown[i].leaf.layer);
+    Chosen { selection, order }
 }
 
-/// Pick a variant for each visible fragment and record that it was shown.
-pub(crate) fn pick(
-    state: &mut crate::State,
-    fragments: &[CFragment],
-    visible: &[usize],
-) -> Vec<Pick> {
-    visible
-        .iter()
-        .map(|&i| {
-            let f = &fragments[i];
-            let n = f.variants.len();
-            let mut rng_state = state.rng;
-            let progress = state.progress.entry(f.key.clone()).or_default();
-            let variant = match f.mode {
-                FragmentMode::Cycle => progress.shown as usize % n,
-                FragmentMode::Shuffle => rng::below(&mut rng_state, n),
-                FragmentMode::Sticky => *progress
-                    .sticky
-                    .get_or_insert_with(|| rng::below(&mut rng_state, n) as u32)
-                    as usize,
-                _ => 0,
-            };
-            progress.shown += 1;
-            state.rng = rng_state;
-            Pick { index: i, variant }
-        })
-        .collect()
+/// The fragments of `text` that show now, in assembly order, without a
+/// change to the state.
+pub(crate) fn visible(ev: &Eval, text: &CText) -> Vec<usize> {
+    let mut rng = ev.state.rng;
+    let chosen = choose(ev, &text.pool, &ev.world.pools, &mut rng);
+    let mut out: Vec<usize> = Vec::new();
+    for &i in &chosen.order {
+        let f = chosen.selection.shown[i].leaf.fragment;
+        if !out.contains(&f) {
+            out.push(f);
+        }
+    }
+    out
 }
 
-/// Render picked fragments to runs that remember their source.
-pub(crate) fn runs(ev: &Eval, fragments: &[CFragment], picks: &[Pick]) -> Vec<Run> {
+/// Record what showed: the progress of the candidates that show (not of the
+/// ones that a later fragment replaced). Returns the story variables that
+/// the player learned, to set to true.
+pub(crate) fn commit(state: &mut State, chosen: &Chosen) -> Vec<String> {
+    let mut selection = chosen.selection.clone();
+    selection
+        .steps
+        .retain(|s| s.leaves.is_empty() || s.leaves.clone().any(|i| chosen.order.contains(&i)));
+    let mut learned = Vec::new();
+    dramaturge_runtime::commit(&selection, &seen_by_player(), state, &mut |var: &String,
+                                                                           _: Option<
+        &Id,
+    >| {
+        learned.push(var.clone())
+    });
+    learned
+}
+
+/// Render a chosen text to runs. A fragment's text remembers its source
+/// (`owner`, the fragment, the layer); a line of a named pool renders like
+/// `base`.
+pub(crate) fn runs(ev: &Eval, chosen: &Chosen, owner: &str, base: &Run) -> Vec<Run> {
     let mut out: Vec<Run> = Vec::new();
-    for p in picks {
-        let f = &fragments[p.index];
-        // Markup that renders to nothing can leave a space at the end; it would show as a gap.
-        let text = render(ev, &f.variants[p.variant]).trim_end().to_string();
-        if text.trim().is_empty() {
+    for &i in &chosen.order {
+        let shown = &chosen.selection.shown[i];
+        let leaf = shown.leaf;
+        let runs = match &leaf.text {
+            LeafText::Markup(segments) => {
+                // Markup that renders to nothing can leave a space at the end; it would show as a gap.
+                let text = render(ev, segments).trim_end().to_string();
+                if text.trim().is_empty() {
+                    continue;
+                }
+                vec![Run {
+                    text,
+                    source: Some(Source {
+                        owner: owner.to_string(),
+                        fragment: leaf.fragment,
+                        layer: leaf.layer,
+                        condition: leaf.when_src.clone(),
+                        variant: chosen.selection.steps[shown.step].variant as usize,
+                    }),
+                    link: None,
+                    speaker: None,
+                }]
+            }
+            LeafText::Line(line) => line_runs(ev, line, base),
+        };
+        if runs.is_empty() {
             continue;
         }
         if !out.is_empty() {
             out.push(Run::plain(" "));
         }
-        out.push(Run {
-            text,
-            source: Some(Source {
-                owner: f.owner.clone(),
-                fragment: f.index,
-                layer: f.layer,
-                condition: f.when_src.clone(),
-                variant: p.variant,
-            }),
-            link: None,
-            speaker: None,
-        });
+        out.extend(runs);
     }
     out
 }

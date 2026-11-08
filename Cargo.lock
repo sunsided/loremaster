@@ -229,33 +229,33 @@ dependencies = [
 
 [[package]]
 name = "dramaturge-authoring"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ab726378020460d24bde69a81474f0082067be0d321c14b38a87bdec0ee0664"
+checksum = "eb509716945ec66a1e73d9683bfb1f0398070524f7880c34129ba59ce1e53fd0"
 dependencies = [
  "dramaturge-model",
 ]
 
 [[package]]
 name = "dramaturge-model"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f20c3c7f5dd8f2633bb1191a4b2f10e78f9de9d4d9dd667b199c8faf637d28d1"
+checksum = "9e63bc7152561e17d78d690a73f193273497e092f0d3a600ad8f3068fe98e38e"
 
 [[package]]
 name = "dramaturge-runtime"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a80a35a29eabe6281f183630d0685d040ffc0b009ed3a95d87cd471de6a61e41"
+checksum = "e65867076143da348196cb6628bec5396cccfedbfaf824061fc61cc5f490adc7"
 dependencies = [
  "dramaturge-model",
 ]
 
 [[package]]
 name = "dramaturge-syntax"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4528eb2e49439536684a74a3804f05547284af3ce342c5bd54600ffe28a6eb01"
+checksum = "cf230354a7fa59f9435648e07a64415fce98d1981e98c79790ac17d54d384296"
 dependencies = [
  "dramaturge-model",
  "proc-macro2",
@@ -529,6 +529,7 @@ version = "0.1.0"
 dependencies = [
  "assert2",
  "dramaturge-authoring",
+ "dramaturge-model",
  "dramaturge-syntax",
  "loremaster-lang",
  "loremaster-model",

@@ -15,16 +15,16 @@ The slice: three rooms (kitchen, keeper's room, lock chamber), the lock machine 
 
 ## Which file needs which phase
 
-Files in today's syntax load now. The other files use syntax that the model does not know yet. Today's loader rejects them (`things/stove.yaml`, `rules/keeper.yaml`, `dialogues/`) or skips their folder with a warning (`texts/`; any other unknown folder is an error since P2-14). `endings/` loads since P1-03, `agendas/` since P4-02 (#79).
+Files in today's syntax load now. The other files use syntax that the model did not know at first. `endings/` loads since P1-03, `agendas/` and the Command record of `rules/keeper.yaml` since P4-02 (#79), and `things/stove.yaml`, `texts/`, `dialogues/` and the `say: { text: … }` of `rules/keeper.yaml` since P4-01 (#78), with dramaturge's text selection core (R9). Any unknown folder is an error since P2-14.
 
 | Part | Files | New syntax | Phase |
 | --- | --- | --- | --- |
 | Today | `story.yaml`, `rooms/`, `things/` (not the stove), `machines/`, `timers/`, `rules/lock.yaml`, `rules/accuse.yaml`, `verbs/` | None | Now |
 | Endings | `endings/` | Ending entities with `kind`, `rank`, `title`; `end: <ending id>` | Today (since P1-03, #44) |
-| Dialogue | `dialogues/keeper.yaml` | A node says a text pool: `say: { text: keeper_remark }`. The speech segments (`{ says: … }`) load since P3-15 (#111) | 4 (R9) |
-| Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky`. The speech segments with a speaker (`{ says: …, by: keeper }`) are lines as in P3-15 (#111) | 4 (R9) |
-| Stove | `things/stove.yaml` | `one_of`, `pick: best`, `seen_by(player)`, `learn` | 4 (R9) |
-| Keeper rule | `rules/keeper.yaml` | `on: { verb: examine, direct: stove }` (Command record, loads since P4-02 #79), `say: { text: … }` | 4 (R9) |
+| Dialogue | `dialogues/keeper.yaml` | A node says a text pool: `say: { text: keeper_remark }`. The speech segments (`{ says: … }`) load since P3-15 (#111) | Loads since P4-01 (#78) |
+| Texts | `texts/keeper_remark.yaml` | Named pool with `one_of`, `pick: best`, `mode: sticky`. The speech segments with a speaker (`{ says: …, by: keeper }`) are lines as in P3-15 (#111) | Loads since P4-01 (#78) |
+| Stove | `things/stove.yaml` | `one_of`, `pick: best`, `seen_by(player)`, `learn` | Loads since P4-01 (#78) |
+| Keeper rule | `rules/keeper.yaml` | `on: { verb: examine, direct: stove }` (Command record, loads since P4-02 #79), `say: { text: … }` | Loads since P4-01 (#78) |
 | Agenda | `agendas/keeper.yaml` | `actor`, `steps` with `at`, `place`, `when`, `then`, `closes`, `reason` | Loads since P4-02 (#79, D6). It stays a part: the model hash and `slice_equivalence` compare today's syntax, and `world!` has no agendas yet. P4-04 (CK) reads `closes` |
 
 ## Pending tests
@@ -33,20 +33,20 @@ The Rust tests are in `crates/loremaster-runtime/tests/slice.rs`, and the ones o
 
 | Test | It proves | Loads | Passes after | Issue |
 | --- | --- | --- | --- | --- |
-| `slice_baseline` | Rooms, things and the lock machine load and play in today's syntax; every walkthrough without a pending mark passes (`slice_baseline`, `slice_drowning`) | Today | Phase 0 (passes now) | #37 |
+| `slice_baseline` | Rooms, things and the lock machine load and play in today's syntax; every walkthrough without a pending mark passes (`slice_baseline`, `slice_drowning`), except the ones that need a new part and run in their own test | Today | Phase 0 (passes now) | #37 |
 | `slice_endings` | Endings are entities with id, kind and rank | Today | Passes (P1-03) | #44 |
 | `slice_save_envelope` | A save from the middle of `slice_best` has an envelope and restores | Today | Passes (P1-04) | #45 |
 | `slice_model_hash` | The YAML form gives the model hash in `expected/model.hash` | Today | Passes (P1-06) | #47 |
 | `slice_equivalence` | YAML, DSL and mixed give one model hash, for the part in today's syntax with the endings | Today, per form | Passes (L3, P3-03 #66). In `crates/loremaster-cli/tests/slice_dsl.rs`, with the feature `dsl` | #66 |
-| `slice_equivalence_all_parts` | The same for the whole slice, with all new-syntax parts | All, per form | Phase 4: R9 (texts, `one_of`, the text pool of the keeper dialogue), D6 (agenda, command slots). The dialogue grammar is in world! since L4 (P4-08 #85) | P4-01 #78, P4-02 #79 |
+| `slice_equivalence_all_parts` | The same for the whole slice, with all new-syntax parts | All, per form | Phase 4: `texts`, `one_of` and a node that says a pool in world! (the YAML form loads them since P4-01), agendas and command slots in world! (YAML since P4-02). The dialogue grammar is in world! since L4 (P4-08 #85) | P4-01 #78, P4-02 #79 |
 | `the_dsl_dialogue_equals_the_yaml_dialogue` | The keeper dialogue in world! equals `dialogues/keeper.yaml`, with an inline line in place of the text pool in both | Dialogue (inline copy) | Passes (L4, P4-08 #85). In `slice_dsl.rs` | #85 |
 | `slice_undo_after_death` | The death prompt, and undo after it | Today | Passes (P2-03) | #54 |
-| `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Phase 4 (R9, the text pool); the speech segments work since P3-15 | P4-01 #78 |
-| `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Phase 4 | P4-01 #78 |
-| `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Passes (P4-02). `slice_baseline` and `slice_dsl_walkthroughs` leave it out: it needs the agenda part | P4-02 #79 |
-| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Phase 4, R9 for the text pool. The pause works since P4-02: `slice_talk_pauses_agenda_without_the_text_pool` passes with the line of the pool in place of the pool | P4-01 #78 |
-| `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Phase 4: the ending checks (P4-04 #81) read the agenda step's `closes` since P4-02 (#79); with today's files plus the agenda, they accept the drop at midnight. The test waits for the other new-syntax parts that `NEW_SYNTAX` loads: the text pool, the stove and the keeper rule (R9) | P4-01 #78 |
-| `slice_best`, `slice_ashes` | The two full walkthroughs | All | Phase 4 | P4-07 #84 |
+| `slice_keeper_dialogue` | One dialogue format with a text pool and speech segments | + Dialogue, Texts | Passes (P4-01, the text core of R9); the speech segments work since P3-15 | #78 |
+| `slice_stove_text` | `one_of`, `pick: best`, `seen_by` and `learn` | + Stove, Agenda | Passes (P4-01) | #78 |
+| `slice_keeper_agenda` | The keeper feeds the stove at midnight | + Agenda | Passes (P4-02). `slice_baseline` and `slice_dsl_walkthroughs` leave it out, as the stove, dialogue and talk tests: each needs a part | P4-02 #79 |
+| `slice_talk_pauses_agenda` | A talk at midnight delays the agenda step | + Agenda, Dialogue, Texts | Passes (P4-01): the pause since P4-02, the text pool since R9 | #78, #79 |
+| `slice_endings_reachable` | No dead end; the agenda step is a point of no return, and `closes` accepts it | All | Passes (P4-01): the ending checks (P4-04 #81) read the agenda step's `closes` since P4-02 (#79). The whole slice has more states than the default explore budget, so the test walks up to 5000 | #78, #81 |
+| `slice_best`, `slice_ashes` | The two full walkthroughs | All | Pass since P4-01 (#78), with the agenda of P4-02; `expected/slice_best.transcript` follows with P4-07 | P4-07 #84 |
 
 Run the pending tests with `task test:pending`. When a test passes, remove its `#[ignore]` mark and the `pending:` line of its walkthrough in the same pull request.
 
@@ -93,3 +93,4 @@ What felt bad to write, and what to change. Rule 5 of phase 0: change the slice 
 | 2026-11-08 | DSL | L4: the sealed mode `world!(yaml = "..")` and `uses <pack>;` were not done; both need the macro to read files or other blocks at compile time. | Later work, after R9 and D6, when the slice shows how much `extern` remains. |
 | 2026-11-08 | YAML | P4-02: `slice_keeper_agenda` sets `stove.hot`, but the stove is a part with R9 syntax that the test does not load. The game sets the fact anyway; `loremaster check` on today's files plus the agenda reports it. | None: the stove loads with R9 (P4-01 #78). |
 | 2026-11-08 | All | P4-02: a rule without `actor` matches only the player's commands, so `on: { verb: examine, direct: stove }` does not fire when the keeper examines the stove. | Keep (ADR 0004): stories have many rules for the player. A rule for any actor would need a word such as `actor: any`. |
+| 2026-11-08 | YAML | P4-01 (#78): the sticky candidate of `texts/keeper_remark.yaml` had no `key`, so `loremaster check` warned that a candidate inserted before it moves its progress. | Done: `key: midnight`, in the YAML and the mixed form. |

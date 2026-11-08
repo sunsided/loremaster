@@ -39,7 +39,7 @@ pub use dialogue::{Dialogue, DialogueId, DialogueNode, DialogueOption, DialogueT
 /// The dialogue AST of dramaturge (decision D3).
 pub use dramaturge_syntax;
 pub use ending::{Ending, EndingKind};
-pub use fragment::{Fragment, FragmentMode, Layer};
+pub use fragment::{Candidate, Fragment, FragmentMode, Layer, Pick, TextPool};
 pub use frame::{Frame, Frames};
 pub use id::Id;
 pub use line::{Line, LineSegment, PLAYER_SPEAKER, Voice};
