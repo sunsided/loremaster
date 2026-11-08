@@ -1210,8 +1210,8 @@ impl Checker<'_> {
 
     /// `export:` and `import:` (TX-12): each fact is a variable or a thing
     /// property, each relation a thing and a declared axis, and each memory
-    /// a thing and a key. An exported memory needs a dialogue that gives it,
-    /// or an import; an imported one declares its key.
+    /// a thing and a key. An exported memory needs a dialogue of that thing
+    /// that gives it, or an import; an imported one declares its key.
     fn episodes(&mut self) {
         let story = self.story().clone();
         let file = &self.file_of("story");
@@ -1245,8 +1245,25 @@ impl Checker<'_> {
                 let at = format!("{list}.memories[{i}]");
                 match name.split_once('.') {
                     Some((thing, key)) if story.thing(thing).is_some() => {
-                        if !self.scope.memories.contains(key) {
-                            self.error(file, &at, format!("no dialogue remembers `{key}`"));
+                        let given = story.import.memories.contains(name)
+                            || story
+                                .dialogues
+                                .iter()
+                                .filter(|d| d.with.as_str() == thing)
+                                .any(|d| {
+                                    d.nodes.iter().any(|n| {
+                                        n.outcomes.remember.iter().any(|m| m == key)
+                                            || n.options.iter().any(|o| {
+                                                o.outcomes.remember.iter().any(|m| m == key)
+                                            })
+                                    })
+                                });
+                        if !given {
+                            self.error(
+                                file,
+                                &at,
+                                format!("no dialogue of `{thing}` remembers `{key}`"),
+                            );
                         }
                     }
                     Some((thing, _)) => self.error(file, &at, format!("unknown thing `{thing}`")),

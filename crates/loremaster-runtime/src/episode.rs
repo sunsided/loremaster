@@ -112,6 +112,7 @@ impl Game {
             from: episode.story,
             ..Imported::default()
         };
+        let mut taken = Vec::new();
         for (key, value) in episode.facts {
             let name = format!("fact:{key}");
             if !import.facts.contains(&key) {
@@ -125,10 +126,15 @@ impl Game {
             ) {
                 out.misfits.push(name);
             } else {
-                let value = self.clamped(&key, value);
-                self.state_mut().facts.insert(key, value);
+                self.state_mut().facts.insert(key.clone(), value);
+                taken.push(key);
                 out.applied.push(name);
             }
+        }
+        // Clamp after all facts are in: a limit can name an imported variable.
+        for key in taken {
+            let value = self.clamped(&key, self.state().facts[&key].clone());
+            self.state_mut().facts.insert(key, value);
         }
         for (key, value) in episode.relations {
             if import.relations.contains(&key) {

@@ -148,15 +148,21 @@ start: shore
 relations: [trust]
 vars:
   - { id: gold, type: int, initial: 0 }
+  - { id: met, type: bool, initial: false }
 export:
   facts: [silver, keeper.trust]
   relations: [keeper.fear, ghost.trust, trust]
-  memories: [keeper.forgot]
+  memories: [keeper.forgot, gull.asked, keeper.asked]
 import:
   facts: [gold]
   memories: [ghost.asked]
 "#;
-    let found = check(&load(files(story, false)).unwrap());
+    let mut files = files(story, true);
+    files.push(SourceFile {
+        path: "things/gull.yaml".into(),
+        text: "name: gull\nlocation: { room: shore }\n".into(),
+    });
+    let found = check(&load(files).unwrap());
     let found: Vec<_> = found
         .iter()
         .map(|d| format!("{}: {}", d.at, d.message))
@@ -169,8 +175,47 @@ import:
             "export.relations[0]: unknown relation axis `fear`",
             "export.relations[1]: unknown thing `ghost`",
             "export.relations[2]: `trust` is not `thing.axis`",
-            "export.memories[0]: no dialogue remembers `forgot`",
+            "export.memories[0]: no dialogue of `keeper` remembers `forgot`",
+            // Only the keeper's dialogue gives `asked`.
+            "export.memories[1]: no dialogue of `gull` remembers `asked`",
             "import.memories[0]: unknown thing `ghost`",
         ]
     );
+}
+
+#[test]
+fn a_limit_reads_the_imported_value_of_its_variable() {
+    let story = r#"
+title: Island Two
+start: shore
+vars:
+  - { id: gold, type: int, initial: 0, max: purse }
+  - { id: purse, type: int, initial: 1 }
+import:
+  facts: [gold, purse]
+  memories: [keeper.asked]
+"#;
+    let world = world(story, false);
+    let episode = json!({
+        "format": EPISODE_FORMAT, "version": 1, "story": "island-one",
+        "facts": { "gold": 3, "purse": 5 },
+    });
+    let (two, _) = Session::from_episode(world, episode).unwrap();
+    // `purse` sorts after `gold`, but the clamp uses its imported 5, not 1.
+    assert_eq!(two.state().facts["gold"].as_int(), Some(3));
+}
+
+#[test]
+fn a_huge_imported_relation_saturates() {
+    let story = format!("{ONE}import:\n  relations: [keeper.trust]\n");
+    let world = world(&story, true);
+    let episode = json!({
+        "format": EPISODE_FORMAT, "version": 1, "story": "island-one",
+        "relations": { "keeper.trust": i32::MAX },
+    });
+    let (mut two, _) = Session::from_episode(world, episode).unwrap();
+    authoring::start(&mut two);
+    input(&mut two, "talk to keeper");
+    two.choose(0);
+    assert_eq!(two.state().relations["keeper.trust"], i32::MAX);
 }

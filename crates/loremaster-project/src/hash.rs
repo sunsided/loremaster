@@ -37,5 +37,10 @@ fn canonical(story: &Story) -> Story {
     s.machines.sort_by(|a, b| a.id.cmp(&b.id));
     s.vars.sort_by(|a, b| a.id.cmp(&b.id));
     s.relations.sort();
+    for items in [&mut s.export, &mut s.import] {
+        items.facts.sort();
+        items.relations.sort();
+        items.memories.sort();
+    }
     s
 }
