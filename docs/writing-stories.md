@@ -314,7 +314,7 @@ The effects:
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
-More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response.
+More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
 
 ### Wait for the host
 
@@ -413,6 +413,32 @@ text: "{night: Far below, the *Marigold*'s masthead light turns, and steadies, a
 - A walkthrough checks the ending with `ending:`, for example `expect: { ending: beacon_lit }`.
 - An ending of kind `death` asks the player to undo the last input, restart or restore a save (the death prompt). A walkthrough step `undo` goes back one input. `death_prompt: false` in story.yaml turns the prompt off.
 
+### Dead ends and points of no return
+
+The state explorer (`loremaster explore`, or Atlas › Checks › "Whole game") checks the endings. It walks back from the endings over the states it explored:
+
+- A **dead end** is a state from which no ending can be reached, the softlock of early King's Quest. This is an error. The explorer gives the shortest command list into it, the room and the rule that fired on the last turn.
+- A **point of no return** is a turn after which the best ending that can still be reached gets worse, by `rank`. This is a warning. Endings without a rank are worse than every ranked ending. A reached ending, also a bad one, resolves the game: the turn into an ending is neither a dead end nor a point of no return.
+
+Some points of no return are on purpose. Name the endings that a rule or a machine step closes in `closes`, and say why in `reason`:
+
+```yaml
+# rules/burn.yaml
+- id: keeper_burns_the_pages
+  on: { time: "00:00" }
+  when: in(pages, gear_housing)
+  then:
+    - move: { pages: nowhere }
+  closes: [committed]
+  reason: "The keeper burns the pages at midnight. A late player gets the ashes ending."
+```
+
+- The check compares the list with the endings that really drop out. It accepts a point of no return when each ranked ending that drops out is in the `closes` of a rule that fires on the turn, or that can still fire after it. The second case covers the turns before a timed step, after which the player is too late.
+- A ranked ending that drops out and that no `closes` names is a warning at the rule. A `closes` that names an ending that never drops out at the rule is a warning too.
+- `loremaster check` gives an error for an unknown ending in `closes`, and for `closes` without a `reason`.
+- Agenda steps (`agendas/`, P4-02) take the same `closes` and `reason`.
+- When the budget stopped the walk, the checks are **not proven**: the explorer reports only dead ends and points of no return that it proved, and says that the rest is not proven. "No dead end" holds only for a walk that finished.
+
 ## Timers
 
 A timer counts down by one each turn. Put it in `timers/*.yaml`, or in a `timers:` list in story.yaml.
@@ -501,6 +527,7 @@ steps:
 - The id of the machine is a variable with its state. Conditions read it: `exorcism == lit`.
 - Each step is a rule with the id `<machine>#<number>`. The rules view, the checks and the explorer show them.
 - Without `states`, the states are the start state and all states that the steps name.
+- A step can name the endings that it closes on purpose, with `closes: [<ending ids>]` and a `reason`, as a rule can. Read [Dead ends and points of no return](#dead-ends-and-points-of-no-return).
 - A state in the list can be a map with a description for the authors: `{ name: rung, description: The spirits are stunned. }`. The player does not see it.
 
 In the editor, Atlas › Machines shows each machine: the states in a row, and the steps as numbered arrows. Forward steps are above, steps back are below. The current state is filled. A step that the next event can take is marked. Point at a state or a step to light its connections. Select a state to see its description and its steps in and out on the right. There you can also change the description, rename the state, or delete a state that no step uses. "+ State" under the drawing adds a state. A rename changes the start and the steps of the machine, but not conditions in other files, such as `exorcism == lit`. The checks show these.
@@ -697,6 +724,9 @@ The explorer shows:
 - Fragments that never show and rules that never fire.
 - Endings, with the shortest command list to each.
 - Stuck states: states from which the player can not reach an ending.
+- The ending checks: dead ends and points of no return. Read [Dead ends and points of no return](#dead-ends-and-points-of-no-return).
+
+When the walk stops at the budget (2000 states or 40 commands), the results are incomplete, and the ending checks say "not proven".
 
 The explorer tries the actions that move the story forward: exits, verbs that rules listen to, take, open, turn on, unlock with a key in reach, and wait when the story reacts to time. It does not try drop, close, turn off or lock.
 

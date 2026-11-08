@@ -1,4 +1,4 @@
-error: expected `extern`, `story`, `var`, `room`, `thing`, `rule`, `machine`, `timer`, `ending`, `verb` or `test`
+error: expected `extern`, `story`, `var`, `room`, `thing`, `rule`, `machine`, `timer`, `ending`, `verb`, `dialogue`, `thread`, `behavior` or `test`
  --> tests/ui/fail/syntax.rs:5:9
   |
 5 |         chamber hall "Hall" {}

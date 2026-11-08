@@ -258,7 +258,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4528eb2e49439536684a74a3804f05547284af3ce342c5bd54600ffe28a6eb01"
 dependencies = [
  "dramaturge-model",
+ "proc-macro2",
  "serde",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -488,6 +490,7 @@ dependencies = [
 name = "loremaster-macros"
 version = "0.1.0"
 dependencies = [
+ "dramaturge-syntax",
  "loremaster",
  "loremaster-dsl",
  "loremaster-model",

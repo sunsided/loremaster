@@ -7,6 +7,10 @@ use loremaster_model::{EventPattern, Id, Location, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
+mod endings;
+
+pub use endings::{DeadEnd, EndingCheck, NoReturn, StaleCloses};
+
 /// Limits for one exploration.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Budget {
@@ -67,10 +71,15 @@ pub struct Exploration {
     /// Rules that never fired.
     pub never_fired: Vec<String>,
     pub endings: Vec<EndingFound>,
-    /// States from which no explored path reaches an ending. Empty when the story has no ending.
+    /// Dead ends: states from which no ending can be reached. 0 when the story
+    /// has no ending. When the budget stopped the walk, only the proven ones
+    /// count: states whose future the walk did not finish are left out.
     pub stuck: usize,
     /// The shortest path into a stuck state, if there is one.
     pub stuck_path: Vec<String>,
+    /// The ending checks: dead ends and points of no return (CK, P4-04).
+    #[serde(default)]
+    pub ending_checks: EndingCheck,
     /// For each open or resolved thread with a payoff: whether a payoff showed, and in which order.
     #[serde(default)]
     pub threads: Vec<crate::threads::ThreadReach>,
@@ -269,7 +278,16 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
 
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut nodes: Vec<(Game, Vec<String>)> = Vec::new();
-    let mut edges: Vec<Vec<usize>> = Vec::new();
+    // The graph for the ending checks: for each state, one edge per command
+    // (the next state, and the index of the command in `commands` of the
+    // state), so that two commands into one state stay two turns.
+    let mut edges: Vec<Vec<(u32, u32)>> = Vec::new();
+    // States whose future the walk did not finish: the depth cut them, or the
+    // budget dropped a state after them.
+    let mut open: Vec<bool> = Vec::new();
+    // The rules with `closes`, and the turns on which they fired: (state, command, rule).
+    let closers = endings::closers(&start.world().story);
+    let mut closed: Vec<(u32, u32, u32)> = Vec::new();
     let mut shown: BTreeSet<(String, usize)> = BTreeSet::new();
     let mut fired: BTreeSet<String> = BTreeSet::new();
     let mut variants: BTreeMap<String, BTreeMap<String, TextVariant>> = BTreeMap::new();
@@ -348,18 +366,33 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     ));
     nodes.push((game, Vec::new()));
     edges.push(Vec::new());
+    open.push(false);
     queue.push_back(0);
 
     while let Some(i) = queue.pop_front() {
         let (game, path) = nodes[i].clone();
-        if game.state().ended || path.len() >= budget.max_depth {
+        if game.state().ended {
             continue;
         }
-        for (label, cmd) in commands(&game) {
+        if path.len() >= budget.max_depth {
+            // The depth stops the walk here: what comes after is not known,
+            // unless nothing can come after it.
+            if commands(&game).is_empty() {
+                continue;
+            }
+            open[i] = true;
+            truncated = true;
+            continue;
+        }
+        for (c, (label, cmd)) in commands(&game).into_iter().enumerate() {
             let mut next = game.clone();
             let turn = next.act(cmd);
             sources(&turn, &mut shown);
+            let mut closing: Vec<u32> = Vec::new();
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
+                if let Some(&r) = closers.get(entry.text.as_str()) {
+                    closing.push(r);
+                }
                 fired.insert(entry.text.clone());
             }
             let key = fingerprint(&next, counters);
@@ -377,6 +410,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                 None => {
                     if nodes.len() >= budget.max_states {
                         truncated = true;
+                        open[i] = true;
                         continue;
                     }
                     if next.state().ended {
@@ -398,47 +432,28 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                     seen.insert(key, j);
                     nodes.push((next, next_path));
                     edges.push(Vec::new());
+                    open.push(false);
                     queue.push_back(j);
                     j
                 }
             };
-            if !edges[i].contains(&j) {
-                edges[i].push(j);
-            }
+            let (from, c) = (i as u32, c as u32);
+            edges[i].push((j as u32, c));
+            closed.extend(closing.into_iter().map(|r| (from, c, r)));
         }
     }
 
-    // Stuck states: no path to an ending, when the story has endings at all.
-    let has_endings = start.world().story.rules.iter().any(|r| {
-        r.then
-            .iter()
-            .any(|e| matches!(e, loremaster_model::Effect::End(_)))
-    });
-    let (stuck, stuck_path) = if has_endings && !truncated {
-        let mut good: Vec<bool> = nodes.iter().map(|(g, _)| g.state().ended).collect();
-        loop {
-            let mut changed = false;
-            for i in 0..nodes.len() {
-                if !good[i] && edges[i].iter().any(|&j| good[j]) {
-                    good[i] = true;
-                    changed = true;
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
-        let bad: Vec<usize> = (0..nodes.len()).filter(|&i| !good[i]).collect();
-        let path = bad
-            .iter()
-            .map(|&i| &nodes[i].1)
-            .min_by_key(|p| p.len())
-            .cloned()
-            .unwrap_or_default();
-        (bad.len(), path)
-    } else {
-        (0, Vec::new())
-    };
+    let ending_checks = endings::check(
+        start.world(),
+        &endings::Graph {
+            nodes: &nodes,
+            edges: &edges,
+            open: &open,
+            closers: &closers,
+            closed: &closed,
+        },
+    );
+    let (stuck, stuck_path) = (ending_checks.stuck, ending_checks.stuck_path.clone());
 
     let world = start.world();
     let rooms = world
@@ -502,6 +517,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         endings: endings.into_values().collect(),
         stuck,
         stuck_path,
+        ending_checks: ending_checks.report,
         threads: thread_ids
             .iter()
             .enumerate()
