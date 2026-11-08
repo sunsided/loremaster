@@ -15,6 +15,7 @@ import type {
 	Choice,
 	CombatView,
 	StatView,
+	MediaView,
 	Input,
 	JournalEntry,
 	Loaded,
@@ -229,6 +230,11 @@ export class Session {
 		return this.#session.stats();
 	}
 
+	/** The active illustration, portrait, music and ambience. */
+	media(): MediaView {
+		return this.#session.media();
+	}
+
 	verbs(): VerbInfo[] {
 		return this.#session.verbs();
 	}
@@ -353,6 +359,11 @@ export class Workbench {
 	/** The adventure sheet. Empty when the story has no `stats:`. */
 	stats(): StatView[] {
 		return this.#bench.stats();
+	}
+
+	/** The active illustration, portrait, music and ambience. */
+	media(): MediaView {
+		return this.#bench.media();
 	}
 
 	verbs(): VerbInfo[] {

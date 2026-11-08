@@ -8,8 +8,7 @@
 use crate::output::{Block, BlockKind, Choice, LogEntry, RollDetail, TalkInfo};
 use crate::state::{AwaitRequest, Awaiting};
 use crate::{Command, Game, Restored, Save, SaveError, State, Turn, World};
-use loremaster_model::Value;
-use loremaster_model::{EndingKind, Id};
+use loremaster_model::{EndingKind, Id, Interface, InterfaceMismatch, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
@@ -62,6 +61,8 @@ pub enum Effect {
     /// A roll of the dice: the dice, the total and any test. A `roll` notice
     /// has the same total as text.
     Roll { roll: RollDetail },
+    /// Play this sound once. Show its caption when the sound is off.
+    Sound { sound: crate::MediaCue },
     /// The story has ended.
     Ending { ending: EndingInfo },
 }
@@ -167,6 +168,14 @@ impl Session {
     pub fn new(world: Arc<World>) -> Self {
         let seed = world.story.seed;
         Self::with_seed(world, seed)
+    }
+
+    /// A new game for a host built for `built_for` (IF-5). Refuses to make
+    /// the session when the story has another interface.
+    pub fn for_host(world: Arc<World>, built_for: &Interface) -> Result<Self, InterfaceMismatch> {
+        let session = Self::new(world);
+        session.check_interface(built_for)?;
+        Ok(session)
     }
 
     /// A new game with another seed for chance, shuffled and sticky texts.
@@ -275,6 +284,39 @@ impl Session {
     pub fn resume(&mut self, await_id: &str, value: Value) -> Result<Step, String> {
         let turn = self.resume_turn(await_id, value)?;
         Ok(self.step(turn))
+    }
+
+    /// The host reports a declared event (IF-1, HG-1): check its arguments
+    /// and precondition, and run the rules that listen for it. An `Err` says
+    /// why it is refused, and nothing has changed.
+    pub fn host_event(
+        &mut self,
+        name: &str,
+        args: BTreeMap<String, Value>,
+    ) -> Result<Step, String> {
+        let before = self.before();
+        let candidates = self.step_candidates(&Input::Tick);
+        let turn = self.game.host_event(name, &args)?;
+        self.mark_steps(candidates);
+        self.remember(before);
+        Ok(self.step(turn))
+    }
+
+    /// `Err` with what differs when the host was built for another
+    /// interface than the story has (IF-5).
+    pub fn check_interface(&self, built_for: &Interface) -> Result<(), InterfaceMismatch> {
+        let story = self.interface();
+        story.compare(built_for)
+    }
+
+    /// The interface of the story; empty when it has none.
+    pub fn interface(&self) -> Interface {
+        self.game
+            .world()
+            .story
+            .interface
+            .clone()
+            .unwrap_or_default()
     }
 
     /// Go back to the state before the last input (SE-8).
@@ -538,6 +580,7 @@ impl Session {
                 .map(|entry| Effect::Notice { entry }),
         );
         effects.extend(turn.rolls.into_iter().map(|roll| Effect::Roll { roll }));
+        effects.extend(turn.sounds.into_iter().map(|sound| Effect::Sound { sound }));
         // While a rule waits, its answers come with `Status::Await`, not as
         // the choices of a talk.
         if let Some(talk) = turn.talk

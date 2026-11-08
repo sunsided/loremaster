@@ -247,6 +247,17 @@ impl JsSession {
         to_js(&self.session.restart())
     }
 
+    /// Throws what differs when the host was built for another interface
+    /// than the story has (IF-5). `built_for` is the interface as JSON.
+    #[wasm_bindgen(js_name = checkInterface)]
+    pub fn check_interface(&self, built_for: &str) -> Result<(), JsValue> {
+        let built = loremaster_model::Interface::from_json(built_for)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.session
+            .check_interface(&built)
+            .map_err(|m| JsValue::from_str(&m.to_string()))
+    }
+
     /// The state now, to put back later with `restore`.
     pub fn snapshot(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.snapshot())
@@ -310,6 +321,11 @@ impl JsSession {
     /// The adventure sheet: `[{ var, label, short?, value, max? }]`.
     pub fn stats(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.stats())
+    }
+
+    /// The active illustration, portrait, music and ambience.
+    pub fn media(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.session.media())
     }
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
@@ -451,6 +467,11 @@ impl JsWorkbench {
     /// The adventure sheet: `[{ var, label, short?, value, max? }]`.
     pub fn stats(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().stats())
+    }
+
+    /// The active illustration, portrait, music and ambience.
+    pub fn media(&self) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.session().media())
     }
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {

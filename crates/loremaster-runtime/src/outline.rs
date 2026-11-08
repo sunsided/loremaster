@@ -175,6 +175,7 @@ pub(crate) fn describe(o: &Outcomes) -> Vec<String> {
                 .join(", ")
         ),
         Effect::Cancel(t) => format!("cancel {t}"),
+        Effect::PlaySound(s) => format!("play the sound {s}"),
     }));
     out
 }

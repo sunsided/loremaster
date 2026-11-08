@@ -75,6 +75,7 @@ impl<'a> MachineBuilder<'a> {
         description: impl Into<String>,
     ) -> Self {
         self.machine().states.push(StateDef::Described {
+            media: Default::default(),
             name: name.into(),
             description: Some(description.into()),
             journal: None,
@@ -94,6 +95,7 @@ impl<'a> MachineBuilder<'a> {
     /// A quest state with its journal text; `done` marks a finished quest.
     pub fn journal(mut self, state: impl Into<String>, text: impl Into<Line>, done: bool) -> Self {
         self.machine().states.push(StateDef::Described {
+            media: Default::default(),
             name: state.into(),
             description: None,
             journal: Some(text.into()),

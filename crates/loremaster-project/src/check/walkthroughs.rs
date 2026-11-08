@@ -79,6 +79,7 @@ impl Checker<'_> {
     }
 
     fn walkthrough(&mut self, key: &str, walk: &Walkthrough) {
+        self.event_steps(key, walk);
         let mut position: BTreeMap<&Id, usize> = BTreeMap::new();
         for (i, step) in walk.steps.iter().enumerate() {
             if let Some(id) = step.id()
@@ -99,7 +100,24 @@ impl Checker<'_> {
                 first.entry(id).or_insert(i);
             }
         }
+        let story = self.story().clone();
+        let unknown = |sound: &String| story.asset(sound).is_none();
+        for sound in walk.expect.sound.iter().filter(|s| unknown(s)) {
+            (self.out).push(Diagnostic::error(
+                key,
+                "expect",
+                format!("unknown asset `{sound}`"),
+            ));
+        }
         for (i, step) in walk.steps.iter().enumerate() {
+            for sound in step
+                .expect()
+                .into_iter()
+                .flat_map(|e| &e.sound)
+                .filter(|s| unknown(s))
+            {
+                self.at_step(key, i, Severity::Error, format!("unknown asset `{sound}`"));
+            }
             let Some(plan) = step.plan() else { continue };
             if let Some(room) = &plan.at
                 && self.story().room(room.as_str()).is_none()
@@ -224,7 +242,13 @@ impl Checker<'_> {
     /// A diagnostic at step `i` of a walkthrough. In a YAML file the line is
     /// the one of the step (see [`step_position`]); a walkthrough from Rust
     /// has its place in its key.
-    fn at_step(&mut self, key: &str, i: usize, severity: Severity, message: impl Into<String>) {
+    pub(super) fn at_step(
+        &mut self,
+        key: &str,
+        i: usize,
+        severity: Severity,
+        message: impl Into<String>,
+    ) {
         let at = format!("steps[{i}]");
         let mut d = match severity {
             Severity::Error => Diagnostic::error(key, at, message),

@@ -12,6 +12,7 @@ mod agendas;
 mod awaits;
 mod combat;
 mod machines;
+mod media;
 mod orders;
 pub use awaits::{ARRIVED, REFUSED};
 pub(crate) use combat::{ATTACK_TEXT, LUCK_TEXT};
@@ -247,6 +248,13 @@ impl Game {
                 state
                     .facts
                     .insert(format!("{}.{prop}", t.id), value.clone());
+            }
+        }
+        for e in story.interface.iter().flat_map(|i| &i.events) {
+            for (arg, ty) in &e.args {
+                state
+                    .facts
+                    .insert(format!("{}.{arg}", e.id), default_arg(ty));
             }
         }
         // The first playable actor starts as the active one. The others hold
@@ -1900,6 +1908,7 @@ impl Game {
                 self.state.combat = None;
             }
             CompiledEffect::Stop => self.stopped = true,
+            CompiledEffect::PlaySound(cue) => turn.sounds.push(cue.clone()),
             CompiledEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             // Only a rule can pause (the fire loop handles it there); the checks
             // reject `await` in timers and dialogues.
@@ -2469,6 +2478,18 @@ fn split_links(run: Run, needles: &[(String, String)], out: &mut Vec<Run>) {
     let rest = piece(&run.text[i + len..], None);
     if !rest.text.is_empty() {
         split_links(rest, needles, out);
+    }
+}
+
+/// The value of a host event's argument before the first report.
+fn default_arg(ty: &loremaster_model::ArgType) -> Value {
+    use loremaster_model::ArgType;
+    match ty {
+        ArgType::Bool => Value::Bool(false),
+        ArgType::Int => Value::Int(0),
+        ArgType::Text => Value::Text(String::new()),
+        // The least value: the interface hash does not see the order.
+        ArgType::Enum(values) => Value::Text(values.iter().min().cloned().unwrap_or_default()),
     }
 }
 

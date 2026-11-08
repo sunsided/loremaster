@@ -61,7 +61,8 @@ impl HintBook {
             let chart = loremaster_model::step_chart(key, walk);
             for (i, step) in walk.steps.iter().enumerate() {
                 let Some(plan) = step.plan() else { continue };
-                if plan.id.is_none() && plan.hints.is_empty() {
+                // The host reports an event; the player cannot type it.
+                if plan.event.is_some() || (plan.id.is_none() && plan.hints.is_empty()) {
                     continue;
                 }
                 let key = match &plan.id {
@@ -111,7 +112,14 @@ fn rooms_before_steps(world: Arc<World>, walk: &Walkthrough) -> Vec<Id> {
     let mut rooms = Vec::with_capacity(walk.steps.len());
     for step in &walk.steps {
         rooms.push(session.state().room.clone());
-        session.submit(Input::Text(step.command().into()));
+        match step.plan().and_then(|p| Some((p.event.as_ref()?, &p.args))) {
+            Some((event, args)) => {
+                let _ = session.host_event(event.as_str(), args.clone());
+            }
+            None => {
+                session.submit(Input::Text(step.command().into()));
+            }
+        }
     }
     rooms
 }

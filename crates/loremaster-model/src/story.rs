@@ -1,6 +1,6 @@
 use crate::{
-    Agenda, ClockConfig, Dialogue, DialogueId, Ending, Fragment, Frames, Id, Machine, Note, Room,
-    Rule, Thing, Thread, Timer, Value, VerbDef,
+    Agenda, Asset, ClockConfig, Dialogue, DialogueId, Ending, Fragment, Frames, Id, Machine, Note,
+    Room, Rule, Thing, Thread, Timer, Value, VerbDef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -190,6 +190,9 @@ pub struct Story {
     /// Relation axes between the player and the characters, such as `trust`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub relations: Vec<Id>,
+    /// The media files of the project, from `assets/` (ME-3).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<Asset>,
     /// Conversations with things, from `dialogues/`.
     #[serde(
         default,
@@ -212,6 +215,9 @@ pub struct Story {
     /// Long-range threads: promises to the reader, with their beats in notes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub threads: Vec<Thread>,
+    /// The contract with the host (IF-1). Without it, no contract checks run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<crate::Interface>,
     /// What the episode of this story carries to the next story (TX-12).
     #[serde(default, skip_serializing_if = "EpisodeItems::is_empty")]
     pub export: EpisodeItems,
@@ -229,6 +235,10 @@ fn is_true(b: &bool) -> bool {
 }
 
 impl Story {
+    pub fn asset(&self, id: &str) -> Option<&Asset> {
+        self.assets.iter().find(|a| a.id.as_str() == id)
+    }
+
     /// The named text pool `id`.
     pub fn text_pool(&self, id: &str) -> Option<&crate::TextPool> {
         self.texts.iter().find(|p| p.id.as_deref() == Some(id))

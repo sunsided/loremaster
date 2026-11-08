@@ -118,6 +118,8 @@ pub enum Effect {
     Start(StartTimers),
     /// Stop a timer. Its rules do not fire.
     Cancel(Id),
+    /// Ask the host to play a sound asset once. It is not saved.
+    PlaySound(Id),
 }
 
 /// A term of a `calc` sum: a whole number, or the name of an integer

@@ -15,6 +15,7 @@ A story is a folder of YAML files. Each entity has its own file.
 | `timers/*.yaml` | One timer in each file. Read [Timers](#timers). |
 | `agendas/*.yaml` | One agenda of a character in each file. Read [Actors and agendas](#actors-and-agendas). |
 | `endings/*.yaml` | One ending in each file. Read [Endings](#endings). |
+| `assets/*.yaml` | One media asset in each file, next to its media file. Read [Media and sound](#media-and-sound). |
 | `machines/*.yaml` | One puzzle machine in each file. Read [Puzzle machines](#puzzle-machines). |
 | `verbs/*.yaml` | One custom verb in each file, as an item of `verbs:` in story.yaml. |
 | `behaviors/*.yaml` | One file for each behavior in Rust, with notes about it. Read [Behaviors in Rust](#behaviors-in-rust). |
@@ -416,6 +417,33 @@ A `verb` or `check` event can name the slots:
 
 While a rule waits, the player can only answer. The answer is not a new turn: the clock and the timers do not move. A save game keeps the waiting rule. `await` works only in rules, not in dialogues or timers.
 
+### The interface: a contract with the host
+
+A story that a game engine hosts can declare everything it asks of the host and everything the host can report, in one section of story.yaml:
+
+```yaml
+interface:
+  actions:
+    - { id: lockpick, args: { difficulty: int }, results: [success, failure, broken_pick] }
+  events:
+    - { id: killed, args: { boss: text }, when: "not game_over" }
+```
+
+An argument type is `bool`, `int`, `text` or `{ enum: [a, b] }`. An `await` of a declared action can leave out `results`. The ids, arguments, results and enum values become names in the host's code: they are plain names (lowercase letters, digits and single `_`, from a letter on), and two of them must not make one Rust name (`level_2` and `level2`). An event argument cannot have the name of a thing property such as `name` or `location`. The `when` of an event cannot read its own arguments: it runs before they are stored, so test them in the rule.
+
+With the section, `loremaster check` fails when:
+
+- a rule calls an action that is not declared, or gives an argument of the wrong type;
+- the `results` of an `await` are not the declared ones;
+- an action with two or more results has no `into`, or no condition or text names `into` and a result (`lock == broken_pick`). Each result needs a branch;
+- a rule listens for an event that nothing emits and that is not declared, or emits one that no rule hears and that is not declared. An event that the story both emits and hears is its own and needs no declaration.
+
+Rules hear a host event with `on: { event: killed }`. Its arguments read as `killed.boss`: the last reported value. The host reports it with `Session::host_event`. The session refuses an undeclared event, a wrong argument, a false `when`, and an event while a rule waits. An event is not a turn: the clock does not move.
+
+`Session::for_host` refuses to start when the host was built for another interface: the message names the added, removed and changed entries. In a walkthrough, an `await` of an action takes only a declared result, by name, and a step `{ event: killed, args: { boss: ogre } }` reports an event. A step has `do` or `event`, not both.
+
+A Rust host gets its types from the `loremaster-build` crate in `build.rs`, or from `world!`, which writes the module `interface`. `loremaster interface <project> --ts` or `--json-schema` writes them for other languages. `loremaster protocol <project>` plays the story as a JSON-RPC 2.0 server on stdio, one message per line, for hosts in any language.
+
 ### Combat
 
 The effect `combat` runs a fight by built-in rules. The player needs the number variables `skill` and `stamina`, and can have `luck`. An enemy is a thing with the number properties `skill` and `stamina`.
@@ -519,6 +547,46 @@ rules:
     then:
       - say: "The rug is extremely heavy and cannot be carried."
 ```
+
+## Media and sound
+
+A room, a thing or a machine state can have media slots: `illustration`, `portrait`, `music` and `ambience`. A slot names assets by id. It is one id, or a list of variants, and the first variant whose `when` holds is the active one.
+
+```yaml
+# rooms/road.yaml
+media:
+  illustration:
+    - { asset: gate_open, when: iron_gate.open }
+    - gate_closed
+  ambience: wind
+  music: calm
+```
+
+Machine states take `media` in the long form: `{ name: ringing, media: { music: alarm } }`. The strongest slot wins: a machine state, then the partner of a talk or a fight, then the room. The partner's `portrait` shows during the talk. Music and the other slots come from the state after each step, so they are not in a save.
+
+Each asset is a file in `assets/`:
+
+```yaml
+# assets/gate_creak.yaml
+file: assets/gate_creak.wav
+caption: "[The gate creaks on its hinges.]"
+licence: { name: CC0-1.0, author: Ada, source: made for this story }
+```
+
+`file` is relative to the project folder. `caption` is the alt text of an image and the caption of a sound. An image or a sound effect without information has `decorative: true` instead. A music or ambience asset needs no caption, but one that carries information should have it.
+
+`play_sound` is a rule effect. It plays once, and is not saved:
+
+```yaml
+then:
+  - play_sound: gate_creak
+```
+
+A walkthrough checks it with `sound:`, in a step or in `expect`: `{ do: open gate, sound: gate_creak }`.
+
+`loremaster check` reports an unknown asset, a file that does not exist and a path outside the project as errors. An asset without a licence, an unused asset and a missing caption are warnings.
+
+The web player shows the images and plays the audio. The sound is off by default; Alt+M switches it. Audio starts after the first input of the player. Captions show while the sound is off, or with the Captions switch. The web player has the files of the bundled examples only: a story from a folder or a zip shows the captions in place of its media.
 
 ## Endings
 

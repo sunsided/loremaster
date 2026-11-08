@@ -21,6 +21,7 @@
 //! runs it through [`check_files`], and the `world!` macro runs it on its
 //! packs at compile time.
 
+mod bindings;
 mod check;
 mod codegen;
 mod hash;
@@ -31,6 +32,7 @@ mod origin;
 mod quality;
 mod scaffold;
 
+pub use bindings::{json_schema, rust_bindings, typescript};
 pub use check::{Checked, MAX_HINTS, check, check_files, check_packs};
 pub use codegen::world_snippet;
 pub use hash::model_hash;
@@ -48,4 +50,4 @@ pub use quality::{
 pub use scaffold::{START_TEXT, scaffold};
 
 #[cfg(not(target_family = "wasm"))]
-pub use load::read_dir;
+pub use load::{missing_asset_files, read_dir};

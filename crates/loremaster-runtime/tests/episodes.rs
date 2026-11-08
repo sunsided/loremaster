@@ -175,9 +175,9 @@ import:
             "export.relations[0]: unknown relation axis `fear`",
             "export.relations[1]: unknown thing `ghost`",
             "export.relations[2]: `trust` is not `thing.axis`",
-            "export.memories[0]: no dialogue of `keeper` remembers `forgot`",
+            "export.memories[0]: the first dialogue of `keeper`, which the talk uses, does not remember `forgot`",
             // Only the keeper's dialogue gives `asked`.
-            "export.memories[1]: no dialogue of `gull` remembers `asked`",
+            "export.memories[1]: the first dialogue of `gull`, which the talk uses, does not remember `asked`",
             "import.memories[0]: unknown thing `ghost`",
         ]
     );
@@ -203,6 +203,29 @@ import:
     let (two, _) = Session::from_episode(world, episode).unwrap();
     // `purse` sorts after `gold`, but the clamp uses its imported 5, not 1.
     assert_eq!(two.state().facts["gold"].as_int(), Some(3));
+}
+
+#[test]
+fn a_chain_of_limits_settles() {
+    let story = r#"
+title: Island Two
+start: shore
+vars:
+  - { id: gold, type: int, initial: 0, max: purse }
+  - { id: purse, type: int, initial: 1, max: cap }
+  - { id: cap, type: int, initial: 1 }
+import:
+  facts: [gold, purse, cap]
+  memories: [keeper.asked]
+"#;
+    let world = world(story, false);
+    let episode = json!({
+        "format": EPISODE_FORMAT, "version": 1, "story": "island-one",
+        "facts": { "gold": 9, "purse": 8, "cap": 4 },
+    });
+    let (two, _) = Session::from_episode(world, episode).unwrap();
+    assert_eq!(two.state().facts["purse"].as_int(), Some(4));
+    assert_eq!(two.state().facts["gold"].as_int(), Some(4));
 }
 
 #[test]

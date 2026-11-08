@@ -95,8 +95,11 @@ pub fn validate(world: &World) -> Result<(), Error> {
                     ));
                 }
             }
-            Item::Extern(_) => {}
+            Item::Extern(_) | Item::Interface(..) => {}
         }
+    }
+    if let Some(at) = two_interfaces(world) {
+        errors.push(Error::new(at, "a block has one `interface` section"));
     }
     for item in &world.items {
         match item {
@@ -449,6 +452,15 @@ fn stubs(world: &World, pack: &mut Pack, spans: &mut Spans) -> Pack {
     stub
 }
 
+fn two_interfaces(world: &World) -> Option<proc_macro2::Span> {
+    (world.items.iter())
+        .filter_map(|i| match i {
+            Item::Interface(_, at) => Some(*at),
+            _ => None,
+        })
+        .nth(1)
+}
+
 /// The pack of the block, as the expansion makes it (crate::emit).
 fn build(world: &World, spans: &mut Spans) -> Pack {
     let mut p = Pack::new("world");
@@ -462,8 +474,8 @@ fn build(world: &World, spans: &mut Spans) -> Pack {
         .collect();
     for item in &world.items {
         match item {
-            Item::Extern(_) | Item::Var(_) => {}
-            Item::Story(s) => story(&mut p, s, &vars, spans),
+            Item::Extern(_) | Item::Var(_) | Item::Interface(..) => {}
+            Item::Story(s) => story(&mut p, s, &vars, world, spans),
             Item::Room(r) => room(&mut p, r, spans),
             Item::Thing(t) => thing(&mut p, t, spans),
             Item::Rule(r) => rule(&mut p, r, spans),
@@ -689,9 +701,12 @@ fn name_stage(n: &NameStage) -> ModelNameStage {
     }
 }
 
-fn story(p: &mut Pack, s: &Story, vars: &[&Var], spans: &mut Spans) {
+fn story(p: &mut Pack, s: &Story, vars: &[&Var], world: &World, spans: &mut Spans) {
     let start = s.start.as_ref().expect("parse requires start");
     let mut b = p.story(s.title.value.as_str(), start.value.as_str());
+    if let Some(i) = crate::emit::interface_of(world) {
+        b = b.interface(i.clone());
+    }
     if let Some(a) = &s.author {
         b = b.author(a.value.as_str());
     }

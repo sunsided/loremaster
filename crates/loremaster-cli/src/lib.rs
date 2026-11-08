@@ -18,6 +18,10 @@ pub use loremaster_dsl as dsl;
 #[cfg(feature = "dsl")]
 pub use loremaster_macros::{behavior, world};
 
+/// The runtime: the code that `interface` in `world!` generates names it.
+#[cfg(feature = "dsl")]
+pub use loremaster_runtime as runtime;
+
 /// Everything a story module needs: `use loremaster::prelude::*;`.
 ///
 /// ```no_run

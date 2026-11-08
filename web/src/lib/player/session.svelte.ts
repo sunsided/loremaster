@@ -6,6 +6,8 @@ import {
 	type StatView,
 	type Awaiting,
 	type Input,
+	type MediaCue,
+	type MediaView,
 	type Status,
 	type Value,
 	type Choice,
@@ -60,6 +62,21 @@ export class Session {
 	combat = $state<CombatView | null>(null);
 	/** The dice of the newest turn. */
 	rolls = $derived<RollDetail[]>(this.entries.at(-1)?.turn.rolls ?? []);
+	/** The active illustration, portrait, music and ambience. */
+	media = $state.raw<MediaView>({});
+	/** The newest sound captions, oldest first. */
+	captions = $state<{ id: number; text: string }[]>([]);
+	#onsound: ((sound: MediaCue) => void) | null = null;
+	/** Sounds played before the host set `onsound`, such as those of the start turn. */
+	#unheard: MediaCue[] = [];
+	/** The host plays a sound effect here. Sounds from before it is set play when it is set. */
+	get onsound() {
+		return this.#onsound;
+	}
+	set onsound(play) {
+		this.#onsound = play;
+		if (play) for (const sound of this.#unheard.splice(0)) play(sound);
+	}
 	/** The action frame used for the last action, or null. */
 	frame = $state<FrameUse | null>(null);
 	/** The talk in progress, or null. While it is open, only answers and Leave run. */
@@ -122,7 +139,9 @@ export class Session {
 	#push(turn: Turn) {
 		this.turns++;
 		this.entries.push({ id: this.#next++, turn });
+		const before = this.media;
 		this.#refresh();
+		this.#sounds(turn, before);
 		// A chosen answer in a talk has no typed command: the answer is the command.
 		const command = turn.blocks.find((b) => b.kind === 'command' || b.kind === 'author' || b.kind === 'said');
 		this.history.push({
@@ -137,6 +156,19 @@ export class Session {
 			changes: turn.log.filter((l) => l.kind !== 'rule').map((l) => l.text),
 			ended: turn.ended
 		});
+	}
+
+	/** Captions for the sounds of a turn and for music or ambience that changed; the sounds go to the host. */
+	#sounds(turn: Turn, before: MediaView) {
+		const changed = (['music', 'ambience'] as const).flatMap((slot) => {
+			const cue = this.media[slot];
+			return cue && cue.id !== before[slot]?.id ? [cue] : [];
+		});
+		const sounds = turn.sounds ?? [];
+		if (this.#onsound) for (const sound of sounds) this.#onsound(sound);
+		else this.#unheard.push(...sounds);
+		const texts = [...changed, ...sounds].flatMap((c) => (c.caption ? [c.caption] : []));
+		this.captions = [...this.captions, ...texts.map((text) => ({ id: this.#next++, text }))].slice(-3);
 	}
 
 	/**
@@ -179,6 +211,7 @@ export class Session {
 		this.machines = this.bench.machines();
 		this.vars = this.bench.vars();
 		this.stats = this.bench.stats();
+		this.media = this.bench.media();
 		this.combat = this.bench.combat();
 		this.frame = this.bench.lastFrame();
 		this.choices = this.bench.choices();

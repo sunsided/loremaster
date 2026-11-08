@@ -44,6 +44,7 @@ impl<'a> StoryBuilder<'a> {
             machines: Vec::new(),
             behaviors: Vec::new(),
             score: None,
+            interface: None,
         });
         register(pack, "story".into());
         StoryBuilder { pack }
@@ -54,6 +55,12 @@ impl<'a> StoryBuilder<'a> {
             .header
             .as_mut()
             .expect("the builder made the header")
+    }
+
+    /// `interface:` the contract with the host (IF-1).
+    pub fn interface(mut self, interface: loremaster_model::Interface) -> Self {
+        self.header().interface = Some(interface);
+        self
     }
 
     /// `author:`.

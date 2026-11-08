@@ -238,6 +238,13 @@ pub(crate) fn keep_known_actors(world: &World, state: &mut State) {
     if state.active.as_ref().is_some_and(|a| playable.contains(a)) {
         return;
     }
+    // The actor that is replaced is no longer active. A fact the reconcile
+    // dropped (the actor is gone) stays dropped.
+    if let Some(old) = state.active.take()
+        && let Some(fact) = state.facts.get_mut(&format!("{old}.active"))
+    {
+        *fact = loremaster_model::Value::Bool(false);
+    }
     state.active = playable.first().cloned();
     let Some(first) = state.active.clone() else {
         return;

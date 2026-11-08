@@ -55,6 +55,8 @@ pub enum Item {
     Thread(Thread),
     /// `behavior <id>;`: a behavior in Rust, by id.
     Behavior(Name),
+    /// `interface { .. }`: the contract with the host (IF-1).
+    Interface(loremaster_model::Interface, proc_macro2::Span),
     /// `behavior <expr>;`: a behavior in Rust with its instance, for
     /// example `behavior Thief::zork();`. The pack keeps the instance.
     Register(syn::Expr),

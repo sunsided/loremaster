@@ -12,9 +12,14 @@ interface Stored {
 	tooltips: boolean;
 	reveal: RevealMode;
 	serveLink: boolean;
+	sound: boolean;
+	captions: boolean;
+	musicVolume: number;
+	ambienceVolume: number;
+	effectsVolume: number;
 }
 
-const defaults: Stored = { theme: 'phosphor', effects: 'full', motion: 'system', tooltips: true, reveal: 'lines', serveLink: false };
+const defaults: Stored = { theme: 'phosphor', effects: 'full', motion: 'system', tooltips: true, reveal: 'lines', serveLink: false, sound: false, captions: false, musicVolume: 70, ambienceVolume: 70, effectsVolume: 70 };
 
 function read(): Stored {
 	try {
@@ -23,6 +28,11 @@ function read(): Stored {
 	} catch {
 		return defaults;
 	}
+}
+
+/** A stored volume from 0 to 100, or the default when it is not a number. */
+function volume(value: unknown, fallback: number): number {
+	return typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : fallback;
 }
 
 class Settings {
@@ -35,6 +45,14 @@ class Settings {
 	reveal = $state<RevealMode>(defaults.reveal);
 	/** On a hosted page: look for `loremaster serve` on this computer. Off by default, because the browser asks for permission. */
 	serveLink = $state(defaults.serveLink);
+	/** Audio plays only when this is on. Off by default. */
+	sound = $state(defaults.sound);
+	/** Show captions also while the sound is on. */
+	captions = $state(defaults.captions);
+	/** The volumes, from 0 to 100. */
+	musicVolume = $state(defaults.musicVolume);
+	ambienceVolume = $state(defaults.ambienceVolume);
+	effectsVolume = $state(defaults.effectsVolume);
 	/** The operating system asks for reduced motion. */
 	systemReduce = $state(false);
 
@@ -48,6 +66,11 @@ class Settings {
 		this.tooltips = s.tooltips;
 		this.reveal = s.reveal === 'blocks' ? 'blocks' : 'lines';
 		this.serveLink = s.serveLink === true;
+		this.sound = s.sound === true;
+		this.captions = s.captions === true;
+		this.musicVolume = volume(s.musicVolume, defaults.musicVolume);
+		this.ambienceVolume = volume(s.ambienceVolume, defaults.ambienceVolume);
+		this.effectsVolume = volume(s.effectsVolume, defaults.effectsVolume);
 		if (typeof window !== 'undefined' && window.matchMedia) {
 			const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
 			this.systemReduce = mq.matches;
@@ -61,7 +84,12 @@ class Settings {
 					motion: this.motion,
 					tooltips: this.tooltips,
 					reveal: this.reveal,
-					serveLink: this.serveLink
+					serveLink: this.serveLink,
+					sound: this.sound,
+					captions: this.captions,
+					musicVolume: this.musicVolume,
+					ambienceVolume: this.ambienceVolume,
+					effectsVolume: this.effectsVolume
 				};
 				try {
 					localStorage.setItem(KEY, JSON.stringify(value));

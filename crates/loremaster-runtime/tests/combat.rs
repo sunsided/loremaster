@@ -224,6 +224,30 @@ fn two_enemies_fight_one_after_the_other() {
 }
 
 #[test]
+fn the_portrait_is_the_enemy_still_standing() {
+    let mut f = files("{ enemies: [hound, warden], win: yard, loss: fallen }", 0);
+    for (thing, text) in [("hound", HOUND), ("warden", WARDEN)] {
+        let path = format!("things/{thing}.yaml");
+        f.retain(|x| x.path != path);
+        f.push(file(
+            &path,
+            &format!("{text}media: {{ portrait: {thing} }}\n"),
+        ));
+        f.push(file(
+            &format!("assets/{thing}.yaml"),
+            &format!("file: {thing}.png\n"),
+        ));
+    }
+    let mut s = Session::new(compiled(f));
+    let step = s.start();
+    let portrait = |s: &Session| s.media().portrait.map(|c| c.id.to_string());
+    assert_eq!(portrait(&s).as_deref(), Some("hound"));
+    play(&mut s, &step, "attack", &WIN);
+    assert_eq!(stat(&s, "hound.stamina"), 0);
+    assert_eq!(portrait(&s).as_deref(), Some("warden"));
+}
+
+#[test]
 fn enemies_can_fight_all_at_once() {
     let (mut s, step) = session(
         "{ enemies: [warden, hound], win: yard, loss: fallen, together: true }",
