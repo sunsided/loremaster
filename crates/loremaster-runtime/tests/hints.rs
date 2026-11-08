@@ -116,3 +116,60 @@ fn a_story_without_hints_says_so() {
     s.start();
     assert_eq!(say(&mut s, "hint"), "This story has no hints.");
 }
+
+/// The lighthouse with one more walkthrough file.
+fn lighthouse_with(test: &str) -> Session {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse");
+    let mut files = read_dir(&dir).unwrap();
+    files.retain(|f| !f.path.starts_with("tests/"));
+    files.push(loremaster_project::SourceFile {
+        path: "tests/extra.yaml".into(),
+        text: test.into(),
+    });
+    let project = load(files).unwrap();
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let mut session = Session::new(world.clone());
+    session.set_hints(HintBook::new(world, &project.walkthroughs));
+    session.start();
+    session
+}
+
+#[test]
+fn a_restart_starts_the_ladders_again() {
+    let mut s = lighthouse();
+    say(&mut s, "n");
+    say(&mut s, "hint");
+    say(&mut s, "hint");
+    s.restart();
+    say(&mut s, "n");
+    let first = s.hints().remove(0);
+    assert!(first.shown.is_empty(), "{first:?}");
+    assert_eq!(say(&mut s, "hint").split(':').next(), Some("Hint 1 of 3"));
+}
+
+#[test]
+fn an_author_command_that_sets_the_facts_does_the_step() {
+    use loremaster_model::Value;
+    use loremaster_runtime::authoring::{AuthorCommand, author};
+    let mut s = lighthouse_with(
+        "steps:\n  - { id: lit, do: light lamp, at: shore, facts: { oil_lamp.lit: true }, hints: [\"A flame.\"] }\n",
+    );
+    assert_eq!(open_steps(&s), ["lit"]);
+    author(
+        &mut s,
+        AuthorCommand::Set {
+            name: "oil_lamp.lit".into(),
+            value: Value::Bool(true),
+        },
+    );
+    assert!(s.hints().is_empty());
+}
+
+#[test]
+fn a_step_without_an_id_keeps_its_needs() {
+    let s = lighthouse_with(
+        "steps:\n  - { id: key, do: take key }\n  - { do: wait, needs: key, hints: [\"Wait.\"] }\n",
+    );
+    // The hinted step needs `key`, which is not done: no hint yet.
+    assert!(s.hints().is_empty(), "{:?}", s.hints());
+}

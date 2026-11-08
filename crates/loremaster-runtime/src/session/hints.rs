@@ -45,9 +45,12 @@ struct HintStep {
 
 impl HintBook {
     /// The steps with an id or hints of the walkthroughs that are not
-    /// pending. Each walkthrough plays once from the start, for the room of
-    /// each step without `at`. A step id that two walkthroughs use is one
-    /// step: the first one counts.
+    /// pending. Each walkthrough plays once from the start, as
+    /// [`run_walkthrough`](crate::run_walkthrough) plays it, for the room of
+    /// each step without `at`; that is one play per call, so a host builds
+    /// the book once per build of the story. A step id that two walkthroughs
+    /// use is one step: the first one counts, and `loremaster check` warns
+    /// when the two steps differ.
     pub fn new(world: Arc<World>, walks: &[(String, Walkthrough)]) -> Self {
         let mut steps: Vec<HintStep> = Vec::new();
         for (key, walk) in walks {
@@ -72,7 +75,8 @@ impl HintBook {
                     .as_ref()
                     .and_then(|c| c.steps.iter().find(|s| s.index == i))
                     .map(|s| s.needs.iter().map(Id::to_string).collect())
-                    .unwrap_or_default();
+                    // A step without an id is not in the chart: its own `needs` gate it.
+                    .unwrap_or_else(|| plan.needs.iter().map(Id::to_string).collect());
                 steps.push(HintStep {
                     key,
                     command: step.command().to_string(),

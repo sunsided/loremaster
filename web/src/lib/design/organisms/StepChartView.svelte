@@ -22,7 +22,7 @@
 	const BAR_GAP = 4;
 	const BAR_UNIT = 10;
 
-	/** The step under the pointer or the focus: its needs and the steps that need it light up. */
+	/** The step under the pointer: its needs and the steps that need it light up. The list under the drawing says the same for keyboard and touch. */
 	let lit = $state<{ chart: string; step: string } | null>(null);
 
 	function layout(c: StepChart) {

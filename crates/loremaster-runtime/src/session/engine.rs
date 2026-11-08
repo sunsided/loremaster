@@ -48,7 +48,10 @@ impl Session {
     /// before it, as after an input.
     pub(crate) fn author_turn(&mut self, command: crate::authoring::AuthorCommand) -> Turn {
         let before = self.before();
+        // An author command can set the facts of a step: only facts count, no command.
+        let candidates = self.step_candidates(&Input::Tick);
         let turn = self.game.author(command);
+        self.mark_steps(candidates);
         self.remember(before);
         turn
     }
@@ -87,7 +90,10 @@ impl Session {
             };
         }
         let before = self.before();
+        // The rest of the rule can set the facts of a step.
+        let candidates = self.step_candidates(&Input::Tick);
         let turn = self.game.resume(await_id, value)?;
+        self.mark_steps(candidates);
         self.remember(before);
         Ok(turn)
     }
@@ -114,6 +120,8 @@ impl Session {
         game.host_rolls = host_rolls;
         self.game = game;
         self.started = true;
+        // A new game: the hint ladders start from their first level again.
+        self.revealed.clear();
         let turn = self.game.start();
         self.remember(before);
         turn

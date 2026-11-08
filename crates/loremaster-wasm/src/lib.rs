@@ -454,8 +454,9 @@ impl JsWorkbench {
     /// Continue the game of a workbench with an earlier version of the story, after an edit.
     #[wasm_bindgen(js_name = carryOver)]
     pub fn carry_over(&mut self, from: &JsWorkbench) {
-        self.bench = from.bench.carried_to(self.world.clone());
-        self.bench.set_walkthroughs(self.walkthroughs.clone());
+        self.bench = from
+            .bench
+            .carried_to_with(self.world.clone(), self.walkthroughs.clone());
     }
 
     /// The story has hints, also when none is open in this room now.

@@ -378,7 +378,7 @@
 		{ id: 'map', label: 'Map' },
 		{ id: 'rules', label: 'Rules' },
 		...(session?.machines.length ? [{ id: 'machines', label: `Machines ${session.machines.length}` }] : []),
-		...(session?.charts.length ? [{ id: 'steps', label: `Steps ${session.charts.length}` }] : []),
+		...(session?.charts.length ? [{ id: 'steps', label: `Steps ${session.charts.reduce((n, c) => n + c.steps.length, 0)}` }] : []),
 		{ id: 'state', label: 'State' },
 		{ id: 'story', label: 'Story' },
 		{ id: 'checks', label: 'Checks' },
@@ -1244,8 +1244,8 @@
 	/** The values that the room text shows instead of the game: a preview. It never moves the game. */
 	let previewValues = $state<Record<string, string>>({});
 	$effect(() => {
-		// A turn or another room ends the preview.
-		session?.entries.length;
+		// A turn or another room ends the preview. A hint is no turn.
+		session?.turns;
 		session?.scene.room;
 		previewValues = {};
 	});

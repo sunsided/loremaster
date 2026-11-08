@@ -165,8 +165,14 @@ impl Workbench {
     /// A new workbench with the game of this one in a changed world. This one
     /// does not change. Read [`Workbench::reload`].
     pub fn carried_to(&self, world: Arc<World>) -> Self {
+        self.carried_to_with(world, self.walkthroughs.clone())
+    }
+
+    /// [`Workbench::carried_to`] with the walkthroughs of the changed story,
+    /// so the hint book is built once, in the new world.
+    pub fn carried_to_with(&self, world: Arc<World>, walks: Vec<(String, Walkthrough)>) -> Self {
         let mut next = Self::from_session(authoring::carry_over(&self.session, world));
-        next.set_walkthroughs(self.walkthroughs.clone());
+        next.set_walkthroughs(walks);
         next
     }
 

@@ -17,6 +17,39 @@ impl Checker<'_> {
         for (key, walk) in &walks {
             self.walkthrough(key, walk);
         }
+        self.shared_ids(&walks);
+    }
+
+    /// The hint ladder has one step per id across the walkthroughs that are
+    /// not pending, the first in file order. A later step with the same id
+    /// and another command or room would never get its own hints.
+    fn shared_ids(&mut self, walks: &[(String, Walkthrough)]) {
+        let mut first: BTreeMap<&Id, (&str, &str, Option<&Id>)> = BTreeMap::new();
+        let mut found = Vec::new();
+        for (key, walk) in walks.iter().filter(|(_, w)| w.pending.is_none()) {
+            for (i, step) in walk.steps.iter().enumerate() {
+                let (Some(id), Some(plan)) = (step.id(), step.plan()) else {
+                    continue;
+                };
+                let this = (key.as_str(), step.command(), plan.at.as_ref());
+                match first.get(id) {
+                    None => {
+                        first.insert(id, this);
+                    }
+                    Some(&(other, command, at))
+                        if other != key && (command != this.1 || at != this.2) =>
+                    {
+                        found.push((key.clone(), i, format!(
+                            "the step id `{id}` is also in {other} with `{command}`: the hint ladder keeps only the first, so give this step another id"
+                        )));
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
+        for (key, i, message) in found {
+            self.at_step(&key, i, Severity::Warning, message);
+        }
     }
 
     fn walkthrough(&mut self, key: &str, walk: &Walkthrough) {
@@ -28,7 +61,6 @@ impl Checker<'_> {
                 self.at_step(
                     key,
                     i,
-                    Some(id.as_str()),
                     Severity::Error,
                     format!("two steps have the id `{id}`"),
                 );
@@ -43,23 +75,15 @@ impl Checker<'_> {
         }
         for (i, step) in walk.steps.iter().enumerate() {
             let Some(plan) = step.plan() else { continue };
-            let anchor = plan.id.as_ref().map(Id::as_str);
             if let Some(room) = &plan.at
                 && self.story().room(room.as_str()).is_none()
             {
-                self.at_step(
-                    key,
-                    i,
-                    anchor,
-                    Severity::Error,
-                    format!("unknown room `{room}`"),
-                );
+                self.at_step(key, i, Severity::Error, format!("unknown room `{room}`"));
             }
             if (!plan.needs.is_empty() || !plan.before.is_empty()) && plan.id.is_none() {
                 self.at_step(
                     key,
                     i,
-                    anchor,
                     Severity::Warning,
                     "a step with `needs` or `before` needs an `id` to be in the chart",
                 );
@@ -69,14 +93,12 @@ impl Checker<'_> {
                     None => self.at_step(
                         key,
                         i,
-                        anchor,
                         Severity::Error,
                         format!("`needs` names `{n}`, which is no step of this walkthrough"),
                     ),
                     Some(&p) if p >= i => self.at_step(
                         key,
                         i,
-                        anchor,
                         Severity::Error,
                         format!("`needs` names `{n}`, which comes later in the walkthrough"),
                     ),
@@ -88,14 +110,12 @@ impl Checker<'_> {
                     None => self.at_step(
                         key,
                         i,
-                        anchor,
                         Severity::Error,
                         format!("`before` names `{b}`, which is no step of this walkthrough"),
                     ),
                     Some(&p) if p <= i => self.at_step(
                         key,
                         i,
-                        anchor,
                         Severity::Error,
                         format!("`before` names `{b}`, which comes earlier in the walkthrough"),
                     ),
@@ -106,7 +126,6 @@ impl Checker<'_> {
                 self.at_step(
                     key,
                     i,
-                    anchor,
                     Severity::Error,
                     format!(
                         "a step has at most {MAX_HINTS} hints, this one has {}: the last level of the ladder is the command",
@@ -122,7 +141,6 @@ impl Checker<'_> {
                 self.at_step(
                     key,
                     a.index,
-                    Some(a.id.as_str()),
                     Severity::Warning,
                     format!(
                         "{} steps in a row, from `{}` to `{}`, can only be done one after the other (width 1): give the player a second puzzle to work on",
@@ -145,22 +163,32 @@ impl Checker<'_> {
             .iter()
             .map(|s| things_in(&nouns, objects(s.command())))
             .collect();
-        let mut seen: BTreeSet<&Id> = BTreeSet::new();
+        // What the player has or sees from the start is no spoiler: the
+        // things carried and the things in the start room.
+        let mut seen: BTreeSet<&Id> = story
+            .things
+            .iter()
+            .filter(|t| match &t.location {
+                loremaster_model::Location::Carried => true,
+                loremaster_model::Location::Room(r) => *r == story.start,
+                _ => false,
+            })
+            .map(|t| &t.id)
+            .collect();
         let mut found = Vec::new();
         for (i, step) in walk.steps.iter().enumerate() {
             seen.extend(named[i].iter().copied());
             let Some(plan) = step.plan() else { continue };
             for (h, hint) in plan.hints.iter().enumerate() {
                 if let Some(what) = later_name(walk, i, hint, &nouns, &named, &seen) {
-                    found.push((i, plan.id.as_ref().map(Id::as_str), h, what));
+                    found.push((i, h, what));
                 }
             }
         }
-        for (i, anchor, h, what) in found {
+        for (i, h, what) in found {
             self.at_step(
                 key,
                 i,
-                anchor,
                 Severity::Warning,
                 format!("hint {} names {what}: it gives away a later step", h + 1),
             );
@@ -168,26 +196,16 @@ impl Checker<'_> {
     }
 
     /// A diagnostic at step `i` of a walkthrough. In a YAML file the line is
-    /// the one of the step's id (or command); a walkthrough from Rust has its
-    /// place in its key.
-    fn at_step(
-        &mut self,
-        key: &str,
-        i: usize,
-        anchor: Option<&str>,
-        severity: Severity,
-        message: impl Into<String>,
-    ) {
+    /// the one of the step (see [`step_position`]); a walkthrough from Rust
+    /// has its place in its key.
+    fn at_step(&mut self, key: &str, i: usize, severity: Severity, message: impl Into<String>) {
         let at = format!("steps[{i}]");
         let mut d = match severity {
             Severity::Error => Diagnostic::error(key, at, message),
             _ => Diagnostic::warning(key, at, message),
         };
         if let Some(f) = self.project.file(key) {
-            let needle = anchor
-                .map(|id| format!("id: {id}"))
-                .unwrap_or_else(|| step_command(self.project, key, i));
-            if let Some(pos) = f.text.find(&needle) {
+            if let Some(pos) = step_position(self.project, key, &f.text, i) {
                 let (line, column) = line_col(&f.text, pos);
                 d.line = Some(line);
                 d.column = Some(column);
@@ -201,14 +219,38 @@ impl Checker<'_> {
     }
 }
 
-fn step_command(project: &crate::Project, key: &str, i: usize) -> String {
-    project
-        .walkthroughs
-        .iter()
-        .find(|(k, _)| k == key)
-        .and_then(|(_, w)| w.steps.get(i))
-        .map(|s| s.command().to_string())
-        .unwrap_or_default()
+/// Where step `i` starts in the YAML text: each step is looked for after the
+/// one before it, by `id: <id>` or else by its command as a word, so two
+/// steps with the same command get their own lines.
+fn step_position(project: &crate::Project, key: &str, text: &str, i: usize) -> Option<usize> {
+    let (_, walk) = project.walkthroughs.iter().find(|(k, _)| k == key)?;
+    let mut from = text.find("steps:")?;
+    let mut at = None;
+    for step in walk.steps.iter().take(i + 1) {
+        let found = match step.id() {
+            Some(id) => text[from..].find(&format!("id: {id}")).map(|p| p + from),
+            None => find_word(text, step.command(), from),
+        };
+        // A step that is not found leaves the search where it was.
+        if let Some(p) = found {
+            from = p + 1;
+            at = Some(p);
+        } else {
+            at = None;
+        }
+    }
+    at
+}
+
+/// The first place at or after `from` where `text` has `word` as a whole word.
+fn find_word(text: &str, word: &str, from: usize) -> Option<usize> {
+    let edge = |c: Option<char>| c.is_none_or(|c| !c.is_alphanumeric() && c != '_');
+    text[from..]
+        .match_indices(word)
+        .map(|(p, _)| p + from)
+        .find(|&at| {
+            edge(text[..at].chars().next_back()) && edge(text[at + word.len()..].chars().next())
+        })
 }
 
 /// `file:line:column` (maybe with `#n`) of a walkthrough from Rust.
@@ -417,6 +459,46 @@ mod tests {
         );
         check!(m.len() == 1, "{m:?}");
         check!(m[0].contains("5 steps in a row, from `a` to `e`"), "{m:?}");
+    }
+
+    #[test]
+    fn the_line_is_the_one_of_the_step_also_for_a_repeated_command() {
+        let d: Vec<_> = check_files(files("steps:\n  - wait\n  - { do: wait, at: attic }\n"))
+            .diagnostics
+            .into_iter()
+            .filter(|d| d.file == "tests/win.yaml")
+            .collect();
+        check!(d.len() == 1, "{d:?}");
+        check!(d[0].at == "steps[1]");
+        check!(d[0].line == Some(3), "{d:?}");
+    }
+
+    #[test]
+    fn a_thing_of_the_start_room_is_no_later_step() {
+        // The drawer is in the start room, so a hint may name it.
+        let m = messages(
+            "steps:\n\
+             - { id: look, do: look, hints: [\"Look at the drawer.\"] }\n\
+             - { id: open, do: open drawer }\n",
+        );
+        check!(m.is_empty(), "{m:?}");
+    }
+
+    #[test]
+    fn a_step_id_in_two_walkthroughs_with_other_commands_is_a_warning() {
+        let mut f = files("steps:\n  - { id: d, do: open drawer }\n");
+        f.push(SourceFile {
+            path: "tests/zz.yaml".into(),
+            text: "steps:\n  - { id: d, do: look }\n".into(),
+        });
+        let m: Vec<String> = check_files(f)
+            .diagnostics
+            .into_iter()
+            .filter(|d| d.file == "tests/zz.yaml")
+            .map(|d| d.message)
+            .collect();
+        check!(m.len() == 1, "{m:?}");
+        check!(m[0].contains("is also in tests/win.yaml"), "{m:?}");
     }
 
     #[test]

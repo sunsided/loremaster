@@ -42,6 +42,8 @@ export class Session {
 	/** How many turns `undo` can go back. */
 	undoSteps = $state(0);
 	entries = $state<Entry[]>([]);
+	/** Counts the turns of the game, also author commands and undo. A hint is no turn and does not count. */
+	turns = $state(0);
 	scene = $state<Scene>() as Scene;
 	assembly = $state<FragmentView[]>([]);
 	map = $state<MapView>({ rooms: [], links: [] });
@@ -109,6 +111,7 @@ export class Session {
 	}
 
 	#push(turn: Turn) {
+		this.turns++;
 		this.entries.push({ id: this.#next++, turn });
 		this.#refresh();
 		// A chosen answer in a talk has no typed command: the answer is the command.
