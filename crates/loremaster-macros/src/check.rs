@@ -224,6 +224,7 @@ pub fn check(world: &World) -> Result<(), Error> {
         }
         Err(diagnostics) => diagnostics,
     };
+    let has_story = world.items.iter().any(|i| matches!(i, Item::Story(_)));
     let mut errors = Vec::new();
     let mut seen = BTreeSet::new();
     for d in &diagnostics {
@@ -233,7 +234,7 @@ pub fn check(world: &World) -> Result<(), Error> {
         if !seen.insert((d.file.clone(), d.at.clone(), d.message.clone())) {
             continue;
         }
-        let message = rust_hint(&d.message);
+        let message = rust_hint(&d.message, has_story);
         errors.push(match spans.find(&d.file, &d.at) {
             Some(tokens) => Error::new_spanned(tokens, message),
             None => Error::new(Span::call_site(), message),
@@ -244,15 +245,20 @@ pub fn check(world: &World) -> Result<(), Error> {
 
 /// The checks write their hints for YAML files. An unknown id in a block
 /// gets the hint for Rust: define it, or declare it as an id of another
-/// pack.
-fn rust_hint(message: &str) -> String {
+/// pack. A block with a story header has its relations there (`validate`
+/// rejects an `extern` relation in it).
+fn rust_hint(message: &str, has_story: bool) -> String {
     let message = message.split(": add it as ").next().unwrap_or(message);
     if let Some(rest) = message.strip_prefix("unknown relation `")
         && let Some((axis, _)) = rest.split_once('`')
     {
-        return format!(
-            "unknown relation `{axis}`; add it to `relations: [..]` in the story header, or write `extern {{ relation {axis}; }}` for one of another pack"
-        );
+        return if has_story {
+            format!("unknown relation `{axis}`; add it to `relations: [..]` in the story header")
+        } else {
+            format!(
+                "unknown relation `{axis}`; add it to `relations: [..]` in the story header, or write `extern {{ relation {axis}; }}` for one of another pack"
+            )
+        };
     }
     for kind in ["room", "thing", "timer", "ending", "verb"] {
         if let Some(rest) = message.strip_prefix(&format!("unknown {kind} `"))
