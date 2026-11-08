@@ -478,6 +478,8 @@ Conditions compare a variable with a constant. For `$r + skill >= 9`, write the 
 
 Then a later rule tests `total >= 9`.
 
+`against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). It names a number variable and changes nothing else: the story still compares the values.
+
 ### Action phases
 
 A verb goes through these phases:

@@ -52,6 +52,16 @@ impl Game {
         {
             let roll = spec.roll.as_deref().unwrap_or_default();
             let total = self.take_roll(turn, dice, roll);
+            if let Some(var) = &spec.against {
+                let story = &self.world.story;
+                let stat = story.stats.iter().find(|s| s.var.as_str() == var);
+                let who = stat.map_or_else(|| var.to_uppercase(), |s| s.label.clone());
+                let target = self.state.facts.get(var.as_str()).and_then(Value::as_int);
+                if let Some(r) = turn.rolls.last_mut() {
+                    r.who = Some(who);
+                    r.target = target;
+                }
+            }
             if let Some(into) = &spec.into {
                 self.set_fact(turn, into, Value::Int(total));
             }

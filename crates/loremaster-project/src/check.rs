@@ -1603,6 +1603,18 @@ impl Checker<'_> {
                 format!("`{dice}` is not dice such as `2d6` or `1d20+3`"),
             );
         }
+        if let Some(var) = &spec.against {
+            if spec.roll.is_none() {
+                self.error(file, at, "`against` belongs to a `roll`");
+            }
+            if self.ty_of(var) != Some(Ty::Int) {
+                self.error(
+                    file,
+                    at,
+                    format!("`against: {var}` is not a number variable"),
+                );
+            }
+        }
         if spec.action.is_none() && (!spec.args.is_empty() || !spec.results.is_empty()) {
             self.error(file, at, "`args` and `results` belong to an `action`");
         }
