@@ -1,0 +1,31 @@
+name: Spent
+# Six lost rounds leave 2 STAMINA. The fight is won, but the fall at section 8 takes the rest.
+steps:
+  - { do: roll your character, rolls: [4, 2, 3] }
+  - ring the bell
+  - refuse
+  - { do: attack, rolls: [12, 2] }
+  - go on
+  - { do: attack, rolls: [12, 2] }
+  - go on
+  - { do: attack, rolls: [12, 2] }
+  - go on
+  - { do: attack, rolls: [12, 2] }
+  - go on
+  - { do: attack, rolls: [12, 2] }
+  - go on
+  - { do: attack, rolls: [12, 2] }
+  - go on
+  - { do: attack, rolls: [2, 12] }
+  - go on
+  - { do: attack, rolls: [2, 12] }
+  - go on
+  - { do: attack, rolls: [2, 12] }
+  - go on
+  - { do: attack, rolls: [2, 12], room: section_6, facts: { stamina: 2 } }
+  - { do: climb the stairs, see: "You are very tired" }
+  - { do: test your luck, rolls: [12] }
+expect:
+  facts: { stamina: 0 }
+  ended: true
+  ending: fallen

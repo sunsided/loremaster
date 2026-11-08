@@ -1,0 +1,5 @@
+name: "4. The Grate"
+description:
+  - "The grate is heavy, and the rust has welded it to its frame."
+exits:
+  - { direction: "test your skill", to: section_7 }

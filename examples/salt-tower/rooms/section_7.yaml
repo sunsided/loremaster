@@ -1,0 +1,10 @@
+name: "7. The Tunnel"
+description:
+  - "You crawl through a flooded tunnel. On a ledge you find a wet note with one word on it: HEARTH."
+exits:
+  - { direction: "crawl on", to: section_6 }
+rules:
+  - id: read_the_note
+    on: { enter: section_7 }
+    then:
+      - set: { codeword_hearth: true }

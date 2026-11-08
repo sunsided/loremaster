@@ -1,0 +1,13 @@
+# A Skill test, with the same shape as luck_test: roll, compare, outcome.
+# A machine has no parameters, so each test in the book is its own short machine.
+start: idle
+steps:
+  - from: idle
+    on: { check: [go, "test your skill"] }
+    to: compare
+    then:
+      - await: { roll: 2d6, into: r }
+      - calc: { margin: "skill - r" }
+      - say: "{r} against SKILL {skill}."
+  - { from: compare, on: next, when: "margin >= 0", to: idle, say: "The grate comes up.", then: [{ goto: section_7 }, stop] }
+  - { from: compare, on: next, to: idle, say: "The grate drops on your hand, and you drag it aside.", then: [{ add: { stamina: -2 } }, { goto: section_7 }, stop] }

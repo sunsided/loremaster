@@ -1,0 +1,22 @@
+# Section 1: a rule, not the opening turn, so that a walkthrough can force the rolls.
+- id: roll_character
+  on: { check: [go, "roll your character"] }
+  then:
+    - await: { roll: 1d6, into: r }
+    - calc: { skill_initial: "r + 6" }
+    - calc: { skill: "skill_initial" }
+    - await: { roll: 2d6, into: r }
+    - calc: { stamina_initial: "r + 12" }
+    - calc: { stamina: "stamina_initial" }
+    - await: { roll: 1d6, into: r }
+    - calc: { luck_initial: "r + 6" }
+    - calc: { luck: "luck_initial" }
+    - say: "SKILL {skill}, STAMINA {stamina}, LUCK {luck}."
+    - goto: section_2
+    - stop
+
+- id: spent
+  on: turn
+  when: "stamina <= 0"
+  then:
+    - goto: fallen

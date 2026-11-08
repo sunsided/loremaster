@@ -1,0 +1,11 @@
+# Not a section: combat needs a room for its loss, and a stat at 0 ends here too.
+name: "The Salt"
+description:
+  - "The white flats go dark."
+rules:
+  - id: fallen
+    on: { enter: fallen }
+    closes: [delivered, sent_away]
+    reason: "A courier at 0 STAMINA can not deliver the letter."
+    then:
+      - end: fallen
