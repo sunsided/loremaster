@@ -61,7 +61,19 @@ impl Game {
     fn region(&self, region: &Region) -> Option<SceneRegion> {
         let name = if let Some(thing) = &region.thing {
             let id = thing.as_str();
-            if !self.reachable(id) || self.state.is_carried(id) {
+            // The scope also has the doors of the room, in the dark and
+            // behind hidden exits: the player does not see those.
+            let in_room = matches!(
+                self.state.outer_location(id),
+                Some(loremaster_model::Location::Room(r)) if *r == self.state.room
+            );
+            let visible_door =
+                (self.visible_exits().iter()).any(|(_, e)| e.door.as_ref() == Some(thing));
+            if !self.reachable(id)
+                || self.state.is_carried(id)
+                || self.is_dark()
+                || (!in_room && !visible_door && self.doors_here().contains(thing))
+            {
                 return None;
             }
             self.name_of(thing)

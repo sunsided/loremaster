@@ -214,3 +214,59 @@ fn a_text_host_walks_at_once() {
     assert_eq!(step.status, loremaster_runtime::Status::Ready);
     assert!(game.state().flag("iron_gate.open"));
 }
+
+#[test]
+fn a_walk_survives_a_carry_over() {
+    use loremaster_runtime::authoring::carry_over;
+    let mut game = Session::new(world());
+    game.set_host_walks(true);
+    game.start();
+    game.submit(Input::Text("open gate".into()));
+    let mut next = carry_over(&game, world());
+    let open = next.state().awaiting.clone().expect("the walk waits");
+    next.resume(&open.id, Value::Text(ARRIVED.into())).unwrap();
+    assert!(next.state().flag("iron_gate.open"));
+}
+
+/// A dark cellar with a crate, and a hidden exit with a hatch.
+fn cellar(dark: bool) -> Session {
+    use loremaster_project::SourceFile;
+    let file = |path: &str, text: &str| SourceFile {
+        path: path.into(),
+        text: text.into(),
+    };
+    let tags = if dark { "tags: [dark]\n" } else { "" };
+    let room = format!(
+        "name: Cellar\n{tags}exits: [{{ direction: down, to: pit, door: hatch, visible: found }}]\nmedia:\n  illustration:\n    asset: pic\n    regions:\n      - {{ thing: crate, rect: [0, 0, 10, 10] }}\n      - {{ thing: hatch, rect: [20, 0, 10, 10] }}\n"
+    );
+    let project = load(vec![
+        file(
+            "story.yaml",
+            "title: T\nstart: cellar\nvars: [{ id: found, type: bool, initial: false }]\n",
+        ),
+        file("rooms/cellar.yaml", &room),
+        file("rooms/pit.yaml", "name: Pit\n"),
+        file(
+            "things/crate.yaml",
+            "name: crate\nlocation: { room: cellar }\n",
+        ),
+        file(
+            "things/hatch.yaml",
+            "name: hatch\nlocation: { room: pit }\nprops: { open: false }\n",
+        ),
+        file(
+            "assets/pic.yaml",
+            "file: assets/pic.png\ndecorative: true\n",
+        ),
+    ])
+    .unwrap_or_else(|e| panic!("{e:#?}"));
+    let mut game = Session::new(Arc::new(World::compile(project.story).unwrap()));
+    game.start();
+    game
+}
+
+#[test]
+fn no_hotspot_for_a_dark_room_or_the_door_of_a_hidden_exit() {
+    assert_eq!(regions(&cellar(false)), [("crate".into(), "crate".into())]);
+    assert_eq!(regions(&cellar(true)), []);
+}

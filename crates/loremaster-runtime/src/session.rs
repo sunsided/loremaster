@@ -278,6 +278,8 @@ impl Session {
 
     /// Answer the request of a rule that waits, and run the rest of the rule
     /// (SE-6). This is not a new turn: the clock and the timers do not move.
+    /// A walk before a command (`set_host_walks`) is the exception: with
+    /// `arrived`, the command runs now as its turn, with its time.
     ///
     /// The death prompt is answered here too: `undo` and `restart` run in the
     /// session; for `restore`, the host restores a save itself.
@@ -401,8 +403,8 @@ impl Session {
 
     /// Let the host walk the player, for a stage host. A command on a thing
     /// in the room, or a move through an exit, then first waits for
-    /// `walk_to` with that thing or exit; `arrived` runs the command and
-    /// `refused` drops it. Without it, the walk happens at once. Like
+    /// `walk_to` with that thing or exit; `arrived` runs the command, as a
+    /// turn with its time, and `refused` drops it. Without it, the walk happens at once. Like
     /// `set_host_rolls`, the setting is not in the save.
     pub fn set_host_walks(&mut self, host_walks: bool) {
         self.game.host_walks = host_walks;

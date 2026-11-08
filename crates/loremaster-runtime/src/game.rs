@@ -361,10 +361,15 @@ impl Game {
             .flatten()
             .all(has_room)
         };
+        // A walk before a command has no rule: the command checks its
+        // objects again when it runs.
+        let rule_gone = |open: &crate::state::Awaiting| {
+            open.command.is_none()
+                && (rule_of(&world, &open.rule).is_none()
+                    || rule_of(&world, &open.rule) != rule_of(&self.world, &open.rule))
+        };
         if let Some(open) = &state.awaiting
-            && (rule_of(&world, &open.rule).is_none()
-                || rule_of(&world, &open.rule) != rule_of(&self.world, &open.rule)
-                || state.combat.as_ref().is_some_and(|c| !combat_ok(c)))
+            && (rule_gone(open) || state.combat.as_ref().is_some_and(|c| !combat_ok(c)))
         {
             state.awaiting = None;
             state.combat = None;
@@ -683,8 +688,10 @@ impl Game {
             }
             Command::Verb { objects, actor, .. } => {
                 // An unknown object or another actor: the command says why.
-                if actor.as_ref().is_some_and(|a| a.as_str() != crate::PLAYER)
-                    || objects.iter().any(|o| !self.reachable(o.as_str()))
+                // The same test as `action`: the active actor is the player.
+                if actor.as_ref().is_some_and(|a| {
+                    a.as_str() != crate::PLAYER && Some(a) != self.state.active.as_ref()
+                }) || objects.iter().any(|o| !self.reachable(o.as_str()))
                 {
                     return None;
                 }

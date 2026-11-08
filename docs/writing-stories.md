@@ -599,12 +599,14 @@ media:
     asset: gate_closed
     regions:
       - { thing: iron_gate, rect: [31, 33, 38, 67] }
-      - { exit: north, rect: [80, 10, 15, 40] }
+      - { thing: rope, rect: [68, 8, 8, 54] }
 ```
+
+A region of an exit names its direction: the yard of the example has `{ exit: south, rect: [40, 25, 20, 30] }` on the gate in its wall.
 
 `Session::media()` lists the hotspots whose thing the player can see in the room (not carried) and whose exit is visible, each with its name now. A click on one is a command on the thing, or `go` through the exit. In the web player, the hotspots are buttons over the illustration: Tab reaches each one, and a click uses the verb of the prompt, or looks at the thing. `loremaster check` reports a region with an unknown thing, an exit the room does not have, both or neither, a `rect` outside the image, and regions on another slot.
 
-A stage host that animates the walk calls `set_host_walks(true)`. Then a command on a thing in the room, or a move, first waits for `walk_to` with the `thing` or the `exit`; `arrived` runs the command, and `refused` drops it. Without it, as in the web player, the walk happens at once.
+A stage host that animates the walk calls `set_host_walks(true)`. Then a command on a thing in the room, or a move, first waits for `walk_to` with the `thing` or the `exit`; `arrived` runs the command, and `refused` drops it. Time passes when the command runs, not while the walk waits. Without it, as in the web player, the walk happens at once.
 
 ## Endings
 
