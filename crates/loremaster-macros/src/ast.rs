@@ -34,6 +34,8 @@ pub enum Value {
 }
 
 pub struct World {
+    /// `pack <name>;`: the name of the function, `pack` without it.
+    pub name: Option<Name>,
     pub items: Vec<Item>,
 }
 
@@ -49,6 +51,10 @@ pub enum Item {
     Ending(Ending),
     Verb(Verb),
     Test(Test),
+    Dialogue(Dialogue),
+    Thread(Thread),
+    /// `behavior <id>;`: a behavior in Rust, by id.
+    Behavior(Name),
 }
 
 /// An id from another pack, for the checks at compile time.
@@ -60,7 +66,8 @@ pub struct Extern {
 
 pub enum ExternKind {
     Room,
-    Thing,
+    /// The thing's properties, when given: conditions read them.
+    Thing(Vec<(Name, PropType)>),
     Var(VarType),
     /// The machine's states, when given: conditions compare it with them.
     Machine(Vec<Name>),
@@ -68,6 +75,16 @@ pub enum ExternKind {
     Ending,
     Verb,
     Behavior,
+    /// A relation axis of the story header.
+    Relation,
+}
+
+/// The type of an extern thing's property.
+#[derive(Clone, Copy)]
+pub enum PropType {
+    Bool,
+    Int,
+    Text,
 }
 
 pub struct Story {
@@ -80,6 +97,10 @@ pub struct Story {
     pub clock_start: Option<Text>,
     pub minutes_per_turn: Option<u16>,
     pub phases: Option<Vec<(Name, Text)>>,
+    pub relations: Vec<Name>,
+    pub score: Option<i64>,
+    pub score_var: Option<Name>,
+    pub ranks: Vec<(i64, Text)>,
     pub tokens: TokenStream,
 }
 
@@ -106,10 +127,33 @@ pub struct Frag {
     pub texts: Vec<Text>,
     /// `[..]`: the texts are variants.
     pub variants: bool,
+    /// `id <name>` after the text.
+    pub id: Option<Name>,
+    /// `replaces` after the text.
+    pub replaces: bool,
+    /// `note "…"` after the text.
+    pub notes: Vec<Text>,
     pub tokens: TokenStream,
 }
 
+/// `before <verb> <frag>`, `instead ..` or `after ..`: text around the
+/// response to a verb.
+pub struct Frame {
+    pub when: FrameWhen,
+    pub verb: Name,
+    pub frag: Frag,
+}
+
+#[derive(Clone, Copy)]
+pub enum FrameWhen {
+    Before,
+    Instead,
+    After,
+}
+
 pub struct Room {
+    /// `replace room ..`: it replaces the room of an earlier pack.
+    pub replace: bool,
     pub id: Name,
     pub name: Text,
     pub parts: Vec<RoomPart>,
@@ -123,6 +167,7 @@ pub enum RoomPart {
     Region(Name),
     Level(i32),
     Note(Note),
+    Frame(Frame),
 }
 
 pub struct Exit {
@@ -142,6 +187,7 @@ pub struct Note {
 }
 
 pub struct Thing {
+    pub replace: bool,
     pub id: Name,
     pub name: Text,
     pub location: Option<Location>,
@@ -178,6 +224,18 @@ pub enum ThingPart {
     Presence(Frag),
     AlsoIn(Name),
     Note(Note),
+    Frame(Frame),
+    /// `name [when <cond> =>] "text" [aliases [..]] [proper]`: a stage of
+    /// the name.
+    Name(NameStage),
+}
+
+pub struct NameStage {
+    pub when: Option<Cond>,
+    pub text: Text,
+    pub aliases: Vec<Text>,
+    pub proper: bool,
+    pub tokens: TokenStream,
 }
 
 pub struct Event {
@@ -252,10 +310,12 @@ pub enum EffectKind {
 }
 
 pub struct Machine {
+    pub replace: bool,
     pub id: Name,
     pub start: Name,
     pub states: Vec<(Name, Option<Text>)>,
     pub steps: Vec<Step>,
+    pub notes: Vec<Note>,
 }
 
 pub struct Step {
@@ -275,6 +335,7 @@ pub struct Step {
 }
 
 pub struct Timer {
+    pub replace: bool,
     pub id: Name,
     pub turns: u32,
     pub running: bool,
@@ -282,9 +343,11 @@ pub struct Timer {
     pub runs_while: Option<Cond>,
     /// Effects by the value of the timer; 0 is when it runs out.
     pub at: Vec<(u32, Vec<Effect>)>,
+    pub notes: Vec<Note>,
 }
 
 pub struct Ending {
+    pub replace: bool,
     pub id: Name,
     pub title: Text,
     pub kind: Name,
@@ -294,6 +357,7 @@ pub struct Ending {
 }
 
 pub struct Verb {
+    pub replace: bool,
     pub id: Name,
     pub label: Text,
     pub words: Vec<Text>,
@@ -325,4 +389,33 @@ pub enum Expectation {
     Room(Name),
     Ending(Name),
     Ended(bool),
+}
+
+/// A line in a dialogue: its segments.
+#[derive(Clone)]
+pub struct DialogueLine {
+    pub segments: Vec<Segment>,
+}
+
+/// The dialogue tree of dramaturge's token form, with loremaster's
+/// conditions, lines and effects, and the span of each place.
+pub type DialogueTree = dramaturge_syntax::tokens::Spanned<Cond, DialogueLine, Effect, Note>;
+
+/// `dialogue [<id>] with <thing> start [..] { .. }`.
+pub struct Dialogue {
+    pub replace: bool,
+    /// The id, or the thing's id when the block names none.
+    pub id: Name,
+    pub tree: DialogueTree,
+}
+
+/// `thread <id> "<name>" { .. }`: a promise to the reader.
+pub struct Thread {
+    pub replace: bool,
+    pub id: Name,
+    pub name: Text,
+    pub status: Option<Name>,
+    pub summary: Option<Text>,
+    pub tracks: Vec<Name>,
+    pub notes: Vec<Note>,
 }

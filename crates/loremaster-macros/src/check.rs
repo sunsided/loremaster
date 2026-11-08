@@ -10,13 +10,15 @@
 
 use crate::ast::*;
 use crate::emit::camel;
+use dramaturge_syntax::{OutcomePlace, Outcomes, Place};
 use loremaster_dsl::{
-    BuildPack, Effects, EndingBuilder, FragmentExt, HasNotes, RoomBuilder, ThingBuilder, frag, on,
-    variants,
+    BuildPack, DialogueBuilder, Effects, EndingBuilder, FragmentExt, HasFrames, HasNotes,
+    RoomBuilder, ThingBuilder, frag, on, variants,
 };
 use loremaster_model::{
-    EndingKind, EventPattern, Fragment, FragmentMode, Id, Layer, Line, LineSegment, TimeOfDay,
-    VarDef, VarType as ModelVarType, VerbSlots,
+    EndingKind, EventPattern, Fragment, FragmentMode, Id, Layer, Line, LineSegment,
+    NameStage as ModelNameStage, ThreadStatus, TimeOfDay, VarDef, VarType as ModelVarType,
+    VerbSlots,
 };
 use loremaster_project::{Origin, Pack, Severity, assemble};
 use proc_macro2::{Span, TokenStream};
@@ -71,6 +73,19 @@ pub fn validate(world: &World) -> Result<(), Error> {
                 defined.insert(("verb".into(), v.id.value.clone()));
             }
             Item::Rule(r) => times.extend(time_of(&r.on)),
+            Item::Dialogue(d) => {
+                defined.insert(("dialogue".into(), d.id.value.clone()));
+                if let Err(e) = d.tree.check(false) {
+                    errors.push(e);
+                }
+                not_played_yet(d, &mut errors);
+            }
+            Item::Thread(t) => {
+                defined.insert(("thread".into(), t.id.value.clone()));
+            }
+            Item::Behavior(b) => {
+                defined.insert(("behavior".into(), b.value.clone()));
+            }
             Item::Test(t) => {
                 if !tests.insert(t.id.value.clone()) {
                     errors.push(Error::new(
@@ -94,6 +109,15 @@ pub fn validate(world: &World) -> Result<(), Error> {
             Item::Extern(list) => {
                 for e in list {
                     let kind = extern_kind(&e.kind);
+                    if story_seen && matches!(e.kind, ExternKind::Relation) {
+                        errors.push(Error::new(
+                            e.id.span,
+                            format!(
+                                "the relations live in the story header, and this block has it, so no other pack can define `{}`; write `relations: [{}]` in the story header",
+                                e.id.value, e.id.value
+                            ),
+                        ));
+                    }
                     if story_seen && matches!(e.kind, ExternKind::Var(_)) {
                         errors.push(Error::new(
                             e.id.span,
@@ -130,6 +154,25 @@ pub fn validate(world: &World) -> Result<(), Error> {
     combine(errors)
 }
 
+/// The parts of dramaturge's token form that loremaster's talks do not play
+/// yet: more lines of a node, and `-> <node>` (`next`).
+fn not_played_yet(d: &Dialogue, errors: &mut Vec<Error>) {
+    for (n, node) in d.tree.dialogue.nodes.iter().enumerate() {
+        if !node.lines.is_empty() {
+            errors.push(Error::new(
+                d.tree.span(&Place::Line(n, 0)),
+                "a node has one line in loremaster's talks; more lines (`<speaker>: \"…\";`) are in the dialogue shape, but the talks do not play them yet",
+            ));
+        }
+        if node.next.is_some() {
+            errors.push(Error::new(
+                d.tree.span(&Place::Next(n)),
+                "`-> <node>` (`next`) is in the dialogue shape, but loremaster's talks do not play it yet; give the node an option",
+            ));
+        }
+    }
+}
+
 fn time_of(e: &Event) -> Option<&Text> {
     match &e.kind {
         EventKind::Time(t) => Some(t),
@@ -140,13 +183,14 @@ fn time_of(e: &Event) -> Option<&Text> {
 fn extern_kind(k: &ExternKind) -> &'static str {
     match k {
         ExternKind::Room => "room",
-        ExternKind::Thing => "thing",
+        ExternKind::Thing(_) => "thing",
         ExternKind::Var(_) => "var",
         ExternKind::Machine(_) => "machine",
         ExternKind::Timer => "timer",
         ExternKind::Ending => "ending",
         ExternKind::Verb => "verb",
         ExternKind::Behavior => "behavior",
+        ExternKind::Relation => "relation",
     }
 }
 
@@ -223,6 +267,13 @@ pub fn check(world: &World) -> Result<(), Error> {
 /// pack.
 fn rust_hint(message: &str) -> String {
     let message = message.split(": add it as ").next().unwrap_or(message);
+    if let Some(rest) = message.strip_prefix("unknown relation `")
+        && let Some((axis, _)) = rest.split_once('`')
+    {
+        return format!(
+            "unknown relation `{axis}`; add it to `relations: [..]` in the story header, or write `extern {{ relation {axis}; }}` for one of another pack"
+        );
+    }
     for kind in ["room", "thing", "timer", "ending", "verb"] {
         if let Some(rest) = message.strip_prefix(&format!("unknown {kind} `"))
             && let Some(id) = rest.strip_suffix('`')
@@ -277,6 +328,7 @@ fn text_tokens(t: &Text) -> TokenStream {
 fn stubs(world: &World, pack: &mut Pack, spans: &mut Spans) -> Pack {
     let mut stub = Pack::new("extern");
     let mut vars = Vec::new();
+    let mut relations = Vec::new();
     for item in &world.items {
         let Item::Extern(list) = item else { continue };
         for e in list {
@@ -285,9 +337,17 @@ fn stubs(world: &World, pack: &mut Pack, spans: &mut Spans) -> Pack {
                 ExternKind::Room => {
                     stub.room(id, id);
                 }
-                ExternKind::Thing => {
+                ExternKind::Thing(props) => {
                     // Any holder: the block may put a thing inside or upon it.
-                    stub.thing(id, id).container().supporter();
+                    let mut t = stub.thing(id, id).container().supporter();
+                    for (prop, ty) in props {
+                        let prop = prop.value.as_str();
+                        t = match ty {
+                            PropType::Bool => t.prop(prop, false),
+                            PropType::Int => t.prop(prop, 0i64),
+                            PropType::Text => t.prop(prop, ""),
+                        };
+                    }
                 }
                 ExternKind::Var(ty) => {
                     let (ty, initial) = match ty {
@@ -329,15 +389,52 @@ fn stubs(world: &World, pack: &mut Pack, spans: &mut Spans) -> Pack {
                 ExternKind::Behavior => {
                     stub.behavior(id);
                 }
+                ExternKind::Relation => relations.push(Id::new(id)),
             }
         }
     }
+    // A `replace` item replaces an entity of an earlier pack: a stub gives
+    // it one here.
+    for item in &world.items {
+        match item {
+            Item::Room(r) if r.replace => {
+                stub.room(r.id.value.as_str(), "");
+            }
+            Item::Thing(t) if t.replace => {
+                stub.thing(t.id.value.as_str(), "");
+            }
+            Item::Machine(m) if m.replace => {
+                let start = m.start.value.as_str();
+                stub.machine(m.id.value.as_str(), start).state(start);
+            }
+            Item::Timer(t) if t.replace => {
+                stub.timer(t.id.value.as_str(), 1);
+            }
+            Item::Ending(e) if e.replace => {
+                stub.ending(e.id.value.as_str(), EndingKind::Neutral, "");
+            }
+            Item::Verb(v) if v.replace => {
+                stub.verb(v.id.value.as_str(), "");
+            }
+            Item::Dialogue(d) if d.replace => {
+                stub.dialogue(d.id.value.as_str(), d.tree.dialogue.with.as_str());
+            }
+            Item::Thread(t) if t.replace => {
+                stub.thread(t.id.value.as_str(), "");
+            }
+            _ => {}
+        }
+    }
     match &mut pack.header {
-        Some(header) => header.vars.extend(vars),
+        Some(header) => {
+            header.vars.extend(vars);
+            header.relations.extend(relations);
+        }
         None => {
             stub.story("extern", "extern");
             if let Some(header) = &mut stub.header {
                 header.vars.extend(vars);
+                header.relations.extend(relations);
             }
         }
     }
@@ -390,12 +487,43 @@ fn build(world: &World, spans: &mut Spans) -> Pack {
                     b = b.parser_only();
                 }
                 if let Some(d) = &v.default {
-                    b.default_response(d.value.as_str());
+                    b = b.default_response(d.value.as_str());
+                }
+                if v.replace {
+                    b.replace();
                 }
                 spans.add(&format!("verb:{}", v.id.value), "", name_tokens(&v.id));
             }
             // Tests have no checks of the schema.
             Item::Test(_) => {}
+            Item::Dialogue(d) => dialogue(&mut p, d, spans),
+            Item::Thread(t) => {
+                let mut b = p.thread(t.id.value.as_str(), t.name.value.as_str());
+                if let Some(s) = &t.status {
+                    b = b.status(thread_status(&s.value));
+                }
+                if let Some(s) = &t.summary {
+                    b = b.summary(s.value.as_str());
+                }
+                for f in &t.tracks {
+                    b = b.tracks(f.value.as_str());
+                }
+                for n in &t.notes {
+                    b = if n.todo {
+                        b.todo(n.text.value.as_str())
+                    } else {
+                        b.note(n.text.value.as_str())
+                    };
+                }
+                if t.replace {
+                    b.replace();
+                }
+                spans.add(&format!("thread:{}", t.id.value), "", name_tokens(&t.id));
+            }
+            Item::Behavior(id) => {
+                p.behavior(id.value.as_str());
+                spans.add(&format!("behavior:{}", id.value), "", name_tokens(id));
+            }
         }
     }
     p
@@ -503,7 +631,61 @@ fn fragment(f: &Frag) -> Fragment {
     if let Some(w) = &f.when {
         out = out.when(w.source.as_str());
     }
+    if let Some(id) = &f.id {
+        out = out.id(id.value.as_str());
+    }
+    if f.replaces {
+        out = out.replaces();
+    }
+    for n in &f.notes {
+        out = FragmentExt::note(out, n.value.as_str());
+    }
     out
+}
+
+pub fn thread_status(word: &str) -> ThreadStatus {
+    match word {
+        "resolved" => ThreadStatus::Resolved,
+        "dropped" => ThreadStatus::Dropped,
+        _ => ThreadStatus::Open,
+    }
+}
+
+/// A frame on a room or a thing: the fragment and its span at
+/// `frames.<verb>.<when>[i]`; `count` counts the fragments of each list.
+fn frame<B: HasFrames>(
+    b: B,
+    f: &Frame,
+    key: &str,
+    count: &mut std::collections::BTreeMap<String, usize>,
+    spans: &mut Spans,
+) -> B {
+    let verb = f.verb.value.as_str();
+    let when = match f.when {
+        FrameWhen::Before => "before",
+        FrameWhen::Instead => "instead",
+        FrameWhen::After => "after",
+    };
+    let at = format!("frames.{verb}.{when}");
+    let i = count.entry(at.clone()).or_default();
+    spans.add(key, format!("frames.{verb}"), name_tokens(&f.verb));
+    spans.add(key, format!("{at}[{i}]"), f.frag.tokens.clone());
+    *i += 1;
+    let fr = fragment(&f.frag);
+    match f.when {
+        FrameWhen::Before => b.frame_before(verb, fr),
+        FrameWhen::Instead => b.frame_instead(verb, fr),
+        FrameWhen::After => b.frame_after(verb, fr),
+    }
+}
+
+fn name_stage(n: &NameStage) -> ModelNameStage {
+    ModelNameStage {
+        text: n.text.value.clone(),
+        aliases: n.aliases.iter().map(|a| a.value.clone()).collect(),
+        when: n.when.as_ref().map(|w| w.source.clone()),
+        proper: n.proper,
+    }
 }
 
 fn story(p: &mut Pack, s: &Story, vars: &[&Var], spans: &mut Spans) {
@@ -535,6 +717,20 @@ fn story(p: &mut Pack, s: &Story, vars: &[&Var], spans: &mut Spans) {
                 .map(|(n, t)| (n.value.clone(), t.value.as_str())),
         );
     }
+    for r in &s.relations {
+        b = b.relation(r.value.as_str());
+    }
+    if let Some(max) = s.score {
+        b = b.score(max);
+        if let Some(v) = &s.score_var {
+            b = b.score_var(v.value.as_str());
+            spans.add("story", "score.var", name_tokens(v));
+        }
+        for (i, (from, rank)) in s.ranks.iter().enumerate() {
+            b = b.rank(*from, rank.value.as_str());
+            spans.add("story", format!("score.ranks[{i}]"), text_tokens(rank));
+        }
+    }
     for v in vars {
         let id = v.id.value.as_str();
         b = match (&v.ty, &v.initial) {
@@ -557,6 +753,7 @@ fn room(p: &mut Pack, r: &Room, spans: &mut Spans) {
     let key = format!("room:{}", r.id.value);
     let mut b: RoomBuilder = p.room(r.id.value.as_str(), r.name.value.as_str());
     let (mut texts, mut exits) = (0, 0);
+    let mut frames = std::collections::BTreeMap::new();
     for part in &r.parts {
         b = match part {
             RoomPart::At(x, y) => b.at(*x, *y),
@@ -600,7 +797,11 @@ fn room(p: &mut Pack, r: &Room, spans: &mut Spans) {
             RoomPart::Level(l) => b.level(*l),
             RoomPart::Note(n) if n.todo => b.todo(n.text.value.as_str()),
             RoomPart::Note(n) => b.note(n.text.value.as_str()),
+            RoomPart::Frame(f) => frame(b, f, &key, &mut frames, spans),
         };
+    }
+    if r.replace {
+        b.replace();
     }
     spans.add(&key, "", name_tokens(&r.id));
 }
@@ -618,7 +819,8 @@ fn thing(p: &mut Pack, t: &Thing, spans: &mut Spans) {
             LocationKind::Nowhere => b.nowhere(),
         };
     }
-    let (mut texts, mut presence) = (0, 0);
+    let (mut texts, mut presence, mut stages) = (0, 0, 0);
+    let mut frames = std::collections::BTreeMap::new();
     for part in &t.parts {
         b = match part {
             ThingPart::Aliases(list) => b.aliases(list.iter().map(|a| a.value.as_str())),
@@ -646,7 +848,19 @@ fn thing(p: &mut Pack, t: &Thing, spans: &mut Spans) {
             ThingPart::AlsoIn(n) => b.also_in(n.value.as_str()),
             ThingPart::Note(n) if n.todo => b.todo(n.text.value.as_str()),
             ThingPart::Note(n) => b.note(n.text.value.as_str()),
+            ThingPart::Frame(f) => frame(b, f, &key, &mut frames, spans),
+            ThingPart::Name(n) => {
+                spans.add(&key, format!("names[{stages}]"), n.tokens.clone());
+                if let Some(w) = &n.when {
+                    spans.add(&key, format!("names[{stages}].when"), w.tokens.clone());
+                }
+                stages += 1;
+                b.name_stage(name_stage(n))
+            }
         };
+    }
+    if t.replace {
+        b.replace();
     }
     spans.add(&key, "", name_tokens(&t.id));
 }
@@ -792,6 +1006,16 @@ fn machine(p: &mut Pack, m: &Machine, spans: &mut Spans) {
         };
         b = effects(b, &step.effects, &then, spans);
     }
+    for n in &m.notes {
+        b = if n.todo {
+            b.todo(n.text.value.as_str())
+        } else {
+            b.note(n.text.value.as_str())
+        };
+    }
+    if m.replace {
+        b.replace();
+    }
     if let Some((first, _)) = m.states.first() {
         spans.add(&key, format!("{at}.states"), name_tokens(first));
     }
@@ -828,6 +1052,16 @@ fn timer(p: &mut Pack, t: &Timer, spans: &mut Spans) {
         };
         b = effects(b, list, &then, spans);
     }
+    for n in &t.notes {
+        b = if n.todo {
+            b.todo(n.text.value.as_str())
+        } else {
+            b.note(n.text.value.as_str())
+        };
+    }
+    if t.replace {
+        b.replace();
+    }
     spans.add(&key, "", name_tokens(&t.id));
 }
 
@@ -856,5 +1090,113 @@ fn ending(p: &mut Pack, e: &Ending, spans: &mut Spans) {
             b.note(n.text.value.as_str())
         };
     }
+    if e.replace {
+        b.replace();
+    }
     spans.add(&key, "", name_tokens(&e.id));
+}
+
+/// A dialogue, as the expansion makes it: the builder, node by node, with
+/// the outcomes of each node before its options. The spans come from the
+/// token form: each place of dramaturge's tree has a path
+/// (`nodes.stove.options[0].when`), and the checks name the same paths.
+fn dialogue(p: &mut Pack, d: &Dialogue, spans: &mut Spans) {
+    let key = format!("dialogue:{}", d.id.value);
+    let tree = &d.tree.dialogue;
+    let mut b = p
+        .dialogue(d.id.value.as_str(), tree.with.as_str())
+        .start(tree.start.iter());
+    for node in &tree.nodes {
+        let at = format!("nodes.{}", node.key);
+        b = b.node(node.key.as_str(), line(&node.say.segments));
+        segment_spans(spans, &key, &at, &node.say.segments);
+        if let Some(s) = &node.speaker {
+            b = b.speaker(s.as_str());
+        }
+        if let Some(w) = &node.when {
+            spans.add(&key, format!("{at}.when"), w.tokens.clone());
+            b = b.when(w.source.as_str());
+        }
+        b = outcomes(b, &node.outcomes, &key, &at, spans);
+        for (o, option) in node.options.iter().enumerate() {
+            let at = format!("{at}.options[{o}]");
+            let say = option
+                .say
+                .as_ref()
+                .map(|s| s.segments.as_slice())
+                .unwrap_or(&[]);
+            b = b.option(line(say), option.go.as_key());
+            segment_spans(spans, &key, &at, say);
+            if let Some(id) = &option.id {
+                b = b.option_id(id.as_str());
+            }
+            if let Some(w) = &option.when {
+                spans.add(&key, format!("{at}.when"), w.tokens.clone());
+                b = b.when(w.source.as_str());
+            }
+            b = outcomes(b, &option.outcomes, &key, &at, spans);
+        }
+    }
+    if d.replace {
+        b.replace();
+    }
+    for (place, span) in &d.tree.spans {
+        let path = place.path(tree);
+        // The effects of `then` get their spans from `effects`, which
+        // knows the index of each effect in the model.
+        if matches!(
+            place,
+            Place::NodeWhen(_)
+                | Place::OptionWhen(..)
+                | Place::NodeOutcome(_, OutcomePlace::Then(_))
+                | Place::OptionOutcome(_, _, OutcomePlace::Then(_))
+        ) {
+            continue;
+        }
+        spans.add(
+            &key,
+            path,
+            proc_macro2::Ident::new("x", *span).into_token_stream(),
+        );
+    }
+    spans.add(&key, "", name_tokens(&d.id));
+}
+
+/// The outcomes of a node or an option: dramaturge's `set`, `add`,
+/// `relation` and `remember`, and loremaster's effects in `then`.
+fn outcomes<'a>(
+    mut b: DialogueBuilder<'a>,
+    o: &Outcomes<Effect>,
+    key: &str,
+    at: &str,
+    spans: &mut Spans,
+) -> DialogueBuilder<'a> {
+    for (name, v) in &o.set {
+        b = b.set(name.as_str(), loremaster_model::Value::from(v));
+    }
+    for (name, n) in &o.add {
+        b = b.add(name.as_str(), *n);
+    }
+    for (axis, n) in &o.relation {
+        b = b.relation(axis.as_str(), *n);
+    }
+    for m in &o.remember {
+        b = b.remember(m.as_str());
+    }
+    if !o.then.is_empty() {
+        let then_at = format!("{at}.then");
+        let then = Then {
+            key,
+            at: &then_at,
+            offset: 0,
+        };
+        let list = effects(
+            Vec::<loremaster_model::Effect>::new(),
+            &o.then,
+            &then,
+            spans,
+        );
+        b = b.then_effects(list);
+    }
+    b
 }

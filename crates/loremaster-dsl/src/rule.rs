@@ -269,3 +269,11 @@ pub trait Effects: Sized {
         self.effect(Effect::Cancel(id(timer)))
     }
 }
+
+/// A plain list of effects, for a dialogue's `then:`
+/// ([`DialogueBuilder::then_effects`](crate::DialogueBuilder::then_effects)).
+impl Effects for Vec<Effect> {
+    fn effects_mut(&mut self) -> &mut Vec<Effect> {
+        self
+    }
+}

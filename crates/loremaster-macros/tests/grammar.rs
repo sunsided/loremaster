@@ -434,3 +434,282 @@ fn a_condition_can_start_with_an_id_says() {
         ]))
     );
 }
+
+/// Dialogues (DSL step L4): dramaturge's token form, with the conditions,
+/// lines and effects of `world!`. Two blocks share a module with `pack`.
+mod talks {
+    pub mod cantina {
+        use loremaster::prelude::*;
+
+        world! {
+            pack cantina;
+
+            story "Cantina" { start: deck, relations: [trust] }
+            var knows_blackbeard_name: bool = false;
+            room deck "Deck" {}
+            thing blackbeard "Blackbeard" in deck {}
+
+            dialogue blackbeard_talk with blackbeard start [again, meet] {
+                meet: "The figure looks up." says "Sit, if you like." {
+                    says "Who are you?" => names;
+                    says "Not tonight." => end;
+                }
+                names: says "They call me Blackbeard." {
+                    set knows_blackbeard_name = true;
+                    relation trust += 1;
+                    says "Where did the *Marigold* go?" when blackbeard.trust >= 1 => back {
+                        id marigold;
+                        remember asked_marigold;
+                    }
+                }
+                again: says "Back again." {
+                    when blackbeard.talked > 1;
+                    says "Goodbye." => end { then goto deck, line "You leave."; }
+                }
+            }
+        }
+    }
+
+    pub mod keeper {
+        use loremaster::prelude::*;
+
+        world! {
+            pack keeper;
+
+            extern { thing keeper; }
+
+            // Without an id, the dialogue has the id of its thing.
+            dialogue with keeper start [hello] {
+                hello: "He nods." {
+                    narrate "You nod back." player says "Evening." => end;
+                }
+            }
+        }
+    }
+}
+
+const BLACKBEARD_YAML: &str = r#"
+id: blackbeard_talk
+with: blackbeard
+start: [again, meet]
+nodes:
+  meet:
+    say: ["The figure looks up.", { says: "Sit, if you like." }]
+    options:
+      - say: [{ says: "Who are you?" }]
+        go: names
+      - say: [{ says: "Not tonight." }]
+        go: end
+  names:
+    say: [{ says: "They call me Blackbeard." }]
+    set: { knows_blackbeard_name: true }
+    relation: { trust: 1 }
+    options:
+      - id: marigold
+        say: [{ says: "Where did the *Marigold* go?" }]
+        when: blackbeard.trust >= 1
+        remember: [asked_marigold]
+        go: back
+  again:
+    when: blackbeard.talked > 1
+    say: [{ says: "Back again." }]
+    options:
+      - say: [{ says: "Goodbye." }]
+        go: end
+        then:
+          - goto: deck
+          - say: "You leave."
+"#;
+
+#[test]
+fn dialogues_are_the_yaml_dialogues() {
+    use loremaster::dsl::project::SourceFile;
+    let yaml = Pack::from_files(vec![SourceFile {
+        path: "dialogues/blackbeard_talk.yaml".into(),
+        text: BLACKBEARD_YAML.into(),
+    }])
+    .unwrap();
+    let p = talks::cantina::cantina();
+    assert_eq!(p.dialogues, yaml.dialogues);
+    let Origin::Rust { line, .. } = &p.origins["dialogue:blackbeard_talk"] else {
+        panic!("not from Rust");
+    };
+    let source = include_str!("grammar.rs");
+    let at = source.lines().nth(*line as usize - 1).unwrap();
+    assert!(at.contains("dialogue blackbeard_talk with"), "{at}");
+
+    let keeper = talks::keeper::keeper();
+    assert_eq!(keeper.dialogues[0].id.as_deref(), Some("keeper"));
+    assert!(
+        keeper.name.ends_with("talks::keeper::keeper"),
+        "{}",
+        keeper.name
+    );
+    let (project, warnings) = Loremaster::new()
+        .pack(p)
+        .check()
+        .unwrap_or_else(|e| panic!("{e:#?}"));
+    assert!(warnings.is_empty(), "{warnings:#?}");
+    assert_eq!(project.story.dialogues.len(), 1);
+}
+
+/// Threads, behaviors, frames, name stages, the score, fragment fields,
+/// `replace` and extern properties (DSL step L4).
+mod more {
+    use loremaster::prelude::*;
+
+    world! {
+        extern {
+            thing stove [hot: bool, fuel: int];
+            room kitchen;
+        }
+
+        thread stove_secret "Who fed the stove?" {
+            status resolved;
+            summary "The stove is warm at dawn.";
+            tracks ash_seen;
+            note "Pays off in the keeper's room.";
+        }
+
+        behavior thief;
+
+        replace thing poker "poker" in kitchen {
+            name "iron rod" aliases [rod];
+            name when poker.cleaned => "Poker" proper;
+            prop cleaned = false;
+            "A poker." id poker_text replaces note "The first text.";
+            before examine "You lean closer.";
+            instead take when stove.hot => "It is too hot.";
+            after take "It is heavy.";
+            when stove.fuel > 2 => "Ash clings to it.";
+        }
+    }
+}
+
+mod scored {
+    use loremaster::prelude::*;
+
+    world! {
+        story "Score" {
+            start: hall,
+            score: 10,
+            score_var: points,
+            ranks { 0 "Beginner", 5 "Amateur" },
+        }
+        var points: int = 0;
+        var ash_seen: bool = false;
+        room hall "Hall" {
+            before look "The hall is quiet.";
+        }
+        timer bell turns 3 {
+            note "Rings at the third turn.";
+        }
+        machine door starts shut {
+            todo "Add a locked state.";
+            state shut;
+            state open;
+            shut -> open on verb(open);
+        }
+    }
+}
+
+#[test]
+fn threads_frames_names_and_the_score() {
+    use loremaster::dsl::model::{Id, NameStage, ThreadStatus};
+    let p = more::pack();
+    let t = &p.threads[0];
+    assert_eq!(t.id.as_str(), "stove_secret");
+    assert_eq!(t.status, ThreadStatus::Resolved);
+    assert_eq!(t.summary.as_deref(), Some("The stove is warm at dawn."));
+    assert_eq!(t.notes.len(), 1);
+    assert_eq!(t.tracks, ["ash_seen"]);
+    assert_eq!(p.behaviors[0].as_str(), "thief");
+    assert!(p.replaces.contains("thing:poker"));
+    let poker = &p.things[0];
+    assert_eq!(
+        poker.names,
+        [
+            NameStage {
+                text: "iron rod".into(),
+                aliases: vec!["rod".into()],
+                when: None,
+                proper: false,
+            },
+            NameStage {
+                text: "Poker".into(),
+                aliases: vec![],
+                when: Some("poker.cleaned".into()),
+                proper: true,
+            },
+        ]
+    );
+    let first = &poker.description[0];
+    assert_eq!(first.id.as_ref().map(|i| i.as_str()), Some("poker_text"));
+    assert!(first.replaces);
+    assert_eq!(first.notes.len(), 1);
+    let take = &poker.frames[&Id::new("take")];
+    assert_eq!(take.instead[0].when.as_deref(), Some("stove.hot"));
+    assert_eq!(take.after.len(), 1);
+    assert_eq!(poker.frames[&Id::new("examine")].before.len(), 1);
+
+    let s = scored::pack();
+    let score = s.header.as_ref().unwrap().score.as_ref().unwrap();
+    assert_eq!((score.var.as_str(), score.max), ("points", 10));
+    assert_eq!(score.ranks[1].name, "Amateur");
+    assert_eq!(s.rooms[0].frames.len(), 1);
+    assert_eq!(s.timers[0].notes.len(), 1);
+    assert!(s.machines[0].notes[0].todo);
+}
+
+/// A `then` list in a dialogue: an effect that takes a list (`set`) ends
+/// where the next effect starts, and `x.then` in a condition is a
+/// property, not the marker of a segment condition.
+mod then_lists {
+    use loremaster::prelude::*;
+
+    world! {
+        story "Then" { start: deck }
+        var flag: bool = false;
+        room deck "Deck" {}
+        thing mara "Mara" in deck { prop then = 0; }
+
+        dialogue with mara start [hi] {
+            hi: "Hi." when mara.then == 1 then "She smiles." {
+                says "Bye." when mara.then == 0 => end {
+                    then set flag = true, mara.then = 2, goto deck, line "You go.", stop;
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn then_lists_and_then_properties() {
+    use loremaster::dsl::model::{Line, LineSegment};
+    let p = then_lists::pack();
+    let node = &p.dialogues[0].nodes[0];
+    assert_eq!(
+        node.say,
+        Line::new(vec![
+            LineSegment::plain("Hi."),
+            LineSegment::narrate("She smiles.").when("mara.then == 1"),
+        ])
+    );
+    let option = &node.options[0];
+    assert_eq!(option.when.as_deref(), Some("mara.then == 0"));
+    assert_eq!(
+        option.outcomes.then,
+        [
+            Effect::Set(
+                [
+                    ("flag".to_string(), Value::Bool(true)),
+                    ("mara.then".to_string(), Value::Int(2)),
+                ]
+                .into()
+            ),
+            Effect::Goto(loremaster::dsl::model::Id::new("deck")),
+            Effect::Say(Line::from("You go.")),
+            Effect::Stop,
+        ]
+    );
+}
