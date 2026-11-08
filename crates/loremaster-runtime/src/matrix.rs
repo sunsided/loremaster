@@ -2,7 +2,7 @@
 //! that the text depends on, reachable or not. It finds the corners where the
 //! text reads badly: no text, two replacing fragments that fight, odd spacing.
 
-use crate::world::CFragment;
+use crate::world::CompiledFragment;
 use crate::{BlockKind, Game, Turn};
 use dramaturge_model::{Condition, FactValue, SymbolTable};
 use loremaster_lang::{Derived, Operand, Segment};
@@ -193,7 +193,7 @@ impl<'w> Found<'w> {
         }
     }
 
-    fn fragments(&mut self, fragments: &[CFragment]) {
+    fn fragments(&mut self, fragments: &[CompiledFragment]) {
         for f in fragments {
             if let Some(c) = &f.when {
                 self.condition(c);

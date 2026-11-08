@@ -1,7 +1,7 @@
 pub(crate) mod pool;
 
 use crate::eval::Eval;
-use crate::world::CText;
+use crate::world::CompiledText;
 use crate::{Run, Source, State};
 use dramaturge_model::Pools;
 use dramaturge_runtime::{Selection, select, select_named};
@@ -235,7 +235,7 @@ fn arrange(selection: Selection<'_, Lore>) -> Chosen<'_> {
 
 /// The fragments of `text` that show now, in assembly order, without a
 /// change to the state.
-pub(crate) fn visible(ev: &Eval, text: &CText) -> Vec<usize> {
+pub(crate) fn visible(ev: &Eval, text: &CompiledText) -> Vec<usize> {
     let mut rng = ev.state.rng;
     let chosen = choose(ev, &text.pool, &ev.world.pools, &mut rng);
     let mut out: Vec<usize> = Vec::new();

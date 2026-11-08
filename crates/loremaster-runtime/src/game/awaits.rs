@@ -8,7 +8,7 @@ use super::Game;
 use crate::output::{Choice, RollDetail};
 use crate::rng;
 use crate::state::{AwaitRequest, Awaiting};
-use crate::world::CEffect;
+use crate::world::CompiledEffect;
 use crate::{BlockKind, LogEntry, Turn};
 use loremaster_model::{AwaitSpec, Dice, Id, Value};
 use std::collections::BTreeMap;
@@ -199,13 +199,13 @@ impl Game {
         let world = self.world.clone();
         let rule = &world.story.rules[i].id;
         for (k, effect) in world.rules[i].then.iter().enumerate().skip(from) {
-            if let CEffect::Await(spec) = effect {
+            if let CompiledEffect::Await(spec) = effect {
                 if self.begin_await(turn, rule, k + 1, spec) != AwaitStep::Answered {
                     return false;
                 }
                 continue;
             }
-            if let CEffect::Combat(spec) = effect {
+            if let CompiledEffect::Combat(spec) = effect {
                 if self.begin_combat(turn, rule, k + 1, spec, depth) != AwaitStep::Answered {
                     return false;
                 }

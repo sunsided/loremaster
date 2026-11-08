@@ -22,7 +22,7 @@ use super::{Game, rule_run};
 use crate::output::{Choice, TalkInfo};
 use crate::state::Talk;
 use crate::text;
-use crate::world::{CEffect, COption, CompiledDialogue};
+use crate::world::{CompiledDialogue, CompiledEffect, CompiledOption};
 use crate::{BlockKind, LogEntry, Run, Source, Turn};
 use dramaturge_model::{DialogTarget, DialogText, DialogueNodeId, SymbolTable};
 use dramaturge_runtime::{
@@ -42,7 +42,7 @@ type Runtime =
     DefaultRuntime<DefaultConditionEvaluator<DerivedValues>, DefaultOutcomeApplier<WorldEffects>>;
 
 /// The compiled effects of a `then` list: the host outcome of a dialogue.
-type Then = Arc<[CEffect]>;
+type Then = Arc<[CompiledEffect]>;
 
 /// dramaturge for a turn of a talk, with the world effects of the dialogue.
 fn runtime(d: &CompiledDialogue) -> Runtime {
@@ -86,7 +86,7 @@ impl Game {
     }
 
     /// The options the player can choose now.
-    fn available(&self) -> Vec<COption> {
+    fn available(&self) -> Vec<CompiledOption> {
         let (Some(talk), Some(d)) = (&self.state.talk, self.current()) else {
             return Vec::new();
         };
