@@ -5,7 +5,7 @@
 //! loremaster_build::generate("story").unwrap();
 //! ```
 //!
-//! ```ignore
+//! ```text
 //! // src/main.rs
 //! include!(concat!(env!("OUT_DIR"), "/loremaster_interface.rs"));
 //! ```
