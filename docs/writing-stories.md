@@ -77,7 +77,7 @@ description:
 
 ### Named text pools
 
-A file in `texts/` is a pool that rules and dialogues show by its id, the file name:
+A file in `texts/` is a pool that rules and dialogues show by its id: the file name, or `id:` in the file:
 
 ```yaml
 # texts/keeper_remark.yaml
@@ -94,7 +94,7 @@ one_of:
       - [{ says: "Cold stove, cold supper,", by: keeper }, { narrate: "he says." }]
 ```
 
-A pool's texts are lines with speech segments. `say: { text: keeper_remark }` in a rule or a dialogue node shows the pool. A `sticky` line stays the same in every rule and dialogue that shows the pool. In a pool, `first_time` means the first visit of the current room. `loremaster check` warns about two `best` candidates with the same score that can both hold, and about a candidate with progress (`once`, `cycle`, `shuffle`, `sticky`) in a group or a pool that has no `key`; a pool that names an unknown pool is an error.
+A pool's texts are lines with speech segments. `say: { text: keeper_remark }` in a rule or in the lines of a dialogue node shows the pool; an option's `say` and a quest's `journal` cannot show one. A `sticky` line stays the same in every rule and dialogue that shows the pool. In a pool, `first_time` means the first visit of the current room. `loremaster check` warns about two `best` candidates with the same score that can both hold, and about a candidate with progress (`once`, `cycle`, `shuffle`, `sticky`) in a group or a pool that has no `key`; a pool that names an unknown pool is an error, as are two fragments of one text with the same `id` and two candidates of one `one_of` with the same `key`: they would share their progress.
 
 ## Inline markup
 
@@ -117,7 +117,7 @@ Conditions use variables, thing properties and values that the runtime calculate
 - Containers: `in(coin, trophy_case)` is true when the coin is in or on the trophy case, also deeper inside.
 - Timers: `timer.fuse` is the number of turns left, 0 when the timer does not run. `timer.fuse.running` is true while it runs.
 - Machines: `exorcism == lit`. The id of a machine is a variable with its state.
-- The perceiver of a text: `seen_by(player)`, `seen_by(keeper)`. Only in fragments and text pools.
+- The perceiver of a text: `seen_by(player)`, `seen_by(keeper)`. Only in the `when` of a fragment or of a candidate in `one_of`; `loremaster check` reports it anywhere else, where nobody perceives.
 - Chance: `chance(30)` is true in about 30 of 100 turns. In one state, the result is always the same, so a game replays.
 - The current action: `action.repeat`, `action.count`, `action.total`, `action.verb`.
 

@@ -67,3 +67,65 @@ fn a_group_learns_only_bool_variables_and_says_known_pools() {
         "{found:#?}"
     );
 }
+
+#[test]
+fn texts_that_cannot_show_where_they_are_written_are_errors() {
+    let found = lighthouse_with(&[
+        (
+            "texts/remark.yaml",
+            "id: keeper_remark\none_of: [\"Hm.\"]\n",
+        ),
+        (
+            "rules/remark.yaml",
+            "id: remark\non: { verb: [jump] }\nwhen: seen_by(player)\nthen:\n  - say: { text: keeper_remark }\n",
+        ),
+        (
+            "things/note.yaml",
+            "name: note\nlocation: { room: shore }\ndescription:\n  - { id: a, text: \"One.\" }\n  - { id: a, text: \"Two.\" }\n  - one_of:\n      - { key: k, text: \"Three.\" }\n      - { key: k, text: \"Four.\" }\n",
+        ),
+    ]);
+    let error = |file: &str, what: &str| {
+        found
+            .iter()
+            .any(|d| d.file == file && d.severity == Severity::Error && d.message.contains(what))
+    };
+    // The pool's `id` wins over the file name, so the rule finds it.
+    assert!(
+        !error("rules/remark.yaml", "unknown text pool"),
+        "{found:#?}"
+    );
+    assert!(
+        error("rules/remark.yaml", "`seen_by` works only"),
+        "{found:#?}"
+    );
+    assert!(error("things/note.yaml", "the id `a`"), "{found:#?}");
+    assert!(error("things/note.yaml", "the key `k`"), "{found:#?}");
+}
+
+#[test]
+fn an_option_cannot_say_a_pool() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/cantina");
+    let mut files = read_dir(&dir).unwrap();
+    let d = files
+        .iter_mut()
+        .find(|f| f.path == "dialogues/blackbeard.yaml")
+        .unwrap();
+    let at = d
+        .text
+        .find("    options:\n      - say: ")
+        .expect("an option with say");
+    let start = at + "    options:\n      - say: ".len();
+    let end = start + d.text[start..].find('\n').unwrap();
+    d.text.replace_range(start..end, "{ text: remark }");
+    files.push(SourceFile {
+        path: "texts/remark.yaml".into(),
+        text: "one_of: [\"Hm.\"]\n".into(),
+    });
+    let found = check(&load(files).unwrap());
+    assert!(
+        found.iter().any(|d| d.file == "dialogues/blackbeard.yaml"
+            && d.severity == Severity::Error
+            && d.message.contains("not here")),
+        "{found:#?}"
+    );
+}

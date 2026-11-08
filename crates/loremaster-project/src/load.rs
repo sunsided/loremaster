@@ -325,11 +325,12 @@ impl Pack {
                         Err(e) => errors.push(parse_err(e)),
                     }
                 }
-                // The id is the file name; rules and dialogue lines name it.
+                // Rules and dialogue lines name a pool by its id: the file
+                // name, or an `id` in the file, as in the other folders.
                 "texts" => match serde_saphyr::from_str::<TextPool>(&file_text) {
                     Ok(mut t) => {
-                        t.id = Some(stem.to_string());
-                        origins.insert(format!("text:{stem}"), Origin::yaml(path));
+                        let id = t.id.get_or_insert_with(|| stem.to_string());
+                        origins.insert(format!("text:{id}"), Origin::yaml(path));
                         texts.push(t);
                     }
                     Err(e) => errors.push(parse_err(e)),
