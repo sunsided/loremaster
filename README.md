@@ -30,6 +30,7 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 | `crates/loremaster-tools` | The operations that an AI assistant can do on a project: read, play and verify. It has no input or output of its own. |
 | `crates/loremaster-mcp` | The MCP server and the embedded web editor (`ui/`, made by `task release:ui`) for one project: `loremaster mcp <project-folder>` on stdin and stdout, and `loremaster serve <project-folder>` on local HTTP with the proposal and job endpoints for the editor. A job gives a task prompt (`imagine_exit`, `review_room`) to Claude Code. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
+| `examples/terminal-host` | A small terminal host of the Session API: what a host must do. |
 | `examples/salt-tower` | A small gamebook: sections as rooms, dice, stats and combat. |
 | `examples/cantina` | A small story with a character whose name changes, and a dialogue with him. |
 | `examples/zork1` | Zork I, imported from its ZIL source. A large map for tests. Read `examples/zork1/README.md`. |
