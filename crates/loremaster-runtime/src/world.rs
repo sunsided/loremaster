@@ -62,6 +62,9 @@ pub(crate) struct CFragment {
     pub when_src: Option<String>,
     /// The conditions of a group's candidates (`one_of`), for the views.
     pub inner_when: Vec<Condition>,
+    /// For each variant, the indexes into `inner_when` of the conditions of
+    /// its candidates in a group: all of them must hold for it to show.
+    pub gates: Vec<Vec<usize>>,
     pub mode: FragmentMode,
     pub layer: Layer,
     pub replaces: bool,
@@ -276,16 +279,25 @@ impl From<&CompileError> for loremaster_model::Diagnostic {
 /// The texts and conditions of the candidates of a group, nested groups too.
 fn group_texts(
     one_of: &[loremaster_model::Candidate],
+    gate: &[usize],
     texts: &mut Vec<String>,
+    gates: &mut Vec<Vec<usize>>,
     whens: &mut Vec<String>,
 ) {
     use loremaster_model::dramaturge_syntax::Variant;
     for c in one_of {
-        whens.extend(c.when.iter().cloned());
+        let mut gate = gate.to_vec();
+        if let Some(when) = &c.when {
+            gate.push(whens.len());
+            whens.push(when.clone());
+        }
         for v in &c.variants {
             match v {
-                Variant::Text(t) => texts.push(t.clone()),
-                Variant::Pool(p) => group_texts(&p.one_of, texts, whens),
+                Variant::Text(t) => {
+                    texts.push(t.clone());
+                    gates.push(gate.clone());
+                }
+                Variant::Pool(p) => group_texts(&p.one_of, &gate, texts, gates, whens),
                 _ => {}
             }
         }
@@ -391,7 +403,8 @@ impl Compiler {
                 // A group shows the texts of its candidates: the views (the
                 // things that a room text mentions, the matrix) read them all.
                 let (mut sources, mut whens) = (f.variants.clone(), Vec::new());
-                group_texts(&f.one_of, &mut sources, &mut whens);
+                let mut gates = vec![Vec::new(); sources.len()];
+                group_texts(&f.one_of, &[], &mut sources, &mut gates, &mut whens);
                 Ok(CFragment {
                     key: format!(
                         "{owner}/{}",
@@ -413,6 +426,7 @@ impl Compiler {
                             at: at.clone(),
                             error,
                         })?,
+                    gates,
                     mode: f.mode,
                     layer: f.layer,
                     replaces: f.replaces,

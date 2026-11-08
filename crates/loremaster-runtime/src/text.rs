@@ -7,6 +7,7 @@ use dramaturge_model::Pools;
 use dramaturge_runtime::{Selection, select, select_named};
 use loremaster_lang::{CompiledLine, Segment};
 use loremaster_model::Id;
+pub(crate) use pool::holds_for_player;
 use pool::{LeafText, Lore, LoreJudge, LorePool, Rng, seen_by_player};
 use serde::{Deserialize, Serialize};
 
