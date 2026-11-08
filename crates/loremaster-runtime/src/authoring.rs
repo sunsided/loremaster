@@ -200,6 +200,16 @@ impl<'a> Inspector<'a> {
 }
 
 /// The opening as a whole turn, with the rule log, for an editor transcript.
+/// Force the totals of the next rolls of a session, as a walkthrough does.
+pub fn force_rolls(session: &mut Session, totals: &[i64]) {
+    session.force_rolls(totals);
+}
+
+/// The errors of the forced rolls, as a walkthrough reports them.
+pub fn forced_roll_errors(session: &mut Session) -> Vec<String> {
+    session.forced_roll_errors()
+}
+
 pub fn start(session: &mut Session) -> Turn {
     session.start_turn()
 }
@@ -258,6 +268,25 @@ pub fn carry_over(session: &Session, world: Arc<World>) -> Session {
 
 /// What an `await` effect waits for, in words, for the rules view. `None`
 /// for a spec that the checks reject.
+pub fn describe_combat(spec: &loremaster_model::CombatSpec) -> String {
+    let enemies: Vec<&str> = spec.enemies.iter().map(|e| e.as_str()).collect();
+    let mode = if spec.together {
+        "all at once"
+    } else {
+        "one by one"
+    };
+    let escape = match &spec.escape {
+        Some(room) => format!(", escape to {room}"),
+        None => String::new(),
+    };
+    format!(
+        "combat with {} ({mode}): win to {}, loss to {}{escape}",
+        enemies.join(", "),
+        spec.win,
+        spec.loss
+    )
+}
+
 pub fn describe_await(spec: &loremaster_model::AwaitSpec) -> Option<String> {
     crate::state::AwaitRequest::of(spec).map(|r| r.describe())
 }

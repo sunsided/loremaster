@@ -1,4 +1,4 @@
-use crate::{AwaitSpec, CommandPattern, Id, Line, Note, StartTimers, TimeOfDay, Value};
+use crate::{AwaitSpec, CombatSpec, CommandPattern, Id, Line, Note, StartTimers, TimeOfDay, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -111,6 +111,9 @@ pub enum Effect {
     Call(Id),
     /// Stop the rule, ask the host, and go on with the answer (SE-5, SE-6).
     Await(Box<AwaitSpec>),
+    /// A fight by the built-in rules (P5-03): the rule waits for the player
+    /// round by round, then goes on in the `win`, `loss` or `escape` room.
+    Combat(Box<CombatSpec>),
     /// Start timers, or start them again from the beginning.
     Start(StartTimers),
     /// Stop a timer. Its rules do not fire.

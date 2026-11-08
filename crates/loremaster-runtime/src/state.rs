@@ -73,6 +73,12 @@ pub struct State {
     /// A rule that waits for the host (SE-6): where it goes on, and what it asked.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub awaiting: Option<Awaiting>,
+    /// Counts the awaits, so that each has its own id, also in a loop.
+    #[serde(default)]
+    pub await_seq: u32,
+    /// The combat in progress (P5-03), if any. `awaiting` is then its next question.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<CombatState>,
     /// The walkthrough steps of the hint ladder that the player has done
     /// (CK-6), by their key. Empty without hints.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
@@ -103,6 +109,54 @@ pub enum StepOutcome {
     /// The step did not happen: its `when` did not hold when it was due, or a
     /// `check` rule refused its command.
     Skipped,
+}
+
+/// A combat in progress, as data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CombatState {
+    pub spec: loremaster_model::CombatSpec,
+    pub round: u32,
+    /// The attack strengths of the last round.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last: Option<LastRound>,
+    /// The hit that waits for "Test your Luck": an enemy, or `player`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<Id>,
+    /// The last lines of the combat, for the panel.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub log: Vec<String>,
+}
+
+/// The attack strengths of one round.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LastRound {
+    pub player: i64,
+    pub enemies: BTreeMap<Id, i64>,
+}
+
+/// The combat as a host shows it. See `Session::combat`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct CombatView {
+    pub round: u32,
+    pub enemies: Vec<EnemyView>,
+    /// The player's attack strength in the last round.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub player_strength: Option<i64>,
+    pub log: Vec<String>,
+}
+
+/// An enemy in a [`CombatView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct EnemyView {
+    pub id: Id,
+    pub name: String,
+    pub skill: i64,
+    pub stamina: i64,
+    /// The enemy's attack strength in the last round.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub strength: Option<i64>,
 }
 
 /// A paused rule, as data (XP-3): the rule, the next effect, the request.

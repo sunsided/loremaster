@@ -185,6 +185,9 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                     ),
                     loremaster_model::Effect::Cancel(t) => format!("cancel {t}"),
                     loremaster_model::Effect::Call(b) => format!("run the behavior {b}"),
+                    loremaster_model::Effect::Combat(c) => {
+                        loremaster_runtime::authoring::describe_combat(c)
+                    }
                     loremaster_model::Effect::Await(spec) => {
                         match loremaster_runtime::authoring::describe_await(spec) {
                             Some(r) => format!("wait for the host: {r}"),

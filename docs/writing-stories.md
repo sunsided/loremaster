@@ -416,6 +416,34 @@ A `verb` or `check` event can name the slots:
 
 While a rule waits, the player can only answer. The answer is not a new turn: the clock and the timers do not move. A save game keeps the waiting rule. `await` works only in rules, not in dialogues or timers.
 
+### Combat
+
+The effect `combat` runs a fight by built-in rules. The player needs the number variables `skill` and `stamina`, and can have `luck`. An enemy is a thing with the number properties `skill` and `stamina`.
+
+```yaml
+- id: fight_warden
+  on: { enter: gate }
+  then:
+    - combat: { enemies: [warden], win: yard, loss: fallen, escape: road }
+```
+
+`win`, `loss` and `escape` are rooms. `escape` is optional. With `together: true`, all enemies fight in the same round; without it, they fight one after the other. Effects after `combat` run in the room where the combat ends.
+
+In each round, the player selects "Attack" or, if the combat has `escape`, "Escape". The enemy and the player each roll 2d6 and add their `skill`. The enemy rolls first. The higher total hits and takes 2 `stamina`. In an all-at-once combat, each enemy rolls and the player rolls once. The player attacks the first living enemy, and the other enemies only attack.
+
+After a hit, the player can select "Test your Luck" or "Go on", when `luck` is more than 0. The roll is 2d6 against `luck`, and the test costs 1 `luck`. A lucky result on a hit: the enemy loses 2 more. An unlucky one: the enemy loses 1 less. A lucky result on a wound: the player loses 1 less. An unlucky one: the player loses 1 more. If more than one hit happens in a round, the test changes the last one. A test is not offered for a hit that already kills the enemy.
+
+Escape costs 2 `stamina`. If that is the last `stamina`, the combat ends in `loss`.
+
+In a walkthrough, each step answers one question. `rolls:` has the enemy totals, then the player total:
+
+```yaml
+- { do: attack, rolls: [5, 11] }
+- { do: "Test your Luck", rolls: [4] }
+```
+
+`combat` works only in rules. The explorer tries the win and the loss of a round and the escape; it does not try Luck tests.
+
 ### Number limits and sums
 
 A number variable can have limits, written as `min` and `max` in `story.yaml`: a number, or the id of another number variable.

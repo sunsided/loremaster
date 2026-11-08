@@ -249,6 +249,8 @@ pub(crate) enum CEffect {
     Stop,
     /// A pause for the host; the fire loop handles it, not `apply`.
     Await(Box<loremaster_model::AwaitSpec>),
+    /// A fight; like `Await`, the fire loop handles it.
+    Combat(Box<loremaster_model::CombatSpec>),
     Emit(Id),
     Call(Id),
     Start(Vec<(Id, Option<u32>)>),
@@ -552,6 +554,7 @@ impl Compiler {
                 }
                 CEffect::Await(spec.clone())
             }
+            Effect::Combat(spec) => CEffect::Combat(spec.clone()),
             Effect::Set(m) => CEffect::Set(m.clone()),
             Effect::Add(m) => CEffect::Add(m.clone()),
             Effect::Calc(m) => {

@@ -10,8 +10,10 @@ use std::sync::Arc;
 
 mod agendas;
 mod awaits;
+mod combat;
 mod machines;
 pub use awaits::{ARRIVED, REFUSED};
+pub(crate) use combat::{ATTACK_TEXT, LUCK_TEXT};
 mod narrative;
 mod talk;
 pub use talk::{TalkOptionView, TalkView};
@@ -212,6 +214,8 @@ impl Game {
             ended: false,
             ending: None,
             awaiting: None,
+            await_seq: 0,
+            combat: None,
             action: None,
             last_command: None,
             repeat: 0,
@@ -311,6 +315,7 @@ impl Game {
                 || rule_of(&world, &open.rule) != rule_of(&self.world, &open.rule))
         {
             state.awaiting = None;
+            state.combat = None;
         }
         state
             .fired
@@ -1789,9 +1794,9 @@ impl Game {
             CEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             // Only a rule can pause (the fire loop handles it there); the checks
             // reject `await` in timers and dialogues.
-            CEffect::Await(_) => turn.log.push(LogEntry {
+            CEffect::Await(_) | CEffect::Combat(_) => turn.log.push(LogEntry {
                 kind: "await".into(),
-                text: format!("{rule}: `await` works only in rules"),
+                text: format!("{rule}: `await` and `combat` work only in rules"),
             }),
             CEffect::Emit(name) => {
                 turn.log.push(LogEntry {

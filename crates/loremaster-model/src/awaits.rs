@@ -37,6 +37,27 @@ pub struct AwaitSpec {
     pub into: Option<String>,
 }
 
+/// The `combat` effect (P5-03): a fight by the built-in rules, one round per
+/// player decision. Enemies are things with the int properties `skill` and
+/// `stamina`. The targets are rooms.
+///
+/// ```yaml
+/// - combat: { enemies: [warden, hound], win: yard, loss: fallen, escape: road, together: true }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CombatSpec {
+    pub enemies: Vec<Id>,
+    pub win: Id,
+    pub loss: Id,
+    /// Without it, the player can not escape.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escape: Option<Id>,
+    /// All enemies fight at once. Without it, one after the other.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub together: bool,
+}
+
 /// An option of a choice: an id, or an id with a text to show.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
