@@ -19,7 +19,10 @@ use loremaster_lang::{NameForm, Scope, Segment};
 use loremaster_model::Id;
 use std::sync::Arc;
 
-pub use crate::explore::{Budget, EndingFound, Exploration, RoomCoverage, TextVariant};
+pub use crate::explore::{
+    Budget, DeadEnd, EndingCheck, EndingFound, Exploration, NoReturn, RoomCoverage, StaleCloses,
+    TextVariant,
+};
 pub use crate::game::{
     AuthorCommand, FragmentView, FrameFragment, FramePart, FrameUse, PartView, RoomParts,
     TalkOptionView, TalkView,

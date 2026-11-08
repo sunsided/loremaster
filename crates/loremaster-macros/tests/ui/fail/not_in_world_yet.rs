@@ -1,9 +1,9 @@
-// Dialogues come with dramaturge's dialogue! (DSL step L4).
+// `extend` waits: an extension in Rust needs the fields as data (later work).
 use loremaster::prelude::*;
 
 world! {
-    dialogue with keeper start [stove] {
-        stove: "Hello." {}
+    extend thing stove {
+        prop hot = true;
     }
 }
 

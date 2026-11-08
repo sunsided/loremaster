@@ -1,5 +1,5 @@
-error: dialogues are not in `world!` yet: they come with dramaturge's `dialogue!` (R12, DSL step L4, P4-08 #85)
+error: `extend` is not in `world!` yet: an extension needs the fields as data (later work); write the whole entity with `replace`, or extend it in YAML
  --> tests/ui/fail/not_in_world_yet.rs:5:5
   |
-5 |     dialogue with keeper start [stove] {
-  |     ^^^^^^^^
+5 |     extend thing stove {
+  |     ^^^^^^

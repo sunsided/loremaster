@@ -1,7 +1,7 @@
 //! Rules, the events they listen for ([`on`](crate::on)) and their effects
 //! ([`Effects`]).
 
-use crate::convert::{IntoValue, id};
+use crate::convert::{IntoValue, id, ids};
 use crate::pack::{register, with_notes};
 use loremaster_model::{Effect, EventPattern, Id, Rule, StartTimers};
 use loremaster_project::Pack;
@@ -38,6 +38,8 @@ impl<'a> RuleBuilder<'a> {
             within: None,
             priority: 0,
             machine: None,
+            closes: Vec::new(),
+            reason: None,
             notes: Vec::new(),
         });
         let i = pack.rules.len() - 1;
@@ -75,6 +77,19 @@ impl<'a> RuleBuilder<'a> {
     /// `priority:`, the order in one scope.
     pub fn priority(mut self, priority: i32) -> Self {
         self.rule().priority = priority;
+        self
+    }
+
+    /// `closes:` and `reason:`: the endings that the rule closes on purpose
+    /// (a point of no return that the ending checks accept), and why.
+    pub fn closes(
+        mut self,
+        endings: impl IntoIterator<Item = impl AsRef<str>>,
+        reason: impl Into<String>,
+    ) -> Self {
+        let rule = self.rule();
+        rule.closes = ids(endings);
+        rule.reason = Some(reason.into());
         self
     }
 }
@@ -252,5 +267,13 @@ pub trait Effects: Sized {
     /// `cancel:` a timer.
     fn cancel(self, timer: impl AsRef<str>) -> Self {
         self.effect(Effect::Cancel(id(timer)))
+    }
+}
+
+/// A plain list of effects, for a dialogue's `then:`
+/// ([`DialogueBuilder::then_effects`](crate::DialogueBuilder::then_effects)).
+impl Effects for Vec<Effect> {
+    fn effects_mut(&mut self) -> &mut Vec<Effect> {
+        self
     }
 }

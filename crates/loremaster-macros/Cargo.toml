@@ -18,6 +18,9 @@ exclude = ["tests/"]
 proc-macro = true
 
 [dependencies]
+# Dialogues: dramaturge's token form of `dialogue!` (`tokens::parse_dialogue`),
+# with loremaster's conditions, lines and effects as its payloads.
+dramaturge-syntax = { workspace = true, features = ["syn"] }
 # The macro builds the pack at compile time with the builder, to run the
 # schema checks (check_packs) on it.
 loremaster-dsl.workspace = true
