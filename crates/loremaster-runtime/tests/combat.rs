@@ -3,7 +3,9 @@
 use loremaster_model::Value;
 use loremaster_project::{Severity, SourceFile, check, load};
 use loremaster_runtime::authoring::{Budget, carry_over, explore, force_rolls, forced_roll_errors};
-use loremaster_runtime::{AwaitRequest, Session, Status, Step, World, run_walkthrough};
+use loremaster_runtime::{
+    AwaitRequest, Effect, RollDetail, Session, Status, Step, World, run_walkthrough,
+};
 use std::sync::Arc;
 
 fn file(path: &str, text: &str) -> SourceFile {
@@ -369,6 +371,105 @@ fn the_checks_reject_a_repeated_enemy_and_a_stamina_floor() {
             .any(|d| d.severity == Severity::Error && d.message.contains(t))
     };
     assert!(has("named twice") && has("`min` of `stamina`"), "{diags:?}");
+}
+
+#[test]
+fn the_rolls_of_a_luck_test_carry_the_target_and_the_result() {
+    let (mut s, step) = session(ONE, 9);
+    let step = play(&mut s, &step, "attack", &[5, 11]);
+    let rolls = rolls(&step);
+    assert_eq!(rolls[0].who.as_deref(), Some("GATE WARDEN"));
+    assert_eq!(rolls[1].who.as_deref(), Some("You"));
+    assert_eq!(rolls[1].total, 11);
+    assert!(rolls[1].faces.is_empty(), "a forced total has no faces");
+
+    let step = play(&mut s, &step, "luck", &[4]);
+    let roll = rolls_of_one(&step);
+    assert_eq!(roll.who.as_deref(), Some("LUCK"));
+    assert_eq!(roll.target, Some(9));
+    assert_eq!(roll.result.as_deref(), Some("lucky"));
+}
+
+#[test]
+fn a_roll_without_a_forced_total_has_its_faces() {
+    let (mut s, step) = session(ONE, 9);
+    let id = await_id(&step);
+    let step = s.resume(&id, Value::Text("attack".into())).unwrap();
+    let roll = rolls_of_one(&step);
+    assert_eq!(roll.faces.len(), 2);
+    assert_eq!(roll.faces.iter().sum::<i64>(), roll.total);
+}
+
+fn rolls(step: &Step) -> Vec<&RollDetail> {
+    (step.effects.iter())
+        .filter_map(|e| match e {
+            Effect::Roll { roll } => Some(roll),
+            _ => None,
+        })
+        .collect()
+}
+
+fn rolls_of_one(step: &Step) -> &RollDetail {
+    rolls(step)[0]
+}
+
+const STATS: &str = "  - { id: stamina_initial, type: int, initial: 19 }\n  - { id: hearth, type: bool, initial: false }\nstats:\n  - { var: stamina, label: STAMINA, short: ST, max: stamina_initial }\n  - { var: skill, label: SKILL, max: 12 }\n  - { var: hearth, label: HEARTH }\n";
+
+fn with_stats(stats: &str) -> Vec<SourceFile> {
+    let mut f = files(ONE, 9);
+    f[0].text.push_str(stats);
+    f
+}
+
+#[test]
+fn the_stat_sheet_has_the_current_values() {
+    let world = World::compile(load(with_stats(STATS)).unwrap().story).unwrap();
+    let mut s = Session::new(Arc::new(world));
+    s.start();
+    let stats = s.stats();
+    assert_eq!(stats.len(), 3);
+    assert_eq!(stats[0].label, "STAMINA");
+    assert_eq!(stats[0].value, Value::Int(12));
+    assert_eq!(stats[0].max, Some(19));
+    assert_eq!(stats[1].max, Some(12));
+    assert_eq!(stats[2].value, Value::Bool(false));
+}
+
+#[test]
+fn a_story_without_stats_has_no_sheet() {
+    let (s, _) = session(ONE, 9);
+    assert!(s.stats().is_empty());
+}
+
+#[test]
+fn check_refuses_a_bad_stat() {
+    for (stats, wanted) in [
+        ("stats:\n  - { var: nope, label: X }\n", "`nope`"),
+        (
+            "stats:\n  - { var: skill, label: A }\n  - { var: skill, label: B }\n",
+            "twice",
+        ),
+        (
+            "  - { id: w, type: { enum: [a] }, initial: a }\nstats:\n  - { var: w, label: X }\n",
+            "`w`",
+        ),
+        (
+            "  - { id: f, type: bool, initial: false }\nstats:\n  - { var: f, label: X, max: 3 }\n",
+            "`max`",
+        ),
+        (
+            "stats:\n  - { var: skill, label: X, max: nope }\n",
+            "`nope`",
+        ),
+    ] {
+        let found = check(&load(with_stats(stats)).unwrap());
+        assert!(
+            found
+                .iter()
+                .any(|d| d.severity == Severity::Error && d.message.contains(wanted)),
+            "{stats}: {found:?}"
+        );
+    }
 }
 
 #[test]

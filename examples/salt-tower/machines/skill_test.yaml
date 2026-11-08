@@ -6,7 +6,7 @@ steps:
     on: { check: [go, "test your skill"] }
     to: compare
     then:
-      - await: { roll: 2d6, into: r }
+      - await: { roll: 2d6, into: r, against: skill }
       - calc: { margin: "skill - r" }
       - say: "{r} against SKILL {skill}."
   - { from: compare, on: next, when: "margin >= 0", to: idle, say: "The grate comes up.", then: [{ goto: section_7 }, stop] }

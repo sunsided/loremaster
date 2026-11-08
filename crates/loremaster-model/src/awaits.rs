@@ -35,6 +35,10 @@ pub struct AwaitSpec {
     /// The variable that takes the answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub into: Option<String>,
+    /// For a roll: the number variable it tests against. The dice display
+    /// shows it; the story still compares the values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub against: Option<String>,
 }
 
 /// The `combat` effect (P5-03): a fight by the built-in rules, one round per

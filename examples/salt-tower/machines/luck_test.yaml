@@ -5,7 +5,7 @@ steps:
     on: { check: [go, "test your luck"] }
     to: compare
     then:
-      - await: { roll: 2d6, into: r }
+      - await: { roll: 2d6, into: r, against: luck }
       - calc: { margin: "luck - r" }
       - say: "{r} against LUCK {luck}."
       - add: { luck: -1 }

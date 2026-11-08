@@ -107,6 +107,9 @@ pub struct StoryHeader {
     pub behaviors: Vec<Id>,
     #[serde(default)]
     pub score: Option<loremaster_model::Score>,
+    /// The adventure sheet of the player.
+    #[serde(default)]
+    pub stats: Vec<loremaster_model::Stat>,
 }
 /// Load a project from its files: one YAML pack, assembled. Paths use `/` and
 /// are relative to the project folder.
@@ -764,6 +767,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         death_prompt: header.death_prompt,
         carry_limit: header.carry_limit,
         step_limit: header.step_limit,
+        stats: header.stats,
         notes: header.notes,
         threads,
     };

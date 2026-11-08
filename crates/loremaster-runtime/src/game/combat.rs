@@ -123,6 +123,15 @@ impl Game {
         turn.say(BlockKind::Narration, line);
     }
 
+    /// A roll of the combat, with the name for the dice display.
+    fn named_roll(&mut self, turn: &mut Turn, who: String) -> i64 {
+        let total = self.take_roll(turn, ROLL, "2d6");
+        if let Some(r) = turn.rolls.last_mut() {
+            r.who = Some(who);
+        }
+        total
+    }
+
     fn pending_hit(&mut self) -> Option<Id> {
         self.state.combat.as_mut().and_then(|c| c.pending.take())
     }
@@ -195,14 +204,15 @@ impl Game {
         };
         let mut enemies = BTreeMap::new();
         for e in &fighting {
-            let total = self.take_roll(turn, ROLL, "2d6");
+            let name = self.enemy_name(e);
+            let total = self.named_roll(turn, name);
             enemies.insert(
                 e.clone(),
                 total.saturating_add(self.int(&format!("{e}.skill"))),
             );
         }
         let player = self
-            .take_roll(turn, ROLL, "2d6")
+            .named_roll(turn, "You".into())
             .saturating_add(self.int("skill"));
         let mut round = 0;
         if let Some(c) = &mut self.state.combat {
@@ -261,10 +271,14 @@ impl Game {
             return;
         };
         let luck = self.int("luck");
-        let roll = self.take_roll(turn, ROLL, "2d6");
+        let roll = self.named_roll(turn, "LUCK".into());
         let lucky = roll <= luck;
         self.set_fact(turn, "luck", Value::Int((luck - 1).max(0)));
         let word = if lucky { "lucky" } else { "unlucky" };
+        if let Some(r) = turn.rolls.last_mut() {
+            r.target = Some(luck);
+            r.result = Some(word.to_string());
+        }
         self.combat_say(
             turn,
             format!("Test your Luck: {roll} against {luck}: {word}."),

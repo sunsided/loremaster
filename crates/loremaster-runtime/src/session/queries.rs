@@ -4,6 +4,7 @@
 
 use super::Session;
 use crate::{Choice, JournalEntry, Preview, Scene, Talk, VerbInfo};
+use loremaster_model::Limit;
 
 impl Session {
     /// The room, the time, the things here, the inventory and the exits, as
@@ -32,6 +33,26 @@ impl Session {
     /// of the last round and the last lines of the log (P5-03).
     pub fn combat(&self) -> Option<crate::CombatView> {
         self.game.combat_view()
+    }
+
+    /// The adventure sheet: the current value of each stat of the story.
+    /// Empty when the story has no `stats:`.
+    pub fn stats(&self) -> Vec<crate::StatView> {
+        let facts = &self.game.state().facts;
+        (self.game.world().story.stats.iter())
+            .filter_map(|s| {
+                Some(crate::StatView {
+                    var: s.var.clone(),
+                    label: s.label.clone(),
+                    short: s.short.clone(),
+                    value: facts.get(s.var.as_str())?.clone(),
+                    max: s.max.as_ref().and_then(|max| match max {
+                        Limit::Value(n) => Some(*n),
+                        Limit::Var(v) => facts.get(v.as_str())?.as_int(),
+                    }),
+                })
+            })
+            .collect()
     }
 
     /// The talk in progress, or `None`.

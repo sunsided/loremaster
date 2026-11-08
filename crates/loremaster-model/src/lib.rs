@@ -48,7 +48,7 @@ pub use note::{Note, NoteRole, Thread, ThreadStatus};
 pub use plan::{ChartStep, SERIAL_RUN, StepChart, step_chart};
 pub use room::{Direction, Exit, Room};
 pub use rule::{Effect, EventPattern, Rule, SumError, SumTerm, Term, parse_sum};
-pub use story::{Limit, Rank, Score, Story, VarDef, VarType};
+pub use story::{Limit, Rank, Score, Stat, Story, VarDef, VarType};
 pub use thing::{Location, NameStage, Thing};
 pub use timer::{StartTimers, Timer};
 pub use value::Value;

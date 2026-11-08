@@ -52,10 +52,57 @@ export interface LogEntry {
 	text: string;
 }
 
+/** One roll of the dice, for a dice display. The log has the same total as text. */
+export interface RollDetail {
+	/** The dice as the story writes them, for example `2d6`. */
+	dice: string;
+	total: number;
+	/** The result of each die. Empty for a total that a walkthrough forced. */
+	faces?: number[];
+	/** Who rolled or what the roll tests, for example `You` or `LUCK`. */
+	who?: string;
+	/** The value that the roll tests against. */
+	target?: number;
+	/** The result of the test, for example `lucky`. */
+	result?: string;
+}
+
+/** A line of the adventure sheet. */
+export interface StatView {
+	var: string;
+	label: string;
+	/** The short name for the one-line form, for example `ST`. */
+	short?: string;
+	/** A number, or a flag that shows as a codeword when true. */
+	value: Value;
+	max?: number;
+}
+
+/** An enemy in a combat. */
+export interface EnemyView {
+	id: string;
+	name: string;
+	skill: number;
+	stamina: number;
+	/** The attack strength of the last round. */
+	strength?: number;
+}
+
+/** The combat in progress. */
+export interface CombatView {
+	round: number;
+	enemies: EnemyView[];
+	/** The attack strength of the player in the last round. */
+	player_strength?: number;
+	log: string[];
+}
+
 export interface Turn {
 	blocks: Block[];
 	ended: boolean;
 	log: LogEntry[];
+	/** The dice of this turn, in order. */
+	rolls?: RollDetail[];
 	/** The talk in progress after this turn. Absent outside a talk. */
 	talk?: TalkInfo;
 	/** The answers the player can choose now, during a talk. */
@@ -659,6 +706,7 @@ export type Status =
 export type Effect =
 	| { type: 'text'; block: Block }
 	| { type: 'notice'; entry: LogEntry }
+	| { type: 'roll'; roll: RollDetail }
 	| { type: 'choices'; talk: TalkInfo; choices: Choice[] }
 	| { type: 'ending'; ending: EndingInfo };
 

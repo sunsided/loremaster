@@ -13,6 +13,8 @@ import init, {
 import type {
 	AuthorCommand,
 	Choice,
+	CombatView,
+	StatView,
 	Input,
 	JournalEntry,
 	Loaded,
@@ -216,6 +218,16 @@ export class Session {
 		return this.#session.journal();
 	}
 
+	/** The combat in progress, or null. */
+	combat(): CombatView | null {
+		return this.#session.combat();
+	}
+
+	/** The adventure sheet. Empty when the story has no `stats:`. */
+	stats(): StatView[] {
+		return this.#session.stats();
+	}
+
 	verbs(): VerbInfo[] {
 		return this.#session.verbs();
 	}
@@ -325,6 +337,16 @@ export class Workbench {
 	/** The quest journal of the session. */
 	journal(): JournalEntry[] {
 		return this.#bench.journal();
+	}
+
+	/** The combat in progress, or null. */
+	combat(): CombatView | null {
+		return this.#bench.combat();
+	}
+
+	/** The adventure sheet. Empty when the story has no `stats:`. */
+	stats(): StatView[] {
+		return this.#bench.stats();
 	}
 
 	verbs(): VerbInfo[] {

@@ -14,12 +14,36 @@ pub struct Turn {
     /// The answers the player can choose now, during a talk.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<Choice>,
+    /// The dice of this turn, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rolls: Vec<RollDetail>,
     /// `on: next` steps taken in this turn, for the step limit.
     #[serde(skip)]
     pub(crate) machine_steps: u32,
     /// The note about the step limit is in this turn.
     #[serde(skip)]
     pub(crate) step_limit_noted: bool,
+}
+
+/// One roll of the dice, for a host that shows dice.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct RollDetail {
+    /// The dice as the story writes them, for example `2d6`.
+    pub dice: String,
+    pub total: i64,
+    /// The result of each die. Empty for a total that a walkthrough forced.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub faces: Vec<i64>,
+    /// Who rolled or what the roll tests, for example `You` or `LUCK`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Option<String>,
+    /// The value that the roll tests against.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<i64>,
+    /// The result of the test, for example `lucky`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
 }
 
 /// Who the player is talking to.

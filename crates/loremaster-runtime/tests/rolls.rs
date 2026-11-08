@@ -3,7 +3,7 @@
 
 use loremaster_model::{Value, Walkthrough};
 use loremaster_project::{Severity, SourceFile, check, load};
-use loremaster_runtime::{Input, Session, Status, World, run_walkthrough};
+use loremaster_runtime::{Effect, Input, Session, Status, World, run_walkthrough};
 use std::sync::Arc;
 
 fn file(path: &str, text: &str) -> SourceFile {
@@ -204,4 +204,51 @@ fn a_calc_is_checked_at_load() {
         ["`skil + 1`: `skil` is not a number variable or property"]
     );
     assert_eq!(with("skill +"), ["`skill +`: a number or a name expected"]);
+}
+
+#[test]
+fn a_roll_against_a_variable_names_its_target() {
+    let tug = "- id: tug\n  on: { verb: [prod, lever] }\n  then:\n    - await: { roll: 2d6, into: r, against: skill }\n";
+    let mut f = files(STAMINA);
+    f.push(file("verbs/prod.yaml", "label: Prod\nwords: [prod]\n"));
+    f.push(file("rules/tug.yaml", tug));
+    let story = load(f).unwrap().story;
+    let mut s = Session::new(Arc::new(World::compile(story).unwrap()));
+    s.start();
+    let step = s.submit(Input::Text("prod lever".into()));
+    let roll = step
+        .effects
+        .iter()
+        .find_map(|e| match e {
+            Effect::Roll { roll } => Some(roll),
+            _ => None,
+        })
+        .expect("a roll");
+    assert_eq!(roll.who.as_deref(), Some("SKILL"));
+    assert_eq!(roll.target, Some(3));
+}
+
+#[test]
+fn against_needs_a_roll_and_a_number() {
+    let bad = |spec: &str| {
+        let rule =
+            format!("- id: tug\n  on: {{ verb: [pull, lever] }}\n  then:\n    - await: {spec}\n");
+        let mut f = files(STAMINA);
+        f.push(file("rules/tug.yaml", &rule));
+        check(&load(f).unwrap())
+            .into_iter()
+            .filter(|d| d.severity == Severity::Error)
+            .map(|d| d.message)
+            .collect::<Vec<_>>()
+    };
+    assert!(
+        bad("{ choice: [left, right], against: skill }")
+            .iter()
+            .any(|m| m.contains("belongs to a `roll`"))
+    );
+    assert!(
+        bad("{ roll: 2d6, against: nope }")
+            .iter()
+            .any(|m| m.contains("not a number variable"))
+    );
 }

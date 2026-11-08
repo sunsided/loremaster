@@ -19,3 +19,10 @@ vars:
   - { id: luck, type: int, initial: 9, min: 0, max: luck_initial }
   - { id: gold, type: int, initial: 5, min: 0 }
   - { id: codeword_hearth, type: bool, initial: false }
+
+stats:
+  - { var: skill, label: SKILL, short: SK, max: skill_initial }
+  - { var: stamina, label: STAMINA, short: ST, max: stamina_initial }
+  - { var: luck, label: LUCK, short: LK, max: luck_initial }
+  - { var: gold, label: Gold }
+  - { var: codeword_hearth, label: HEARTH }
