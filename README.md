@@ -14,101 +14,22 @@ Try it in the browser: [sunsided.github.io/loremaster](https://sunsided.github.i
 
 ![The Atlas map of Zork I, imported from its ZIL source: 110 rooms on six floors, with the rooms of the current floor and the details of the selected room.](docs/images/atlas.png)
 
-## Layout
+## Examples and docs
 
 | Path | Contents |
 | --- | --- |
-| `crates/loremaster-model` | World types: rooms, exits, things, fragments, rules, clock and verbs. |
-| `crates/loremaster-lang` | The condition language and the inline markup. They compile to dramaturge conditions. |
-| `crates/loremaster-project` | The project folder format (one YAML file for each entity) and the checker. |
-| `crates/loremaster-runtime` | The runtime: state, text assembly, rules and parser. It has no input or output of its own. Hosts play through its `Session`. |
-| `crates/loremaster-workbench` | The authoring views over a running session: Atlas, map, rules, machines, symbols, markup and condition checks, previews, room matrix and explorer. `reload` carries the game over to a changed world. |
-| `crates/loremaster-dsl` | The builder API in plain Rust: write a story as a pack, and join it with YAML folders (`Loremaster::new().pack(..).yaml(..).build()`). The crate `loremaster` gives it with the cargo feature `dsl`. |
-| `crates/loremaster-macros` | The `world!` macro: a story pack in a grammar close to the YAML files. It expands to calls of the builder API, and runs the schema checks at compile time. The crate `loremaster` gives it with the cargo feature `dsl`. |
-| `crates/loremaster-wasm` | The WebAssembly bindings for the web app. Trunk builds them. |
-| `crates/loremaster-cli` | The crate `loremaster`, with the terminal player: `loremaster play` and `loremaster check`. Also `loremaster new`, `loremaster mcp` and `loremaster serve`. |
-| `crates/loremaster-tools` | The operations that an AI assistant can do on a project: read, play and verify. It has no input or output of its own. |
-| `crates/loremaster-mcp` | The MCP server and the embedded web editor (`ui/`, made by `task release:ui`) for one project: `loremaster mcp <project-folder>` on stdin and stdout, and `loremaster serve <project-folder>` on local HTTP with the proposal and job endpoints for the editor. A job gives a task prompt (`imagine_exit`, `review_room`) to Claude Code. |
 | `examples/lighthouse` | A small story. The tests, the terminal player and the web app use it. |
 | `examples/terminal-host` | A small terminal host of the Session API: what a host must do. |
 | `examples/salt-tower` | A small gamebook: sections as rooms, dice, stats and combat. |
 | `examples/cantina` | A small story with a character whose name changes, and a dialogue with him. |
 | `examples/zork1` | Zork I, imported from its ZIL source. A large map for tests. Read `examples/zork1/README.md`. |
 | `examples/tower` | A spiral tower on four levels, for the level map. |
-| `crates/loremaster-zil` | The importer for ZIL games: `loremaster-zil <zil-folder> <project-folder>`. |
 | `docs/writing-stories.md` | How to write a story: files, fragments, markup, conditions, frames, name stages, levels, and how to write in the game. |
 | `docs/ai-tools.md` | How to connect an AI assistant to a project with MCP, the proposal format, the task prompts, the jobs and the HTTP endpoints. |
-| `web/` | The SvelteKit app and the design system with its Storybook. |
-
-## How loremaster uses dramaturge
-
-loremaster uses [dramaturge](https://github.com/sunsided/dramaturge) 0.2 (`dramaturge-model`, `dramaturge-runtime` and `dramaturge-authoring`) for conditions, the stored facts and dialogues. All other parts are loremaster's own.
-
-| Part | dramaturge | loremaster |
-| --- | --- | --- |
-| Conditions | Each `when:` compiles to a dramaturge `Condition` tree: `FactEquals`, `FactAtLeast`, `FactAtMost`, `All`, `Any`, `Not` | `loremaster-lang` parses the condition language and does the compilation |
-| Stored facts | Story variables and thing properties are world facts (`FactScope::World`) in a `DialogWorldState` | The save state keeps the same facts again (`State.facts`), because dramaturge 0.1 had no serialization |
-| Derived values | One `Condition::Custom` with the key `loremaster.derived` | A `CustomHandler` answers the time of day, the room, visits, carried things and the action verb |
-| Evaluation | `DefaultConditionEvaluator` walks `All`, `Any` and `Not` | `crates/loremaster-runtime/src/eval.rs` |
-| Text fragments, rules, verbs, parser, map, clock | Not used | loremaster's own model and runtime |
-| Dialogues | `dialogues/*.yaml` compiles to a `DialogueGraph`, with ids from a `SymbolTable`. `DefaultRuntime` selects the answers that show and applies their outcomes. `dramaturge-authoring` examines each graph in `loremaster check` | `crates/loremaster-lang/src/dialogue.rs` and `crates/loremaster-runtime/src/game/talk.rs`. The text stays loremaster markup. World effects (`then`) and `add` go through `Outcome::Custom` |
-| Relations and memories | `<thing>.<axis>` and `remembers(<thing>, <memory>)` compile to `RelationshipAtLeast`/`AtMost` and `HasMemory`. The player is the entity `@player` | The save state keeps the same values again (`State.relations`, `State.memories`). Read [docs/dramaturge-dialogue-fit.md](docs/dramaturge-dialogue-fit.md) |
-
-## Commands
-
-Install [go-task](https://taskfile.dev), Trunk and Node.js before you start, and run `corepack enable` once. Corepack gives the Yarn version that `web/package.json` pins.
-
-| Command | What it does |
-| --- | --- |
-| `task play` | Plays the example in the terminal. |
-| `task import:zork` | Imports Zork I again from its ZIL source into `examples/zork1`. |
-| `task web:install` | Installs the web dependencies. Do this one time. |
-| `task dev` | Builds the WebAssembly package, then runs `trunk watch` and the Vite dev server. |
-| `task build:static` | Builds the browser-only site for GitHub Pages into `web/build`, below `/loremaster`. |
-| `task release:ui` | Builds the web app below `/` and copies it into `crates/loremaster-mcp/ui` for the embedded editor. |
-| `task build:local` | Builds `target/release/loremaster` with the web editor in it. |
-| `task package` | Builds the web editor, then packages the crates for crates.io. It does not upload them. |
-| `task serve:local` | Builds the local binary, then opens the example in the editor. |
-| `task storybook` | Starts Storybook on port 6006. |
-| `task web:check` | Type-checks the Svelte code and the stories. |
-| `task verify` | Examines the format, runs clippy and runs the Rust tests. |
-
-If you do not use go-task:
-
-1. Play in the terminal with `cargo run -p loremaster --no-default-features -- play examples/lighthouse`.
-2. For the web app, run `trunk watch` in `crates/loremaster-wasm`.
-3. At the same time, run `yarn dev` in `web/`.
-
-## How Trunk and SvelteKit work together
-
-Trunk builds the Rust part. The file `crates/loremaster-wasm/Trunk.toml` tells Trunk to build the crate with wasm-bindgen and TypeScript declarations. Trunk writes the output to `web/src/lib/engine/pkg/` without content hashes. `trunk watch` builds again when a crate changes.
-
-SvelteKit and Vite make the user interface. They import the package as a normal module. Thus a change in Rust gets to the browser as a normal Vite reload.
-
-## Design system
-
-The web app uses design tokens and atomic design. Storybook shows and documents each element. Start with the "Introduction" page in Storybook.
-
-These rules apply to all web work:
-
-- Use only design tokens for colour, type, space, size and motion.
-- Make each element accessible from the start. The target is WCAG 2.2 AA.
-- Make each element work at all widths from 320px.
-- Write a story with documentation for each element.
-
-## Documentation
-
-Write all documentation in ASD-STE100 Simplified Technical English. The "Foundations/Writing documentation" page in Storybook gives the rules.
-
-## Crates
-
-These crates are on crates.io: `loremaster`, `loremaster-model`, `loremaster-lang`, `loremaster-project`, `loremaster-runtime`, `loremaster-workbench`, `loremaster-tools`, `loremaster-dsl`, `loremaster-macros` and `loremaster-mcp`. All have the same version. `loremaster-wasm` and `loremaster-zil` are not on crates.io. The changes are in [CHANGELOG.md](CHANGELOG.md).
-
-The crate `loremaster` builds with the web editor by default. In a git checkout, the editor must be in `crates/loremaster-mcp/ui` first: run `task release:ui`. To build without the editor, use `--no-default-features`.
 
 ## Contributing
 
-loremaster uses GitHub Flow: `main` and short-lived `feature/` branches. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md): the crates, the commands, how Trunk and SvelteKit work together, the design system, the writing rules and the branch flow. The changes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
