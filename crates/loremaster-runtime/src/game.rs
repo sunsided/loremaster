@@ -479,7 +479,7 @@ impl Game {
             turn.say(BlockKind::Response, format!("The story waits: {open}."));
             return self.finish(turn);
         }
-        self.advance(&mut turn);
+        self.advance(&mut turn, self.world.story.clock.minutes_per_turn);
         self.finish(turn)
     }
 
@@ -575,6 +575,13 @@ impl Game {
             }
             _ => {}
         }
+        let clock = &self.world.story.clock;
+        let minutes = match &cmd {
+            Command::Go { .. } => clock.minutes_for("go"),
+            Command::Verb { verb, .. } => clock.minutes_for(verb.as_str()),
+            // A choice or a leave returned above.
+            _ => clock.minutes_per_turn,
+        };
         match cmd {
             Command::Choose { .. } | Command::Leave => {}
             Command::Go { direction } => {
@@ -656,7 +663,7 @@ impl Game {
             }
         }
         self.state.action = None;
-        self.advance(turn);
+        self.advance(turn, minutes);
     }
 
     /// Count an action before it runs, so `action.*` includes this time.
@@ -838,16 +845,32 @@ impl Game {
                             && ev.is_backdrop_of(t, room, self.state.location_of(id))
                     }
                 };
-                visible && self.state.closed_around(id, true).is_none()
+                visible
+                    && self.state.closed_around(id, true).is_none()
+                    && !self.state.is_concealed(id)
             })
             .map(|t| t.id.clone())
             .collect();
         for d in self.doors_here() {
-            if !ids.contains(&d) {
+            if !ids.contains(&d) && !self.state.is_concealed(d.as_str()) {
                 ids.push(d);
             }
         }
         ids
+    }
+
+    /// The concealed things directly in or on a holder that a search finds:
+    /// not behind a closed container, unless it is transparent (WO-2).
+    pub(crate) fn searchable(&self, holder: &str) -> Vec<Id> {
+        self.state
+            .contents(holder)
+            .into_iter()
+            .filter(|c| {
+                self.state.flag(&format!("{c}.concealed"))
+                    && self.state.closed_around(c.as_str(), true).is_none()
+            })
+            .cloned()
+            .collect()
     }
 
     fn reachable(&self, id: &str) -> bool {
@@ -898,6 +921,9 @@ impl Game {
                 .iter()
                 .filter_map(|(_, e)| {
                     let door = self.world.thing(e.door.as_ref()?.as_str())?;
+                    if self.state.is_concealed(door.id.as_str()) {
+                        return None;
+                    }
                     Some((e.direction.name().to_string(), self.nouns_of(door)))
                 })
                 .collect(),
@@ -1307,7 +1333,7 @@ impl Game {
                     || self
                         .eval()
                         .is_backdrop_here(thing.id.as_str(), room.id.as_str());
-                if !direct {
+                if !direct || self.state.is_concealed(thing.id.as_str()) {
                     continue;
                 }
                 let contents = self.contents_text(thing);
@@ -1530,6 +1556,7 @@ impl Game {
             .state
             .contents(id)
             .iter()
+            .filter(|c| !self.state.is_concealed(c.as_str()))
             .map(|c| {
                 self.eval()
                     .thing_name(c.as_str(), loremaster_lang::NameForm::A)
@@ -1730,13 +1757,13 @@ impl Game {
         }
     }
 
-    /// One turn passes: the clock moves, turn and time rules fire.
-    fn advance(&mut self, turn: &mut Turn) {
+    /// One turn passes: the clock moves by `minutes`, turn and time rules fire.
+    fn advance(&mut self, turn: &mut Turn, minutes: u16) {
         if self.state.ended {
             return;
         }
         let before = self.state.minutes;
-        self.state.minutes += u32::from(self.world.story.clock.minutes_per_turn);
+        self.state.minutes += u32::from(minutes);
         self.state.turns += 1;
         let after = self.state.minutes;
         self.fire(turn, &Event::Turn, 0);
@@ -1867,13 +1894,23 @@ impl Game {
         if let Some(door) = &exit.door {
             let the = self.the(door, false);
             let the_cap = self.the(door, true);
+            // A concealed door is not named: it opens without a note, and a
+            // locked one names only the way, which the exits still list.
+            let concealed = self.state.is_concealed(door.as_str());
             if !self.state.flag(&format!("{door}.open")) {
                 if self.state.flag(&format!("{door}.locked")) {
-                    turn.say(BlockKind::Response, format!("{the_cap} is locked."));
+                    let text = if concealed {
+                        format!("The way {direction} is locked.")
+                    } else {
+                        format!("{the_cap} is locked.")
+                    };
+                    turn.say(BlockKind::Response, text);
                     return;
                 }
                 self.set_fact(turn, &format!("{door}.open"), Value::Bool(true));
-                turn.say(BlockKind::Note, format!("(first opening {the})"));
+                if !concealed {
+                    turn.say(BlockKind::Note, format!("(first opening {the})"));
+                }
             }
         }
         if !self.eval().holds_opt(&compiled.passable) {
@@ -1913,6 +1950,7 @@ impl Game {
                             .state
                             .contents(id.as_str())
                             .iter()
+                            .filter(|c| !self.state.is_concealed(c.as_str()))
                             .map(|c| {
                                 self.eval()
                                     .thing_name(c.as_str(), loremaster_lang::NameForm::A)
@@ -1941,6 +1979,30 @@ impl Game {
                 }
             }
             "wait" => say(turn, "Time passes.".into()),
+            "search" => {
+                let Some(o) = first else { return };
+                let found = self.searchable(o.as_str());
+                if found.is_empty() {
+                    let closed = self.state.facts.get(&prop("open")) == Some(&Value::Bool(false));
+                    if closed && thing.as_ref().is_some_and(|t| t.container) {
+                        say(turn, format!("{the_cap} is closed."));
+                    } else {
+                        say(turn, "You find nothing.".into());
+                    }
+                    return;
+                }
+                for c in &found {
+                    self.set_fact(turn, &format!("{c}.concealed"), Value::Bool(false));
+                }
+                let names: Vec<String> = found
+                    .iter()
+                    .map(|c| {
+                        self.eval()
+                            .thing_name(c.as_str(), loremaster_lang::NameForm::A)
+                    })
+                    .collect();
+                say(turn, format!("You find {}.", text::list(&names, "and")));
+            }
             "score" => {
                 let Some(score) = &self.world.story.score else {
                     say(turn, "This story has no score.".into());
@@ -1989,6 +2051,13 @@ impl Game {
                     say(turn, format!("{} is closed.", self.the(&c, true)));
                 } else if !t.portable {
                     say(turn, format!("{the_cap} won't budge."));
+                } else if self
+                    .world
+                    .story
+                    .carry_limit
+                    .is_some_and(|limit| self.state.held_count() >= limit)
+                {
+                    say(turn, "Your hands are full.".into());
                 } else {
                     self.move_thing(&t.id, Location::Carried);
                     turn.log.push(LogEntry {

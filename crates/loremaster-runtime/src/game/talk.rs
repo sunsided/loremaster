@@ -334,6 +334,6 @@ impl Game {
             }
             _ => self.end_talk(),
         }
-        self.advance(turn);
+        self.advance(turn, self.world.story.clock.minutes_per_turn);
     }
 }

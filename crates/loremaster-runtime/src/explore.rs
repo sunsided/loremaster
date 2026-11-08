@@ -129,7 +129,8 @@ fn reads_counters(game: &Game) -> bool {
 /// The commands worth trying in a state: the actions that can move the story
 /// forward. Commands that only undo or repeat (drop, close, turn off, lock) and
 /// commands that can not change the state (examine with no rule, wait in a
-/// story without time rules) are left out, so the walk stays small.
+/// story without time rules) are left out, so the walk stays small. With a
+/// carry limit and full hands, `drop` frees a hand, so it is tried then.
 fn commands(game: &Game) -> Vec<(String, Command)> {
     let world = game.world();
     let story = &world.story;
@@ -176,7 +177,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     // of the player, and an indirect object needs a direct one.
     for rule in &story.rules {
         if let EventPattern::Verb(p) = &rule.on
-            && p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
+            && for_player(p)
             && (p.direct.is_some() || p.indirect.is_none())
         {
             let objects: Vec<Id> = p.objects().cloned().collect();
@@ -204,6 +205,11 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         }
     }
     // The standard verbs that change state.
+    let take_rules = story.rules.iter().any(|r| {
+        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
+            if p.verb.as_str() == "take"
+                && for_player(p))
+    });
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();
         if story.dialogue_with(id.as_str()).is_some() {
@@ -216,7 +222,19 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             game.state().location_of(id.as_str()),
             Some(Location::Carried)
         );
-        if t.portable && !carried {
+        // With a carry limit, full hands refuse the default take, and a drop
+        // frees a hand: it is no longer only an undo. A rule on `take` can
+        // still handle a take with full hands.
+        let full = story
+            .carry_limit
+            .is_some_and(|limit| game.state().held_count() >= limit);
+        if full && carried {
+            out.push((
+                label("drop", std::slice::from_ref(&id)),
+                verb("drop", vec![id.clone()]),
+            ));
+        }
+        if t.portable && !carried && (!full || take_rules) {
             out.push((
                 label("take", std::slice::from_ref(&id)),
                 verb("take", vec![id.clone()]),
@@ -229,6 +247,13 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
                     verb(on, vec![id.clone()]),
                 ));
             }
+        }
+        // A search reveals what is concealed in or on the thing (WO-2).
+        if !game.searchable(id.as_str()).is_empty() {
+            out.push((
+                label("search", std::slice::from_ref(&id)),
+                verb("search", vec![id.clone()]),
+            ));
         }
         if let Some(key) = &t.key
             && scope.contains(key)
@@ -257,6 +282,11 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out.dedup_by(|a, b| a.0 == b.0);
     out
+}
+
+/// A pattern that matches the player's commands: no `actor`, or the player.
+fn for_player(p: &loremaster_model::CommandPattern) -> bool {
+    p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
 }
 
 fn facts_of(game: &Game) -> Vec<String> {

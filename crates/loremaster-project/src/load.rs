@@ -91,6 +91,9 @@ pub struct StoryHeader {
     /// `false` turns off the death prompt (SE-9).
     #[serde(default = "yes")]
     pub death_prompt: bool,
+    /// How many things the player can hold (WO-3).
+    #[serde(default)]
+    pub carry_limit: Option<u32>,
     #[serde(default)]
     pub notes: Vec<Note>,
     #[serde(default)]
@@ -742,6 +745,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         frames: header.frames,
         seed: header.seed,
         death_prompt: header.death_prompt,
+        carry_limit: header.carry_limit,
         notes: header.notes,
         threads,
     };
