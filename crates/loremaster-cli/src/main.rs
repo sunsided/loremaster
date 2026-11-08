@@ -546,7 +546,7 @@ fn things_in_color(block: &Block, style: bool) -> String {
         .runs
         .iter()
         .map(|r| match &r.link {
-            Some(l) if style && l.kind == LinkKind::Thing => format!("\x1b[36m{}\x1b[0m", r.text),
+            Some(l) if style && l.kind == LinkKind::Thing => format!("\x1b[36m{}\x1b[39m", r.text),
             _ => r.text.clone(),
         })
         .collect()
@@ -565,16 +565,20 @@ fn emphasis(text: &str, style: bool) -> String {
     out
 }
 
-/// The width of a word on screen: ANSI color codes take none.
+/// The width of a word on screen: ANSI CSI codes (`ESC [ … final byte`) take none.
 fn visible_len(word: &str) -> usize {
     let mut len = 0;
-    let mut in_escape = false;
-    for c in word.chars() {
-        match c {
-            '\x1b' => in_escape = true,
-            'm' if in_escape => in_escape = false,
-            _ if !in_escape && !c.is_control() => len += 1,
-            _ => {}
+    let mut chars = word.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' && chars.next_if_eq(&'[').is_some() {
+            // Parameters and intermediates run until the final byte, `@` to `~`.
+            for c in chars.by_ref() {
+                if ('@'..='~').contains(&c) {
+                    break;
+                }
+            }
+        } else if !c.is_control() {
+            len += 1;
         }
     }
     len
@@ -604,7 +608,8 @@ mod tests {
 
     #[test]
     fn color_codes_take_no_width() {
-        assert_eq!(visible_len("\x1b[36mlantern\x1b[0m,"), 8);
+        assert_eq!(visible_len("\x1b[36mlantern\x1b[39m,"), 8);
+        assert_eq!(visible_len("\x1b[Kab"), 2);
         assert_eq!(wrap("a \x1b[36mbb\x1b[0m c", 6), "a \x1b[36mbb\x1b[0m c");
     }
 }
