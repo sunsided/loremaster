@@ -29,14 +29,27 @@
 	}
 
 	let { illustration = null, portrait = null, hotspots = [], onhotspot, children }: Props = $props();
+
+	/** A key per hotspot that stays when other hotspots come and go: its target, and which one of that target. */
+	/** Width by height of the scene image, once it loaded. The scene keeps it, so the hotspots in percent fit. */
+	let ratio = $state(1.6);
+
+	const keys = $derived(hotspots.map((s, i) => `${s.inspect ?? ''}#${hotspots.slice(0, i).filter((o) => o.inspect === s.inspect).length}`));
 </script>
 
 {#snippet image(item: Image, kind: string)}
 	<figure class={kind}>
 		{#if item.src && kind === 'illustration' && hotspots.length}
-			<div class="scene" role="group" aria-label="In the picture">
-				<img src={item.src} alt={item.alt} />
-				{#each hotspots as spot, i (i)}
+			<div class="scene" role="group" aria-label="In the picture" style:--ratio={ratio}>
+				<img
+					src={item.src}
+					alt={item.alt}
+					onload={(e) => {
+						const { naturalWidth: w, naturalHeight: h } = e.currentTarget as HTMLImageElement;
+						if (w && h) ratio = w / h;
+					}}
+				/>
+				{#each hotspots as spot, i (keys[i])}
 					<button
 						type="button"
 						class="hotspot"
@@ -102,11 +115,16 @@
 		border: 1px solid var(--color-border-subtle);
 	}
 	/* A scene is larger, so its hotspots are large enough to hit. */
+	/* The width follows the height limit and the image's ratio, and the height follows the width: the image keeps its ratio on a narrow screen. */
 	.scene {
 		position: relative;
+		width: calc(min(36dvh, 240px) * var(--ratio));
+		max-width: 100%;
 	}
 	.scene img {
-		height: min(36dvh, 240px);
+		box-sizing: border-box;
+		width: 100%;
+		height: auto;
 	}
 	.hotspot {
 		position: absolute;
@@ -126,6 +144,10 @@
 	}
 	/* The name shows on hover and focus; it is the button's name for screen readers all the time. */
 	.name {
+		/* A long name is cut, so it stays inside the hotspot and its rect. */
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		padding: 0 var(--space-1);
 		background: var(--color-surface-raised);
 		color: var(--color-text-strong);
