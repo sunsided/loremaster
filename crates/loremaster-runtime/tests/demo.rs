@@ -25,10 +25,15 @@ fn demo() -> (Project, Arc<World>) {
 /// the environment, the test writes the file instead.
 fn assert_transcript(name: &str, transcript: &str) {
     let path = slice("expected").join(format!("{name}.transcript"));
-    if std::env::var_os("BLESS").is_some() {
+    if std::env::var("BLESS").is_ok_and(|v| v == "1") {
         std::fs::write(&path, transcript).unwrap();
     }
-    let expected = std::fs::read_to_string(&path).unwrap_or_default();
+    let expected = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "cannot read {}: {e}; run the test with BLESS=1 to write it",
+            path.display()
+        )
+    });
     assert!(
         expected == transcript,
         "the transcript of {name} changed; if that is right, run the test with BLESS=1 to write {}\n\n{transcript}",
@@ -53,6 +58,45 @@ fn demo_walkthroughs_pass() {
         names.push(name);
     }
     assert_eq!(names, ["ashes", "best", "wrong_man"]);
+}
+
+/// Play commands from the start; the text of all of them.
+fn play(world: Arc<World>, commands: &[&str]) -> String {
+    let mut session = Session::new(world);
+    session.start();
+    let mut text = String::new();
+    for c in commands {
+        text.push_str(&session.submit(Input::Text((*c).into())).plain_text());
+    }
+    text
+}
+
+#[test]
+fn the_pages_count_only_while_the_player_holds_them() {
+    // The best path to the pages and the weapon; the coroner comes at three.
+    // With the pages in hand, the case is whole. Dropped in the chamber,
+    // they are no proof, and the case is weak, as with the ash.
+    let (_, world) = demo();
+    let to_pages = [
+        "w",
+        "examine boots",
+        "e",
+        "n",
+        "e",
+        "talk to crane",
+        "1",
+        "w",
+        "open lower paddles",
+        "wait",
+        "wait",
+        "down",
+        "take pages",
+    ];
+    let rest = ["up", "s", "s", "search chest", "wait", "wait", "wait"];
+    let held = play(world.clone(), &[&to_pages[..], &rest].concat());
+    assert!(held.contains("Committed for trial"), "{held}");
+    let dropped = play(world, &[&to_pages[..], &["drop pages"], &rest].concat());
+    assert!(dropped.contains("Charged, case weak"), "{dropped}");
 }
 
 #[test]

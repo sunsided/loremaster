@@ -24,8 +24,6 @@ Town boots, wet to the ankle, with canal mud in the welts. Marsh said he never l
 
 You write it in your notebook: Marsh was out in the wet.
 
-Hester Reed goes up.
-
 > e
 e
 
@@ -67,6 +65,8 @@ talk to crane
 
 "Take the spare. Bring it back."
 
+Hester Reed comes in.
+
 > w
 w
 
@@ -86,6 +86,8 @@ wait
 
 Time passes.
 
+Hester Reed comes in.
+
 > wait
 wait
 
@@ -93,7 +95,7 @@ Time passes.
 
 The chamber is empty. Wet ladder rungs go down into the dark.
 
-Hester Reed comes in.
+Hester Reed goes south.
 
 > down
 down
@@ -122,8 +124,6 @@ The lock gates stand black against the sky, and a gangplank leads east to a barg
 
 Exits: south, east, down.
 
-Hester Reed comes in.
-
 > s
 s
 
@@ -132,8 +132,6 @@ Towpath
 A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
 
 Exits: west, north, south.
-
-Hester Reed comes in.
 
 > s
 s
@@ -176,7 +174,7 @@ Exits: east, west, up.
 > accuse marsh
 accuse marsh
 
-You lay the pages, the windlass and your notes on the table. Marsh reads them, and sits down.
+You lay the pages and your notes on the table, and tell him of the dented windlass in the tool chest. Marsh reads them, and sits down.
 
 Committed for trial
 

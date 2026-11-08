@@ -27,7 +27,7 @@ The walkthroughs are the three paths of the design: `best` (committed for trial)
 | Part | Files | Design step |
 | --- | --- | --- |
 | Nine rooms, the clock, the people, the coroner | `rooms/`, `things/`, `story.yaml`, `agendas/coroner.yaml` | 1 |
-| The tool chest and the windlass under the rope (concealed), the coat and the notebook | `things/chest.yaml`, `things/windlass.yaml`, `things/coat.yaml` | 2 |
+| The tool chest and the windlass under the rope (concealed), the coat and the notebook | `things/chest.yaml`, `things/windlass.yaml`, `things/coat.yaml`, `things/notebook.yaml` | 2 |
 | Talks with Bert, Crane, Hester and Marsh | `dialogues/` | 3 |
 | Agendas: Marsh, Hester, Bert, Crane | `agendas/` | 4 |
 | The lock machine, the drain timer, the pages and the stove | `machines/lock.yaml`, `timers/`, `things/pages.yaml`, `things/stove.yaml` | 5 |

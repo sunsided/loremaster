@@ -30,7 +30,7 @@ steps:
     facts: { lock: emptying }
     hints:
       - "With a windlass you can let the water out of the chamber."
-      - "Open the lower gate and let the chamber run dry, before someone else comes to the lock at one."
+      - "Open the lower paddles and let the chamber run dry, before someone else comes to the lock at one."
   - wait
   - { do: wait, see: "The chamber is empty." }
   - down

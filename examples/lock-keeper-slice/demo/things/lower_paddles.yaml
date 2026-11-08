@@ -1,5 +1,5 @@
 name: lower paddles
-aliases: [paddles, paddle, sluice]
+aliases: [paddles, paddle, sluice, lower gate]
 location: { room: lock_side }
 listed: false
 description:
