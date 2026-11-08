@@ -68,6 +68,8 @@ export class AudioPlayer {
 			buffer = fetch(url)
 				.then((r) => r.arrayBuffer())
 				.then((data) => context.decodeAudioData(data));
+			// Forget a failed load, so that the next play tries again.
+			buffer.catch(() => this.#buffers.delete(url));
 			this.#buffers.set(url, buffer);
 		}
 		return buffer;

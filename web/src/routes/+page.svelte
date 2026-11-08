@@ -145,10 +145,12 @@
 	});
 	$effect(() => {
 		if (!session) return;
-		session.onsound = (sound) => {
+		const current = session;
+		current.onsound = (sound) => {
 			const url = soundUrl(sound);
 			if (url) audio.once(url);
 		};
+		return () => (current.onsound = null);
 	});
 	// In development, the workspace is on `window.loremaster` for experiments in the browser console.
 	$effect(() => {

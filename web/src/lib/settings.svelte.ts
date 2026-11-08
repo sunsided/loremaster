@@ -30,6 +30,11 @@ function read(): Stored {
 	}
 }
 
+/** A stored volume from 0 to 100, or the default when it is not a number. */
+function volume(value: unknown, fallback: number): number {
+	return typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : fallback;
+}
+
 class Settings {
 	theme = $state<Theme>(defaults.theme);
 	effects = $state<Effects>(defaults.effects);
@@ -63,9 +68,9 @@ class Settings {
 		this.serveLink = s.serveLink === true;
 		this.sound = s.sound === true;
 		this.captions = s.captions === true;
-		this.musicVolume = s.musicVolume;
-		this.ambienceVolume = s.ambienceVolume;
-		this.effectsVolume = s.effectsVolume;
+		this.musicVolume = volume(s.musicVolume, defaults.musicVolume);
+		this.ambienceVolume = volume(s.ambienceVolume, defaults.ambienceVolume);
+		this.effectsVolume = volume(s.effectsVolume, defaults.effectsVolume);
 		if (typeof window !== 'undefined' && window.matchMedia) {
 			const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
 			this.systemReduce = mq.matches;
