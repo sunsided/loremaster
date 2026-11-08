@@ -230,3 +230,20 @@ fn a_walkthrough_reports_host_events() {
     let bad = walk("steps:\n  - { event: killed, args: { boss: 3, level: 2 } }\n");
     assert!(!bad.passed());
 }
+
+#[test]
+fn an_event_step_while_awaiting_is_no_answer_to_the_action() {
+    let r = walk("steps:\n  - pull lever\n  - { event: killed, args: { boss: ogre, level: 2 } }\n");
+    assert!(
+        r.failures.iter().any(|f| f.contains("waits")),
+        "{:?}",
+        r.failures
+    );
+    assert!(
+        !r.failures
+            .iter()
+            .any(|f| f.contains("not a declared result")),
+        "{:?}",
+        r.failures
+    );
+}

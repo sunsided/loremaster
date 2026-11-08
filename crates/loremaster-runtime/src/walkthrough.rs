@@ -71,10 +71,13 @@ pub fn run_walkthrough(world: Arc<World>, walk: &Walkthrough, name: &str) -> Wal
             ));
         }
         session.force_rolls(step.rolls());
-        if let Some(why) = undeclared_result(&session, command) {
+        let host_event = step.plan().and_then(|p| Some((p.event.as_ref()?, &p.args)));
+        // An event step is no answer to an action.
+        if host_event.is_none()
+            && let Some(why) = undeclared_result(&session, command)
+        {
             failures.push(format!("step {} (`{command}`): {why}", i + 1));
         }
-        let host_event = step.plan().and_then(|p| Some((p.event.as_ref()?, &p.args)));
         let text = match host_event {
             Some((event, args)) => match session.host_event(event.as_str(), args.clone()) {
                 Ok(step) => step.plain_text(),

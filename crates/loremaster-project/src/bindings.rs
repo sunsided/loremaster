@@ -16,8 +16,12 @@ fn pascal(id: &str) -> String {
         .collect()
 }
 
-/// A Rust field name: a keyword gets the `r#` prefix.
+/// A Rust field name: a keyword gets the `r#` prefix, and the names that
+/// cannot be raw get a trailing `_`.
 fn field(name: &str) -> String {
+    if matches!(name, "self" | "Self" | "crate" | "super") {
+        return format!("{name}_");
+    }
     const KEYWORDS: &[&str] = &[
         "as", "async", "await", "break", "const", "continue", "dyn", "else", "enum", "extern",
         "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut",
@@ -248,6 +252,11 @@ pub fn json_schema(interface: &Interface) -> Value {
         .actions
         .iter()
         .map(|a| {
+            let mut required = vec!["kind", "name"];
+            // The session leaves out empty `args` and `results`.
+            if !a.args.is_empty() {
+                required.push("args");
+            }
             let mut props = json!({
                 "kind": { "const": "action" },
                 "name": { "const": a.id },
@@ -258,8 +267,9 @@ pub fn json_schema(interface: &Interface) -> Value {
                 defs.insert(def.clone(), json!({ "enum": a.results }));
                 props["results"] =
                     json!({ "type": "array", "items": { "$ref": format!("#/$defs/{def}") } });
+                required.push("results");
             }
-            json!({ "type": "object", "properties": props, "required": ["kind", "name"] })
+            json!({ "type": "object", "properties": props, "required": required })
         })
         .collect();
     let events: Vec<Value> = interface
@@ -373,6 +383,17 @@ mod tests {
             json!("killed")
         );
         assert_eq!(s["x-interface-hash"], json!(sample().hash()));
+        assert_eq!(
+            s["$defs"]["Request"]["oneOf"][0]["required"],
+            json!(["kind", "name", "args", "results"])
+        );
+    }
+
+    #[test]
+    fn a_name_that_cannot_be_raw_gets_an_underscore() {
+        assert_eq!(field("type"), "r#type");
+        assert_eq!(field("self"), "self_");
+        assert_eq!(field("boss"), "boss");
     }
 
     #[test]
