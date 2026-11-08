@@ -78,7 +78,6 @@ pub fn validate(world: &World) -> Result<(), Error> {
                 if let Err(e) = d.tree.check(false) {
                     errors.push(e);
                 }
-                not_played_yet(d, &mut errors);
             }
             Item::Thread(t) => {
                 defined.insert(("thread".into(), t.id.value.clone()));
@@ -152,25 +151,6 @@ pub fn validate(world: &World) -> Result<(), Error> {
         }
     }
     combine(errors)
-}
-
-/// The parts of dramaturge's token form that loremaster's talks do not play
-/// yet: more lines of a node, and `-> <node>` (`next`).
-fn not_played_yet(d: &Dialogue, errors: &mut Vec<Error>) {
-    for (n, node) in d.tree.dialogue.nodes.iter().enumerate() {
-        if !node.lines.is_empty() {
-            errors.push(Error::new(
-                d.tree.span(&Place::Line(n, 0)),
-                "a node has one line in loremaster's talks; more lines (`<speaker>: \"…\";`) are in the dialogue shape, but the talks do not play them yet",
-            ));
-        }
-        if node.next.is_some() {
-            errors.push(Error::new(
-                d.tree.span(&Place::Next(n)),
-                "`-> <node>` (`next`) is in the dialogue shape, but loremaster's talks do not play it yet; give the node an option",
-            ));
-        }
-    }
 }
 
 fn time_of(e: &Event) -> Option<&Text> {
@@ -1112,6 +1092,13 @@ fn dialogue(p: &mut Pack, d: &Dialogue, spans: &mut Spans) {
         segment_spans(spans, &key, &at, &node.say.segments);
         if let Some(s) = &node.speaker {
             b = b.speaker(s.as_str());
+        }
+        for (i, l) in node.lines.iter().enumerate() {
+            b = b.line(l.speaker.as_str(), line(&l.say.segments));
+            segment_spans(spans, &key, &format!("{at}.lines[{i}]"), &l.say.segments);
+        }
+        if let Some(next) = &node.next {
+            b = b.next(next.as_key());
         }
         if let Some(w) = &node.when {
             spans.add(&key, format!("{at}.when"), w.tokens.clone());
