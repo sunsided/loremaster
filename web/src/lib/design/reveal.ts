@@ -7,6 +7,12 @@
 
 import type { Attachment } from 'svelte/attachments';
 
+/** How long a changed value of the adventure sheet stays marked, in ms. */
+export const STAT_MARK_MS = 1500;
+/** The roll animation of the ASCII dice: the time for one frame in ms, and the number of frames. */
+export const DICE_FRAME_MS = 70;
+export const DICE_FRAMES = 8;
+
 export interface LineReveal {
 	/** Time for one line, in ms. */
 	line: number;

@@ -33,6 +33,9 @@
 	import Button from '#lib/design/atoms/Button.svelte';
 	import CommandPrompt from '#lib/design/molecules/CommandPrompt.svelte';
 	import AwaitPrompt from '#lib/design/molecules/AwaitPrompt.svelte';
+	import DiceDisplay from '#lib/design/molecules/DiceDisplay.svelte';
+	import CombatPanel from '#lib/design/organisms/CombatPanel.svelte';
+	import StatSheet from '#lib/design/organisms/StatSheet.svelte';
 	import StatusLine from '#lib/design/organisms/StatusLine.svelte';
 	import AppHeader from '#lib/design/organisms/AppHeader.svelte';
 	import MapPanel from '#lib/design/organisms/MapPanel.svelte';
@@ -1735,6 +1738,7 @@
 			<ScreenEffects theme={settings.theme} effects={settings.effects} />
 		{/snippet}
 		{#snippet player()}
+			{#if s.stats.length}<StatSheet stats={s.stats} inventory={s.scene.inventory} />{/if}
 			<Transcript
 				entries={s.entries}
 				room={s.scene.room}
@@ -1820,6 +1824,8 @@
 					{/if}
 				{/snippet}
 			</Transcript>
+			{#if s.combat}<CombatPanel combat={s.combat} />{/if}
+			<DiceDisplay rolls={s.rolls} reduceMotion={settings.reduceMotion} />
 			{#if s.awaiting}
 				<!-- A paused rule or the death prompt waits: its answers replace the verb bar until the player answers. -->
 				<AwaitPrompt awaiting={s.awaiting} onanswer={(value) => s.resume(value)} />

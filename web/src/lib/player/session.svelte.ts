@@ -1,6 +1,9 @@
 import {
 	Workbench,
 	type AuthorCommand,
+	type CombatView,
+	type RollDetail,
+	type StatView,
 	type Awaiting,
 	type Input,
 	type Status,
@@ -51,6 +54,12 @@ export class Session {
 	rules = $state<RuleView[]>([]);
 	machines = $state<MachineView[]>([]);
 	vars = $state<VarView[]>([]);
+	/** The adventure sheet. Empty when the story has no `stats:`. */
+	stats = $state<StatView[]>([]);
+	/** The combat in progress, or null. */
+	combat = $state<CombatView | null>(null);
+	/** The dice of the newest turn. */
+	rolls = $derived<RollDetail[]>(this.entries.at(-1)?.turn.rolls ?? []);
 	/** The action frame used for the last action, or null. */
 	frame = $state<FrameUse | null>(null);
 	/** The talk in progress, or null. While it is open, only answers and Leave run. */
@@ -169,6 +178,8 @@ export class Session {
 		this.rules = this.bench.rules();
 		this.machines = this.bench.machines();
 		this.vars = this.bench.vars();
+		this.stats = this.bench.stats();
+		this.combat = this.bench.combat();
 		this.frame = this.bench.lastFrame();
 		this.choices = this.bench.choices();
 		this.talkView = this.bench.talkView();

@@ -155,6 +155,8 @@
 		}
 		.screen {
 			min-height: 85dvh;
+			/* Not `hidden`: a scroll container would stop the one-line stat sheet from sticking to the top of the page. */
+			overflow: clip;
 		}
 		/* On a phone the panel is a bottom sheet (fixed), so it takes no place in the page; the page keeps
 		   room at the bottom for the line of the sheet. */
