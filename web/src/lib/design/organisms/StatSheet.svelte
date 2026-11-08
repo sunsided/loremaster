@@ -48,7 +48,9 @@
 				marks[s.var] = up ? 'up' : 'down';
 				said.push(
 					same
-						? `${s.label} maximum ${up ? 'up' : 'down'} to ${s.max}.`
+						? s.max === undefined
+							? `${s.label} has no maximum now.`
+							: `${s.label} maximum ${up ? 'went up' : 'went down'} to ${s.max}.`
 						: `${s.label} ${up ? 'up' : 'down'} to ${amount(s)}.`
 				);
 			} else if (typeof s.value === 'boolean') {

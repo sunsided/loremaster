@@ -215,13 +215,17 @@ impl Game {
                     .join(" ")
             ),
         });
+        let waiting = self.state.awaiting.is_some();
         if self
             .fire(turn, &Event::of_command(Phase::Check, c), 1)
             .stopped
-            // A check rule that waits holds the action, as for the player.
-            || self.state.awaiting.is_some()
         {
             return false;
+        }
+        // A check rule that waits holds the action, as for the player. An
+        // await that was open before says nothing about this command.
+        if !waiting && self.state.awaiting.is_some() {
+            return true;
         }
         let instead = self.fire(turn, &Event::of_command(Phase::Instead, c), 1);
         if !instead.instead && !instead.stopped {
