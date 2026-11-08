@@ -196,3 +196,130 @@ fn an_action_cost_can_make_an_agenda_step_come_due() {
     // A quick search leaves time to take the key.
     assert_eq!(wins(with_keeper(STORY)), 1);
 }
+
+/// The files of [`STORY`] with more files, or other text for some.
+fn world_with(story: &str, extra: &[(&str, &str)]) -> Arc<World> {
+    let mut files = files(story);
+    for (path, text) in extra {
+        files.retain(|f| f.path != *path);
+        files.push(SourceFile {
+            path: (*path).into(),
+            text: (*text).into(),
+        });
+    }
+    Arc::new(World::compile(load(files).unwrap().story).unwrap())
+}
+
+fn play(world: Arc<World>) -> Session {
+    let mut game = Session::new(world);
+    authoring::start(&mut game);
+    game
+}
+
+#[test]
+fn a_concealed_door_can_not_be_named() {
+    let hall = "name: Hall\ndescription: [\"A hall.\"]\nexits:\n  - { direction: north, to: yard, door: hatch }\n";
+    let world = world_with(
+        STORY,
+        &[
+            ("rooms/hall.yaml", hall),
+            (
+                "rooms/yard.yaml",
+                "name: Yard\ndescription: [\"A yard.\"]\n",
+            ),
+            (
+                "things/hatch.yaml",
+                "name: hatch\nlocation: { room: hall }\nlisted: false\nprops: { open: false, concealed: true }\n",
+            ),
+        ],
+    );
+    let mut game = play(world);
+    assert!(!game.scene().things.iter().any(|t| t.id == "hatch"));
+    let open = input(&mut game, "open hatch");
+    assert!(!open.contains("You open"), "{open}");
+}
+
+#[test]
+fn a_search_finds_what_is_on_a_closed_box_or_in_a_glass_one() {
+    let chest = "name: chest\nlocation: { room: hall }\ncontainer: true\nsupporter: true\nprops: { open: false }\n";
+    let on = KEY.replace("{ on: rug }", "{ on: chest }");
+    let mut game = play(world_with(
+        STORY,
+        &[("things/chest.yaml", chest), ("things/key.yaml", &on)],
+    ));
+    let found = input(&mut game, "search chest");
+    assert!(found.contains("You find a brass key."), "{found}");
+
+    let glass = chest.replace("open: false", "open: false, transparent: true");
+    let inside = KEY.replace("{ on: rug }", "{ in: chest }");
+    let mut game = play(world_with(
+        STORY,
+        &[("things/chest.yaml", &glass), ("things/key.yaml", &inside)],
+    ));
+    let found = input(&mut game, "search chest");
+    assert!(found.contains("You find a brass key."), "{found}");
+
+    let shut = play(world_with(
+        STORY,
+        &[("things/chest.yaml", chest), ("things/key.yaml", &inside)],
+    ));
+    let mut game = shut;
+    let found = input(&mut game, "search chest");
+    assert!(found.contains("The chest is closed."), "{found}");
+    // The explorer does not search a closed chest; it opens it first.
+    let found = explore(
+        world_with(
+            STORY,
+            &[("things/chest.yaml", chest), ("things/key.yaml", &inside)],
+        ),
+        Budget::default(),
+    );
+    assert_eq!(
+        found.endings[0].path,
+        ["open chest", "search chest", "take key"]
+    );
+}
+
+#[test]
+fn the_explorer_drops_a_thing_to_free_a_hand() {
+    // The gem wins only after the coin was taken once; with one hand, the
+    // coin must go down first.
+    let rules = r#"
+- id: paid
+  on: { verb: [take, coin] }
+  then:
+    - set: { paid: true }
+- id: win
+  on: { verb: [take, gem] }
+  when: paid and carried(gem)
+  then:
+    - end: won
+"#;
+    let story = format!("{STORY}vars:\n  - {{ id: paid, type: bool, initial: false }}\n");
+    let world = world_with(
+        &story,
+        &[
+            ("rules/rules.yaml", rules),
+            (
+                "things/gem.yaml",
+                "name: gem\nlocation: { room: hall }\nportable: true\n",
+            ),
+        ],
+    );
+    let found = explore(world, Budget::default());
+    assert_eq!(found.endings.len(), 1, "{found:#?}");
+    assert_eq!(
+        found.endings[0].path,
+        ["take coin", "drop coin", "take gem"]
+    );
+}
+
+#[test]
+fn a_cost_for_the_score_verb_checks_clean() {
+    let story = format!(
+        "{}score: {{ max: 1 }}\n",
+        STORY.replace("wait: 5", "score: 0")
+    );
+    let found = check(&load(files(&story)).unwrap());
+    assert!(found.is_empty(), "{found:#?}");
+}

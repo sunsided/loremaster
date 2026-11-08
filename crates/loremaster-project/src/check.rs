@@ -243,11 +243,15 @@ impl Checker<'_> {
         self.room_ref(&header, "start", story.start.as_str());
         self.fragments(&header, "intro", &story.intro);
         self.frames(&header, "frames", &story.frames);
-        let verbs: BTreeSet<String> = standard_verbs()
+        let mut verbs: BTreeSet<String> = standard_verbs()
             .iter()
             .chain(story.verbs.iter())
             .map(|v| v.id.to_string())
             .collect();
+        // The world adds the `score` verb for a story with a score.
+        if story.score.is_some() {
+            verbs.insert("score".into());
+        }
         for verb in story.clock.costs.keys() {
             if !verbs.contains(verb.as_str()) {
                 self.error(

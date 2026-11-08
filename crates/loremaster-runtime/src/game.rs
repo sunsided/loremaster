@@ -578,7 +578,8 @@ impl Game {
         let minutes = match &cmd {
             Command::Go { .. } => clock.minutes_for("go"),
             Command::Verb { verb, .. } => clock.minutes_for(verb.as_str()),
-            Command::Choose { .. } | Command::Leave => clock.minutes_per_turn,
+            // A choice or a leave returned above.
+            _ => clock.minutes_per_turn,
         };
         match cmd {
             Command::Choose { .. } | Command::Leave => {}
@@ -850,11 +851,25 @@ impl Game {
             .map(|t| t.id.clone())
             .collect();
         for d in self.doors_here() {
-            if !ids.contains(&d) {
+            if !ids.contains(&d) && !self.state.is_concealed(d.as_str()) {
                 ids.push(d);
             }
         }
         ids
+    }
+
+    /// The concealed things directly in or on a holder that a search finds:
+    /// not behind a closed container, unless it is transparent (WO-2).
+    pub(crate) fn searchable(&self, holder: &str) -> Vec<Id> {
+        self.state
+            .contents(holder)
+            .into_iter()
+            .filter(|c| {
+                self.state.flag(&format!("{c}.concealed"))
+                    && self.state.closed_around(c.as_str(), true).is_none()
+            })
+            .cloned()
+            .collect()
     }
 
     fn reachable(&self, id: &str) -> bool {
@@ -899,6 +914,9 @@ impl Game {
                 .iter()
                 .filter_map(|(_, e)| {
                     let door = self.world.thing(e.door.as_ref()?.as_str())?;
+                    if self.state.is_concealed(door.id.as_str()) {
+                        return None;
+                    }
                     Some((e.direction.name().to_string(), self.nouns_of(door)))
                 })
                 .collect(),
@@ -1911,20 +1929,14 @@ impl Game {
             "wait" => say(turn, "Time passes.".into()),
             "search" => {
                 let Some(o) = first else { return };
-                let closed = self.state.facts.get(&prop("open")) == Some(&Value::Bool(false));
-                if closed && thing.as_ref().is_some_and(|t| t.container) {
-                    say(turn, format!("{the_cap} is closed."));
-                    return;
-                }
-                let found: Vec<Id> = self
-                    .state
-                    .contents(o.as_str())
-                    .into_iter()
-                    .filter(|c| self.state.flag(&format!("{c}.concealed")))
-                    .cloned()
-                    .collect();
+                let found = self.searchable(o.as_str());
                 if found.is_empty() {
-                    say(turn, "You find nothing.".into());
+                    let closed = self.state.facts.get(&prop("open")) == Some(&Value::Bool(false));
+                    if closed && thing.as_ref().is_some_and(|t| t.container) {
+                        say(turn, format!("{the_cap} is closed."));
+                    } else {
+                        say(turn, "You find nothing.".into());
+                    }
                     return;
                 }
                 for c in &found {

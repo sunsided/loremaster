@@ -208,7 +208,18 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             game.state().location_of(id.as_str()),
             Some(Location::Carried)
         );
-        if t.portable && !carried {
+        // With a carry limit, a full pair of hands refuses a take, and a drop
+        // frees a hand: it is no longer only an undo.
+        let full = story
+            .carry_limit
+            .is_some_and(|limit| game.state().held_count() >= limit);
+        if story.carry_limit.is_some() && carried {
+            out.push((
+                label("drop", std::slice::from_ref(&id)),
+                verb("drop", vec![id.clone()]),
+            ));
+        }
+        if t.portable && !carried && !full {
             out.push((
                 label("take", std::slice::from_ref(&id)),
                 verb("take", vec![id.clone()]),
@@ -223,12 +234,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             }
         }
         // A search reveals what is concealed in or on the thing (WO-2).
-        if game
-            .state()
-            .contents(id.as_str())
-            .iter()
-            .any(|c| game.state().flag(&format!("{c}.concealed")))
-        {
+        if !game.searchable(id.as_str()).is_empty() {
             out.push((
                 label("search", std::slice::from_ref(&id)),
                 verb("search", vec![id.clone()]),

@@ -570,11 +570,11 @@ portable: true
 props: { concealed: true }
 ```
 
-The explorer searches each thing that hides something.
+A door can be concealed too: the player can not name it, but the exit stays. The explorer searches each thing that hides something it can find.
 
 ### Carry limit
 
-`carry_limit: 4` in story.yaml is the number of things that the player can hold. A `take` beyond it says "Your hands are full." Things in a carried bag do not count, so a bag lets the player carry more. A rule that moves a thing to `carried` does not check the limit.
+`carry_limit: 4` in story.yaml is the number of things that the player can hold. A `take` beyond it says "Your hands are full." Things in a carried bag do not count, so a bag lets the player carry more. A rule that moves a thing to `carried` does not check the limit. In a story with a limit, the explorer also tries to drop what the player holds, and it does not try a `take` with full hands.
 
 ## Action cost
 
@@ -588,7 +588,7 @@ clock:
   costs: { search: 10, wait: 15, go: 5 }
 ```
 
-The cost is for the player's command. A tick of the host and a turn in a talk take `minutes_per_turn`. Actors act in the player's turn and have no cost of their own. Timers count turns, not minutes; time rules and agenda steps see the minutes, so a long search can let the clock pass midnight.
+The cost is for the player's command. A tick of the host and a choice in a talk take `minutes_per_turn`; leaving a talk takes no time. Actors act in the player's turn and have no cost of their own. Timers count turns, not minutes; time rules and agenda steps see the minutes, so a long search can let the clock pass midnight.
 
 ## Score
 
