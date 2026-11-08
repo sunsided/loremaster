@@ -186,7 +186,7 @@ tasks:
       - release:ui
     cmds:
       # git ignores crates/loremaster-mcp/ui, so cargo sees its files as not committed.
-      - "{{.CARGO}} package --workspace --exclude loremaster-wasm --exclude loremaster-zil --allow-dirty"
+      - "{{.CARGO}} package --workspace --exclude loremaster-wasm --exclude loremaster-zil --exclude loremaster-terminal-host --allow-dirty"
 
   release:publish:
     desc: After `cargo release --execute`, upload loremaster-mcp and loremaster (with the web editor) to crates.io
