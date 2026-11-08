@@ -14,10 +14,6 @@
 </div>
 
 <style>
-	.captions {
-		flex: none;
-		padding: 0 var(--space-4);
-	}
 	p {
 		margin: 0;
 		color: var(--color-text-muted);

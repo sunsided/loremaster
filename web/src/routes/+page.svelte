@@ -1771,16 +1771,17 @@
 		{#snippet player()}
 			{#if s.stats.length}<StatSheet stats={s.stats} inventory={s.scene.inventory} />{/if}
 			{#if hasAssets}
-				<AudioControls
-					bind:sound={settings.sound}
-					bind:captions={settings.captions}
-					bind:music={settings.musicVolume}
-					bind:ambience={settings.ambienceVolume}
-					bind:effects={settings.effectsVolume}
-				/>
+				<MediaPanel illustration={image(s.media.illustration)} portrait={image(s.media.portrait)}>
+					<AudioControls
+						bind:sound={settings.sound}
+						bind:captions={settings.captions}
+						bind:music={settings.musicVolume}
+						bind:ambience={settings.ambienceVolume}
+						bind:effects={settings.effectsVolume}
+					/>
+					{#if !settings.sound || settings.captions}<CaptionLog captions={s.captions} />{/if}
+				</MediaPanel>
 			{/if}
-			<MediaPanel illustration={image(s.media.illustration)} portrait={image(s.media.portrait)} />
-			{#if hasAssets && (!settings.sound || settings.captions)}<CaptionLog captions={s.captions} />{/if}
 			<Transcript
 				entries={s.entries}
 				room={s.scene.room}

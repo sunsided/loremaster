@@ -28,24 +28,35 @@
 	</Button>
 	<span class="key">Alt+M</span>
 	<Checkbox bind:checked={captions}>Captions</Checkbox>
-	<label>Music <input type="range" min="0" max="100" step="5" bind:value={music} /></label>
-	<label>Ambience <input type="range" min="0" max="100" step="5" bind:value={ambience} /></label>
-	<label>Effects <input type="range" min="0" max="100" step="5" bind:value={effects} /></label>
+	<details>
+		<summary>Volumes</summary>
+		<div class="volumes">
+			<label>Music <input type="range" min="0" max="100" step="5" bind:value={music} /></label>
+			<label>Ambience <input type="range" min="0" max="100" step="5" bind:value={ambience} /></label>
+			<label>Effects <input type="range" min="0" max="100" step="5" bind:value={effects} /></label>
+		</div>
+	</details>
 </section>
 
 <style>
 	.audio {
-		flex: none;
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--space-3);
-		padding: var(--space-2) var(--space-4);
 		font-size: var(--font-size-xs);
 		color: var(--color-text);
 	}
 	.key {
 		color: var(--color-text-muted);
+	}
+	summary {
+		cursor: pointer;
+	}
+	.volumes {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-3);
 	}
 	label {
 		display: inline-flex;
