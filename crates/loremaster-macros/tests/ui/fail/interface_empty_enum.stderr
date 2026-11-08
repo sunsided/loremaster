@@ -1,0 +1,5 @@
+error: an enum needs at least one value
+ --> tests/ui/fail/interface_empty_enum.rs:9:22
+  |
+9 |         event killed(boss: []);
+  |                      ^^^^

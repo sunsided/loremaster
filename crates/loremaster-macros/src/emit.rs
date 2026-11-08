@@ -21,8 +21,8 @@ pub fn expand(world: &World) -> TokenStream {
         .collect();
     for item in &world.items {
         body.extend(match item {
-            Item::Extern(_) | Item::Var(_) => TokenStream::new(),
-            Item::Story(s) => story(s, &vars),
+            Item::Extern(_) | Item::Var(_) | Item::Interface(..) => TokenStream::new(),
+            Item::Story(s) => story(s, &vars, world),
             Item::Room(r) => room(r),
             Item::Thing(t) => thing(t),
             Item::Rule(r) => rule(r),
@@ -65,7 +65,9 @@ pub fn expand(world: &World) -> TokenStream {
             "The pack of this `world!` block.".to_string(),
         ),
     };
+    let bindings = interface_module(world);
     quote! {
+        #bindings
         #[doc = #doc]
         pub fn #function() -> ::loremaster::dsl::Pack {
             #[allow(unused_imports)]
@@ -76,6 +78,34 @@ pub fn expand(world: &World) -> TokenStream {
             #body
             #pack
         }
+    }
+}
+
+/// The `interface` section of the block, if it has one.
+pub fn interface_of(world: &World) -> Option<&loremaster_model::Interface> {
+    world.items.iter().find_map(|i| match i {
+        Item::Interface(i, _) => Some(i),
+        _ => None,
+    })
+}
+
+/// `pub mod interface` with the host types (IF-3), or `<name>_interface`
+/// for a block `pack <name>;`.
+fn interface_module(world: &World) -> TokenStream {
+    let Some(interface) = interface_of(world) else {
+        return TokenStream::new();
+    };
+    let module = match &world.name {
+        Some(n) => Ident::new(&format!("{}_interface", n.value), n.span),
+        None => Ident::new("interface", Span::call_site()),
+    };
+    let code: TokenStream = loremaster_project::rust_bindings(interface, "::loremaster::runtime")
+        .parse()
+        .expect("the generated code is Rust");
+    quote! {
+        /// The host types of this block's `interface`.
+        #[allow(dead_code)]
+        pub mod #module { #code }
     }
 }
 
@@ -204,12 +234,18 @@ fn notes(list: &[&Note], span: Span) -> TokenStream {
     out
 }
 
-fn story(st: &Story, vars: &[&Var]) -> TokenStream {
+fn story(st: &Story, vars: &[&Var], world: &World) -> TokenStream {
     let span = st.title.span;
     let p = pack_ident(span);
     let title = text(&st.title);
     let start = st.start.as_ref().map(name).expect("parse requires start");
     let mut chain = TokenStream::new();
+    if let Some(i) = interface_of(world) {
+        let json = serde_json::to_string(i).expect("an interface is plain data");
+        chain.extend(quote_spanned!(span=> .interface(
+            ::loremaster::runtime::Interface::from_json(#json).expect("the macro wrote it")
+        )));
+    }
     if let Some(a) = &st.author {
         let a = text(a);
         chain.extend(quote_spanned!(span=> .author(#a)));

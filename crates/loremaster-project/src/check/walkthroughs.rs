@@ -79,6 +79,7 @@ impl Checker<'_> {
     }
 
     fn walkthrough(&mut self, key: &str, walk: &Walkthrough) {
+        self.event_steps(key, walk);
         let mut position: BTreeMap<&Id, usize> = BTreeMap::new();
         for (i, step) in walk.steps.iter().enumerate() {
             if let Some(id) = step.id()
@@ -245,7 +246,13 @@ impl Checker<'_> {
     /// A diagnostic at step `i` of a walkthrough. In a YAML file the line is
     /// the one of the step (see [`step_position`]); a walkthrough from Rust
     /// has its place in its key.
-    fn at_step(&mut self, key: &str, i: usize, severity: Severity, message: impl Into<String>) {
+    pub(super) fn at_step(
+        &mut self,
+        key: &str,
+        i: usize,
+        severity: Severity,
+        message: impl Into<String>,
+    ) {
         self.at_place(key, format!("steps[{i}]"), Some(i), severity, message);
     }
 

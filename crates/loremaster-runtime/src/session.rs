@@ -8,8 +8,7 @@
 use crate::output::{Block, BlockKind, Choice, LogEntry, RollDetail, TalkInfo};
 use crate::state::{AwaitRequest, Awaiting};
 use crate::{Command, Game, Restored, Save, SaveError, State, Turn, World};
-use loremaster_model::Value;
-use loremaster_model::{EndingKind, Id};
+use loremaster_model::{EndingKind, Id, Interface, InterfaceMismatch, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
@@ -171,6 +170,14 @@ impl Session {
         Self::with_seed(world, seed)
     }
 
+    /// A new game for a host built for `built_for` (IF-5). Refuses to make
+    /// the session when the story has another interface.
+    pub fn for_host(world: Arc<World>, built_for: &Interface) -> Result<Self, InterfaceMismatch> {
+        let session = Self::new(world);
+        session.check_interface(built_for)?;
+        Ok(session)
+    }
+
     /// A new game with another seed for chance, shuffled and sticky texts.
     /// The same world, seed and input give the same effects (SE-10).
     pub fn with_seed(world: Arc<World>, seed: u64) -> Self {
@@ -277,6 +284,39 @@ impl Session {
     pub fn resume(&mut self, await_id: &str, value: Value) -> Result<Step, String> {
         let turn = self.resume_turn(await_id, value)?;
         Ok(self.step(turn))
+    }
+
+    /// The host reports a declared event (IF-1, HG-1): check its arguments
+    /// and precondition, and run the rules that listen for it. An `Err` says
+    /// why it is refused, and nothing has changed.
+    pub fn host_event(
+        &mut self,
+        name: &str,
+        args: BTreeMap<String, Value>,
+    ) -> Result<Step, String> {
+        let before = self.before();
+        let candidates = self.step_candidates(&Input::Tick);
+        let turn = self.game.host_event(name, &args)?;
+        self.mark_steps(candidates);
+        self.remember(before);
+        Ok(self.step(turn))
+    }
+
+    /// `Err` with what differs when the host was built for another
+    /// interface than the story has (IF-5).
+    pub fn check_interface(&self, built_for: &Interface) -> Result<(), InterfaceMismatch> {
+        let story = self.interface();
+        story.compare(built_for)
+    }
+
+    /// The interface of the story; empty when it has none.
+    pub fn interface(&self) -> Interface {
+        self.game
+            .world()
+            .story
+            .interface
+            .clone()
+            .unwrap_or_default()
     }
 
     /// Go back to the state before the last input (SE-8).

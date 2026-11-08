@@ -9,7 +9,7 @@ use crate::output::{Choice, RollDetail};
 use crate::rng;
 use crate::state::{AwaitRequest, Awaiting};
 use crate::world::CompiledEffect;
-use crate::{BlockKind, LogEntry, Turn};
+use crate::{BlockKind, Event, LogEntry, Turn};
 use loremaster_model::{AwaitSpec, Dice, Id, Value};
 use std::collections::BTreeMap;
 
@@ -240,6 +240,42 @@ impl Game {
             .enumerate()
             .map(|(index, (_, text))| Choice { index, text })
             .collect()
+    }
+
+    /// A host event (IF-1): check it against the interface, keep its
+    /// arguments as `event.arg`, and run the rules that listen for it. It is
+    /// no turn: the clock does not move.
+    pub(crate) fn host_event(
+        &mut self,
+        name: &str,
+        args: &BTreeMap<String, Value>,
+    ) -> Result<Turn, String> {
+        let world = self.world.clone();
+        let decl = (world.story.interface.as_ref())
+            .and_then(|i| i.event(name))
+            .ok_or_else(|| format!("`{name}` is not a declared host event"))?;
+        loremaster_model::check_args(&format!("the event `{name}`"), &decl.args, args)?;
+        if self.state.ended {
+            return Err("the story has ended".into());
+        }
+        if let Some(open) = &self.state.awaiting {
+            return Err(format!("the story waits: {}", open.request.describe()));
+        }
+        if world
+            .event_when
+            .get(name)
+            .is_some_and(|when| !self.eval().holds(when))
+        {
+            return Err(format!(
+                "the precondition of the event `{name}` does not hold"
+            ));
+        }
+        let mut turn = Turn::default();
+        for (arg, value) in args {
+            self.set_fact(&mut turn, &format!("{name}.{arg}"), value.clone());
+        }
+        self.fire(&mut turn, &Event::Custom(Id::new(name)), 0);
+        Ok(self.finish(turn))
     }
 
     /// Typed input while a rule waits: a number of the list, or an answer

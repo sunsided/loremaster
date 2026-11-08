@@ -16,7 +16,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::{Error, LitFloat, LitInt, LitStr, Result, Token, braced, bracketed, parenthesized};
 
 /// The items of a block, for the error on an unknown one.
-const ITEMS: &str = "`extern`, `story`, `var`, `room`, `thing`, `rule`, `machine`, `timer`, `ending`, `verb`, `dialogue`, `thread`, `behavior` or `test`";
+const ITEMS: &str = "`extern`, `story`, `var`, `interface`, `room`, `thing`, `rule`, `machine`, `timer`, `ending`, `verb`, `dialogue`, `thread`, `behavior` or `test`";
 
 /// The items that `replace` can stand before.
 const REPLACEABLE: &[&str] = &[
@@ -76,6 +76,7 @@ fn item(input: ParseStream) -> Result<Item> {
     Ok(match word.as_str() {
         "story" => Item::Story(story(input)?),
         "var" => Item::Var(var(input)?),
+        "interface" => interface(input)?,
         "room" => Item::Room(Room {
             replace,
             ..room(input)?
@@ -583,6 +584,102 @@ fn var_type(input: ParseStream) -> Result<VarType> {
             "expected `bool`, `int` or a list of enum values `[a, b]`",
         )),
     }
+}
+
+/// `interface { action name(arg: int) -> a | b; event name(arg: text) when "cond"; }`.
+fn interface(input: ParseStream) -> Result<Item> {
+    use loremaster_model::{ActionDecl, EventDecl, Id, Interface};
+    let at = keyword(input, "interface")?.span();
+    let body;
+    syn::braced!(body in input);
+    let mut out = Interface::default();
+    while !body.is_empty() {
+        match peek_word(&body).as_deref() {
+            Some("action") => {
+                keyword(&body, "action")?;
+                let id = Id::new(name(&body)?.value);
+                let args = declared_args(&body)?;
+                let mut results = Vec::new();
+                if body.peek(Token![->]) {
+                    body.parse::<Token![->]>()?;
+                    results.push(Id::new(name(&body)?.value));
+                    while body.peek(Token![|]) {
+                        body.parse::<Token![|]>()?;
+                        results.push(Id::new(name(&body)?.value));
+                    }
+                }
+                out.actions.push(ActionDecl { id, args, results });
+            }
+            Some("event") => {
+                keyword(&body, "event")?;
+                let id = Id::new(name(&body)?.value);
+                let args = declared_args(&body)?;
+                let when = if peek_kw(&body, "when") {
+                    keyword(&body, "when")?;
+                    Some(text(&body)?.value)
+                } else {
+                    None
+                };
+                out.events.push(EventDecl { id, args, when });
+            }
+            _ => return Err(body.error("expected `action` or `event`")),
+        }
+        semi(&body)?;
+    }
+    Ok(Item::Interface(out, at))
+}
+
+/// `(a: int, b: text, c: [x, y])`; the parentheses can be left out.
+fn declared_args(
+    input: ParseStream,
+) -> Result<std::collections::BTreeMap<String, loremaster_model::ArgType>> {
+    use loremaster_model::ArgType;
+    let mut out = std::collections::BTreeMap::new();
+    if !input.peek(syn::token::Paren) {
+        return Ok(out);
+    }
+    let body;
+    syn::parenthesized!(body in input);
+    while !body.is_empty() {
+        let arg = name(&body)?;
+        body.parse::<Token![:]>()?;
+        let ty = if body.peek(syn::token::Bracket) {
+            let list;
+            syn::bracketed!(list in body);
+            let mut values = Vec::new();
+            while !list.is_empty() {
+                values.push(name(&list)?.value);
+                if !list.is_empty() {
+                    list.parse::<Token![,]>()?;
+                }
+            }
+            if values.is_empty() {
+                return Err(Error::new(arg.span, "an enum needs at least one value"));
+            }
+            ArgType::Enum(values)
+        } else {
+            let word = name(&body)?;
+            match word.value.as_str() {
+                "bool" => ArgType::Bool,
+                "int" => ArgType::Int,
+                "text" => ArgType::Text,
+                _ => {
+                    return Err(Error::new(
+                        word.span,
+                        "expected `bool`, `int`, `text` or `[a, b]`",
+                    ));
+                }
+            }
+        };
+        if out.contains_key(&arg.value) {
+            return Err(Error::new(arg.span, format!("`{}` comes twice", arg.value)));
+        }
+        out.insert(arg.value, ty);
+        if !body.is_empty() {
+            body.parse::<Token![,]>()?;
+        }
+    }
+    Ok(out)
 }
 
 fn var(input: ParseStream) -> Result<Var> {

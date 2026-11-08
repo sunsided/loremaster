@@ -1,0 +1,5 @@
+error: `boss` comes twice
+ --> tests/ui/fail/interface_duplicate_arg.rs:9:34
+  |
+9 |         event killed(boss: text, boss: int);
+  |                                  ^^^^

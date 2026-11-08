@@ -16,6 +16,7 @@ include = ["/src/", "/build.rs", "/ui/", "/writing-stories.md", "/README.md", "/
 
 [dependencies]
 loremaster-project.workspace = true
+loremaster-runtime.workspace = true
 loremaster-tools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
