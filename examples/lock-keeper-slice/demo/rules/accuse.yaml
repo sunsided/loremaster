@@ -12,7 +12,7 @@
 
 - id: accuse_marsh_weak
   on: { verb: [accuse, marsh] }
-  when: means == proven and opportunity == proven and motive != open and not (motive == strong and carried(pages))
+  when: means == proven and opportunity == proven and (motive == weak or (motive == strong and not carried(pages)))
   instead: true
   then:
     - say: "You tell Marsh what you know. He asks for the pages, and you do not have them."
@@ -20,7 +20,7 @@
 
 - id: accuse_marsh_unproven
   on: { verb: [accuse, marsh] }
-  when: not (means == proven and opportunity == proven and motive != open)
+  when: not (means == proven and opportunity == proven and (motive == weak or motive == strong))
   instead: true
   then:
     - say: ["Marsh smiles.", { says: "On what evidence, constable?", by: marsh }]
