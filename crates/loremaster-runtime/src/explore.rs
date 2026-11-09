@@ -188,47 +188,84 @@ fn fingerprint(
 
 /// What the timeless key of [`fingerprint`] keeps of the parts time changes.
 struct Timeless {
-    /// The story reads the visits (`first_visit`, `visits`, `visited`).
+    /// The story reads the visits: `first_visit`, `visits`, `visited`, or a
+    /// first-visit text.
     visits: bool,
-    /// The agenda actors that no `move` effect moves: their places are time.
+    /// The agenda actors that only their agenda moves: their places are time.
     actors: BTreeSet<Id>,
 }
 
 impl Timeless {
     fn new(game: &Game) -> Self {
-        let story = &game.world().story;
+        let world = game.world();
+        let story = &world.story;
         let json = serde_json::to_value(story).unwrap_or_default();
-        let text = json.to_string();
         let mut moved: BTreeSet<String> = BTreeSet::new();
-        moves(&json, &mut moved);
+        let mut calls = false;
+        effects(&json, &mut moved, &mut calls);
+        // A behavior can move any thing: then every actor's place counts.
+        let behaviors = calls || !world.behaviors.is_empty();
+        let only_agenda = |a: &Id| {
+            !behaviors
+                && !moved.contains(a.as_str())
+                // An actor that takes orders walks, and a portable one is carried.
+                && !story.playable.contains(a)
+                && !world.thing(a.as_str()).is_some_and(|t| t.portable)
+        };
         Self {
-            visits: ["first_visit", "visits", "visited"]
-                .iter()
-                .any(|w| text.contains(w)),
+            visits: reads_visits(world),
             actors: story
                 .agendas
                 .iter()
                 .map(|a| a.actor.clone())
-                .filter(|a| !moved.contains(a.as_str()))
+                .filter(only_agenda)
                 .collect(),
         }
     }
 }
 
-/// The things that a `move` effect anywhere in the story moves.
-fn moves(value: &serde_json::Value, into: &mut BTreeSet<String>) {
+/// The things that a `move` effect anywhere in the story moves, and whether
+/// a `call` effect runs a behavior.
+fn effects(value: &serde_json::Value, moved: &mut BTreeSet<String>, calls: &mut bool) {
     match value {
         serde_json::Value::Object(map) => {
             for (k, v) in map {
-                if let (true, Some(targets)) = (k == "move", v.as_object()) {
-                    into.extend(targets.keys().cloned());
+                match (k.as_str(), v.as_object()) {
+                    ("move", Some(targets)) => moved.extend(targets.keys().cloned()),
+                    ("call", _) => *calls = true,
+                    _ => {}
                 }
-                moves(v, into);
+                effects(v, moved, calls);
             }
         }
-        serde_json::Value::Array(list) => list.iter().for_each(|v| moves(v, into)),
+        serde_json::Value::Array(list) => list.iter().for_each(|v| effects(v, moved, calls)),
         _ => {}
     }
+}
+
+/// True when a compiled condition, markup operand or text mode of the world
+/// reads the visits: `first_visit`, `room.visits`, `visited(room)`, or a
+/// first-visit text. Prose that says "visited" does not count.
+///
+/// shortcut: reads the `Debug` form of the compiled world, so that a new
+/// place for conditions is covered without a walker. A derived condition is
+/// matched with its quotes, which escaped prose can not hold; the type names
+/// could only match prose that spells them, and that just keeps the visits.
+/// Upgrade to a walker when the compiled conditions get a visitor.
+fn reads_visits(world: &crate::World) -> bool {
+    let compiled = format!("{world:?}");
+    let custom = |name: &str| {
+        format!(
+            "key: \"{}\", args: [Text(\"{name}\")",
+            loremaster_lang::CUSTOM_KEY
+        )
+    };
+    ["first_visit", "visits", "visited"]
+        .iter()
+        .any(|n| compiled.contains(&custom(n)))
+        || ["FirstVisit", "FirstTime", "Visits(", "Visited("]
+            .iter()
+            .any(|m| compiled.contains(m))
 }
 
 /// True when any condition or markup in the story reads the talk or interaction counters.
@@ -855,6 +892,22 @@ mod tests {
 
     fn labels(game: &Game) -> Vec<String> {
         commands(game).into_iter().map(|(label, _)| label).collect()
+    }
+
+    #[test]
+    fn only_conditions_and_text_modes_read_the_visits() {
+        // Prose and a note that say "visited", "visits" or "first_visit" do not count.
+        let prose = "- id: look\n  on: { verb: [examine, coin] }\n  notes: [\"first_visit: visits\"]\n  then: [{ say: You visited the cellar. Your visits are many. }]\n";
+        assert!(!reads_visits(game(prose).world()));
+        for when in ["visited(cellar)", "cellar.visits > 1", "first_visit"] {
+            let rule = format!(
+                "- id: look\n  on: {{ verb: [examine, coin] }}\n  when: {when}\n  then: [{{ say: Hm. }}]\n"
+            );
+            assert!(reads_visits(game(&rule).world()), "{when}");
+        }
+        // In markup, too.
+        let markup = "- id: look\n  on: { verb: [examine, coin] }\n  then: [{ say: \"{visited(cellar) ? Again. | New.}\" }]\n";
+        assert!(reads_visits(game(markup).world()));
     }
 
     #[test]

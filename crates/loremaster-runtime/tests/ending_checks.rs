@@ -288,6 +288,64 @@ fn closes_accepts_the_turns_before_a_timed_step() {
 }
 
 #[test]
+fn moving_a_portable_agenda_actor_is_no_lateness() {
+    // The cat has an agenda, but the player can carry it, and it will not
+    // be put down. Taking it loses `purred`, which only the curfew at
+    // midnight names. The cat's place is the player's doing, not time: the
+    // twin with the cat still in the cell must not prove lateness (#262).
+    let files = vec![
+        file(
+            "story.yaml",
+            "title: Cat\nstart: cell\nclock:\n  start: \"23:45\"\n  minutes_per_turn: 5\nvars:\n  - { id: curfew, type: bool, initial: false }\n",
+        ),
+        file("rooms/cell.yaml", "name: Cell\ndescription: [\"Straw.\"]\n"),
+        file(
+            "things/cat.yaml",
+            "name: cat\nlocation: { room: cell }\nportable: true\n",
+        ),
+        file(
+            "agendas/cat.yaml",
+            "actor: cat\nsteps:\n  - at: \"01:00\"\n    then: [{ say: The cat yawns. }]\n",
+        ),
+        file("endings/purred.yaml", "kind: win\nrank: 1\ntitle: Purred\n"),
+        file(
+            "endings/caught.yaml",
+            "kind: loss\nrank: 3\ntitle: Caught\n",
+        ),
+        file("verbs/pet.yaml", "label: Pet\nwords: [pet]\nslots: none\n"),
+        file(
+            "verbs/surrender.yaml",
+            "label: Surrender\nwords: [surrender]\nslots: none\n",
+        ),
+        file(
+            "rules/cat.yaml",
+            "- id: pet\n  on: { verb: [pet] }\n  when: cat.location == cell and not curfew\n  then: [{ end: purred }]\n- id: clings\n  on: { check: [drop, cat] }\n  then: [{ say: The cat clings to you. }, stop]\n- id: surrender\n  on: { verb: [surrender] }\n  then: [{ end: caught }]\n- id: midnight\n  on: { time: \"00:00\" }\n  then: [{ set: { curfew: true } }]\n  closes: [purred]\n  reason: The curfew starts at midnight.\n",
+        ),
+    ];
+    let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
+    let (result, diagnostics) = full(&project);
+    let checks = &result.ending_checks;
+    assert!(checks.proven, "{checks:#?}");
+    let take = checks
+        .no_return
+        .iter()
+        .find(|p| p.path.last().is_some_and(|c| c.starts_with("take")))
+        .unwrap_or_else(|| panic!("{checks:#?}"));
+    assert!(take.accepted(), "{take:#?}");
+    assert_eq!(take.only_ahead, ["purred"], "{take:#?}");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Info && d.message.contains("`purred`")),
+        "{diagnostics:#?}"
+    );
+    assert!(
+        diagnostics.iter().all(|d| d.severity == Severity::Info),
+        "{diagnostics:#?}"
+    );
+}
+
+#[test]
 fn only_fired_once_rules_tell_states_apart() {
     // A rule that can fire again changes nothing by firing: burning in the
     // cell is the same state as before. A `once` rule cannot fire again, so

@@ -505,7 +505,8 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
         out.sort_unstable();
         out.dedup();
     }
-    twin_reach.close(&Preds::new(&twin_edges));
+    let twin_preds = Preds::new(&twin_edges);
+    twin_reach.close(&twin_preds);
 
     // States that can reach a state the walk did not finish: not proven.
     let mut unproven: Vec<bool> = g.open.to_vec();
@@ -520,10 +521,21 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
     }
 
     // A twin group with a state that the walk did not finish proves nothing:
-    // its turns are incomplete, so no drop into it counts as `only_ahead`.
+    // its turns are incomplete. So does a group with a timeless path into
+    // one: the missing turns may reach the ending. No drop into such a group
+    // counts as `only_ahead`.
     let mut inconclusive = vec![false; groups];
     for (i, &t) in g.twins.iter().enumerate() {
         inconclusive[t as usize] |= unproven[i];
+    }
+    let mut queue: VecDeque<usize> = (0..groups).filter(|&t| inconclusive[t]).collect();
+    while let Some(v) = queue.pop_front() {
+        for &u in twin_preds.of(v) {
+            if !inconclusive[u as usize] {
+                inconclusive[u as usize] = true;
+                queue.push_back(u as usize);
+            }
+        }
     }
 
     // The rules with `closes` that can still fire after each state.
