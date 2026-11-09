@@ -100,16 +100,22 @@ jobs:
         run: |
           # A patch applies only when its version satisfies the requirement,
           # and a range never takes a pre-release of another version. Ask
-          # for exactly the version on main, whatever it is.
-          version=$(curl -fsSL https://raw.githubusercontent.com/sunsided/dramaturge/main/Cargo.toml \
+          # for exactly the version on main, read at one commit and patched
+          # to that commit, so a push to main in between can't skip the patch.
+          rev=$(git ls-remote https://github.com/sunsided/dramaturge refs/heads/main | cut -f1)
+          [[ "$rev" =~ ^[0-9a-f]{40}$ ]] \
+            || { echo "error: could not resolve dramaturge main (got '$rev')"; exit 1; }
+          version=$(curl -fsSL "https://raw.githubusercontent.com/sunsided/dramaturge/$rev/Cargo.toml" \
             | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
-          test -n "$version"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] \
+            || { echo "error: could not read the dramaturge version at $rev (got '$version')"; exit 1; }
+          echo "dramaturge main: $rev, version $version"
           sed -i -E "s/^(dramaturge-[a-z]+ = (\\{ version = )?)\"[^\"]+\"/\\1\"=$version\"/" Cargo.toml
           mkdir -p .cargo
           {
             echo '[patch.crates-io]'
             for crate in dramaturge-model dramaturge-runtime dramaturge-authoring dramaturge-syntax; do
-              echo "$crate = { git = \"https://github.com/sunsided/dramaturge\", branch = \"main\" }"
+              echo "$crate = { git = \"https://github.com/sunsided/dramaturge\", rev = \"$rev\" }"
             done
           } > .cargo/config.toml
           cargo update -p dramaturge-model -p dramaturge-runtime -p dramaturge-authoring -p dramaturge-syntax
