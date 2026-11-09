@@ -257,6 +257,7 @@ fn show(step: &Step) {
 fn show_block(block: &Block) {
     let mut text = String::new();
     let mut speaker = None;
+    let mut emphasis = false;
     for run in &block.runs {
         // Runs of speech name their speaker. The text has the quotes already.
         if run.speaker.is_some() && run.speaker != speaker {
@@ -264,7 +265,16 @@ fn show_block(block: &Block) {
         }
         // Narration between two lines of one speaker names the speaker again.
         speaker.clone_from(&run.speaker);
+        // A plain terminal has no italics: emphasis keeps its stars, one
+        // pair for runs that a link split.
+        if run.emphasis != emphasis {
+            text.push('*');
+            emphasis = run.emphasis;
+        }
         text.push_str(&run.text);
+    }
+    if emphasis {
+        text.push('*');
     }
     match block.kind {
         // The echo of the player's own line: the terminal has it already.

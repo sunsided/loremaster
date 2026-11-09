@@ -603,7 +603,7 @@ fn print_step(step: &Step, style: bool) {
             println!();
         }
         first = false;
-        let text = emphasis(&things_in_color(block, style), style);
+        let text = styled_runs(block, style);
         match block.kind {
             BlockKind::Title => println!("{}", bold(&text, style)),
             BlockKind::Said => println!("{}", wrap(&format!("> {text}"), 78)),
@@ -637,19 +637,29 @@ fn bold(text: &str, style: bool) -> String {
     }
 }
 
-/// The block's text, with each mention of a thing in scope in cyan.
-fn things_in_color(block: &Block, style: bool) -> String {
+/// The block's text, with each mention of a thing in scope in cyan and
+/// emphasis in italics.
+fn styled_runs(block: &Block, style: bool) -> String {
     block
         .runs
         .iter()
-        .map(|r| match &r.link {
-            Some(l) if style && l.kind == LinkKind::Thing => format!("\x1b[36m{}\x1b[39m", r.text),
-            _ => r.text.clone(),
+        .map(|r| {
+            let text = match &r.link {
+                Some(l) if style && l.kind == LinkKind::Thing => {
+                    format!("\x1b[36m{}\x1b[39m", r.text)
+                }
+                _ => r.text.clone(),
+            };
+            if style && r.emphasis {
+                format!("\x1b[3m{text}\x1b[23m")
+            } else {
+                text
+            }
         })
         .collect()
 }
 
-/// `*word*` in story text is emphasis.
+/// `*word*` in a choice's text is emphasis.
 fn emphasis(text: &str, style: bool) -> String {
     let mut out = String::new();
     for (i, part) in text.split('*').enumerate() {

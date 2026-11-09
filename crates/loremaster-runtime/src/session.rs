@@ -610,7 +610,9 @@ impl Session {
         }
     }
 
-    fn step(&self, turn: Turn) -> Step {
+    fn step(&self, mut turn: Turn) -> Step {
+        // The session's own blocks (the journal, notes) did not go through the game.
+        crate::output::split_emphasis(&mut turn.blocks);
         let mut effects: Vec<Effect> = turn
             .blocks
             .into_iter()

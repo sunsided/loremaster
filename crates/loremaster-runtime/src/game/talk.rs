@@ -255,6 +255,7 @@ impl Game {
             }),
             link: None,
             speaker: None,
+            emphasis: false,
         };
         for (speaker, text) in node.all_lines() {
             let player = self.world.symbols.entity_key(speaker.0) == Some(SymbolTable::PLAYER_KEY);

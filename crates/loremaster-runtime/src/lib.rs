@@ -16,6 +16,7 @@
 #[doc(hidden)]
 pub mod authoring;
 mod behavior;
+mod bundle;
 mod episode;
 mod eval;
 mod events;
@@ -35,6 +36,7 @@ mod walkthrough;
 mod world;
 
 pub use behavior::{Behavior, Cx, Flow, Manifest, Unstable};
+pub use bundle::{BUNDLE_FORMAT, BUNDLE_VERSION, Bundle, BundleError};
 pub use episode::{EPISODE_FORMAT, EPISODE_VERSION, Episode, Imported};
 pub use events::{Event, EventKind, Phase};
 pub(crate) use game::Game;

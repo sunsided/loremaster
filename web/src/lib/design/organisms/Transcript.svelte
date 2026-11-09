@@ -251,9 +251,17 @@
 		return `${scope} frame for ${verb}, ${part}`;
 	}
 
-	/** `*word*` in story text is emphasis. */
+	/** `*word*` in a choice's text is emphasis, by the engine's rule: no space just inside the stars, and `**` is no delimiter. */
 	function pieces(text: string): { text: string; em: boolean }[] {
-		return text.split('*').map((t, i) => ({ text: t, em: i % 2 === 1 }));
+		const out: { text: string; em: boolean }[] = [];
+		let last = 0;
+		for (const m of text.matchAll(/(?<!\*)\*(?!\*)(?=\S)([^*\n]*?\S)(?<!\*)\*(?!\*)/g)) {
+			if (m.index > last) out.push({ text: text.slice(last, m.index), em: false });
+			out.push({ text: m[1], em: true });
+			last = m.index + m[0].length;
+		}
+		if (last < text.length) out.push({ text: text.slice(last), em: false });
+		return out;
 	}
 </script>
 
@@ -269,13 +277,13 @@
 			/>{/if}{#if run.link?.kind === 'thing'}{@const id = run.link.id}<ProseLink
 				kind="thing"
 				inspect="thing:{id}"
-				onclick={() => onthing(id, run.text)}>{run.text}</ProseLink
+				onclick={() => onthing(id, run.text)}>{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}</ProseLink
 			>{:else if run.link?.kind === 'exit'}{@const dir = run.link.id}<ProseLink
 				kind="exit"
 				inspect="exit:{dir}"
 				onclick={() => onexit(dir)}>{run.text}</ProseLink
 			>{:else}<span class:focused={focus !== null && run.source?.fragment === focus && isRoomRun(run)}
-				>{#each pieces(run.text) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</span
+				>{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}</span
 			>{/if}{/each}{/snippet}
 
 <!--
@@ -283,15 +291,13 @@
 	Links are plain text there: a click edits, it does not play.
 -->
 {#snippet writableRuns(block: Block, part: 'all' | 'before' | 'after' = 'all')}{@const gs = groups(block.runs)}{@const cut = gs.findIndex((g) => same(g.source, writing))}{#each gs as g, gi (gi)}{#if (part === 'before' && gi >= cut) || (part === 'after' && gi <= cut)}{:else if same(g.source, writing)}<span class="being-written"
-				>{#each g.runs as run, i (i)}{run.text}{/each}</span
+				>{#each g.runs as run, i (i)}{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}{/each}</span
 			>{:else if g.source}{@const src = g.source}<button
 				type="button"
 				class="writable"
 				onclick={() => onwrite?.(src)}
-				><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#each pieces(run.text) as p, j (j)}{#if p.em}<em
-								>{p.text}</em
-							>{:else}{p.text}{/if}{/each}{/each}</button
-			>{:else}{#each g.runs as run, i (i)}{run.text}{/each}{/if}{/each}{/snippet}
+				><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}{/each}</button
+			>{:else}{#each g.runs as run, i (i)}{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}{/each}{/if}{/each}{/snippet}
 
 {#snippet ghostRow(g: GhostLine)}
 	{@const card = firstGhost.has(g) ? proposals.find((p) => p.id === g.proposal) : undefined}
@@ -332,9 +338,7 @@
 						class="writable"
 						aria-describedby={note ? noteId : undefined}
 						onclick={() => onwrite?.(src)}
-						><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#each pieces(run.text) as p, j (j)}{#if p.em}<em
-										>{p.text}</em
-									>{:else}{p.text}{/if}{/each}{/each}</button
+						><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}{/each}</button
 					>{:else}{@render runs({ kind: block.kind, runs: g.runs })}{/if}
 			</p>
 			{#if note || (g.source && findings.length)}
