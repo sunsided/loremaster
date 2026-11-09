@@ -212,32 +212,62 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             if !objects.iter().all(|o| scope.contains(o)) {
                 continue;
             }
-            // The label is the dedup key: keep the slots that tell rules apart.
-            let mut text = label(p.verb.as_str(), &objects);
-            if let Some(prep) = &p.preposition {
-                text.push_str(&format!(" ({prep})"));
+            // `*` tries each verb that takes that many objects; moves come below.
+            let fits = |v: &&loremaster_model::VerbDef| match objects.len() {
+                0 => v.slots == VerbSlots::None,
+                // The parser takes `unlock darkness` with one object, too.
+                1 => v.slots != VerbSlots::None,
+                _ => v.slots == VerbSlots::Two,
+            };
+            let verbs: Vec<Id> = if p.any_verb() {
+                world
+                    .verbs
+                    .iter()
+                    .filter(|v| v.id.as_str() != "go")
+                    .filter(fits)
+                    .map(|v| v.id.clone())
+                    .collect()
+            } else {
+                vec![p.verb.clone()]
+            };
+            for v in verbs {
+                // The label is the dedup key: keep the slots that tell rules apart.
+                let mut text = label(v.as_str(), &objects);
+                if let Some(prep) = &p.preposition {
+                    text.push_str(&format!(" ({prep})"));
+                }
+                if let Some(topic) = &p.topic {
+                    text.push_str(&format!(" about {topic}"));
+                }
+                out.push((
+                    text,
+                    Command::Verb {
+                        verb: v,
+                        objects: objects.clone(),
+                        actor: None,
+                        preposition: p.preposition.clone(),
+                        topic: p.topic.clone(),
+                    },
+                ));
             }
-            if let Some(topic) = &p.topic {
-                text.push_str(&format!(" about {topic}"));
-            }
-            out.push((
-                text,
-                Command::Verb {
-                    verb: p.verb.clone(),
-                    objects,
-                    actor: None,
-                    preposition: p.preposition.clone(),
-                    topic: p.topic.clone(),
-                },
-            ));
         }
     }
     // The standard verbs that change state.
-    let take_rules = story.rules.iter().any(|r| {
-        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
-            if p.verb.as_str() == "take"
-                && for_player(p))
-    });
+    // A `*` rule counts for the things whose `take` it can match.
+    let take_shaped = |p: &loremaster_model::CommandPattern, thing: &Id| {
+        p.verb.as_str() == "take"
+            || (p.any_verb()
+                && p.direct.as_ref().is_none_or(|d| d == thing)
+                && p.indirect.is_none()
+                && p.preposition.is_none()
+                && p.topic.is_none())
+    };
+    let take_rules = |thing: &Id| {
+        story.rules.iter().any(|r| {
+            matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
+                if take_shaped(p, thing) && for_player(p))
+        })
+    };
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();
         if story.dialogue_with(id.as_str()).is_some() {
@@ -262,7 +292,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
                 verb("drop", vec![id.clone()]),
             ));
         }
-        if t.portable && !carried && (!full || take_rules) {
+        if t.portable && !carried && (!full || take_rules(&id)) {
             out.push((
                 label("take", std::slice::from_ref(&id)),
                 verb("take", vec![id.clone()]),
@@ -680,7 +710,63 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::World;
+    use loremaster_project::{SourceFile, load};
     use std::path::Path;
+    use std::sync::Arc;
+
+    fn game(rules: &str) -> Game {
+        let files: Vec<SourceFile> = [
+            ("story.yaml", "title: Dark\nstart: cellar\ncarry_limit: 1\n"),
+            (
+                "rooms/cellar.yaml",
+                "name: Cellar\ndescription: [\"A cellar.\"]\n",
+            ),
+            (
+                "things/darkness.yaml",
+                "name: darkness\nlocation: { room: cellar }\n",
+            ),
+            (
+                "things/lamp.yaml",
+                "name: lamp\nlocation: carried\nportable: true\n",
+            ),
+            (
+                "things/coin.yaml",
+                "name: coin\nlocation: { room: cellar }\nportable: true\n",
+            ),
+            ("rules/rules.yaml", rules),
+        ]
+        .map(|(path, text)| SourceFile {
+            path: path.into(),
+            text: text.into(),
+        })
+        .into();
+        let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
+        let mut game = Game::new(world);
+        game.start();
+        game
+    }
+
+    fn labels(game: &Game) -> Vec<String> {
+        commands(game).into_iter().map(|(label, _)| label).collect()
+    }
+
+    #[test]
+    fn a_star_rule_tries_the_verbs_that_fit_its_objects() {
+        let found = labels(&game(
+            "- id: any\n  on: { verb: [\"*\", darkness] }\n  then: []\n",
+        ));
+        assert!(found.contains(&"push darkness".to_string()), "{found:?}");
+        // A two-object verb runs with one object, as the parser takes it.
+        assert!(found.contains(&"unlock darkness".to_string()), "{found:?}");
+        assert!(!found.contains(&"look darkness".to_string()), "{found:?}");
+        // With full hands, a `*` rule on the darkness does not handle `take coin`.
+        assert!(!found.contains(&"take coin".to_string()), "{found:?}");
+        let found = labels(&game(
+            "- id: any\n  on: { verb: [\"*\", coin] }\n  then: []\n",
+        ));
+        assert!(found.contains(&"take coin".to_string()), "{found:?}");
+    }
 
     /// Every read of `State.fired` that changes play goes through
     /// `reads_fired`, and the explorer builds its set from it: the

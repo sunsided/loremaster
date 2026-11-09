@@ -533,6 +533,14 @@ impl Checker<'_> {
         self.frames(&header, "frames", &story.frames);
         let mut seen = BTreeSet::new();
         for v in &story.verbs {
+            if v.id.as_str() == loremaster_model::ANY_VERB {
+                let file = self.file_of(&format!("verb:{}", v.id));
+                self.error(
+                    &file,
+                    "id",
+                    "`*` is the verb of rules that match any verb; name the verb otherwise",
+                );
+            }
             if !seen.insert(v.id.as_str()) {
                 let file = self.file_of(&format!("verb:{}", v.id));
                 self.error(&file, "id", format!("verb `{}` is defined twice", v.id));
@@ -1667,7 +1675,7 @@ impl Checker<'_> {
         let verb = pattern.verb.as_str();
         if verb.is_empty() {
             self.error(file, at, "name the verb");
-        } else if !verbs.contains(verb) {
+        } else if !verbs.contains(verb) && !pattern.any_verb() {
             self.error(file, at, format!("unknown verb `{verb}`"));
         }
         if let Some(topic) = &pattern.topic {
@@ -1837,6 +1845,13 @@ impl Checker<'_> {
                             &file,
                             &format!("{at}.actor"),
                             "the agenda's actor runs the command; leave `actor` out",
+                        );
+                    }
+                    if cmd.any_verb() {
+                        self.error(
+                            &file,
+                            &at,
+                            "an agenda step runs one verb; `*` is for the events of rules",
                         );
                     }
                     // The actor is reported above; check the other slots.

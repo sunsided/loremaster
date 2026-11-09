@@ -1672,7 +1672,8 @@ impl Game {
         // A machine takes one step for one event, even when its new state
         // matches another step.
         let mut stepped: Vec<&Id> = Vec::new();
-        for &i in &world.rule_order {
+        let mut ran: Vec<usize> = Vec::new();
+        for (at, &i) in world.rule_order.iter().enumerate() {
             if self.stopped || self.state.ended {
                 break;
             }
@@ -1688,6 +1689,10 @@ impl Game {
             {
                 continue;
             }
+            if any_verb(rule) && self.exact_verb_fires(event, at, &ran, &stepped) {
+                continue;
+            }
+            ran.push(i);
             turn.log.push(LogEntry {
                 kind: "rule".into(),
                 text: rule.id.to_string(),
@@ -1725,6 +1730,28 @@ impl Game {
         out.stopped = self.stopped;
         self.stopped = outer;
         out
+    }
+
+    /// Does a rule with an exact verb in the scope of the `*` rule at place
+    /// `at` of the rule order fire for the event? Then it holds the `*` rule
+    /// back (#192). `ran` holds the rules that ran for the event so far.
+    /// shortcut: a rule after `at` is judged by its condition now, before the
+    /// rules between change the state; upgrade if that bites.
+    fn exact_verb_fires(&self, event: &Event, at: usize, ran: &[usize], stepped: &[&Id]) -> bool {
+        let world = &self.world;
+        let order = &world.rule_order;
+        let within = &world.rules[order[at]].within;
+        let exact = |j: usize| !any_verb(&world.story.rules[j]) && world.rules[j].within == *within;
+        // The rules in `ran` matched the event already.
+        ran.iter().any(|&j| exact(j))
+            || order[at + 1..].iter().any(|&j| {
+                let rule = &world.story.rules[j];
+                exact(j)
+                    && event.matches(rule)
+                    && !(reads_fired(rule) && self.state.fired.contains(&rule.id))
+                    && !rule.machine.as_ref().is_some_and(|m| stepped.contains(&m))
+                    && self.eval().holds_opt(&world.rules[j].when)
+            })
     }
 
     /// Does the scope of a rule hold for the event? A thing rule needs the
@@ -2555,6 +2582,11 @@ fn default_arg(ty: &loremaster_model::ArgType) -> Value {
         // The least value: the interface hash does not see the order.
         ArgType::Enum(values) => Value::Text(values.iter().min().cloned().unwrap_or_default()),
     }
+}
+
+/// A rule on a verb event whose pattern matches any verb (`*`).
+fn any_verb(rule: &loremaster_model::Rule) -> bool {
+    matches!(&rule.on, loremaster_model::EventPattern::Verb(p) | loremaster_model::EventPattern::Check(p) if p.any_verb())
 }
 
 #[cfg(test)]

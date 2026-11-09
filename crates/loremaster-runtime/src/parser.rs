@@ -70,7 +70,7 @@ impl CommandRecord {
     /// Does the pattern listen for this verb? The one verb test of
     /// [`Self::matches`], also for the events' fast path without a record.
     pub(crate) fn verb_matches(pattern: &loremaster_model::CommandPattern, verb: &Id) -> bool {
-        pattern.verb == *verb
+        pattern.any_verb() || pattern.verb == *verb
     }
 
     /// Does an event pattern of a rule match this command? A slot of the
