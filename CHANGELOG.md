@@ -52,6 +52,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Fixed
 
+- Answer labels in the explorer's paths no longer collide when an answer text itself ends in a suffix: the choices `Yes.`, `Yes.` and `Yes. (2)` now give `say Yes.`, `say Yes. (3)` and `say Yes. (2)`, so a path replays the answer it took (#247). `authoring::replay_step` now returns the errors of the step's forced combat rolls next to the turn, for example a total that the replay did not take; before, they were dropped. It clears the forced rolls first, so none leak into a later step. `Workbench::replay_step` (WASM `replayStep`) still returns only the turn. **Breaking (library):** `authoring::replay_step` returns `Option<(Turn, Vec<String>)>`.
 - A thing whose `names:` stages all have a `when` that does not hold now has its `name`. Before, it showed the text of the first stage (#178).
 - `Command::verb("go", vec!["up".into()])` now moves the player like `Command::Go`, also for the active actor, when the object is a compass word or an exit of the room. Before, it ran as a verb that did nothing. `go` with a thing, and a story's own verb `go`, stay verbs (#178).
 - The room that `undo` and `restore` show now has its thing links, like every other room description (#194).
