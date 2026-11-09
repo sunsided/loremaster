@@ -296,7 +296,8 @@ fn only_fired_once_rules_tell_states_apart() {
     let (again, _) = full(&cell(&format!("{ESCAPE}{mutter}"), &[]));
     let once = mutter.replace("  then:", "  once: true\n  then:");
     let (once, _) = full(&cell(&format!("{ESCAPE}{once}"), &[]));
-    // The start and the end; with `once`, also the start after the rule fired.
+    // The start and the end. With `once`, the start and the end each come
+    // twice: before and after the rule fired.
     assert_eq!((again.states, once.states), (2, 4));
 }
 

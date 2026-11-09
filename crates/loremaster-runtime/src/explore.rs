@@ -95,7 +95,7 @@ pub struct Exploration {
 /// next step is due. Counters count only up to 3, and only when the story
 /// reads them. Of the rules that fired, only the `once` rules count: the
 /// game reads `fired` only to keep them from firing again.
-fn fingerprint(game: &Game, counters: bool, once: &BTreeSet<&Id>) -> String {
+fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
         if !counters {
@@ -106,12 +106,12 @@ fn fingerprint(game: &Game, counters: bool, once: &BTreeSet<&Id>) -> String {
             .collect()
     };
     let visited: BTreeSet<&Id> = s.visits.keys().collect();
-    let once: Vec<&Id> = s.fired.iter().filter(|id| once.contains(id)).collect();
+    let fired_once: Vec<&Id> = s.fired.iter().filter(|id| once_ids.contains(id)).collect();
     serde_json::to_string(&(
         &s.room,
         &s.facts,
         &s.locations,
-        once,
+        fired_once,
         game.eval().phase(),
         // Two endings from one state are two states.
         (s.ended, &s.ending),
@@ -377,12 +377,12 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     game.host_walks = false;
     let opening = game.start();
     let counters = reads_counters(&game);
-    let once: BTreeSet<&Id> = start
+    let once_ids: BTreeSet<&Id> = start
         .world()
         .story
         .rules
         .iter()
-        .filter(|r| r.once)
+        .filter(|r| crate::game::reads_fired(r))
         .map(|r| &r.id)
         .collect();
 
@@ -465,7 +465,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         entry.states += 1;
     };
 
-    seen.insert(fingerprint(&game, counters, &once), 0);
+    seen.insert(fingerprint(&game, counters, &once_ids), 0);
     record(&game, &[], &mut variants, &mut shown);
     histories.push(beats_of(
         &opening,
@@ -506,7 +506,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
                 fired.insert(entry.text.clone());
             }
-            let key = fingerprint(&next, counters, &once);
+            let key = fingerprint(&next, counters, &once_ids);
             let mut next_path = path.clone();
             next_path.push(label);
             let history = beats_of(
@@ -640,5 +640,46 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                 payoffs: crate::threads::payoff_labels(&beats, t),
             })
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    /// Every read of `State.fired` in the runtime goes through `reads_fired`:
+    /// the fingerprint keeps only those rules, so another read would merge
+    /// states that play differently.
+    #[test]
+    fn the_game_reads_fired_only_for_once_rules() {
+        fn walk(dir: &Path, out: &mut Vec<String>) {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs")
+                    && !path.to_string_lossy().contains("explore")
+                {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    for line in text.lines() {
+                        let reads = [
+                            "contains", "get", "iter", "len", "is_empty", "first", "last",
+                        ]
+                        .iter()
+                        .any(|m| line.contains(&format!("fired.{m}(")));
+                        if reads {
+                            out.push(format!("{}: {}", path.display(), line.trim()));
+                        }
+                    }
+                }
+            }
+        }
+        let mut reads = Vec::new();
+        walk(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut reads,
+        );
+        assert_eq!(reads.len(), 1, "{reads:#?}");
+        assert!(reads[0].contains("reads_fired(rule) &&"), "{reads:#?}");
     }
 }
