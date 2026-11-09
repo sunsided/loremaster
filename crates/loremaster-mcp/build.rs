@@ -5,6 +5,8 @@ use std::path::Path;
 
 fn main() {
     println!("cargo::rerun-if-changed=ui");
+    // `--cfg loom` builds the loom tests of src/jobs/registry.rs.
+    println!("cargo::rustc-check-cfg=cfg(loom)");
     if std::env::var_os("CARGO_FEATURE_EMBED_UI").is_none() {
         return;
     }
