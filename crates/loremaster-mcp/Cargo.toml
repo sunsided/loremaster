@@ -25,7 +25,7 @@ include_dir = { workspace = true, optional = true }
 
 # The loom tests of src/jobs/registry.rs (`task test:loom`).
 [target.'cfg(loom)'.dependencies]
-loom = "0.7"
+loom.workspace = true
 
 [features]
 # Embed the built web app (`ui/`, a copy of web/build) and serve it at `/`. Run `task release:ui` first.

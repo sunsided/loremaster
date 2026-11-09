@@ -56,15 +56,22 @@ impl<P> Clone for Registry<P> {
 
 impl<P: Process> Registry<P> {
     /// Add a running job and its process.
+    ///
+    /// Both at once, so that a job that others can see can also be cancelled.
+    /// The only place that holds both locks; it takes `children` first.
     pub(super) fn insert(&self, job: Job, child: P) {
         let id = job.id.clone();
+        let mut children = self.children.lock().unwrap();
         self.jobs.lock().unwrap().insert(id.clone(), job);
-        self.children.lock().unwrap().insert(id, child);
+        children.insert(id, child);
     }
 
-    /// Change a job, if it is there.
+    /// Change a job, if it is there and not cancelled. A cancelled job stays as
+    /// it is, also when the agent's last output comes in after the kill.
     pub(super) fn update(&self, id: &str, f: impl FnOnce(&mut Job)) {
-        if let Some(j) = self.jobs.lock().unwrap().get_mut(id) {
+        if let Some(j) = self.jobs.lock().unwrap().get_mut(id)
+            && j.status != JobStatus::Cancelled
+        {
             f(j);
         }
     }
@@ -80,12 +87,12 @@ impl<P: Process> Registry<P> {
     /// The agent's output has ended: wait for it and give the job its final status.
     /// `err` is the agent's stderr.
     pub(super) fn finish(&self, id: &str, err: &str) {
-        // Hold the children lock until the status is final, so that a
-        // cancel() in between does not see a job that runs but has no child.
-        let mut children = self.children.lock().unwrap();
         // No child: cancel() took it and sets the status. Leave the job alone,
-        // else it shows as failed (with the kill's error) until then.
-        let Some(mut child) = children.remove(id) else {
+        // else it shows as failed (with the kill's error) until then. With the
+        // child here, cancel() can no longer take it, so the status is ours.
+        // The lock is free during the wait: a slow exit blocks no other job.
+        let child = self.children.lock().unwrap().remove(id);
+        let Some(mut child) = child else {
             return;
         };
         let success = child.wait();
@@ -192,8 +199,60 @@ mod loom_tests {
         });
     }
 
-    /// A new job starts while another finishes: the two take both locks in
-    /// other orders, and neither deadlocks nor loses the other's job.
+    /// The agent's last output comes in while the job is cancelled: a result
+    /// with an error after the kill does not make the cancelled job failed.
+    #[test]
+    fn loom_cancelled_is_final() {
+        loom::model(|| {
+            let r = registry();
+            let reader = {
+                let r = r.clone();
+                thread::spawn(move || {
+                    r.update("j1", |j| {
+                        j.status = JobStatus::Failed;
+                        j.events.push(JobEvent {
+                            kind: "text".into(),
+                            text: "late".into(),
+                        });
+                    });
+                    r.finish("j1", "killed");
+                })
+            };
+            let cancelled = r.cancel("j1");
+            reader.join().unwrap();
+            let end = r.get("j1").unwrap();
+            if cancelled {
+                assert_eq!(end.status, JobStatus::Cancelled);
+                assert!(
+                    end.events.iter().all(|e| e.kind != "error"),
+                    "{:?}",
+                    end.events
+                );
+            } else {
+                assert_eq!(end.status, JobStatus::Failed);
+            }
+        });
+    }
+
+    /// A job that a reader sees can be cancelled, also while it starts.
+    #[test]
+    fn loom_start_races_cancel() {
+        loom::model(|| {
+            let r: Registry<Fake> = Registry::default();
+            let canceller = {
+                let r = r.clone();
+                thread::spawn(move || r.get("j1").is_none() || r.cancel("j1"))
+            };
+            r.insert(super::super::tests::job(), Fake { killed: false });
+            assert!(
+                canceller.join().unwrap(),
+                "a running job without its process"
+            );
+        });
+    }
+
+    /// A new job starts while another finishes: neither loses the other's job.
+    /// (Only `insert` holds both locks, so there is no second lock order.)
     #[test]
     fn loom_start_during_finish() {
         loom::model(|| {
