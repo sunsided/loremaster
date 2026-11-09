@@ -438,14 +438,16 @@ impl Session {
     /// One step of an explorer path as a whole turn, or `None` when the game
     /// has no such step now. The turn runs as the walk ran it: a combat
     /// round gets the rolls the walk forced, and the session answers rolls
-    /// and walks itself, also on a stage host. No forced roll is left over.
+    /// and walks itself, also on a stage host. No forced roll is left over
+    /// for the next turn: totals that the step did not take are kept as
+    /// errors for [`Self::forced_roll_errors`].
     pub(crate) fn explorer_turn(&mut self, step: &str) -> Option<Turn> {
         let cmd = crate::explore::step_command(&mut self.game, step)?;
         let hosts = (self.game.host_rolls, self.game.host_walks);
         (self.game.host_rolls, self.game.host_walks) = (false, false);
         let turn = self.turn(Input::Command(cmd));
         (self.game.host_rolls, self.game.host_walks) = hosts;
-        self.game.forced = Default::default();
+        self.game.forced.misfits = self.forced_roll_errors();
         Some(turn)
     }
 

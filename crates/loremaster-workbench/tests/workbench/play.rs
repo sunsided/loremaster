@@ -45,6 +45,7 @@ fn typed_undo_during_a_talk_goes_to_the_talk() {
 #[test]
 fn explorer_paths_replay_through_talks_and_answers() {
     let mut kinds = std::collections::BTreeSet::new();
+    let mut rounds = 0;
     for name in [
         "cantina",
         "gatehouse",
@@ -70,6 +71,7 @@ fn explorer_paths_replay_through_talks_and_answers() {
             game.restart();
             for step in path {
                 kinds.insert(step.split(' ').next().unwrap_or_default().to_string());
+                rounds += usize::from(step.ends_with(" (win the round)"));
                 assert!(
                     game.replay_step(step).is_some(),
                     "{name}: no step `{step}` in {path:?}"
@@ -101,10 +103,16 @@ fn explorer_paths_replay_through_talks_and_answers() {
     for kind in ["say", "answer"] {
         assert!(kinds.contains(kind), "no `{kind}` step: {kinds:?}");
     }
+    assert!(rounds > 0, "no combat round with forced rolls was replayed");
     // No shortest path above leaves a talk.
     let mut game = example("cantina");
     game.start();
-    for step in ["go in", "talk blackbeard", "leave"] {
+    // A forced total that no roll of the step takes is reported, not dropped.
+    loremaster_runtime::authoring::force_rolls(game.session_mut(), &[7]);
+    assert!(game.replay_step("go in").is_some(), "no step `go in`");
+    let errors = loremaster_runtime::authoring::forced_roll_errors(game.session_mut());
+    assert_eq!(errors, ["no roll took the forced rolls 7"]);
+    for step in ["talk blackbeard", "leave"] {
         assert!(game.replay_step(step).is_some(), "no step `{step}`");
     }
     assert!(game.session().talk().is_none(), "the talk is over");
