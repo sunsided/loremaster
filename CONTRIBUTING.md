@@ -162,6 +162,29 @@ The runtime has no threads, and `World` is shared through `Arc` but never change
 
 The registry takes `Arc` and `Mutex` from loom when the crate is built with `--cfg loom`, and from `std` else. The loom tests are in the module `loom_tests` there, with a fake agent process. `task test:loom` runs them (`RUSTFLAGS="--cfg loom" cargo test -p loremaster-mcp --release --lib loom`). The other tests of the crate do not run under loom. When you add a lock or a thread to the jobs, add a loom test for it. CI runs the tests in the job "Loom (not required)".
 
+### Fuzzing
+
+The fuzz targets in `fuzz/` feed random input to the code that reads input from outside: no input may make it panic or hang. They use [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) and need a nightly toolchain, so `fuzz/` is a crate of its own, outside the workspace (its `Cargo.lock` is not committed).
+
+| Target | Input |
+| --- | --- |
+| `save` | A save file, whole or as fields of a real save (Lighthouse, Salt Tower in a combat) |
+| `protocol` | JSON-RPC lines to `loremaster protocol` |
+| `mcp` | JSON-RPC lines to the MCP server (`loremaster mcp`, `/mcp` of `loremaster serve`); slow, as each input opens the project, so give it minutes |
+| `commands` | Typed commands in the Lighthouse or the Salt Tower |
+| `story_yaml` | Story files (`story.yaml`, a room, a thing, rules, a machine) |
+| `condition`, `markup` | Condition and markup text |
+| `dice_and_sums` | Dice and `calc` sums |
+
+```sh
+rustup toolchain install nightly
+cargo install cargo-fuzz
+task fuzz                              # each target for 30 s
+task fuzz TARGETS=save DURATION=600    # one target for 10 minutes
+```
+
+`fuzz/seeds/<target>/` holds a few start inputs; the corpus that a run builds (`fuzz/corpus/`) and the inputs that fail (`fuzz/artifacts/`) are not committed. To run a failing input again: `cd fuzz && cargo +nightly fuzz run <target> artifacts/<target>/<file>`. Fix the bug with a regression test in the crate, or open an issue with the input when the fix is large. CI does not run the targets: a build with the fuzz instrumentation takes too long for every pull request. Run them when you change one of the parsers, loaders or servers above.
+
 The crate `loremaster` embeds the web editor by default (the feature `embed-ui`). The editor comes from `crates/loremaster-mcp/ui/`, and git ignores this folder. If the folder is missing, the build stops with an error. Thus the Rust tasks and the Rust CI job use `--no-default-features`. To build with the editor, run `task release:ui` first. The CI web job builds the web app, copies it into the crate and runs `cargo package`.
 
 ## Releases
