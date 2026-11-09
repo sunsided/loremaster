@@ -224,8 +224,7 @@ pub fn play(session: &mut Session, input: Input) -> Turn {
 /// as a whole turn, with the rule log. `None` when the game has no such step
 /// now, for example after an edit of the story.
 pub fn replay_step(session: &mut Session, step: &str) -> Option<Turn> {
-    let input = session.explorer_step(step)?;
-    Some(session.turn(input))
+    session.explorer_turn(step)
 }
 
 /// The answer to a paused rule or the death prompt as a whole turn, with the

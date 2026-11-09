@@ -2,6 +2,7 @@
 //! does: `undo` undoes, unless a talk or a waiting rule takes the text.
 
 use crate::{Host, example, lighthouse};
+use loremaster_model::Value;
 
 #[test]
 fn typed_undo_undoes_the_last_input() {
@@ -54,12 +55,16 @@ fn explorer_paths_replay_through_talks_and_answers() {
         let mut game = example(name);
         game.start();
         let found = game.explore(loremaster_workbench::Budget::default());
-        // The paths to the endings end the game; the paths to room texts end in their room.
+        // A stage host answers rolls and walks itself; a replay plays as the walk did.
+        game.session_mut().set_host_rolls(true);
+        game.session_mut().set_host_walks(true);
+        // The paths to the endings end the game; the paths to room texts end
+        // in their room, with the facts of the variant.
         let endings = found.endings.iter().map(|e| (&e.path, None));
         let rooms = found.rooms.iter().flat_map(|r| {
             r.variants
                 .iter()
-                .map(move |v| (&v.path, Some(r.id.as_str())))
+                .map(move |v| (&v.path, Some((r.id.as_str(), &v.facts))))
         });
         for (path, room) in endings.chain(rooms) {
             game.restart();
@@ -70,9 +75,26 @@ fn explorer_paths_replay_through_talks_and_answers() {
                     "{name}: no step `{step}` in {path:?}"
                 );
             }
+            let errors = loremaster_runtime::authoring::forced_roll_errors(game.session_mut());
+            assert!(errors.is_empty(), "{name}: forced rolls left: {errors:?}");
             match room {
-                Some(room) => assert_eq!(game.scene().room, room, "{name}: {path:?}"),
-                None => assert!(game.session().state().ended, "{name}: {path:?}"),
+                Some((room, facts)) => {
+                    assert_eq!(game.scene().room, room, "{name}: {path:?}");
+                    let now: Vec<String> = game
+                        .state()
+                        .facts
+                        .iter()
+                        .filter(|(_, v)| !matches!(v, Value::Bool(false)))
+                        .map(|(k, v)| format!("{k} = {v}"))
+                        .collect();
+                    assert_eq!(&now, facts, "{name}: {path:?}");
+                }
+                None => {
+                    assert!(game.session().state().ended, "{name}: {path:?}");
+                    // Nothing plays after the end.
+                    let first = path.first().unwrap();
+                    assert!(game.replay_step(first).is_none(), "{name}: {path:?}");
+                }
             }
         }
     }

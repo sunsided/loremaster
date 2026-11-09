@@ -11,7 +11,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 ### Added
 
 - `await`, `combat` and `stats` in `world!` and the builder (#191), so a story with rolls or fights does not need YAML. `world!` has the effects `await roll "2d6" into r against luck;`, `await choice [..] into ..;`, `await walk_to ..;`, `await action .. { .. } results [..] into ..;` and `combat [warden] win yard loss fallen escape road together;` (`escape` and `together` are optional), and `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }` in the story header. The builder has `Effects::awaits`, `Effects::combat` and `StoryBuilder::stat`, `stat_short` and `stat_max`. `AwaitSpec` now derives `Default`.
-- `Workbench::replay_step` (WASM `replayStep`) plays one step of a path from the state explorer, as a whole turn, or gives `None` when the game has no such step now. It reads each step as the explorer wrote it, with the rolls of a combat round as the walk forced them.
+- `Workbench::replay_step` (WASM `replayStep`) plays one step of a path from the state explorer, as a whole turn, or gives `None` when the game has no such step now. It reads each step as the explorer wrote it, with the rolls of a combat round as the walk forced them, and with host rolls and host walks off for the step, as in the walk. After the end of the story it gives `None`. Two answers with one text in a talk or a paused rule now have different labels in the explorer's paths (`say Yes.`, `say Yes. (2)`), so a path replays the answer it took.
 
 ### Fixed
 
