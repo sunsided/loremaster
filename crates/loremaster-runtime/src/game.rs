@@ -1538,6 +1538,11 @@ impl Game {
         self.finish(turn)
     }
 
+    /// The player holds as many things as the story's carry limit allows.
+    pub(crate) fn hands_full(&self) -> bool {
+        (self.world.story.carry_limit).is_some_and(|limit| self.state.held_count() >= limit)
+    }
+
     pub(crate) fn verbs(&self) -> Vec<VerbInfo> {
         self.world.verbs.iter().map(verb_info).collect()
     }
@@ -1555,7 +1560,8 @@ impl Game {
         let mut ids: std::collections::BTreeSet<&str> = (self.world.story.rules.iter())
             .filter_map(|r| match &r.on {
                 EventPattern::Verb(p) | EventPattern::Check(p)
-                    if named(&p.direct) || named(&p.indirect) =>
+                    if crate::explore::for_player(p)
+                        && (named(&p.direct) || named(&p.indirect)) =>
                 {
                     Some(p.verb.as_str())
                 }
@@ -1572,8 +1578,15 @@ impl Game {
                 "lock"
             }
         };
+        let scope = self.in_scope();
+        let in_scope = |o: &Id| scope.contains(o);
         ids.insert("examine");
-        if t.portable && !self.state.is_held(id) {
+        // As the default take: not behind a closed container, hands not full.
+        if t.portable
+            && !self.state.is_held(id)
+            && self.state.closed_around(id, false).is_none()
+            && !self.hands_full()
+        {
             ids.insert("take");
         }
         if self.state.is_carried(id) {
@@ -1589,10 +1602,11 @@ impl Game {
                 ids.insert("open");
             }
         }
-        if t.key.is_some() && has("locked") {
+        // A lock and its key, both in scope (in_scope leaves out concealed things).
+        if t.key.as_ref().is_some_and(in_scope) && has("locked") {
             ids.extend([lock_verb(id), "use"]);
         }
-        for door in self.world.story.things.iter() {
+        for door in scope.iter().filter_map(|d| self.world.thing(d.as_str())) {
             let locks = self
                 .state
                 .facts
@@ -1604,7 +1618,7 @@ impl Game {
         if has("lit") {
             ids.extend([if flag("lit") { "turn_off" } else { "turn_on" }, "use"]);
         }
-        if self.world.dialogue_with(id).is_some() {
+        if self.can_talk(id) {
             ids.insert("talk");
         }
         if !self.searchable(id).is_empty() {
@@ -2477,12 +2491,7 @@ impl Game {
                     say(turn, format!("{} is closed.", self.the(&c, true)));
                 } else if !t.portable {
                     say(turn, format!("{the_cap} won't budge."));
-                } else if self
-                    .world
-                    .story
-                    .carry_limit
-                    .is_some_and(|limit| self.state.held_count() >= limit)
-                {
+                } else if self.hands_full() {
                     say(turn, "Your hands are full.".into());
                 } else {
                     self.move_thing(&t.id, Location::Carried);

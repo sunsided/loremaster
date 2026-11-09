@@ -38,16 +38,20 @@ impl Session {
     /// The verbs that apply to a thing now, sorted by id, for a host that
     /// offers them on a click. Empty for an unknown thing or one out of
     /// scope. A verb applies when
-    /// - a rule (`verb` or `check`) names the thing as its direct or
-    ///   indirect object, or the thing has a frame for the verb; or
+    /// - a rule (`verb` or `check`) for the player's commands (no `actor`,
+    ///   or `player`) names the thing as its direct or indirect object, or
+    ///   the thing has a frame for the verb; or
     /// - the default of a standard verb does something for it in the
     ///   current state: `examine` always; `take` for a portable thing not
-    ///   held; `drop` and `put` for a carried thing, and `put` for a
-    ///   container or supporter; `open` while closed and unlocked, `close`
-    ///   while open; `unlock` or `lock` for a thing with a key and a
-    ///   `locked` property, and for its key; `turn_on` or `turn_off` for a
-    ///   thing with `lit`; `use` for a lit-able thing, a lock and a key;
-    ///   `talk` for a dialogue partner; `search` when it hides something.
+    ///   held, not in a closed container, while the hands are not full;
+    ///   `drop` and `put` for a carried thing, and `put` for a container or
+    ///   supporter; `open` while closed and unlocked, `close` while open;
+    ///   `unlock` or `lock` for a thing with a key and a `locked` property
+    ///   while its key is in scope, and for a key while its lock is in
+    ///   scope; `turn_on` or `turn_off` for a thing with `lit`; `use` for a
+    ///   lit-able thing, a lock and a key; `talk` for a dialogue partner
+    ///   with a start node that applies now; `search` when it hides
+    ///   something.
     ///
     /// Rule conditions are not checked: a rule that names the thing counts.
     pub fn verbs_for(&self, id: &str) -> Vec<VerbInfo> {

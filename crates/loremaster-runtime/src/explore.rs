@@ -283,9 +283,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         // With a carry limit, full hands refuse the default take, and a drop
         // frees a hand: it is no longer only an undo. A rule on `take` can
         // still handle a take with full hands.
-        let full = story
-            .carry_limit
-            .is_some_and(|limit| game.state().held_count() >= limit);
+        let full = game.hands_full();
         if full && carried {
             out.push((
                 label("drop", std::slice::from_ref(&id)),
@@ -398,7 +396,7 @@ pub(crate) fn step_command(game: &mut Game, step: &str) -> Option<Command> {
 }
 
 /// A pattern that matches the player's commands: no `actor`, or the player.
-fn for_player(p: &loremaster_model::CommandPattern) -> bool {
+pub(crate) fn for_player(p: &loremaster_model::CommandPattern) -> bool {
     p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
 }
 

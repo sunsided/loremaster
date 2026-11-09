@@ -63,14 +63,16 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
      offers each `bar` verb; `preview(text)` says what a half-typed command
      refers to.
    - `verbs_for(id)` lists the verbs that apply to a thing in scope now,
-     sorted by id, for a menu on a click: each verb whose rule (`verb` or
-     `check`) names the thing as an object or that has a frame on it, and
-     each standard verb whose default does something for it in this state
-     (`examine` always, `take` when portable and not held, `drop` and `put`
+     sorted by id, for a menu on a click: each verb whose rule for the
+     player (`verb` or `check`) names the thing as an object or that has a
+     frame on it, and each standard verb whose default does something for
+     it in this state (`examine` always, `take` when portable, not held,
+     not in a closed container and the hands are not full, `drop` and `put`
      when carried, `open` when closed and unlocked, `close` when open,
-     `unlock`/`lock` for a lock and its key, `turn_on`/`turn_off` for a
-     thing with `lit`, `use`, `talk` for a dialogue partner, `search` when
-     it hides something). Rule conditions are not checked.
+     `unlock`/`lock` for a lock and its key while both are in scope,
+     `turn_on`/`turn_off` for a thing with `lit`, `use`, `talk` when a
+     start node of its dialogue applies, `search` when it hides
+     something). Rule conditions are not checked.
    - `ThingInfo::aliases` lists a thing's aliases and the names of its
      earlier name stages.
 7. Queries take no step: `scene()` (the room, the time as `time` and as

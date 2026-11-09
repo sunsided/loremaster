@@ -7,12 +7,16 @@ use std::sync::Arc;
 
 fn session() -> Session {
     let files = [
-        ("story.yaml", "title: Verbs\nstart: hall\n"),
+        ("story.yaml", "title: Verbs\nstart: hall\ncarry_limit: 3\n"),
         ("rooms/hall.yaml", "name: Hall\n"),
         ("rooms/cellar.yaml", "name: Cellar\n"),
         (
             "things/lamp.yaml",
             "name: lamp\nportable: true\nprops: { lit: false }\nlocation: { room: hall }\n",
+        ),
+        (
+            "things/coin.yaml",
+            "name: coin\nportable: true\nlocation: { room: hall }\n",
         ),
         (
             "things/chest.yaml",
@@ -23,10 +27,45 @@ fn session() -> Session {
             "name: brass key\nportable: true\nlocation: carried\n",
         ),
         (
-            "things/statue.yaml",
-            "name: statue\nlocation: { room: hall }\nframes:\n  pull:\n    before: [\"You grip the statue.\"]\nrules:\n  - id: push_statue\n    on: { verb: [push, statue] }\n    then:\n      - say: \"It rocks.\"\n",
+            "things/safe.yaml",
+            "name: safe\ncontainer: true\nkey: safe_key\nprops: { open: false, locked: true }\nlocation: { room: hall }\n",
         ),
+        (
+            "things/safe_key.yaml",
+            "name: safe key\nportable: true\nlocation: { room: cellar }\n",
+        ),
+        (
+            "things/trunk.yaml",
+            "name: trunk\ncontainer: true\nkey: iron_key\nprops: { open: false, locked: true }\nlocation: { room: cellar }\n",
+        ),
+        (
+            "things/iron_key.yaml",
+            "name: iron key\nportable: true\nlocation: carried\n",
+        ),
+        (
+            "things/jar.yaml",
+            "name: jar\ncontainer: true\nprops: { open: false, transparent: true }\nlocation: { room: hall }\n",
+        ),
+        (
+            "things/pebble.yaml",
+            "name: pebble\nportable: true\nlocation: { in: jar }\n",
+        ),
+        (
+            "things/statue.yaml",
+            "name: statue\nlocation: { room: hall }\nframes:\n  pull:\n    before: [\"You grip the statue.\"]\nrules:\n  - id: push_statue\n    on: { verb: [push, statue] }\n    then:\n      - say: \"It rocks.\"\n  - id: keeper_lifts\n    on: { verb: [take, statue], actor: keeper }\n    then:\n      - say: \"The keeper lifts it.\"\n",
+        ),
+        ("things/keeper.yaml", "name: keeper\nlocation: { room: cellar }\n"),
         ("things/barrel.yaml", "name: barrel\nlocation: { room: cellar }\n"),
+        ("things/bard.yaml", "name: bard\nlocation: { room: hall }\n"),
+        ("things/ghost.yaml", "name: ghost\nlocation: { room: hall }\n"),
+        (
+            "dialogues/bard.yaml",
+            "with: bard\nstart: [hello]\nnodes:\n  hello:\n    say: \"Hello.\"\n",
+        ),
+        (
+            "dialogues/ghost.yaml",
+            "with: ghost\nstart: [boo]\nnodes:\n  boo:\n    when: lamp.lit\n    say: \"Boo.\"\n",
+        ),
     ]
     .map(|(path, text)| SourceFile {
         path: path.into(),
@@ -59,8 +98,38 @@ fn standard_verbs_follow_the_properties_and_the_state() {
 }
 
 #[test]
+fn a_lock_needs_its_key_in_scope_and_a_key_its_lock() {
+    let s = session();
+    // The safe key is in the cellar.
+    assert_eq!(ids(&s, "safe"), ["examine", "put"]);
+    // The trunk of the iron key is in the cellar.
+    assert_eq!(ids(&s, "iron_key"), ["drop", "examine", "put"]);
+}
+
+#[test]
+fn take_follows_the_default_take() {
+    let mut s = session();
+    // Seen through a closed jar, but not reachable.
+    assert_eq!(ids(&s, "pebble"), ["examine"]);
+    assert!(ids(&s, "coin").contains(&"take".to_string()));
+    // Two keys and the lamp fill the carry limit of three.
+    s.submit(Input::Text("take lamp".into()));
+    assert!(!ids(&s, "coin").contains(&"take".to_string()));
+}
+
+#[test]
+fn talk_needs_a_start_node_that_applies() {
+    let mut s = session();
+    assert_eq!(ids(&s, "bard"), ["examine", "talk"]);
+    assert_eq!(ids(&s, "ghost"), ["examine"]);
+    s.submit(Input::Text("turn on lamp".into()));
+    assert_eq!(ids(&s, "ghost"), ["examine", "talk"]);
+}
+
+#[test]
 fn rules_and_frames_that_name_the_thing_count() {
     let s = session();
+    // The rule for the keeper's take is not a command of the player.
     assert_eq!(ids(&s, "statue"), ["examine", "pull", "push"]);
 }
 
