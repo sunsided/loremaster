@@ -113,7 +113,7 @@ fn a_free_enter_rule_does_not_make_the_move_free() {
 
 #[test]
 fn a_walkthrough_counts_a_free_command_as_no_turn() {
-    // Three turns run the fuse out: the opening and two waits, not the refusals.
+    // Three turns run the fuse out: the opening and one wait, not the refusals.
     let walk = "steps:\n  - open box\n  - open box\n  - open box\n  - open box\n  - wait\n  - { do: open box, see: already open }\nexpect: { ended: false }\n";
     let project = load(files(RULES, Some(walk))).unwrap();
     let w = Arc::new(World::compile(project.story).unwrap());
