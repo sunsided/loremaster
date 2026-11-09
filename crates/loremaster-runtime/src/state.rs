@@ -226,7 +226,19 @@ pub enum AwaitRequest {
         results: Vec<Id>,
     },
     /// Roll dice and report the total.
-    Roll { dice: String, min: i64, max: i64 },
+    Roll {
+        dice: String,
+        min: i64,
+        max: i64,
+        /// Who the roll is for, as in `RollDetail::who`: the enemy's name or
+        /// `You` for a combat round, `LUCK` for Test your Luck, or the
+        /// label of the stat of `against`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        who: Option<String>,
+        /// The `against` of the await, for example `luck`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        against: Option<String>,
+    },
     /// Walk the player to a room; answer `arrived` or `refused`. With a
     /// `thing` or an `exit`, the walk is in this room, before a command on
     /// it (`Session::set_host_walks`): `arrived` runs the command.
@@ -277,6 +289,8 @@ impl AwaitRequest {
                 dice: text.clone(),
                 min: dice.min(),
                 max: dice.max(),
+                who: None,
+                against: spec.against.clone(),
             });
         }
         spec.walk_to.as_ref().map(|room| AwaitRequest::WalkTo {
@@ -316,7 +330,7 @@ impl AwaitRequest {
             (AwaitRequest::Roll { min, max, .. }, Value::Int(n)) if (min..=max).contains(&n) => {
                 Ok(())
             }
-            (AwaitRequest::Roll { min, max, dice }, _) => {
+            (AwaitRequest::Roll { min, max, dice, .. }, _) => {
                 Err(format!("a roll of {dice} is a number from {min} to {max}"))
             }
             // Without a list of results, the host answers with any value.

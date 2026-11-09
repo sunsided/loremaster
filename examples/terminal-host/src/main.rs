@@ -199,8 +199,17 @@ fn ask(request: &AwaitRequest) {
             let texts: Vec<_> = results.iter().map(|r| r.as_str()).collect();
             list(&texts);
         }
-        AwaitRequest::Roll { dice, min, max } => {
-            println!("\n(Roll {dice} and type the total, {min} to {max}.)");
+        AwaitRequest::Roll {
+            dice,
+            min,
+            max,
+            who,
+            ..
+        } => {
+            let whom = who
+                .as_ref()
+                .map_or_else(String::new, |w| format!(" for {w}"));
+            println!("\n(Roll {dice}{whom} and type the total, {min} to {max}.)");
         }
         AwaitRequest::WalkTo { .. } => {
             // A terminal has no walking: the player says what happened.
