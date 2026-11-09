@@ -14,9 +14,7 @@ use super::Game;
 use super::awaits::AwaitStep;
 use crate::state::{AwaitOptionInfo, AwaitRequest, CombatState, LastRound};
 use crate::{BlockKind, PLAYER, Turn};
-use loremaster_model::{
-    COMBAT_END, COMBAT_HIT, COMBAT_ROUND, CombatSpec, Dice, EventPattern, Id, Value,
-};
+use loremaster_model::{COMBAT_END, COMBAT_HIT, COMBAT_ROUND, CombatSpec, Dice, Id, Value};
 use std::collections::BTreeMap;
 
 pub(crate) const ATTACK_TEXT: &str = "Attack";
@@ -279,8 +277,7 @@ impl Game {
     /// Does a rule listen for the combat event? Without one, the combat
     /// sets no facts for it.
     fn combat_heard(&self, name: &str) -> bool {
-        (self.world.story.rules.iter())
-            .any(|r| matches!(&r.on, EventPattern::Event(e) if e.as_str() == name))
+        self.world.combat_heard.contains(name)
     }
 
     /// Keep the arguments of a combat event as `event.arg`, as for a host
@@ -429,8 +426,10 @@ impl Game {
         let Some((hit, by)) = hit else {
             return self.combat_round_over(turn, rule, next);
         };
-        // A rule on an earlier hit ended the combat.
+        // A rule on an earlier hit of the round ended the combat: the whole
+        // round still counts, without a Luck test, then the combat ends.
         if self.combat_exit.is_some() {
+            self.combat_strike(turn, (hit, by));
             return self.combat_go_on(turn, rule, next, 1);
         }
         if let Some(c) = &mut self.state.combat {
