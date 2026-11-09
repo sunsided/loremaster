@@ -18,8 +18,14 @@ const ATTACK: &str = "attack";
 const ESCAPE: &str = "escape";
 const LUCK: &str = "luck";
 const GO_ON: &str = "go_on";
+/// The prefix of the option to attack another enemy than the first.
+const TARGET: &str = "attack.";
+/// Enemy properties for special rules: the STAMINA a hit of the enemy
+/// costs the player, and the STAMINA a hit of the player costs the enemy.
+const DEALS: &str = "deals";
+const TAKES: &str = "takes";
 
-/// Damage of a hit, and of an escape.
+/// Damage of a hit without `deals` or `takes`, and of an escape.
 const HIT: i64 = 2;
 const ROLL: Dice = Dice {
     count: 2,
@@ -52,6 +58,9 @@ impl Game {
             round: 0,
             last: None,
             pending: None,
+            by: None,
+            target: None,
+            rolls: Vec::new(),
             log: Vec::new(),
         });
         self.combat_go_on(turn, rule, next, depth)
@@ -68,18 +77,66 @@ impl Game {
     ) -> AwaitStep {
         match answer {
             Value::Text(a) if a == ESCAPE => self.combat_escape(turn),
-            Value::Text(a) if a == LUCK => {
-                self.combat_luck(turn);
-                self.combat_go_on(turn, rule, next, 1)
-            }
+            Value::Text(a) if a == LUCK => self.combat_luck(turn, rule, next),
             Value::Text(a) if a == GO_ON => {
                 if let Some(hit) = self.pending_hit() {
-                    self.combat_damage(turn, &hit, HIT);
+                    let damage = self.hit_damage(&hit);
+                    self.combat_damage(turn, &hit, damage);
                 }
                 self.combat_go_on(turn, rule, next, 1)
             }
+            // A total that the host rolled, for the round or the Luck test.
+            Value::Int(total) => {
+                let luck = (self.state.combat.as_mut()).is_some_and(|c| {
+                    c.rolls.push(*total);
+                    c.pending.is_some()
+                });
+                if luck {
+                    self.combat_luck(turn, rule, next)
+                } else {
+                    self.combat_round(turn, rule, next)
+                }
+            }
+            // `attack`, or `attack.<enemy>` for a target of an all-at-once combat.
+            Value::Text(a) => {
+                let target = a.strip_prefix(TARGET).map(Id::new);
+                if let Some(c) = &mut self.state.combat {
+                    c.target = target;
+                }
+                self.combat_round(turn, rule, next)
+            }
             _ => self.combat_round(turn, rule, next),
         }
+    }
+
+    /// The STAMINA that the hit on `hit` costs: 2, or the `takes` of the
+    /// enemy hit, or the `deals` of the enemy that hit the player.
+    fn hit_damage(&self, hit: &Id) -> i64 {
+        let prop =
+            |e: &Id, p: &str| (self.state.facts.get(&format!("{e}.{p}"))).and_then(Value::as_int);
+        let by = self.state.combat.as_ref().and_then(|c| c.by.as_ref());
+        let damage = if hit.as_str() == PLAYER {
+            by.and_then(|e| prop(e, DEALS))
+        } else {
+            prop(hit, TAKES)
+        };
+        damage.unwrap_or(HIT).max(0)
+    }
+
+    /// The host rolls this combat's dice and fewer than `needed` totals are in.
+    fn combat_waits_for_rolls(&self, needed: usize) -> bool {
+        self.host_rolls
+            && self.forced.totals.is_empty()
+            && (self.state.combat.as_ref()).is_some_and(|c| c.rolls.len() < needed)
+    }
+
+    fn combat_roll_await(&mut self, turn: &mut Turn, rule: &Id, next: usize) -> AwaitStep {
+        let request = AwaitRequest::Roll {
+            dice: "2d6".into(),
+            min: ROLL.min(),
+            max: ROLL.max(),
+        };
+        self.open_await(turn, rule, next, request, None)
     }
 
     /// How many enemies roll in the next round.
@@ -125,7 +182,13 @@ impl Game {
 
     /// A roll of the combat, with the name for the dice display.
     fn named_roll(&mut self, turn: &mut Turn, who: String) -> i64 {
-        let total = self.take_roll(turn, ROLL, "2d6");
+        let host = (self.state.combat.as_mut())
+            .filter(|c| !c.rolls.is_empty())
+            .map(|c| c.rolls.remove(0));
+        let total = match host {
+            Some(total) => Self::record_roll(turn, "2d6", total, Vec::new()),
+            None => self.take_roll(turn, ROLL, "2d6"),
+        };
         if let Some(r) = turn.rolls.last_mut() {
             r.who = Some(who);
         }
@@ -147,11 +210,26 @@ impl Game {
         if self.living(&spec).is_empty() {
             return self.combat_leave(turn, spec.win, depth);
         }
-        let mut options = vec![(ATTACK, ATTACK_TEXT)];
+        // All at once, the player chooses the target; `attack` is the first.
+        let living = self.living(&spec);
+        let mut options: Vec<(String, String)> = if spec.together && living.len() > 1 {
+            (living.iter().enumerate())
+                .map(|(i, e)| {
+                    let id = if i == 0 {
+                        ATTACK.to_string()
+                    } else {
+                        format!("{TARGET}{e}")
+                    };
+                    (id, format!("{ATTACK_TEXT} {}", self.enemy_name(e)))
+                })
+                .collect()
+        } else {
+            vec![(ATTACK.into(), ATTACK_TEXT.into())]
+        };
         if spec.escape.is_some() {
-            options.push((ESCAPE, "Escape"));
+            options.push((ESCAPE.into(), "Escape".into()));
         }
-        self.combat_ask(turn, rule, next, &options)
+        self.combat_ask(turn, rule, next, options)
     }
 
     fn combat_ask(
@@ -159,12 +237,12 @@ impl Game {
         turn: &mut Turn,
         rule: &Id,
         next: usize,
-        options: &[(&str, &str)],
+        options: Vec<(String, String)>,
     ) -> AwaitStep {
-        let options = (options.iter())
+        let options = (options.into_iter())
             .map(|(id, text)| AwaitOptionInfo {
-                id: Id::new(*id),
-                text: (*text).to_string(),
+                id: Id::new(id),
+                text,
             })
             .collect();
         self.open_await(turn, rule, next, AwaitRequest::Choice { options }, None)
@@ -190,7 +268,9 @@ impl Game {
     }
 
     /// One round: the enemies roll, then the player. The player attacks the
-    /// first living enemy; the others of an all-at-once combat only attack.
+    /// chosen enemy, or the first living one; the others of an all-at-once
+    /// combat only attack. When the host rolls, the round first waits for
+    /// one total per roll.
     fn combat_round(&mut self, turn: &mut Turn, rule: &Id, next: usize) -> AwaitStep {
         let Some(spec) = self.state.combat.as_ref().map(|c| c.spec.clone()) else {
             return AwaitStep::Answered;
@@ -199,9 +279,15 @@ impl Game {
         if !spec.together {
             fighting.truncate(1);
         }
-        let Some(target) = fighting.first().cloned() else {
+        let chosen = (self.state.combat.as_ref())
+            .and_then(|c| c.target.clone())
+            .filter(|t| fighting.contains(t));
+        let Some(target) = chosen.or_else(|| fighting.first().cloned()) else {
             return self.combat_go_on(turn, rule, next, 1);
         };
+        if self.combat_waits_for_rolls(fighting.len() + 1) {
+            return self.combat_roll_await(turn, rule, next);
+        }
         let mut enemies = BTreeMap::new();
         for e in &fighting {
             let name = self.enemy_name(e);
@@ -222,9 +308,10 @@ impl Game {
                 player,
                 enemies: enemies.clone(),
             });
+            c.target = None;
         }
         // A Luck test changes the last hit of the round; the others count at once.
-        let mut hit: Option<Id> = None;
+        let mut hit: Option<(Id, Id)> = None;
         for e in &fighting {
             let name = self.enemy_name(e);
             let enemy = enemies[e];
@@ -240,35 +327,54 @@ impl Game {
                 format!("Round {round}: you {player}, {name} {enemy}. {what}"),
             );
             if let Some(new_hit) = new_hit
-                && let Some(earlier) = hit.replace(new_hit)
+                && let Some(earlier) = hit.replace((new_hit, e.clone()))
             {
-                self.combat_damage(turn, &earlier, HIT);
+                self.combat_strike(turn, earlier);
             }
         }
-        let Some(hit) = hit else {
+        let Some((hit, by)) = hit else {
             return self.combat_go_on(turn, rule, next, 1);
         };
+        if let Some(c) = &mut self.state.combat {
+            c.by = Some(by);
+        }
         // No test where it can not help: a hit that already kills the enemy,
-        // or a wound that kills the player even when lucky.
+        // a wound that kills the player even when lucky, or one that costs nothing.
+        let damage = self.hit_damage(&hit);
         let helps = if hit.as_str() == PLAYER {
-            self.int("stamina") > HIT - 1
+            damage > 0 && self.int("stamina") > damage - 1
         } else {
-            self.int(&format!("{hit}.stamina")) > HIT
+            self.int(&format!("{hit}.stamina")) > damage
         };
         if helps && self.int("luck") > 0 && self.int("stamina") > 0 {
             if let Some(c) = &mut self.state.combat {
                 c.pending = Some(hit);
             }
-            return self.combat_ask(turn, rule, next, &[(LUCK, LUCK_TEXT), (GO_ON, "Go on")]);
+            let options = [(LUCK, LUCK_TEXT), (GO_ON, "Go on")];
+            let options = options.map(|(id, text)| (id.to_string(), text.to_string()));
+            return self.combat_ask(turn, rule, next, options.into());
         }
-        self.combat_damage(turn, &hit, HIT);
+        self.combat_damage(turn, &hit, damage);
         self.combat_go_on(turn, rule, next, 1)
     }
 
-    /// The Luck test on the pending hit: it costs 1 LUCK and changes the damage.
-    fn combat_luck(&mut self, turn: &mut Turn) {
+    /// A hit of the round that no Luck test can change: `(hit, by)`.
+    fn combat_strike(&mut self, turn: &mut Turn, (hit, by): (Id, Id)) {
+        if let Some(c) = &mut self.state.combat {
+            c.by = Some(by);
+        }
+        let damage = self.hit_damage(&hit);
+        self.combat_damage(turn, &hit, damage);
+    }
+
+    /// The Luck test on the pending hit: it costs 1 LUCK and changes the
+    /// damage. When the host rolls, it first waits for the total.
+    fn combat_luck(&mut self, turn: &mut Turn, rule: &Id, next: usize) -> AwaitStep {
+        if self.combat_waits_for_rolls(1) {
+            return self.combat_roll_await(turn, rule, next);
+        }
         let Some(hit) = self.pending_hit() else {
-            return;
+            return self.combat_go_on(turn, rule, next, 1);
         };
         let luck = self.int("luck");
         let roll = self.named_roll(turn, "LUCK".into());
@@ -283,13 +389,15 @@ impl Game {
             turn,
             format!("Test your Luck: {roll} against {luck}: {word}."),
         );
+        let base = self.hit_damage(&hit);
         let damage = match (hit.as_str() == PLAYER, lucky) {
-            (true, true) => HIT - 1,
-            (true, false) => HIT + 1,
-            (false, true) => HIT + 2,
-            (false, false) => HIT - 1,
+            (true, true) => base - 1,
+            (true, false) => base + 1,
+            (false, true) => base + 2,
+            (false, false) => base - 1,
         };
-        self.combat_damage(turn, &hit, damage);
+        self.combat_damage(turn, &hit, damage.max(0));
+        self.combat_go_on(turn, rule, next, 1)
     }
 
     fn combat_damage(&mut self, turn: &mut Turn, target: &Id, damage: i64) {

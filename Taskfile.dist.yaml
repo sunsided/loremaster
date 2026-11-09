@@ -67,6 +67,14 @@ tasks:
     cmds:
       - scripts/pending-tests.sh
 
+  test:loom:
+    desc: Check all thread orders of the job registry of loremaster-mcp with loom (see CONTRIBUTING.md)
+    env:
+      RUSTFLAGS: --cfg loom
+    cmds:
+      # Its own target folder: the cfg rebuilds every crate.
+      - "{{.CARGO}} test -p loremaster-mcp --release --lib --target-dir target/loom loom"
+
   walkthroughs:
     desc: Run the walkthrough tests (tests/*.yaml) of every example
     cmds:
