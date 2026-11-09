@@ -22,6 +22,10 @@ fn lockhouse() -> Arc<World> {
             "name: Hester Reed\naliases: [hester, daughter]\nproper: true\nlocation: { room: kitchen }\n",
         ),
         (
+            "things/boots.yaml",
+            "name: pair of boots\nhead: boots\nnames:\n  - { when: lock == empty, text: boots of Amos, head: boots }\nlocation: { room: kitchen }\n",
+        ),
+        (
             "machines/lock.yaml",
             "start: full\nsteps:\n  - { from: full, on: { verb: [examine, hester] }, to: empty }\n",
         ),
@@ -92,4 +96,18 @@ fn the_scene_has_the_clock_as_a_number() {
     let scene = s.scene();
     assert_eq!(scene.time, "08:30");
     assert_eq!(scene.minutes, 8 * 60 + 30);
+}
+
+#[test]
+fn a_thing_has_its_head_noun() {
+    let mut s = Session::new(lockhouse());
+    s.start();
+    let head = |s: &Session, id: &str| s.thing(id).unwrap().head;
+    // The last word of the name, and the author's head.
+    assert_eq!(head(&s, "hester"), "Reed");
+    assert_eq!(head(&s, "boots"), "boots");
+    // The head of the name stage that holds now.
+    s.submit(Input::Text("examine hester".into()));
+    assert_eq!(s.thing("boots").unwrap().name, "boots of Amos");
+    assert_eq!(head(&s, "boots"), "boots");
 }

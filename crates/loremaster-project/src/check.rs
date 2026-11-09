@@ -524,6 +524,20 @@ impl Checker<'_> {
         }
     }
 
+    /// A declared head noun is a word of the name or one of the aliases.
+    fn head(&mut self, file: &str, at: &str, head: &str, name: &str, aliases: &[String]) {
+        let lower = head.to_lowercase();
+        let fits = name.split_whitespace().any(|w| w.to_lowercase() == lower)
+            || aliases.iter().any(|a| a.to_lowercase() == lower);
+        if !fits {
+            self.error(
+                file,
+                at,
+                format!("the head `{head}` is not a word of \"{name}\" or one of its aliases"),
+            );
+        }
+    }
+
     fn run(&mut self) {
         let story = self.story().clone();
         // The header comes from story.yaml, or from a pack in Rust.
@@ -664,9 +678,16 @@ impl Checker<'_> {
             self.fragments(&file, "description", &thing.description);
             self.fragments(&file, "presence", &thing.presence);
             self.frames(&file, "frames", &thing.frames);
+            if let Some(head) = &thing.head {
+                self.head(&file, "head", head, &thing.name, &thing.aliases);
+            }
             for (i, stage) in thing.names.iter().enumerate() {
                 if let Some(when) = &stage.when {
                     self.condition(&file, &format!("names[{i}].when"), when);
+                }
+                if let Some(head) = &stage.head {
+                    let at = format!("names[{i}].head");
+                    self.head(&file, &at, head, &stage.text, &stage.aliases);
                 }
             }
         }

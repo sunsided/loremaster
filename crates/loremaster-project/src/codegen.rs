@@ -207,7 +207,11 @@ fn thing(t: &Thing) -> String {
     frags(&mut b, "examine ", &t.description);
     frags(&mut b, "presence ", &t.presence);
     notes(&mut b, &t.notes);
-    hand_field(&mut b, t, &["red_herring", "names", "frames", "rules"]);
+    hand_field(
+        &mut b,
+        t,
+        &["head", "red_herring", "names", "frames", "rules"],
+    );
     format!(
         "    thing {} {} {place} {{\n{b}    }}\n",
         t.id,

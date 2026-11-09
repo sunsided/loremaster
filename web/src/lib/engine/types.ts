@@ -244,6 +244,8 @@ export interface ThingInfo {
 	location: ThingLocation;
 	/** The thing's aliases and the names and aliases of earlier name stages, lowercased. The parser also takes single words of `name`. Absent when there are none. */
 	aliases?: string[];
+	/** The main word of the current name: the author's `head`, else the last word of `name`. */
+	head: string;
 }
 
 export interface ExitInfo {

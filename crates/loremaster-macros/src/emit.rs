@@ -513,6 +513,7 @@ fn thing(t: &Thing) -> TokenStream {
                 quote_spanned!(span=> .name_stage(::loremaster::dsl::model::NameStage {
                     text: ::std::string::String::from(#t),
                     aliases: ::std::vec![#(::std::string::String::from(#aliases)),*],
+                    head: ::core::option::Option::None,
                     when: #when,
                     proper: #proper,
                 }))
