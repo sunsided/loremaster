@@ -8,6 +8,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- `await`, `combat` and `stats` in `world!` and the builder (#191), so a story with rolls or fights does not need YAML. `world!` has the effects `await roll "2d6" into r against luck;`, `await choice [..] into ..;`, `await walk_to ..;`, `await action .. { .. } results [..] into ..;` and `combat [warden] win yard loss fallen escape road together;` (`escape` and `together` are optional), and `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }` in the story header. The builder has `Effects::awaits`, `Effects::combat` and `StoryBuilder::stat`, `stat_short` and `stat_max`. `AwaitSpec` now derives `Default`.
+
 ### Changed
 
 - Host event arguments are their own namespace in conditions and text (#208). Before, an event read like a thing, so `present(killed)`, `killed.name` or `seen_by(killed)` passed the check. Now they are errors, and `killed.bos` says the event has no such argument, with a hint to `killed.boss`. An event still cannot have the id of a thing, a variable, a room or a built-in path: `killed.level` would still read as a thing's property or a room's `visits`, and the fact keys would clash.

@@ -118,11 +118,13 @@ impl<P: Process> Registry<P> {
         let Some(mut child) = self.children.lock().unwrap().remove(id) else {
             return false;
         };
-        child.kill();
-        child.wait();
+        // Cancelled before the kill: update() then drops what the agent
+        // writes while it dies, and no reader sees it failed on the way.
         if let Some(j) = self.jobs.lock().unwrap().get_mut(id) {
             j.status = JobStatus::Cancelled;
         }
+        child.kill();
+        child.wait();
         true
     }
 }
@@ -130,28 +132,35 @@ impl<P: Process> Registry<P> {
 #[cfg(all(test, loom))]
 mod loom_tests {
     use super::*;
+    use loom::sync::atomic::{AtomicBool, Ordering};
     use loom::thread;
 
     /// An agent that ends on its own with success, or fails once killed.
+    /// `killed` is shared, so that a test can see when the kill began.
+    #[derive(Default)]
     struct Fake {
-        killed: bool,
+        killed: Arc<AtomicBool>,
     }
 
     impl Process for Fake {
         fn kill(&mut self) {
-            self.killed = true;
+            self.killed.store(true, Ordering::SeqCst);
         }
 
         fn wait(&mut self) -> bool {
-            !self.killed
+            !self.killed.load(Ordering::SeqCst)
         }
     }
 
     fn registry() -> Registry<Fake> {
+        registry_with(Fake::default())
+    }
+
+    fn registry_with(child: Fake) -> Registry<Fake> {
         let r = Registry::default();
         let mut job = super::super::tests::job();
         job.result = Some("done".into());
-        r.insert(job, Fake { killed: false });
+        r.insert(job, child);
         r
     }
 
@@ -199,16 +208,20 @@ mod loom_tests {
         });
     }
 
-    /// The agent's last output comes in while the job is cancelled: a result
-    /// with an error after the kill does not make the cancelled job failed.
+    /// The agent's last output comes in while the job is cancelled: from
+    /// the kill on, an update (here a result with an error) does not reach
+    /// the job, so it never shows as failed and gains no events.
     #[test]
     fn loom_cancelled_is_final() {
         loom::model(|| {
-            let r = registry();
+            let child = Fake::default();
+            let killed = child.killed.clone();
+            let r = registry_with(child);
             let reader = {
                 let r = r.clone();
                 thread::spawn(move || {
                     r.update("j1", |j| {
+                        assert!(!killed.load(Ordering::SeqCst), "an update after the kill");
                         j.status = JobStatus::Failed;
                         j.events.push(JobEvent {
                             kind: "text".into(),
@@ -223,11 +236,6 @@ mod loom_tests {
             let end = r.get("j1").unwrap();
             if cancelled {
                 assert_eq!(end.status, JobStatus::Cancelled);
-                assert!(
-                    end.events.iter().all(|e| e.kind != "error"),
-                    "{:?}",
-                    end.events
-                );
             } else {
                 assert_eq!(end.status, JobStatus::Failed);
             }
@@ -243,7 +251,7 @@ mod loom_tests {
                 let r = r.clone();
                 thread::spawn(move || r.get("j1").is_none() || r.cancel("j1"))
             };
-            r.insert(super::super::tests::job(), Fake { killed: false });
+            r.insert(super::super::tests::job(), Fake::default());
             assert!(
                 canceller.join().unwrap(),
                 "a running job without its process"
@@ -263,7 +271,7 @@ mod loom_tests {
             };
             let mut job = super::super::tests::job();
             job.id = "j2".into();
-            r.insert(job, Fake { killed: false });
+            r.insert(job, Fake::default());
             finisher.join().unwrap();
             assert_eq!(r.get("j1").unwrap().status, JobStatus::Done);
             assert_eq!(r.get("j2").unwrap().status, JobStatus::Running);

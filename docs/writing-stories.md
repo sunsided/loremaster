@@ -470,6 +470,8 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: "Test your Luck", rolls: [4] }
 ```
 
+In `world!`, the effects are `await roll "2d6" into r against luck;`, `await choice [left, right "the right door"] into path;`, `await walk_to dock;`, `await action open_sluice { force = 2 } results [open, stuck] into sluice;` and `combat [warden] win yard loss fallen escape road;` (with `together` for all at once). The builder has `.awaits(AwaitSpec { .. })` and `.combat(CombatSpec { .. })`.
+
 `combat` works only in rules. The `min` of `stamina` must be a number of 0 or less, not a variable, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, and it does not force rounds of an all-at-once combat in which the player hits and an enemy hits too.
 
 ### The adventure sheet
@@ -482,6 +484,8 @@ stats:
   - { var: gold, label: Gold }
   - { var: hearth, label: HEARTH }
 ```
+
+In `world!`, the header takes `stats { stamina "STAMINA" short "ST" max stamina_initial, gold "Gold" }`; the builder has `.stat("stamina", "STAMINA").stat_short("stamina", "ST").stat_max("stamina", "stamina_initial")`.
 
 `var` is a number or a true/false variable, or a number or true/false property of a thing. Each variable can show one time only. A number shows as its value, with "/ max" when the stat has `max` (a number or a number variable). A true/false value shows as a codeword when it is true. A number with `short` also shows in the one-line sheet on a phone. The equipment on the sheet is the inventory of the player.
 
