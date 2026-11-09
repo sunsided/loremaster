@@ -18,6 +18,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 - A thing whose `names:` stages all have a `when` that does not hold now has its `name`. Before, it showed the text of the first stage (#178).
 - `Command::verb("go", vec!["up".into()])` now moves the player like `Command::Go`. Before, it ran as a verb that did nothing (#178).
+- A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 
 ## [0.2.0] - 2026-11-09
 

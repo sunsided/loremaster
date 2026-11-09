@@ -122,6 +122,7 @@ Run these commands before you open a pull request:
 | `task web:check` | Type-checks the Svelte code and the stories. Run it when you change `web/`. |
 | `task package` | Builds the web editor and packages the crates for crates.io. Run it when you change a `Cargo.toml`. |
 | `task test:pending` | Runs the pending tests. A pending test that passes is an error. Read "Pending tests" below. |
+| `task test:loom` | Checks all thread orders of the job registry with loom. Run it when you change `crates/loremaster-mcp/src/jobs/`. Read "Loom tests" below. |
 | `task lint:workflows` | Examines the GitHub workflows with actionlint and zizmor. Run it when you change `.github/`. It needs Docker and uv. |
 
 ### dramaturge
@@ -154,6 +155,12 @@ Some tests describe a feature before the engine has it, for example the golden s
 `cargo test` skips the pending Rust tests. `task test:pending` (the script `scripts/pending-tests.sh`) runs them. A pending test must fail. When one passes, the script fails with "unexpected pass". Then remove the mark in the same pull request.
 
 CI runs the script in the job "Pending tests (not required)". The job is not a required check, so a pending test does not block a merge. A red job means that a pending test passes now.
+
+### Loom tests
+
+The runtime has no threads, and `World` is shared through `Arc` but never changed. The HTTP server answers one request after the other. The one state that threads share is the job registry of `loremaster-mcp` (`src/jobs/registry.rs`): the request thread starts, reads and cancels jobs, and each job has a thread that reads the agent's output and sets the final status. [loom](https://docs.rs/loom) checks all orders of these threads.
+
+The registry takes `Arc` and `Mutex` from loom when the crate is built with `--cfg loom`, and from `std` else. The loom tests are in the module `loom_tests` there, with a fake agent process. `task test:loom` runs them (`RUSTFLAGS="--cfg loom" cargo test -p loremaster-mcp --release --lib loom`). The other tests of the crate do not run under loom. When you add a lock or a thread to the jobs, add a loom test for it. CI runs the tests in the job "Loom (not required)".
 
 The crate `loremaster` embeds the web editor by default (the feature `embed-ui`). The editor comes from `crates/loremaster-mcp/ui/`, and git ignores this folder. If the folder is missing, the build stops with an error. Thus the Rust tasks and the Rust CI job use `--no-default-features`. To build with the editor, run `task release:ui` first. The CI web job builds the web app, copies it into the crate and runs `cargo package`.
 
