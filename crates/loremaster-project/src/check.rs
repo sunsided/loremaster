@@ -7,7 +7,7 @@ use loremaster_model::{
     DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
     ThreadStatus, standard_verbs,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 mod contract;
 mod walkthroughs;
@@ -700,6 +700,10 @@ impl Checker<'_> {
                 .map(|e| e.id.to_string()),
         );
         let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
+        let mut group_sizes: BTreeMap<&str, usize> = BTreeMap::new();
+        for g in story.rules.iter().filter_map(|r| r.once.group()) {
+            *group_sizes.entry(g.as_str()).or_default() += 1;
+        }
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
             // One error per id: its origin is the last file of the id.
@@ -707,12 +711,7 @@ impl Checker<'_> {
                 self.error(&file, "id", format!("rule `{}` is defined twice", rule.id));
             }
             if let Some(g) = rule.once.group()
-                && story
-                    .rules
-                    .iter()
-                    .filter(|r| r.once.group() == Some(g))
-                    .count()
-                    == 1
+                && group_sizes.get(g.as_str()) == Some(&1)
             {
                 self.warning(
                     &file,
