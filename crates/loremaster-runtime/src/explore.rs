@@ -201,30 +201,49 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             if !objects.iter().all(|o| scope.contains(o)) {
                 continue;
             }
-            // The label is the dedup key: keep the slots that tell rules apart.
-            let mut text = label(p.verb.as_str(), &objects);
-            if let Some(prep) = &p.preposition {
-                text.push_str(&format!(" ({prep})"));
+            // `*` tries each verb that takes that many objects; moves come below.
+            let fits = |v: &&loremaster_model::VerbDef| match objects.len() {
+                0 => v.slots == VerbSlots::None,
+                1 => v.slots != VerbSlots::None,
+                _ => v.slots == VerbSlots::Two,
+            };
+            let verbs: Vec<Id> = if p.any_verb() {
+                world
+                    .verbs
+                    .iter()
+                    .filter(|v| v.id.as_str() != "go")
+                    .filter(fits)
+                    .map(|v| v.id.clone())
+                    .collect()
+            } else {
+                vec![p.verb.clone()]
+            };
+            for v in verbs {
+                // The label is the dedup key: keep the slots that tell rules apart.
+                let mut text = label(v.as_str(), &objects);
+                if let Some(prep) = &p.preposition {
+                    text.push_str(&format!(" ({prep})"));
+                }
+                if let Some(topic) = &p.topic {
+                    text.push_str(&format!(" about {topic}"));
+                }
+                out.push((
+                    text,
+                    Command::Verb {
+                        verb: v,
+                        objects: objects.clone(),
+                        actor: None,
+                        preposition: p.preposition.clone(),
+                        topic: p.topic.clone(),
+                    },
+                ));
             }
-            if let Some(topic) = &p.topic {
-                text.push_str(&format!(" about {topic}"));
-            }
-            out.push((
-                text,
-                Command::Verb {
-                    verb: p.verb.clone(),
-                    objects,
-                    actor: None,
-                    preposition: p.preposition.clone(),
-                    topic: p.topic.clone(),
-                },
-            ));
         }
     }
     // The standard verbs that change state.
     let take_rules = story.rules.iter().any(|r| {
         matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
-            if p.verb.as_str() == "take"
+            if (p.verb.as_str() == "take" || p.any_verb())
                 && for_player(p))
     });
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {

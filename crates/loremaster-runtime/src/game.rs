@@ -1672,6 +1672,7 @@ impl Game {
         // A machine takes one step for one event, even when its new state
         // matches another step.
         let mut stepped: Vec<&Id> = Vec::new();
+        let mut ran: Vec<usize> = Vec::new();
         for &i in &world.rule_order {
             if self.stopped || self.state.ended {
                 break;
@@ -1688,6 +1689,10 @@ impl Game {
             {
                 continue;
             }
+            if any_verb(rule) && self.exact_verb_fires(event, i, &ran) {
+                continue;
+            }
+            ran.push(i);
             turn.log.push(LogEntry {
                 kind: "rule".into(),
                 text: rule.id.to_string(),
@@ -1725,6 +1730,24 @@ impl Game {
         out.stopped = self.stopped;
         self.stopped = outer;
         out
+    }
+
+    /// Does a rule with an exact verb in the scope of the `*` rule `wild`
+    /// fire for the event? Then it holds the `*` rule back (#192).
+    /// shortcut: a rule that has not run yet is judged by its condition now,
+    /// before the rules ahead of it change the state; upgrade if that bites.
+    fn exact_verb_fires(&self, event: &Event, wild: usize, ran: &[usize]) -> bool {
+        let world = &self.world;
+        let within = &world.rules[wild].within;
+        world.rule_order.iter().any(|&j| {
+            let rule = &world.story.rules[j];
+            !any_verb(rule)
+                && world.rules[j].within == *within
+                && event.matches(rule)
+                && (ran.contains(&j)
+                    || (!(rule.once && self.state.fired.contains(&rule.id))
+                        && self.eval().holds_opt(&world.rules[j].when)))
+        })
     }
 
     /// Does the scope of a rule hold for the event? A thing rule needs the
@@ -2546,6 +2569,11 @@ fn default_arg(ty: &loremaster_model::ArgType) -> Value {
         // The least value: the interface hash does not see the order.
         ArgType::Enum(values) => Value::Text(values.iter().min().cloned().unwrap_or_default()),
     }
+}
+
+/// A rule on a verb event whose pattern matches any verb (`*`).
+fn any_verb(rule: &loremaster_model::Rule) -> bool {
+    matches!(&rule.on, loremaster_model::EventPattern::Verb(p) | loremaster_model::EventPattern::Check(p) if p.any_verb())
 }
 
 #[cfg(test)]

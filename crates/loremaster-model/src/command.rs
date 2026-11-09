@@ -35,6 +35,10 @@ pub struct CommandPattern {
     pub topic: Option<String>,
 }
 
+/// The verb of a rule pattern that matches any verb: `on: { verb: ["*", darkness] }`.
+/// An exact-verb rule that fires in the same scope and phase holds it back.
+pub const ANY_VERB: &str = "*";
+
 /// The names of the slots, in the order of the record.
 const SLOTS: &[&str] = &[
     "verb",
@@ -46,6 +50,11 @@ const SLOTS: &[&str] = &[
 ];
 
 impl CommandPattern {
+    /// Does the pattern match any verb (`*`)?
+    pub fn any_verb(&self) -> bool {
+        self.verb.as_str() == ANY_VERB
+    }
+
     /// A pattern that names only a verb.
     pub fn new(verb: impl Into<Id>) -> Self {
         Self {

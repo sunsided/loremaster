@@ -8,6 +8,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- The wildcard verb in rule events (#192): `on: { verb: ["*", darkness] }` matches any verb on the darkness, also for `check`. An exact-verb rule that fires in the same scope and phase holds the `*` rule back, so only its text shows. `loremaster check` accepts `*` in rules and refuses it in an agenda step's `do`, and the explorer tries each verb that fits the objects. `CommandPattern::any_verb` and `ANY_VERB` are in `loremaster-model`. `world!` syntax waits for #220.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

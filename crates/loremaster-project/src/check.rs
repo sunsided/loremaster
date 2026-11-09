@@ -1667,7 +1667,7 @@ impl Checker<'_> {
         let verb = pattern.verb.as_str();
         if verb.is_empty() {
             self.error(file, at, "name the verb");
-        } else if !verbs.contains(verb) {
+        } else if !verbs.contains(verb) && !pattern.any_verb() {
             self.error(file, at, format!("unknown verb `{verb}`"));
         }
         if pattern.indirect.is_some() && pattern.direct.is_none() {
@@ -1808,6 +1808,13 @@ impl Checker<'_> {
                             &file,
                             &format!("{at}.actor"),
                             "the agenda's actor runs the command; leave `actor` out",
+                        );
+                    }
+                    if cmd.any_verb() {
+                        self.error(
+                            &file,
+                            &at,
+                            "an agenda step runs one verb; `*` is for the events of rules",
                         );
                     }
                     // The actor is reported above; check the other slots.
