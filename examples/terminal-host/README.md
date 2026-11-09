@@ -127,4 +127,5 @@ runs: it prints `story reloaded`, what the new world no longer has, and the
 current room, and the player keeps their place. A broken file prints its
 diagnostics, and the game goes on in the last good version. The host polls
 only before a prompt, because it then blocks on the input, so an edit shows
-after the next command you enter.
+after the next command you enter. This host registers no Rust behaviors, so
+`--watch` refuses a story that needs some.

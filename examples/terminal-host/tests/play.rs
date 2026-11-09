@@ -4,7 +4,9 @@ use loremaster_model::WalkStep;
 use loremaster_project::{load, read_dir};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
+use std::time::{Duration, Instant};
 
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
@@ -151,8 +153,19 @@ struct Watched {
     story: PathBuf,
     child: Child,
     stdin: ChildStdin,
-    stdout: ChildStdout,
+    output: Receiver<Vec<u8>>,
 }
+
+/// A failed assertion must not leave the host running.
+impl Drop for Watched {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// How long the host may take to reach its next prompt.
+const PROMPT_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
@@ -181,12 +194,21 @@ impl Watched {
             .spawn()
             .unwrap();
         let stdin = child.stdin.take().unwrap();
-        let stdout = child.stdout.take().unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        // A thread, so a host that stops printing fails the test instead of hanging it.
+        let (sender, output) = channel();
+        std::thread::spawn(move || {
+            let mut buf = [0; 4096];
+            while let Ok(n) = stdout.read(&mut buf)
+                && n > 0
+                && sender.send(buf[..n].to_vec()).is_ok()
+            {}
+        });
         let mut host = Self {
             story,
             child,
             stdin,
-            stdout,
+            output,
         };
         let out = host.until_prompt();
         (host, out)
@@ -195,12 +217,16 @@ impl Watched {
     /// Everything the host prints up to its next prompt.
     fn until_prompt(&mut self) -> String {
         let mut out = Vec::new();
-        let mut buf = [0; 4096];
+        let deadline = Instant::now() + PROMPT_TIMEOUT;
         while !out.ends_with(b"\n> ") {
-            let n = self.stdout.read(&mut buf).unwrap();
-            let so_far = String::from_utf8_lossy(&out);
-            assert!(n > 0, "the host ended before a prompt: {so_far}");
-            out.extend_from_slice(&buf[..n]);
+            let left = deadline.saturating_duration_since(Instant::now());
+            match self.output.recv_timeout(left) {
+                Ok(chunk) => out.extend_from_slice(&chunk),
+                Err(e @ (RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected)) => {
+                    let so_far = String::from_utf8_lossy(&out);
+                    panic!("no prompt from the host ({e}): {so_far}");
+                }
+            }
         }
         String::from_utf8(out).unwrap()
     }
@@ -262,4 +288,28 @@ fn watch_reports_a_broken_file_and_plays_on() {
     assert!(next.contains(COTTAGE), "{next}");
     assert!(!next.contains("The story has errors"), "{next}");
     host.quit();
+}
+
+#[test]
+fn watch_refuses_a_story_that_needs_behaviors() {
+    let story = Path::new(env!("CARGO_TARGET_TMPDIR")).join("watch-behaviors");
+    let _ = std::fs::remove_dir_all(&story);
+    copy_dir(&example("lighthouse"), &story);
+    let header = std::fs::read_to_string(story.join("story.yaml")).unwrap();
+    std::fs::write(
+        story.join("story.yaml"),
+        format!("behaviors: [thief]\n{header}"),
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_terminal-host"))
+        .arg(&story)
+        .arg("--watch")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let err = String::from_utf8(output.stderr).unwrap();
+    assert!(err.contains("registers no behaviors"), "{err}");
+    assert!(err.contains("thief"), "{err}");
 }

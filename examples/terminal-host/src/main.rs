@@ -65,8 +65,9 @@ struct Watch {
 /// check, so a story that a reload would refuse does not start either.
 fn open_watched(dir: &Path) -> Result<(Arc<World>, Watch), String> {
     // Read first: an edit made during the build then shows at the first poll.
-    let live = LiveStory::new(Loremaster::new().yaml(dir));
-    let (project, warnings) = Loremaster::new().yaml(dir).check().map_err(|found| {
+    let sources = Loremaster::new().yaml(dir);
+    let live = LiveStory::new(sources.clone());
+    let (project, warnings) = sources.check().map_err(|found| {
         let lines: Vec<_> = found.iter().map(ToString::to_string).collect();
         lines.join("\n")
     })?;
@@ -74,6 +75,15 @@ fn open_watched(dir: &Path) -> Result<(Arc<World>, Watch), String> {
         println!("{warning}");
     }
     let world = World::compile(project.story).map_err(|e| e.to_string())?;
+    let missing: Vec<_> = (world.missing_behaviors().iter())
+        .map(ToString::to_string)
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "--watch can not live-reload this story: this host registers no behaviors, and the story needs {}",
+            missing.join(", ")
+        ));
+    }
     let walkthroughs = project.walkthroughs;
     Ok((Arc::new(world), Watch { live, walkthroughs }))
 }
@@ -109,7 +119,13 @@ fn reload(session: &mut Session, world: &mut Arc<World>, watch: &mut Watch) -> O
     }
     // Restoring its own state shows the room without a turn, as after a load.
     let snapshot = session.snapshot();
-    session.restore(&snapshot).ok()
+    match session.restore(&snapshot) {
+        Ok(step) => Some(step),
+        Err(e) => {
+            println!("Can not show the room again: {e}");
+            None
+        }
+    }
 }
 
 /// The loop of a host: show the step, ask what its status asks, send the answer.
