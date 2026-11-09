@@ -10,6 +10,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Sound lines (#222): a sound line, such as an NPC's "clank, clank", is a `play_sound` of an asset with a `caption`, not a `say` with a text prefix. `loremaster play` and the terminal host now print the caption of each sound; before, `loremaster play` dropped sounds and the terminal host reported an unknown effect. `docs/writing-stories.md` and the terminal host's README say so for authors and hosts.
 - `world!` writes the wildcard verb bare (#220): `rule grope on verb(*, darkness) { .. }` and `on check(*)`, the same as `on::verb(["*", "darkness"])` in the builder. `*` goes only in the verb place.
 - Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening, the turn passing (`on: turn`, timers, time rules, agendas, orders) and the rules of a host event. A graphical host can draw the player's own text over the player and the rest as ambient narration.
 - `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Like `snapshot`, it sees everything, also concealed things. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.

@@ -32,6 +32,10 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
    - `Notice`: a change of state. A host may skip it.
    - `Choices`: the answers of a talk. Answer with `Input::Choice(index)`.
    - `Roll`: dice to show.
+   - `Sound`: a one-shot sound (`play_sound`), with the asset's `file` and
+     `caption`. This host plays no audio and prints the caption. A sound
+     line of an NPC is such a sound: float the caption beside the NPC, and
+     do not look for a text prefix such as `sfx:` in `say` text.
    - `Ending`: the story has ended.
 3. Act on the `Status` of the step. Only the status says what may come next:
    - `Ready`: send the next `Input`.

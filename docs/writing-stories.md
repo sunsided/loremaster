@@ -634,6 +634,8 @@ A walkthrough checks it with `sound:`, in a step or in `expect`: `{ do: open gat
 
 `loremaster check` reports an unknown asset, a file that does not exist and a path outside the project as errors. An asset without a licence, an unused asset and a missing caption are warnings.
 
+For a sound line, such as an NPC's "clank, clank", use `play_sound` with an asset that has a `caption`, not a `say` with a text prefix like `sfx:`. The host gets a typed sound with its caption, and each player shows it as it can: `loremaster play` and the terminal host print the caption, the web player plays the audio or shows the caption.
+
 The web player shows the images and plays the audio. The sound is off by default; Alt+M switches it. Audio starts after the first input of the player. Captions show while the sound is off, or with the Captions switch. The web player has the files of the bundled examples only: a story from a folder or a zip shows the captions in place of its media.
 
 ### Scenes with hotspots

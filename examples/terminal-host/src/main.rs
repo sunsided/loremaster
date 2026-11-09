@@ -248,6 +248,12 @@ fn show(step: &Step) {
             Effect::Ending { ending } => {
                 println!("\n*** {} ({:?}) ***", ending.title, ending.kind);
             }
+            // This host plays no audio: it shows the caption of a sound.
+            Effect::Sound { sound } => {
+                if let Some(caption) = &sound.caption {
+                    println!("\n{caption}");
+                }
+            }
             // Effect is non_exhaustive. A new effect must not stop the game.
             other => eprintln!("this host does not know the effect {other:?}"),
         }
