@@ -179,8 +179,8 @@ impl Workbench {
     /// [`Workbench::carried_to`] with the walkthroughs of the changed story,
     /// so the hint book is built once, in the new world.
     pub fn carried_to_with(&self, world: Arc<World>, walks: Vec<(String, Walkthrough)>) -> Self {
-        let mut next = Self::from_session(authoring::carry_over(&self.session, world));
-        next.set_walkthroughs(walks);
+        let mut next = Self::from_session(authoring::carry_over_with(&self.session, world, &walks));
+        next.walkthroughs = walks;
         next
     }
 
