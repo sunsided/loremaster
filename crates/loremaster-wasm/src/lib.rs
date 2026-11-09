@@ -479,6 +479,11 @@ impl JsWorkbench {
         to_js(&self.bench.session().scene())
     }
 
+    /// The value of one fact now, or null; see `Session.fact`.
+    pub fn fact(&self, name: &str) -> Result<JsValue, JsValue> {
+        or_null(self.bench.session().fact(name))
+    }
+
     /// The quest journal of the session.
     pub fn journal(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().journal())

@@ -1,7 +1,6 @@
 //! The Atlas and the map: all rooms, what is in them now, and the exits.
 
 use crate::ThingInfo;
-use loremaster_lang::NameForm;
 use loremaster_runtime::authoring::Inspector;
 use serde::{Deserialize, Serialize};
 
@@ -83,11 +82,7 @@ pub(crate) fn atlas(ins: Inspector<'_>) -> Vec<AtlasRoom> {
                 .things
                 .iter()
                 .filter(|t| ins.state().is_in_room(t.id.as_str(), r.id.as_str()))
-                .map(|t| ThingInfo {
-                    id: t.id.to_string(),
-                    name: ins.thing_name(t.id.as_str(), NameForm::Bare),
-                    aliases: Vec::new(),
-                })
+                .filter_map(|t| ins.thing_info(t.id.as_str()))
                 .collect(),
             exits: r
                 .exits

@@ -370,6 +370,11 @@ export class Workbench {
 		return this.#bench.scene();
 	}
 
+	/** The value of one fact now (a variable, a property or a machine's state), or null. */
+	fact(name: string): Value | null {
+		return this.#bench.fact(name);
+	}
+
 	/** The quest journal of the session. */
 	journal(): JournalEntry[] {
 		return this.#bench.journal();

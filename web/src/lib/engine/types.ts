@@ -230,7 +230,7 @@ export interface OutlineOption {
 export interface ThingInfo {
 	id: string;
 	name: string;
-	/** The other words the parser accepts for the thing now, lowercased. Absent when there are none. */
+	/** The thing's aliases and the names and aliases of earlier name stages, lowercased. The parser also takes single words of `name`. Absent when there are none. */
 	aliases?: string[];
 }
 
