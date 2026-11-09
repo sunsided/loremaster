@@ -155,12 +155,13 @@
 							{#each p.accepted_by as rule, k (rule)}
 								<p class="muted"><code>closes</code> of {rule}: {p.reasons[k] ?? ''}</p>
 							{/each}
-							{#if p.only_ahead?.length}
-								<p class="muted">
-									Info: only a step that fires later accepts {p.only_ahead.join(', ')}, and no state that differs only in time still
-									reaches them, so this turn may close them. If it does, name them in <code>closes</code> of its step.
-								</p>
-							{/if}
+						{/if}
+						{#if p.only_ahead.length}
+							<p class="muted">
+								Info: only a closer that fires later accepts {p.only_ahead.join(', ')}, and no state that differs only in time still
+								reaches {p.only_ahead.length === 1 ? 'it' : 'them'}, so this turn may close {p.only_ahead.length === 1 ? 'it' : 'them'}. If it
+								does, name {p.only_ahead.length === 1 ? 'it' : 'them'} in <code>closes</code> of its rule or step.
+							</p>
 						{/if}
 						{@render path(p.path)}
 						<Button size="compact" variant="quiet" onclick={() => onreplay(p.path)}>Replay this path</Button>

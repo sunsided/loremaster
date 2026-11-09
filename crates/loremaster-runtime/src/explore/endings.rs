@@ -196,12 +196,8 @@ impl EndingCheck {
                 ),
             ));
         }
-        // A drop that also warns says so there.
-        for p in self
-            .no_return
-            .iter()
-            .filter(|p| p.accepted() && !p.only_ahead.is_empty())
-        {
+        // Also on a drop that warns for its other endings.
+        for p in self.no_return.iter().filter(|p| !p.only_ahead.is_empty()) {
             let by = p.rule.as_ref().map(|r| blame(r)).unwrap_or_default();
             let more = if p.turns > 1 {
                 format!(" ({} explored turns)", p.turns)
@@ -212,11 +208,12 @@ impl EndingCheck {
                 "",
                 at(&p.rule, "/closes"),
                 format!(
-                    "point of no return, accepted only by a step that fires later: after {} in `{}`{by}, {} can no longer be reached{more}, and no state that differs only in time still reaches them, so the turn itself may close them. If it does, name them in `closes: [{}]` of the step, with a `reason`",
+                    "point of no return, accepted only by a closer that fires later: after {} in `{}`{by}, {} can no longer be reached{more}, and no state that differs only in time still reaches {them}, so the turn itself may close {them}. If it does, name {them} in `closes: [{}]` of the closer, with a `reason`",
                     quoted(&p.path),
                     p.room,
                     names(&p.only_ahead),
                     p.only_ahead.join(", "),
+                    them = if p.only_ahead.len() == 1 { "it" } else { "them" },
                 ),
             ));
         }
@@ -498,10 +495,15 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
     let mut twin_edges: Vec<Vec<(u32, u32)>> = vec![Vec::new(); groups];
     let mut twin_reach = Sets::new(groups, ids.len());
     for (i, &t) in g.twins.iter().enumerate() {
-        twin_edges[t as usize].extend(g.edges[i].iter().map(|&(j, c)| (g.twins[j as usize], c)));
+        // Only the target counts for the closure.
+        twin_edges[t as usize].extend(g.edges[i].iter().map(|&(j, _)| (g.twins[j as usize], 0)));
         if let Some(e) = ended_as[i] {
             twin_reach.insert(t as usize, e);
         }
+    }
+    for out in &mut twin_edges {
+        out.sort_unstable();
+        out.dedup();
     }
     twin_reach.close(&Preds::new(&twin_edges));
 
@@ -515,6 +517,13 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                 queue.push_back(u as usize);
             }
         }
+    }
+
+    // A twin group with a state that the walk did not finish proves nothing:
+    // its turns are incomplete, so no drop into it counts as `only_ahead`.
+    let mut inconclusive = vec![false; groups];
+    for (i, &t) in g.twins.iter().enumerate() {
+        inconclusive[t as usize] |= unproven[i];
     }
 
     // The rules with `closes` that can still fire after each state.
@@ -618,9 +627,15 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
     // not ended and not dead, after which the best rank is worse. A state
     // that can reach a cut state has an incomplete set: it proves nothing.
     let mut no_return: Vec<NoReturn> = Vec::new();
-    // By cause: the blamed rule, the lost endings, the unaccepted ones, and
-    // the ones only a closer ahead accepts.
-    type Cause = (Option<String>, Vec<usize>, Vec<usize>, Vec<usize>);
+    // By cause: the blamed rule, the lost endings, the unaccepted ones, the
+    // ones only a closer ahead accepts, and the accepting closers.
+    type Cause = (
+        Option<String>,
+        Vec<usize>,
+        Vec<usize>,
+        Vec<usize>,
+        Vec<usize>,
+    );
     let mut no_return_at: BTreeMap<Cause, usize> = BTreeMap::new();
     let mut lost_by: Vec<Vec<bool>> = vec![vec![false; ids.len()]; closer_ids.len()];
     for i in (0..n).filter(|&i| !ended[i] && !unproven[i]) {
@@ -686,6 +701,7 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                     ranks[*e].is_some()
                         && named.contains(e)
                         && !named_now.contains(e)
+                        && !inconclusive[g.twins[ju] as usize]
                         && !members(twin_reach.of(g.twins[ju] as usize)).any(|x| x == *e)
                 })
                 .collect();
@@ -701,6 +717,7 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                 lost.clone(),
                 unaccepted.clone(),
                 only_ahead.clone(),
+                covering.clone(),
             );
             match no_return_at.get(&key) {
                 Some(&k) => no_return[k].turns += 1,
