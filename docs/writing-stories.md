@@ -784,6 +784,7 @@ How a turn goes for an actor, after the clock moved and the timers and time rule
 - An actor does one thing per turn: it walks one room, runs one step, or tries a `do` that a `check` rule refuses. A step skipped for its `when` takes no time.
 - While the player talks with the actor, the actor waits. Its step runs late, in the turn that ends the talk.
 - The player sees an actor come into the room and leave it ("The lock-keeper comes in.").
+- Each walk gives the host an `Effect::Moved` (`{ "type": "moved", "moved": { "actor", "name", "from", "to" } }`, ids of the rooms, `from` missing when the actor was in no room). The `move` notice `<actor> -> <room>` comes in the same step, but not always right before it: match the two by `actor`, not by position. A host that shows actors reads it instead of parsing the text. It comes also when the player does not see the walk.
 - A step runs once. A save game keeps which steps ran and which were skipped.
 
 `closes` marks a point of no return, for the ending checks. It is not a dead end: after the keeper burns the pages, the best ending (`committed`) is gone, but the game can still end (`ashes`). A drop in the best reachable ending is a warning, unless the step names the ending in `closes`; a dead end, where no ending can be reached at all, is an error. `loremaster check` checks today that `closes` names known endings.
