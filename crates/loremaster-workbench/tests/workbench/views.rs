@@ -14,6 +14,23 @@ const HALL: &str = "name: Hall\ndescription:\n  - \"A hall.\"\nexits:\n  - { dir
 const YARD: &str =
     "name: Yard\ndescription:\n  - \"A yard.\"\nexits:\n  - { direction: south, to: hall }\n";
 
+#[test]
+fn host_event_arguments_are_symbols_with_their_values() {
+    let story = "title: Yard\nstart: hall\nvars:\n  - { id: rang, type: bool, initial: false }\ninterface:\n  events:\n    - { id: killed, args: { boss: text, fled: bool } }\n";
+    let world = world_of(&[
+        ("story.yaml", story),
+        ("rooms/hall.yaml", HALL),
+        ("rooms/yard.yaml", YARD),
+    ]);
+    let symbols = Workbench::new(world).symbols();
+    let fled = symbols.iter().find(|s| s.name == "killed.fled").unwrap();
+    assert_eq!(fled.kind, "argument");
+    assert_eq!(fled.values, ["true", "false"]);
+    assert!(symbols.iter().any(|s| s.name == "killed.boss"));
+    // An event is no thing: no name forms or derived reads.
+    assert!(!symbols.iter().any(|s| s.name == "killed.name"));
+}
+
 fn bench() -> Workbench {
     let mut bench = Workbench::new(world_of(&[
         ("story.yaml", STORY),
