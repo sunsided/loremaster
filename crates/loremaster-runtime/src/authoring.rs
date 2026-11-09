@@ -281,6 +281,17 @@ pub fn carry_over(session: &Session, world: Arc<World>) -> Session {
     session.carried_over(world).0
 }
 
+/// [`carry_over`] with the hint book built again from these walkthroughs and
+/// the hint progress fitted to it, as in [`Session::reload`]. `session` does
+/// not change.
+pub fn carry_over_with(
+    session: &Session,
+    world: Arc<World>,
+    walks: &[(String, loremaster_model::Walkthrough)],
+) -> Session {
+    session.carried_over_with(world, walks).0
+}
+
 /// A `combat` effect in words, for the rules view.
 pub fn describe_combat(spec: &loremaster_model::CombatSpec) -> String {
     let enemies: Vec<&str> = spec.enemies.iter().map(|e| e.as_str()).collect();

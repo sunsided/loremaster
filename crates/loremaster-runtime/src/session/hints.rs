@@ -180,7 +180,8 @@ impl Session {
     /// player's progress to it: steps the book no longer has are forgotten,
     /// and a shorter ladder must not show its command unasked. A command stays
     /// shown only when the player saw this same command before. Adds the done
-    /// steps it forgets to `dropped`, as `step:<key>`.
+    /// steps it forgets to `dropped`, as `step:<key>`. An empty book is no
+    /// ladder to compare against, so the progress then stays as it is.
     pub(super) fn rebuild_hints(
         &mut self,
         walks: &[(String, Walkthrough)],
@@ -189,6 +190,10 @@ impl Session {
         let old = self.hints.clone();
         self.set_hints_from(walks);
         let book = self.hints.clone();
+        // For example a session from a save, which has no walkthroughs yet.
+        if book.steps.is_empty() {
+            return;
+        }
         let find = |b: &'_ HintBook, key: &str| b.steps.iter().position(|s| s.key == key);
         self.revealed.retain(|key, level| {
             let Some(i) = find(&book, key) else {

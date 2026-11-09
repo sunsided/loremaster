@@ -3,7 +3,7 @@
 
 use super::{Input, Session};
 use crate::{Command, Game, Turn, World};
-use loremaster_model::Value;
+use loremaster_model::{Value, Walkthrough};
 use std::sync::Arc;
 
 impl Session {
@@ -31,6 +31,20 @@ impl Session {
         next.hints = self.hints.clone();
         next.revealed = self.revealed.clone();
         next.built_for = (self.built_for.clone()).filter(|b| next.check_interface(b).is_ok());
+        (next, dropped)
+    }
+
+    /// [`Session::carried_over`] with the hint book built again from `walks`
+    /// and the hint progress fitted to it. What was dropped comes sorted.
+    pub(crate) fn carried_over_with(
+        &self,
+        world: Arc<World>,
+        walks: &[(String, Walkthrough)],
+    ) -> (Self, Vec<String>) {
+        let (mut next, mut dropped) = self.carried_over(world);
+        // The hint book plays the walkthroughs in its world: build it again.
+        next.rebuild_hints(walks, &mut dropped);
+        dropped.sort();
         (next, dropped)
     }
 

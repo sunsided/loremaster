@@ -2,7 +2,7 @@
 
 use crate::{Host, root, world_of};
 use loremaster_model::{Location, Value};
-use loremaster_project::{load, read_dir};
+use loremaster_project::{SourceFile, load, read_dir};
 use loremaster_runtime::authoring::carry_over;
 use loremaster_runtime::{Input, ReloadError, Session, Status, World};
 use loremaster_workbench::{AuthorCommand, Workbench};
@@ -340,6 +340,40 @@ fn the_unchecked_carry_over_validates_the_host_interface() {
     let mut unbound = carry_over(&session, world(changed));
     assert!(unbound.reload(world(changed), &[]).is_ok());
     assert!(unbound.reload(world(CONTRACT), &[]).is_ok());
+}
+
+#[test]
+fn carried_to_with_fits_the_hint_progress_and_leaves_the_old_workbench() {
+    let project = |test: &str| {
+        let mut files = read_dir(&root("lighthouse")).unwrap();
+        files.retain(|f| !f.path.starts_with("tests/"));
+        files.push(SourceFile {
+            path: "tests/extra.yaml".into(),
+            text: test.into(),
+        });
+        load(files).unwrap()
+    };
+    let long = project(
+        "steps:\n  - { id: go, do: n, hints: [\"North.\"] }\n  - { id: drawer, do: open drawer, hints: [\"A.\", \"B.\", \"C.\"] }\n",
+    );
+    let short = project("steps:\n  - n\n  - { id: drawer, do: open drawer, hints: [\"A.\"] }\n");
+    let mut bench = Workbench::new(Arc::new(World::compile(long.story).unwrap()));
+    bench.set_walkthroughs(long.walkthroughs);
+    bench.start();
+    bench.input("n");
+    bench.hint(None);
+    bench.hint(None);
+
+    let world = Arc::new(World::compile(short.story).unwrap());
+    let next = bench.carried_to_with(world, short.walkthroughs);
+
+    let drawer = next.session().hints().remove(0);
+    assert_eq!(drawer.shown, ["A."]);
+    assert_eq!(drawer.command, None);
+    assert!(!next.state().steps_done.contains("go"));
+    // The old workbench is as it was.
+    assert_eq!(bench.session().hints()[0].shown.len(), 2);
+    assert!(bench.state().steps_done.contains("go"));
 }
 
 const CONTRACT: &str =
