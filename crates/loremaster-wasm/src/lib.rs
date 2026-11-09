@@ -415,6 +415,13 @@ impl JsWorkbench {
         to_js(&self.bench.play(input))
     }
 
+    /// One step of a path from the state explorer, as a turn, or `null` when
+    /// the game has no such step now.
+    #[wasm_bindgen(js_name = replayStep)]
+    pub fn replay_step(&mut self, step: &str) -> Result<JsValue, JsValue> {
+        or_null(self.bench.replay_step(step))
+    }
+
     /// Answer the request of `Status::Await`, also the death prompt, as a turn.
     /// Throws when the id or the value does not fit.
     pub fn resume(&mut self, await_id: &str, value: JsValue) -> Result<JsValue, JsValue> {

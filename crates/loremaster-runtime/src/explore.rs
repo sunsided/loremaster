@@ -171,7 +171,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
                 out.push((format!("answer {}", c.text), cmd));
             }
         }
-        return out;
+        return unique(out);
     }
     // In a talk, only the answers and leaving run.
     if game.talk().is_some() {
@@ -182,7 +182,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             )
         }));
         out.push(("leave".into(), Command::Leave));
-        return out;
+        return unique(out);
     }
     let verb = |v: &str, objects: Vec<Id>| Command::verb(v, objects);
     let label = |v: &str, objects: &[Id]| {
@@ -317,6 +317,20 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     out
 }
 
+/// Labels that a path can replay: of two answers with one text, the second
+/// gets ` (2)`, the third ` (3)`, and so on.
+fn unique(mut out: Vec<(String, Command)>) -> Vec<(String, Command)> {
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    for (label, _) in &mut out {
+        let n = seen.entry(label.clone()).or_insert(0);
+        *n += 1;
+        if *n > 1 {
+            label.push_str(&format!(" ({n})"));
+        }
+    }
+    out
+}
+
 /// Force the rolls of a combat round for its label in [`commands`], so that
 /// the walk sees both outcomes. The extreme rolls keep impossible outcomes
 /// out: with a big gap in SKILL, a forced "win" still loses.
@@ -335,6 +349,18 @@ fn force_round(game: &mut Game, label: &str) {
     let mut totals = vec![enemy; game.combat_fighters()];
     totals.push(player);
     game.forced.totals = totals.into();
+}
+
+/// The command of one step of an explorer path in this state, with the rolls
+/// of a combat round forced as the walk saw them. `None` when the state has
+/// no such step, also when the story has ended.
+pub(crate) fn step_command(game: &mut Game, step: &str) -> Option<Command> {
+    if game.state().ended {
+        return None;
+    }
+    let (label, cmd) = commands(game).into_iter().find(|(l, _)| l == step)?;
+    force_round(game, &label);
+    Some(cmd)
 }
 
 /// A pattern that matches the player's commands: no `actor`, or the player.
@@ -636,5 +662,20 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                 payoffs: crate::threads::payoff_labels(&beats, t),
             })
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn two_answers_with_one_text_get_two_labels() {
+        let choose = |index| ("say Yes.".to_string(), Command::Choose { index });
+        let labels: Vec<String> = unique(vec![choose(0), choose(1), choose(2)])
+            .into_iter()
+            .map(|(l, _)| l)
+            .collect();
+        assert_eq!(labels, ["say Yes.", "say Yes. (2)", "say Yes. (3)"]);
     }
 }

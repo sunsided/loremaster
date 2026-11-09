@@ -316,6 +316,11 @@ export class Workbench {
 		return this.#bench.play(input);
 	}
 
+	/** One step of a path from the state explorer, or null when the game has no such step now. */
+	replayStep(step: string): Turn | null {
+		return this.#bench.replayStep(step);
+	}
+
 	/** Answer the request of an `await` status, also the death prompt. Throws when the answer does not fit. */
 	resume(awaitId: string, value: Value): Turn {
 		return this.#bench.resume(awaitId, value);

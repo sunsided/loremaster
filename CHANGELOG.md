@@ -13,6 +13,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - Combat (#190): in an all-at-once combat with more than one living enemy, the player selects the target ("Attack HOUND", `attack.hound`; `attack` is still the first living enemy). The enemy properties `deals` and `takes` are special rules of one enemy: the STAMINA a hit costs the player or the enemy, instead of 2; Luck shifts them as it shifts the 2, and `loremaster check` rejects a value that is not a number. With `set_host_rolls(true)`, the host answers the dice of a combat as `roll` awaits: one per enemy that fights, then the player, and one for "Test your Luck". A save while a round waits for its rolls keeps the totals so far.
 - **Breaking (library):** `CombatState` has the new fields `by`, `target` and `rolls`. Saves stay compatible: the fields default to empty.
 - `await`, `combat` and `stats` in `world!` and the builder (#191), so a story with rolls or fights does not need YAML. `world!` has the effects `await roll "2d6" into r against luck;`, `await choice [..] into ..;`, `await walk_to ..;`, `await action .. { .. } results [..] into ..;` and `combat [warden] win yard loss fallen escape road together;` (`escape` and `together` are optional), and `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }` in the story header. The builder has `Effects::awaits`, `Effects::combat` and `StoryBuilder::stat`, `stat_short` and `stat_max`. `AwaitSpec` now derives `Default`.
+- `Workbench::replay_step` (WASM `replayStep`) plays one step of a path from the state explorer, as a whole turn, or gives `None` when the game has no such step now. It reads each step as the explorer wrote it, with the rolls of a combat round as the walk forced them, and with host rolls and host walks off for the step, as in the walk. After the end of the story it gives `None`. Two answers with one text in a talk or a paused rule now have different labels in the explorer's paths (`say Yes.`, `say Yes. (2)`), so a path replays the answer it took.
 
 ### Changed
 
@@ -21,6 +22,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 ### Fixed
 
 - A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
+- The "Replay this path" buttons of the explorer in the web editor play `say`, `answer` and `leave` steps, and steps with a preposition or a topic, through `Workbench::replay_step`. Before, a path through a talk or a paused rule stopped working at that step (#163).
 - The state explorer tells states apart by the turns left of each timer. Before, an ending that a timer triggers was never reached, and the ending checks missed the points of no return that a timer makes (#210).
 
 ## [0.2.0] - 2026-11-09
