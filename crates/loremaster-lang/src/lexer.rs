@@ -26,7 +26,11 @@ pub(crate) fn lex(src: &str) -> Result<Vec<(Tok, Span)>, LangError> {
     let mut i = 0;
     while i < bytes.len() {
         // The char, not the byte: a byte of a multi-byte char is no char of its own.
-        let c = src[i..].chars().next().unwrap_or(' ');
+        // Each step below moves `i` by whole chars, so it stays on a char boundary.
+        let c = src[i..]
+            .chars()
+            .next()
+            .expect("`i` is on a char boundary before the end");
         let start = i;
         if c.is_whitespace() {
             i += c.len_utf8();

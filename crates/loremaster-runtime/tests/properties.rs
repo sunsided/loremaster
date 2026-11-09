@@ -342,12 +342,18 @@ fn salt_move(game: &mut Session, pick: usize) -> String {
             return game.submit(Input::Text(cmd.into())).plain_text();
         }
     };
+    // Any kind of await: a total in range for a roll, else one of its answers.
     let answer = match &awaiting.request {
-        AwaitRequest::Choice { options } => {
-            Value::Text(options[pick % options.len()].id.to_string())
+        AwaitRequest::Roll { min, max, .. } => {
+            let span = i128::from(*max) - i128::from(*min) + 1;
+            assert!(span > 0, "a roll from {min} to {max}");
+            Value::Int((i128::from(*min) + pick as i128 % span) as i64)
         }
-        AwaitRequest::Roll { min, max, .. } => Value::Int(min + pick as i64 % (max - min + 1)),
-        other => panic!("unexpected await {other:?}"),
+        request => {
+            let answers = request.answers();
+            assert!(!answers.is_empty(), "no answer to offer: {request:?}");
+            answers[pick % answers.len()].0.clone()
+        }
     };
     game.resume(&awaiting.id, answer).unwrap().plain_text()
 }
@@ -595,8 +601,10 @@ proptest! {
             b => format!(" {count}D{sides}{b:+} "),
         };
         prop_assert_eq!(Dice::parse(&text), Some(Dice { count, sides, bonus }));
+        // Text that reads as dice reads the same once written plainly.
         if let Some(d) = Dice::parse(&junk) {
-            prop_assert!(d.min() <= d.max());
+            let plain = format!("{}d{}{:+}", d.count, d.sides, d.bonus);
+            prop_assert_eq!(Dice::parse(&plain), Some(d), "{:?}", junk);
         }
     }
 
@@ -626,7 +634,8 @@ proptest! {
     /// A valid condition compiles; any text compiles or is refused at a span in it.
     #[test]
     fn conditions_compile_or_refuse_cleanly(good in condition(), junk in noise()) {
-        let scope = Scope::from_story(&museum().story);        let compiled = compile_condition(&good, &scope);
+        let scope = Scope::from_story(&museum().story);
+        let compiled = compile_condition(&good, &scope);
         prop_assert!(compiled.is_ok(), "{good}: {compiled:?}");
         for src in [junk.clone(), format!("{good} {junk}")] {
             if let Err(e) = parse_expr(&src) {
@@ -661,34 +670,52 @@ proptest! {
 
 // ---- the YAML model ---------------------------------------------------------
 
-/// Each example as one pack, exported to YAML and loaded again, gives the
-/// same story by `model_hash`.
+/// The story folders of the examples (with a `story.yaml`, at most two levels down), by
+/// their path below `examples/`.
+fn story_folders(root: &Path, depth: u8) -> Vec<String> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(root).unwrap() {
+        let path = entry.unwrap().path();
+        if !path.is_dir() {
+            continue;
+        }
+        if path.join("story.yaml").exists() {
+            out.push(path.file_name().unwrap().to_string_lossy().into_owned());
+        } else if depth > 1 {
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            out.extend(
+                story_folders(&path, depth - 1)
+                    .into_iter()
+                    .map(|d| format!("{name}/{d}")),
+            );
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Each example story as one pack, exported to YAML and loaded again, gives
+/// the same story by `model_hash`.
 #[test]
 fn every_example_round_trips_through_an_exported_pack() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
-    let mut seen = Vec::new();
-    for dir in std::fs::read_dir(&root).unwrap() {
-        let dir = dir.unwrap().path();
-        let Ok(files) = read_dir(&dir) else { continue };
-        // Examples with Rust parts need their packs; they have their own tests.
-        let Ok(direct) = load(files.clone()) else {
-            continue;
-        };
-        let mut pack = Pack::from_files(files).unwrap();
+    let folders = story_folders(&root, 2);
+    assert!(folders.iter().any(|f| f == "lighthouse"), "{folders:?}");
+    for name in &folders {
+        let dir = root.join(name);
+        let files = read_dir(&dir).unwrap();
+        let direct = load(files.clone()).unwrap_or_else(|e| panic!("{name}: {e:#?}"));
+        let mut pack = Pack::from_files(files).unwrap_or_else(|e| panic!("{name}: {e:#?}"));
         pack.name = "export".into();
         let exported = vec![SourceFile {
             path: "packs/export.yaml".into(),
             text: pack.to_yaml(),
         }];
-        let again = load(exported).unwrap_or_else(|e| panic!("{}: {e:#?}", dir.display()));
+        let again = load(exported).unwrap_or_else(|e| panic!("{name}: {e:#?}"));
         assert_eq!(
             model_hash(&again.story),
             model_hash(&direct.story),
-            "{}",
-            dir.display()
+            "{name}"
         );
-        seen.push(dir.file_name().unwrap().to_string_lossy().into_owned());
     }
-    seen.sort();
-    assert!(seen.len() >= 7, "only {seen:?} load");
 }
