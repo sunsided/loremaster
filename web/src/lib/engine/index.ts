@@ -220,6 +220,11 @@ export class Session {
 		return this.#session.scene();
 	}
 
+	/** The value of one fact now (a variable, a property or a machine's state), or null. */
+	fact(name: string): Value | null {
+		return this.#session.fact(name);
+	}
+
 	/** The quest journal: open quests first, then finished ones. */
 	journal(): JournalEntry[] {
 		return this.#session.journal();

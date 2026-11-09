@@ -230,6 +230,8 @@ export interface OutlineOption {
 export interface ThingInfo {
 	id: string;
 	name: string;
+	/** The other words the parser accepts for the thing now, lowercased. Absent when there are none. */
+	aliases?: string[];
 }
 
 export interface ExitInfo {
@@ -250,7 +252,10 @@ export interface JournalEntry {
 export interface Scene {
 	room: string;
 	room_name: string;
+	/** The time of day, `HH:MM`. */
 	time: string;
+	/** Minutes since midnight of day 1; the time of day is `minutes % 1440`. */
+	minutes: number;
 	phase: string;
 	day: number;
 	turns: number;

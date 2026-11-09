@@ -86,6 +86,7 @@ pub(crate) fn atlas(ins: Inspector<'_>) -> Vec<AtlasRoom> {
                 .map(|t| ThingInfo {
                     id: t.id.to_string(),
                     name: ins.thing_name(t.id.as_str(), NameForm::Bare),
+                    aliases: Vec::new(),
                 })
                 .collect(),
             exits: r

@@ -8,6 +8,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Host queries from the lock-keeper UI (#194): `Session::fact(name)` reads one variable, property or machine state without a copy of the state (protocol `session/fact { name }`, WASM `fact(name)`); `ThingInfo` has `aliases`, the other words the parser accepts for the thing now; `Scene` has `minutes`, the clock as a number next to `time`. The terminal host's README says how a host reads links, nouns and `VerbInfo::slots`.
+- **Breaking (library):** `ThingInfo` has the new field `aliases`, and `Scene` the new field `minutes`; code that builds them with a struct literal needs them.
+
+### Fixed
+
+- The room that `undo` and `restore` show now has its thing links, like every other room description (#194).
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
