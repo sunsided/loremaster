@@ -251,7 +251,7 @@
 		return `${scope} frame for ${verb}, ${part}`;
 	}
 
-	/** `*word*` in story text is emphasis. */
+	/** `*word*` in a choice's text is emphasis; runs carry it as `emphasis`. */
 	function pieces(text: string): { text: string; em: boolean }[] {
 		return text.split('*').map((t, i) => ({ text: t, em: i % 2 === 1 }));
 	}
@@ -269,13 +269,13 @@
 			/>{/if}{#if run.link?.kind === 'thing'}{@const id = run.link.id}<ProseLink
 				kind="thing"
 				inspect="thing:{id}"
-				onclick={() => onthing(id, run.text)}>{run.text}</ProseLink
+				onclick={() => onthing(id, run.text)}>{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}</ProseLink
 			>{:else if run.link?.kind === 'exit'}{@const dir = run.link.id}<ProseLink
 				kind="exit"
 				inspect="exit:{dir}"
 				onclick={() => onexit(dir)}>{run.text}</ProseLink
 			>{:else}<span class:focused={focus !== null && run.source?.fragment === focus && isRoomRun(run)}
-				>{#each pieces(run.text) as p, j (j)}{#if p.em}<em>{p.text}</em>{:else}{p.text}{/if}{/each}</span
+				>{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}</span
 			>{/if}{/each}{/snippet}
 
 <!--
@@ -288,9 +288,7 @@
 				type="button"
 				class="writable"
 				onclick={() => onwrite?.(src)}
-				><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#each pieces(run.text) as p, j (j)}{#if p.em}<em
-								>{p.text}</em
-							>{:else}{p.text}{/if}{/each}{/each}</button
+				><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}{/each}</button
 			>{:else}{#each g.runs as run, i (i)}{run.text}{/each}{/if}{/each}{/snippet}
 
 {#snippet ghostRow(g: GhostLine)}
@@ -332,9 +330,7 @@
 						class="writable"
 						aria-describedby={note ? noteId : undefined}
 						onclick={() => onwrite?.(src)}
-						><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#each pieces(run.text) as p, j (j)}{#if p.em}<em
-										>{p.text}</em
-									>{:else}{p.text}{/if}{/each}{/each}</button
+						><span class="visually-hidden">Edit: </span>{#each g.runs as run, i (i)}{#if run.emphasis}<em>{run.text}</em>{:else}{run.text}{/if}{/each}</button
 					>{:else}{@render runs({ kind: block.kind, runs: g.runs })}{/if}
 			</p>
 			{#if note || (g.source && findings.length)}

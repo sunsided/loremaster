@@ -292,6 +292,7 @@ pub(crate) fn runs(ev: &Eval, chosen: &Chosen, owner: &str, base: &Run) -> Vec<R
                     }),
                     link: None,
                     speaker: None,
+                    emphasis: false,
                 }]
             }
             LeafText::Line(line) => line_runs(ev, line, base),

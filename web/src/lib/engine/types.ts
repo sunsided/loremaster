@@ -22,6 +22,8 @@ export interface Run {
 	link?: Link;
 	/** Who speaks the run, when it is speech: a thing id or `player`. The text has its quotes already. */
 	speaker?: string;
+	/** The story marks the run as emphasis (`*Kestrel*`); the text has no stars. Show it in italics. */
+	emphasis?: boolean;
 }
 
 export type BlockKind =

@@ -491,6 +491,7 @@ impl Game {
         let mut turn = Turn::default();
         self.describe_room(&mut turn);
         self.state = state;
+        crate::output::split_emphasis(&mut turn.blocks);
         turn
     }
 
@@ -1599,6 +1600,7 @@ impl Game {
                         id: dir.clone(),
                     }),
                     speaker: None,
+                    emphasis: false,
                 });
             }
             runs.push(Run::plain("."));
@@ -2075,6 +2077,7 @@ impl Game {
         turn.ended = self.state.ended;
         turn.talk = self.talk_info();
         turn.choices = self.choices();
+        crate::output::split_emphasis(&mut turn.blocks);
         self.link_things(&mut turn.blocks);
         turn
     }
@@ -2469,6 +2472,7 @@ pub(crate) fn rule_run(text: String, rule: &Id) -> Run {
         }),
         link: None,
         speaker: None,
+        emphasis: false,
     }
 }
 
@@ -2516,9 +2520,8 @@ fn split_links(run: Run, needles: &[(String, String)], out: &mut Vec<Run>) {
     };
     let piece = |text: &str, link: Option<Link>| Run {
         text: text.to_string(),
-        source: run.source.clone(),
         link,
-        speaker: run.speaker.clone(),
+        ..run.clone()
     };
     if i > 0 {
         out.push(piece(&run.text[..i], None));

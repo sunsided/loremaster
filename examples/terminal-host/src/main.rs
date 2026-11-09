@@ -264,7 +264,12 @@ fn show_block(block: &Block) {
         }
         // Narration between two lines of one speaker names the speaker again.
         speaker.clone_from(&run.speaker);
-        text.push_str(&run.text);
+        // A plain terminal has no italics: emphasis keeps its stars.
+        if run.emphasis {
+            text.push_str(&format!("*{}*", run.text));
+        } else {
+            text.push_str(&run.text);
+        }
     }
     match block.kind {
         // The echo of the player's own line: the terminal has it already.

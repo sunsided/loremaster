@@ -8,6 +8,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Emphasis as a run attribute (#194): `*Kestrel*` in story text is now a run with `emphasis: true` and the text `Kestrel`, without the stars, also when a thing link splits it. A pair of stars with a space just inside (`2 * 3 * 4`) stays text. `Block::plain_text` puts the stars back, so transcripts and walkthrough checks do not change. `loremaster play` and the web player show emphasis from the attribute; `Choice::text` keeps its stars.
+- The story bundle (#194): `Bundle` (format `loremaster-bundle`, version 1) holds a story, its walkthroughs and the loremaster version that wrote it. `Bundle::from_json` refuses another format and a newer version, and `Bundle::session` compiles the story and sets the hint ladder. A host writes it in its `build.rs` in place of its own `(Story, walkthroughs)` JSON.
+- **Breaking (library):** `Run` has the new field `emphasis`; code that builds it with a struct literal needs it. A host that reads `Run::text` gets emphasized text without its stars.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
