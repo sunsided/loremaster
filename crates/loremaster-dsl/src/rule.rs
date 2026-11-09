@@ -314,6 +314,12 @@ pub trait Effects: Sized {
         self.effect(Effect::Combat(Box::new(spec)))
     }
 
+    /// `end_combat:` a room. In a rule on a combat event: the combat ends,
+    /// and the player goes to the room.
+    fn end_combat(self, room: impl AsRef<str>) -> Self {
+        self.effect(Effect::EndCombat(id(room)))
+    }
+
     /// Play a sound asset once: `play sound gate_creak`.
     fn play_sound(self, sound: impl AsRef<str>) -> Self {
         self.effect(Effect::PlaySound(id(sound)))

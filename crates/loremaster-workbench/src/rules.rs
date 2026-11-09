@@ -162,6 +162,9 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                     loremaster_model::Effect::Goto(room) => {
                         format!("move the player to {}", thing_or_room(room))
                     }
+                    loremaster_model::Effect::EndCombat(room) => {
+                        format!("end the combat in {}", thing_or_room(room))
+                    }
                     loremaster_model::Effect::End(id) => {
                         match ins.world().story.ending(id.as_str()) {
                             Some(e) => {

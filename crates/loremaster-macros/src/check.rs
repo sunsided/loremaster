@@ -951,6 +951,7 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans
                 .iter()
                 .fold(b, |b, (n, to)| b.move_to(n.value.as_str(), to.as_str())),
             EffectKind::Goto(r) => b.goto(r.value.as_str()),
+            EffectKind::EndCombat(r) => b.end_combat(r.value.as_str()),
             EffectKind::End(r) => b.end(r.value.as_str()),
             EffectKind::Stop => b.stop(),
             EffectKind::Emit(r) => b.emit(r.value.as_str()),

@@ -33,7 +33,9 @@ mod verb;
 mod walkthrough;
 
 pub use agenda::{Agenda, AgendaStep};
-pub use awaits::{AwaitOption, AwaitSpec, CombatSpec, Dice};
+pub use awaits::{
+    AwaitOption, AwaitSpec, COMBAT_END, COMBAT_HIT, COMBAT_ROUND, CombatSpec, Dice, combat_events,
+};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
 pub use command::{ANY_VERB, ARTICLES, CommandPattern, topic_words};
 pub use diagnostic::{Diagnostic, Severity};

@@ -227,7 +227,9 @@ impl Checker<'_> {
             }
         }
         for (rule, e) in listens {
-            if interface.event(e.as_str()).is_none() && !sent.contains(&e) {
+            // The combat sends its own events; `check.rs` warns without one.
+            let combat = (loremaster_model::combat_events().iter()).any(|d| d.id == e);
+            if interface.event(e.as_str()).is_none() && !sent.contains(&e) && !combat {
                 let file = self.file_of(&format!("rule:{rule}"));
                 self.error(
                     &file,
