@@ -339,10 +339,10 @@ impl Game {
             c.by = Some(by);
         }
         // No test where it can not help: a hit that already kills the enemy,
-        // or a wound that kills the player even when lucky.
+        // a wound that kills the player even when lucky, or one that costs nothing.
         let damage = self.hit_damage(&hit);
         let helps = if hit.as_str() == PLAYER {
-            self.int("stamina") > damage - 1
+            damage > 0 && self.int("stamina") > damage - 1
         } else {
             self.int(&format!("{hit}.stamina")) > damage
         };

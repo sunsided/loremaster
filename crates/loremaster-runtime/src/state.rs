@@ -131,7 +131,8 @@ pub struct CombatState {
     /// The hit that waits for "Test your Luck": an enemy, or `player`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending: Option<Id>,
-    /// The enemy that made the pending hit on the player, for its `deals`.
+    /// The enemy of the pending hit: the one hit, or the one that hit the
+    /// player (then its `deals` sets the damage).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub by: Option<Id>,
     /// The enemy the player chose to attack in this round (all at once).

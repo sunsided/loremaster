@@ -1847,7 +1847,7 @@ impl Checker<'_> {
                     self.error(file, at, format!("the enemy `{e}` needs a number `{stat}`"));
                 }
             }
-            // Special rules of the enemy: optional, but numbers.
+            // Special rules of the enemy: optional, but numbers of 0 or more.
             for prop in ["deals", "takes"] {
                 if self
                     .ty_of(&format!("{e}.{prop}"))
@@ -1857,6 +1857,14 @@ impl Checker<'_> {
                         file,
                         at,
                         format!("`{prop}` of the enemy `{e}` is not a number"),
+                    );
+                }
+                let value = (self.story().thing(e.as_str())).and_then(|t| t.props.get(prop));
+                if let Some(loremaster_model::Value::Int(n @ ..0)) = value {
+                    self.error(
+                        file,
+                        at,
+                        format!("`{prop}` of the enemy `{e}` is {n}: it must be 0 or more"),
                     );
                 }
             }

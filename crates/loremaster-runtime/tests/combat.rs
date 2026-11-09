@@ -321,6 +321,31 @@ fn the_checks_reject_a_special_rule_that_is_no_number() {
     );
 }
 
+#[test]
+fn the_checks_reject_a_negative_special_rule() {
+    let mut f = files(ONE, 0);
+    f[5] = file(
+        "things/warden.yaml",
+        "name: X\nlocation: { room: gate }\nprops: { skill: 7, stamina: 8, takes: -1 }\n",
+    );
+    let diags = check(&load(f).unwrap());
+    assert!(
+        (diags.iter()).any(|d| d.severity == Severity::Error
+            && d.message
+                .contains("`takes` of the enemy `warden` is -1: it must be 0 or more")),
+        "{diags:?}"
+    );
+}
+
+#[test]
+fn no_luck_test_for_a_wound_that_costs_nothing() {
+    let mut s = special("deals: 0", 8);
+    let step = s.start();
+    let step = play(&mut s, &step, "attack", &LOSE);
+    assert_eq!(options(&step), ["attack", "escape"]);
+    assert_eq!(stat(&s, "stamina"), 12);
+}
+
 fn compiled(f: Vec<SourceFile>) -> Arc<World> {
     Arc::new(World::compile(load(f).unwrap().story).unwrap())
 }
