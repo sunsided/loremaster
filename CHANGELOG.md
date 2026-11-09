@@ -10,6 +10,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Host queries from the lock-keeper UI (#194): `Session::fact(name)` reads one variable, property or machine state without a copy of the state (protocol `session/fact { name }`, WASM `fact(name)` on `Session` and `Workbench`); `ThingInfo` has `aliases` (its aliases and the names of earlier name stages; the Atlas fills them too); `Scene` has `minutes`, the clock as a number next to `time`. The terminal host's README says how a host reads links, nouns and `VerbInfo::slots`.
+- **Breaking (library):** `ThingInfo` has the new field `aliases`, and `Scene` the new field `minutes`; code that builds them with a struct literal needs them.
 - `reload_rolls` in story.yaml (#189): `same` (strict, the default) keeps the next roll after a load, `fresh` (forgiving) rolls anew. `Session::reseed(entropy)` (WASM `reseed`) mixes the host's randomness into the RNG after `load`, `from_save` or `restore`, and changes nothing for `same`. The host passes a fresh, unpredictable value on each load. The web engine wrapper and the terminal host call it after each load. `loremaster new` writes `reload_rolls: same` into story.yaml, the builder has `fresh_rolls()` and `world!` the header key `reload_rolls: fresh`. The setting is not part of the save's story fingerprint, so switching it does not make old saves look like saves of a changed story.
 - **Breaking (library):** `Story` and `StoryHeader` have the new field `reload_rolls`.
 - The wildcard verb in rule events (#192): `on: { verb: ["*", darkness] }` matches any verb on the darkness, also for `check`. An exact-verb rule that fires in the same scope and phase holds the `*` rule back, so only its text shows. `loremaster check` accepts `*` in rules and refuses it in an agenda step's `do` and as the id of a story verb, and the explorer tries each verb that fits the objects. `CommandPattern::any_verb` and `ANY_VERB` are in `loremaster-model`. `world!` syntax waits for #220.
@@ -35,6 +37,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Fixed
 
+- The room that `undo` and `restore` show now has its thing links, like every other room description (#194).
 - A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 - A condition with a character other than a letter outside the ASCII range, such as `€` or an emoji, made `loremaster check`, the editor and the engine loop for ever; now it is an error at that character (#186).
 - An `add` past the range of a whole number no longer stops the game (a debug build) or wraps round; the value stays at the largest or smallest number (#186).
