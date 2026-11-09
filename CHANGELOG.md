@@ -8,6 +8,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- `reload_rolls` in story.yaml (#189): `same` (strict, the default) keeps the next roll after a load, `fresh` (forgiving) rolls anew. `Session::reseed(entropy)` (WASM `reseed`) mixes the host's randomness into the RNG after `load`, `from_save` or `restore`, and changes nothing for `same`. The web engine wrapper and the terminal host call it after each load. `loremaster new` writes `reload_rolls: same` into story.yaml.
+- **Breaking (library):** `Story` and `StoryHeader` have the new field `reload_rolls`.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

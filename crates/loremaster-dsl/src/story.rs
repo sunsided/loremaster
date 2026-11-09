@@ -32,6 +32,7 @@ impl<'a> StoryBuilder<'a> {
             relations: Vec::new(),
             frames: Frames::default(),
             seed: 0,
+            reload_rolls: Default::default(),
             death_prompt: true,
             carry_limit: None,
             playable: Vec::new(),

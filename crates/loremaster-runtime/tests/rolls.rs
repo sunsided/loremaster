@@ -169,6 +169,47 @@ fn a_save_replays_the_next_roll() {
     assert_eq!(fact(&again, "r"), first);
 }
 
+/// The total of the next `pull lever` after a load of `save`, reseeded with `entropy`.
+fn roll_after_load(world: &Arc<World>, save: &serde_json::Value, entropy: u64) -> (bool, i64) {
+    let (mut again, _) = Session::load(world.clone(), save.clone()).unwrap();
+    let reseeded = again.reseed(entropy);
+    again.submit(Input::Text("pull lever".into()));
+    (reseeded, fact(&again, "r"))
+}
+
+fn saved(world: &Arc<World>) -> (serde_json::Value, i64) {
+    let mut s = Session::with_seed(world.clone(), 7);
+    s.start();
+    let save = serde_json::to_value(s.save()).unwrap();
+    s.submit(Input::Text("pull lever".into()));
+    (save, fact(&s, "r"))
+}
+
+#[test]
+fn reload_rolls_same_ignores_a_reseed() {
+    let world = world();
+    let (save, first) = saved(&world);
+    for entropy in 1..20 {
+        assert_eq!(roll_after_load(&world, &save, entropy), (false, first));
+    }
+}
+
+#[test]
+fn reload_rolls_fresh_takes_the_hosts_randomness() {
+    let story = load(files(&format!("{STAMINA}reload_rolls: fresh\n")))
+        .unwrap()
+        .story;
+    let world = Arc::new(World::compile(story).unwrap());
+    let (save, first) = saved(&world);
+    let rolls: Vec<_> = (1..20)
+        .map(|entropy| roll_after_load(&world, &save, entropy))
+        .collect();
+    assert!(rolls.iter().all(|(reseeded, _)| *reseeded));
+    assert!(rolls.iter().any(|(_, r)| *r != first), "{rolls:?}");
+    // The same entropy gives the same roll: the game stays deterministic.
+    assert_eq!(roll_after_load(&world, &save, 5), rolls[4]);
+}
+
 #[test]
 fn limits_are_checked_at_load() {
     assert_eq!(errors(""), Vec::<String>::new());

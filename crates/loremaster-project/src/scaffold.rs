@@ -12,7 +12,10 @@ pub fn scaffold(title: &str) -> Vec<SourceFile> {
     vec![
         SourceFile {
             path: "story.yaml".into(),
-            text: format!("title: {}\nstart: start\n\nintro: []\n", yaml_string(title)),
+            text: format!(
+                "title: {}\nstart: start\n\n# After a load: `same` gives the roll from before the save, `fresh` a new one.\nreload_rolls: same\n\nintro: []\n",
+                yaml_string(title)
+            ),
         },
         SourceFile {
             path: "rooms/start.yaml".into(),

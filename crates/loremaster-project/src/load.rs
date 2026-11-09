@@ -118,6 +118,9 @@ pub struct StoryHeader {
     pub frames: loremaster_model::Frames,
     #[serde(default)]
     pub seed: u64,
+    /// `same` (strict) or `fresh` (forgiving): the next roll after a load.
+    #[serde(default)]
+    pub reload_rolls: loremaster_model::ReloadRolls,
     /// `false` turns off the death prompt (SE-9).
     #[serde(default = "yes")]
     pub death_prompt: bool,
@@ -1083,6 +1086,7 @@ pub fn assemble(packs: Vec<Pack>) -> Result<Project, Vec<Diagnostic>> {
         texts,
         frames: header.frames,
         seed: header.seed,
+        reload_rolls: header.reload_rolls,
         death_prompt: header.death_prompt,
         carry_limit: header.carry_limit,
         playable: header.playable,

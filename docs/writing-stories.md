@@ -508,6 +508,8 @@ Then a later rule tests `total >= 9`.
 
 `against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). It names a number variable and changes nothing else: the story still compares the values.
 
+`reload_rolls` in story.yaml decides what the next roll gives after the player loads a save. `same` (strict, the default) gives the roll from before the save, because the RNG is in the save: the player cannot reload for a better roll. `fresh` (forgiving) gives a new roll: the host mixes its own randomness into the RNG with `Session::reseed` after a load. The web player and the terminal host do this. `loremaster new` writes the setting into story.yaml, so that the author decides.
+
 ### Action phases
 
 A verb goes through these phases:
