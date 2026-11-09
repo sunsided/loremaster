@@ -1,9 +1,11 @@
 //! `reload`: the running game carries over to a changed world (SE-14).
 
-use crate::{Host, world_of};
-use loremaster_model::Value;
-use loremaster_runtime::{Input, Status};
+use crate::{Host, root, world_of};
+use loremaster_model::{Location, Value};
+use loremaster_project::{load, read_dir};
+use loremaster_runtime::{Input, ReloadError, Session, Status, World};
 use loremaster_workbench::{AuthorCommand, Workbench};
+use std::sync::Arc;
 
 const STORY: &str = "title: Yard\nstart: hall\nvars:\n  - { id: rang, type: bool, initial: false }\n  - { id: mood, type: int, initial: 1 }\n";
 const HALL: &str =
@@ -214,4 +216,131 @@ fn a_waiting_rule_waits_on_only_while_the_rule_is_the_same() {
     let edited = "- id: pull_lever\n  on: { verb: [pull, lever] }\n  instead: true\n  then:\n    - await: { choice: [left, right] }\n    - say: \"You go.\"\n";
     bench.reload(world_of(&lever_files(edited)));
     assert!(bench.state().awaiting.is_none());
+}
+
+// ---- Session::reload: the host API ---------------------------------------
+
+const RING: &str = "- id: ring\n  once: true\n  on: { verb: [pull, lever] }\n  instead: true\n  then:\n    - say: \"A bell rings.\"\n";
+
+/// A session in the yard, with the coin carried and the once rule `ring` fired.
+fn host_played() -> Session {
+    let mut session = Session::new(world_of(&lever_files(RING)));
+    session.start();
+    for text in ["pull lever", "n", "take coin"] {
+        session.submit(Input::Text(text.into()));
+    }
+    assert!(session.state().fired.iter().any(|r| r.as_str() == "ring"));
+    assert_eq!(session.state().room.as_str(), "yard");
+    session
+}
+
+#[test]
+fn session_reload_lists_what_it_dropped() {
+    let mut session = host_played();
+    // No coin, no yard, no rule `ring`.
+    let changed = vec![
+        ("story.yaml", STORY),
+        (
+            "rooms/hall.yaml",
+            "name: Hall\ndescription:\n  - \"A hall.\"\n",
+        ),
+        ("things/lamp.yaml", LAMP),
+        ("things/lever.yaml", LEVER_THING),
+        ("verbs/pull.yaml", PULL),
+    ];
+    let reloaded = session.reload(world_of(&changed), &[]).unwrap();
+    assert_eq!(
+        reloaded.dropped,
+        ["fact:coin.shiny", "room:yard", "rule:ring", "thing:coin"]
+    );
+    // The player was in the yard: they go to the start room.
+    assert_eq!(session.state().room.as_str(), "hall");
+    assert!(session.state().fired.is_empty());
+}
+
+#[test]
+fn session_reload_of_the_same_story_drops_nothing() {
+    let mut session = host_played();
+    let reloaded = session.reload(world_of(&lever_files(RING)), &[]).unwrap();
+    assert!(reloaded.dropped.is_empty(), "{:?}", reloaded.dropped);
+    assert!(session.state().is_carried("coin"));
+}
+
+#[test]
+fn a_thing_in_what_is_no_longer_a_container_goes_back_to_its_start() {
+    let with_chest = |chest: &'static str| {
+        let mut files = files(true, YARD);
+        files.push(("things/chest.yaml", chest));
+        world_of(&files)
+    };
+    let box_ = "name: chest\nlocation: { room: hall }\ncontainer: true\n";
+    let mut session = Session::new(with_chest(box_));
+    session.start();
+    session.submit(Input::Text("take lamp".into()));
+    let step = session.submit(Input::Text("put lamp in chest".into()));
+    assert_eq!(
+        session.state().locations["lamp"],
+        Location::In("chest".into()),
+        "{}",
+        step.plain_text()
+    );
+    session
+        .reload(with_chest("name: chest\nlocation: { room: hall }\n"), &[])
+        .unwrap();
+    assert_eq!(
+        session.state().locations["lamp"],
+        Location::Room("hall".into())
+    );
+}
+
+#[test]
+fn hints_work_after_a_session_reload() {
+    let project = load(read_dir(&root("lighthouse")).unwrap()).unwrap();
+    let world = Arc::new(World::compile(project.story).unwrap());
+    let mut session = Session::new(world.clone());
+    session.set_hints_from(&project.walkthroughs);
+    session.start();
+    session.submit(Input::Text("n".into()));
+    session.hint(None);
+    session
+        .reload(Arc::new((*world).clone()), &project.walkthroughs)
+        .unwrap();
+    assert!(session.has_hints());
+    assert_eq!(session.hints()[0].shown.len(), 1);
+    let step = session.hint(None);
+    assert!(
+        step.plain_text().starts_with("Hint 2 of 3:"),
+        "{}",
+        step.plain_text()
+    );
+}
+
+const CONTRACT: &str =
+    "title: Yard\nstart: hall\ninterface:\n  events:\n    - { id: killed, args: { boss: text } }\n";
+
+#[test]
+fn a_host_session_refuses_a_changed_interface() {
+    let world = |story: &'static str| {
+        let mut files = files(true, YARD);
+        files[0] = ("story.yaml", story);
+        world_of(&files)
+    };
+    let before = world(CONTRACT);
+    let built_for = before.story.interface.clone().unwrap();
+    let mut session = Session::for_host(before, &built_for).unwrap();
+    session.start();
+    session.submit(Input::Text("n".into()));
+    let changed = "title: Yard\nstart: hall\ninterface:\n  events:\n    - { id: killed, args: { boss: text, level: int } }\n";
+    let Err(ReloadError::InterfaceChanged(mismatch)) = session.reload(world(changed), &[]) else {
+        panic!("the reload should be refused");
+    };
+    assert_eq!(mismatch.built, built_for.hash());
+    // The session is unchanged: same world, same room.
+    assert_eq!(session.interface(), built_for);
+    assert_eq!(session.state().room.as_str(), "yard");
+    // The same interface reloads.
+    assert!(session.reload(world(CONTRACT), &[]).is_ok());
+    // A session not made for a host never gets the error.
+    let mut plain = Session::new(world(CONTRACT));
+    assert!(plain.reload(world(changed), &[]).is_ok());
 }

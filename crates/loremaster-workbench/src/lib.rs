@@ -162,11 +162,12 @@ impl Workbench {
     /// over. A value still at its start value takes the new start value, so an
     /// edit of a start value shows at once. What the new world does not have
     /// is dropped; a room that is gone becomes the start room. The undo
-    /// history of the session does not carry over.
+    /// history of the session does not carry over. This is
+    /// [`Session::reload`]; a session from [`Session::for_host`] keeps its
+    /// old world when the interface changed.
     pub fn reload(&mut self, world: Arc<World>) {
-        self.session = authoring::carry_over(&self.session, world);
-        // The hint book plays the walkthroughs in its world: build it again.
-        self.session.set_hints_from(&self.walkthroughs);
+        // The editor never makes its session with `for_host`, so this is not refused.
+        let _ = self.session.reload(world, &self.walkthroughs);
     }
 
     /// A new workbench with the game of this one in a changed world. This one

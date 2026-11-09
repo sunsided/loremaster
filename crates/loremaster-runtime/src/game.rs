@@ -314,11 +314,24 @@ impl Game {
     /// things that the new world does not have are dropped; new ones start at their start value.
     /// A current room that is gone becomes the start room. Rules, endings, relations and
     /// memories that the new world does not have are dropped too, and a rule that waits for the
-    /// host keeps waiting only when the new world has the same rule.
-    pub(crate) fn carry_over(&self, world: Arc<World>) -> Self {
+    /// host keeps waiting only when the new world has the same rule. A thing `in` or `on` a thing
+    /// that is no longer a container or supporter goes back to its start location.
+    ///
+    /// Returns the game and what was dropped, sorted, in the keys of `save::reconcile`
+    /// (`fact:…`, `thing:…`, `room:…`, `rule:…`, `once:…`, …).
+    pub(crate) fn carry_over(&self, world: Arc<World>) -> (Self, Vec<String>) {
         let old_start = Game::new(self.world.clone()).state;
         let new_start = Game::new(world.clone()).state;
         let mut state = self.state.clone();
+        let mut dropped: Vec<String> = (self.state.facts.keys())
+            .filter(|k| !new_start.facts.contains_key(*k))
+            .map(|k| format!("fact:{k}"))
+            .chain(
+                (self.state.locations.keys())
+                    .filter(|k| !new_start.locations.contains_key(*k))
+                    .map(|k| format!("thing:{k}")),
+            )
+            .collect();
         state.facts = new_start
             .facts
             .iter()
@@ -336,35 +349,23 @@ impl Game {
             .iter()
             .map(|(k, start)| {
                 let value = match (self.state.locations.get(k), old_start.locations.get(k)) {
-                    (Some(now), Some(was)) if now != was => match now {
-                        Location::Room(r) if !has_room(r) => start.clone(),
-                        _ => now.clone(),
-                    },
+                    (Some(now), Some(was)) if now != was => {
+                        if crate::save::location_valid(&world, now) {
+                            now.clone()
+                        } else {
+                            start.clone()
+                        }
+                    }
                     _ => start.clone(),
                 };
                 (k.clone(), value)
             })
             .collect();
-        if !has_room(&state.room) {
-            state.room = world.story.start.clone();
-        }
-        state
-            .timers
-            .retain(|id, _| world.story.timer(id.as_str()).is_some());
+        crate::save::drop_unknown(&world, &mut state, &mut dropped);
         for (id, turns) in &new_start.timers {
             if !old_start.timers.contains_key(id) {
                 state.timers.entry(id.clone()).or_insert(*turns);
             }
-        }
-        state.visits.retain(|r, _| has_room(r));
-        let talk_ok = state.talk.as_ref().is_some_and(|t| {
-            world
-                .story
-                .dialogue(t.dialogue.as_str())
-                .is_some_and(|d| d.node(&t.node).is_some())
-        });
-        if !talk_ok {
-            state.talk = None;
         }
         // A paused rule goes on only when the rule is the same in the new
         // world: its effects may have moved, as in `save::reconcile`.
@@ -396,33 +397,13 @@ impl Game {
         if let Some(open) = &state.awaiting
             && (rule_gone(open) || state.combat.as_ref().is_some_and(|c| !combat_ok(c)))
         {
+            dropped.push(format!("await:{}", open.id));
             state.awaiting = None;
             state.combat = None;
         }
-        state
-            .fired
-            .retain(|id| world.story.rules.iter().any(|r| r.id == *id));
-        state
-            .once_groups
-            .retain(|g| world.story.rules.iter().any(|r| r.once.group() == Some(g)));
-        if state.previous.as_ref().is_some_and(|r| !has_room(r)) {
-            state.previous = None;
-        }
-        if state
-            .ending
-            .as_ref()
-            .is_some_and(|e| world.story.ending(e.as_str()).is_none())
-        {
-            state.ending = None;
-        }
-        let has_thing = |id: &str| world.story.thing(id).is_some();
-        state
-            .relations
-            .retain(|key, _| key.split_once('.').is_some_and(|(t, _)| has_thing(t)));
-        state.memories.retain(|thing, _| has_thing(thing.as_str()));
-        crate::save::keep_known_steps(&world, &mut state.actors);
-        crate::save::keep_known_actors(&world, &mut state);
-        Self::restore(world, state)
+        dropped.sort();
+        dropped.dedup();
+        (Self::restore(world, state), dropped)
     }
 
     /// Continue from a saved state.

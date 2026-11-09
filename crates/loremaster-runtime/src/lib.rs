@@ -53,7 +53,7 @@ pub(crate) use save::Restored;
 pub use save::{SAVE_FORMAT, SAVE_VERSION, Save, SaveError, StoryStamp};
 pub use session::{
     DEFAULT_UNDO_DEPTH, Effect, EndingInfo, HINT, Hint, HintBook, Input, JOURNAL, Loaded, RESTART,
-    RESTORE, Session, Snapshot, Status, Step, UNDO,
+    RESTORE, ReloadError, Reloaded, Session, Snapshot, Status, Step, UNDO,
 };
 pub use state::{
     ActorState, AwaitOptionInfo, AwaitRequest, Awaiting, CombatState, CombatView, EnemyView,
