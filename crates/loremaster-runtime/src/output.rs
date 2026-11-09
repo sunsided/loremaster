@@ -78,7 +78,9 @@ pub struct SceneRegion {
     pub rect: [u8; 4],
 }
 
-/// An actor's walk of an agenda step: from one room to the next.
+/// An actor's walk of an agenda step: the room it left and the room it is
+/// in now. Without a route, the actor goes to the step's place at once, so
+/// the rooms need not be next to each other.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct MoveDetail {

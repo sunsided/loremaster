@@ -139,6 +139,8 @@ export interface Turn {
 	log: LogEntry[];
 	/** The dice of this turn, in order. */
 	rolls?: RollDetail[];
+	/** The actors that walked in this turn, in order. */
+	moves?: MoveDetail[];
 	/** The sounds of this turn, in order. */
 	sounds?: MediaCue[];
 	/** The talk in progress after this turn. Absent outside a talk. */

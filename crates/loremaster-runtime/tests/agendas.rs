@@ -157,6 +157,7 @@ fn an_agenda_walk_gives_a_typed_move_and_the_notice() {
     let mut game = Session::new(world(AGENDA));
     game.start();
     let mut moves = Vec::new();
+    let mut notices = 0;
     for _ in 0..4 {
         let step = game.submit(Input::Text("wait".into()));
         for e in &step.effects {
@@ -169,6 +170,7 @@ fn an_agenda_walk_gives_a_typed_move_and_the_notice() {
                 )),
                 Effect::Notice { entry } if entry.kind == "move" => {
                     assert!(entry.text.starts_with("keeper -> "), "{}", entry.text);
+                    notices += 1;
                 }
                 _ => {}
             }
@@ -183,6 +185,7 @@ fn an_agenda_walk_gives_a_typed_move_and_the_notice() {
         )
     };
     assert_eq!(moves, [walk("shed", "yard"), walk("yard", "hall")]);
+    assert_eq!(notices, moves.len(), "one move notice per walk");
 }
 
 #[test]
