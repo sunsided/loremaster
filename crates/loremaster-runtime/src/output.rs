@@ -1,4 +1,4 @@
-use loremaster_model::Layer;
+use loremaster_model::{Id, Layer};
 use serde::{Deserialize, Serialize};
 
 /// What one command produced.
@@ -17,6 +17,9 @@ pub struct Turn {
     /// The dice of this turn, in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rolls: Vec<RollDetail>,
+    /// The actors that walked in this turn, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub moves: Vec<MoveDetail>,
     /// The sounds of this turn, in order. They are one-shot and not saved.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sounds: Vec<MediaCue>,
@@ -73,6 +76,21 @@ pub struct SceneRegion {
     pub name: String,
     /// Left, top, width and height, in percent of the image.
     pub rect: [u8; 4],
+}
+
+/// An actor's walk of an agenda step: from one room to the next.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct MoveDetail {
+    /// The thing id of the actor.
+    pub actor: Id,
+    /// Its current name, for example "Uncle Otto".
+    pub name: String,
+    /// The room it left. None when it was in no room (nowhere or carried).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<Id>,
+    /// The room it is in now.
+    pub to: Id,
 }
 
 /// One roll of the dice, for a host that shows dice.

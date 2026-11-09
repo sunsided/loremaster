@@ -183,6 +183,12 @@ impl Game {
             kind: "move".into(),
             text: format!("{actor} -> {to}"),
         });
+        turn.moves.push(crate::MoveDetail {
+            actor: actor.clone(),
+            name: self.name_of(actor),
+            from: from.clone(),
+            to: to.clone(),
+        });
         if sees && from.as_ref() == Some(&here) {
             let the = self.the(actor, true);
             let text = match direction {

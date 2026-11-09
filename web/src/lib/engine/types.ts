@@ -763,11 +763,22 @@ export type Status =
 	| { type: 'ended'; ending: EndingInfo | null }
 	| { type: 'await'; awaiting: Awaiting };
 
+/** An actor's walk of an agenda step. `from` is missing when the actor was in no room. */
+export interface MoveDetail {
+	actor: string;
+	/** Its current name. */
+	name: string;
+	from?: string;
+	to: string;
+}
+
 /** One thing the session shows or tells the host. */
 export type Effect =
 	| { type: 'text'; block: Block }
 	| { type: 'notice'; entry: LogEntry }
 	| { type: 'roll'; roll: RollDetail }
+	/** An actor walked to a room (an agenda step); the `move` notice has it as text. */
+	| { type: 'moved'; moved: MoveDetail }
 	| { type: 'choices'; talk: TalkInfo; choices: Choice[] }
 	| { type: 'ending'; ending: EndingInfo };
 

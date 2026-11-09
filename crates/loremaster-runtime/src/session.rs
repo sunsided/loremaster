@@ -61,6 +61,9 @@ pub enum Effect {
     /// A roll of the dice: the dice, the total and any test. A `roll` notice
     /// has the same total as text.
     Roll { roll: RollDetail },
+    /// An actor walked to a room (an agenda step). The `move` notice has
+    /// the same move as text.
+    Moved { moved: crate::MoveDetail },
     /// Play this sound once. Show its caption when the sound is off.
     Sound { sound: crate::MediaCue },
     /// The story has ended.
@@ -629,6 +632,7 @@ impl Session {
                 .map(|entry| Effect::Notice { entry }),
         );
         effects.extend(turn.rolls.into_iter().map(|roll| Effect::Roll { roll }));
+        effects.extend(turn.moves.into_iter().map(|moved| Effect::Moved { moved }));
         effects.extend(turn.sounds.into_iter().map(|sound| Effect::Sound { sound }));
         // While a rule waits, its answers come with `Status::Await`, not as
         // the choices of a talk.
