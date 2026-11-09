@@ -161,6 +161,8 @@ fn back(scope: &ParseScope, phrase: &str) -> Option<Option<String>> {
 const NO_WAY_BACK: &str = "You can't go back the way you came.";
 
 const ARTICLES: [&str; 6] = ["the", "a", "an", "some", "my", "this"];
+/// The word before the topic of a command.
+const TOPIC: &str = "about";
 const PREPOSITIONS: [&str; 7] = ["with", "on", "to", "in", "into", "at", "using"];
 
 pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Result<Command, String> {
@@ -196,6 +198,10 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
             .ok_or_else(|| "You can't go that way.".to_string());
     }
 
+    let (rest, topic) = split_topic(&rest);
+    if topic.as_deref() == Some("") {
+        return Err(format!("What do you want to {} about?", verb.words[0]));
+    }
     let (first, second) = split_objects(verb, &rest);
     let preposition = (!second.is_empty())
         .then(|| rest.get(first_len(&rest, verb)).cloned())
@@ -232,8 +238,20 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
         objects,
         actor: None,
         preposition,
-        topic: None,
+        topic,
     })
+}
+
+/// The words before `about`, and the topic after it without articles:
+/// `ask bert about the lantern` is about `lantern`. Empty when nothing follows.
+fn split_topic(rest: &[String]) -> (Vec<String>, Option<String>) {
+    match rest.iter().position(|w| w == TOPIC) {
+        Some(i) => (
+            rest[..i].to_vec(),
+            Some(strip_articles(&rest[i + 1..]).join(" ")),
+        ),
+        None => (rest.to_vec(), None),
+    }
 }
 
 /// The place of the preposition in the words after a two-object verb.
@@ -465,6 +483,7 @@ pub(crate) fn preview(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Pre
         return out;
     }
 
+    let (rest, _) = split_topic(&rest);
     let (first, second) = split_objects(verb, &rest);
     let has_second_slot = verb.slots == VerbSlots::Two && rest.len() > first.len();
     for (i, words) in [first, second].iter().enumerate() {
@@ -615,5 +634,27 @@ mod tests {
         check!(parse(&v, &s, "take lamp") == Err("You see no lamp here.".to_string()));
         check!(parse(&v, &s, "dance") == Err("I don't know how to \"dance\".".to_string()));
         check!(parse(&v, &s, "open") == Err("What do you want to open?".to_string()));
+        check!(
+            parse(&v, &s, "push door about") == Err("What do you want to push about?".to_string())
+        );
+    }
+
+    #[test]
+    fn about_fills_the_topic() {
+        let v = standard_verbs();
+        let s = scope();
+        check!(
+            parse(&v, &s, "push the oak door about the old key")
+                == Ok(Command::Verb {
+                    verb: Id::new("push"),
+                    objects: vec![Id::new("door")],
+                    actor: None,
+                    preposition: None,
+                    topic: Some("old key".into()),
+                })
+        );
+        let p = preview(&v, &s, "push door about the bra");
+        check!(p.objects == vec![Id::new("door")]);
+        check!(p.complete);
     }
 }

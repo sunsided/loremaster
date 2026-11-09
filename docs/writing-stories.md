@@ -390,7 +390,33 @@ A `verb` or `check` event can name the slots:
 - A slot that the event does not name matches any command.
 - `actor` is different: an event without `actor` matches only the player's commands. Then the rules for the player do not fire when a character acts. `actor: player` says the same, and `actor: keeper` matches the commands of the keeper's agenda. Read [Actors and agendas](#actors-and-agendas).
 - The list form `verb: [unlock, door, key]` is the same as `{ verb: unlock, direct: door, indirect: key }`. Both forms load into one model.
-- The parser fills `preposition` with the word that you typed. Nothing fills `topic` yet; it is for a later `ask … about …`.
+- The parser fills `preposition` with the word that you typed.
+- The parser fills `topic` with the words after `about`, without articles: `ask bert about the lantern` has the direct object `bert` and the topic `lantern`. The topic is the words as typed, not a thing, so it can name things that are not here. An event matches the topic without regard to case. The explorer tries the topics that rules name.
+
+`ask` and `show` are custom verbs. `show` is a verb with two objects, as `give`:
+
+```yaml
+# verbs/ask.yaml
+label: Ask
+words: [ask]
+default: "They have nothing to say about that."
+
+# verbs/show.yaml
+label: Show
+words: [show]
+slots: two
+preposition: to
+default: "They look at it and say nothing."
+```
+
+```yaml
+- id: bert_lantern
+  on: { verb: ask, direct: bert, topic: lantern }
+  then: [{ say: "Two lights on the gate, sir." }]
+- id: bert_boots
+  on: { verb: show, direct: boots, indirect: bert }
+  then: [{ say: "Those are Mr Marsh's, sir." }]
+```
 
 ### Wait for the host
 
