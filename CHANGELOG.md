@@ -26,6 +26,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 ### Fixed
 
 - A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
+- A condition with a character other than a letter outside the ASCII range, such as `€` or an emoji, made `loremaster check`, the editor and the engine loop for ever; now it is an error at that character (#186).
+- An `add` past the range of a whole number no longer stops the game (a debug build) or wraps round; the value stays at the largest or smallest number (#186).
 - The "Replay this path" buttons of the explorer in the web editor play `say`, `answer` and `leave` steps, and steps with a preposition or a topic, through `Workbench::replay_step`. Before, a path through a talk or a paused rule stopped working at that step (#163).
 - The state explorer tells states apart by the turns left of each timer. Before, an ending that a timer triggers was never reached, and the ending checks missed the points of no return that a timer makes (#210).
 
