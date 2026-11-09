@@ -157,7 +157,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             if combat && c.text == LUCK_TEXT {
                 continue;
             }
-            if combat && c.text == ATTACK_TEXT {
+            if combat && c.text.starts_with(ATTACK_TEXT) {
                 out.push((format!("answer {}{WIN_ROUND}", c.text), cmd.clone()));
                 out.push((format!("answer {}{LOSE_ROUND}", c.text), cmd));
             } else {
