@@ -110,6 +110,11 @@ export function markupTokens(text: string, condition: boolean): { from: number; 
 	return wasmMarkupTokens(text, condition);
 }
 
+/** Fresh randomness for `reseed`: a story with `reload_rolls: fresh` rolls anew after a load. */
+function entropy(): bigint {
+	return crypto.getRandomValues(new BigUint64Array(1))[0];
+}
+
 /** Build an engine object from project files; turn the thrown diagnostics into a `ProjectError`. */
 async function build<T>(make: () => T): Promise<T> {
 	await loadEngine();
@@ -199,7 +204,9 @@ export class Session {
 
 	/** Put a snapshot back. Throws for a snapshot of another story. */
 	restore(snapshot: Snapshot): Step {
-		return this.#session.restore(snapshot);
+		const step = this.#session.restore(snapshot);
+		this.#session.reseed(entropy());
+		return step;
 	}
 
 	/** The save state, as JSON-compatible data. */
@@ -209,7 +216,9 @@ export class Session {
 
 	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
 	load(save: unknown): Loaded {
-		return this.#session.load(save);
+		const loaded = this.#session.load(save);
+		this.#session.reseed(entropy());
+		return loaded;
 	}
 
 	/** What the session waits for now. */
@@ -322,6 +331,11 @@ export class Workbench {
 		return this.#bench.play(input);
 	}
 
+	/** One step of a path from the state explorer, or null when the game has no such step now. */
+	replayStep(step: string): Turn | null {
+		return this.#bench.replayStep(step);
+	}
+
 	/** Answer the request of an `await` status, also the death prompt. Throws when the answer does not fit. */
 	resume(awaitId: string, value: Value): Turn {
 		return this.#bench.resume(awaitId, value);
@@ -412,7 +426,9 @@ export class Workbench {
 
 	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
 	load(save: unknown): Loaded {
-		return this.#bench.load(save);
+		const loaded = this.#bench.load(save);
+		this.#bench.reseed(entropy());
+		return loaded;
 	}
 
 	/** Continue the game of an earlier version of the story in this one. Values still at their start value take the new start value. */

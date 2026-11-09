@@ -119,6 +119,13 @@ impl Workbench {
         authoring::play(&mut self.session, input)
     }
 
+    /// One step of a path from the state explorer, as a whole turn: `go …`,
+    /// a verb with thing ids, `say …` and `leave` in a talk, `answer …` to a
+    /// paused rule. `None` when the game has no such step now.
+    pub fn replay_step(&mut self, step: &str) -> Option<Turn> {
+        authoring::replay_step(&mut self.session, step)
+    }
+
     /// The answer to a paused rule or to the death prompt, as a whole turn
     /// with the rule log. Read [`Session::resume`].
     pub fn resume(&mut self, await_id: &str, value: Value) -> Result<Turn, String> {

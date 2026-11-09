@@ -269,6 +269,12 @@ impl JsSession {
         to_js(&self.session.snapshot())
     }
 
+    /// After `load` or `restore`: mix the host's randomness into the RNG,
+    /// when the story has `reload_rolls: fresh`. Returns whether it did.
+    pub fn reseed(&mut self, entropy: u64) -> bool {
+        self.session.reseed(entropy)
+    }
+
     /// Put a snapshot back. Throws for a snapshot of another story.
     pub fn restore(&mut self, snapshot: JsValue) -> Result<JsValue, JsValue> {
         let snapshot: Snapshot = from_js(snapshot)?;
@@ -421,6 +427,13 @@ impl JsWorkbench {
         to_js(&self.bench.play(input))
     }
 
+    /// One step of a path from the state explorer, as a turn, or `null` when
+    /// the game has no such step now.
+    #[wasm_bindgen(js_name = replayStep)]
+    pub fn replay_step(&mut self, step: &str) -> Result<JsValue, JsValue> {
+        or_null(self.bench.replay_step(step))
+    }
+
     /// Answer the request of `Status::Await`, also the death prompt, as a turn.
     /// Throws when the id or the value does not fit.
     pub fn resume(&mut self, await_id: &str, value: JsValue) -> Result<JsValue, JsValue> {
@@ -512,6 +525,12 @@ impl JsWorkbench {
         self.bench = Workbench::from_session(session);
         self.bench.set_walkthroughs(self.walkthroughs.clone());
         Ok(loaded)
+    }
+
+    /// After `load`: mix the host's randomness into the RNG, when the story
+    /// has `reload_rolls: fresh`. Returns whether it did.
+    pub fn reseed(&mut self, entropy: u64) -> bool {
+        self.bench.session_mut().reseed(entropy)
     }
 
     /// Continue the game of a workbench with an earlier version of the story, after an edit.

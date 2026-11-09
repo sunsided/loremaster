@@ -1686,12 +1686,13 @@ impl Game {
         // A machine takes one step for one event, even when its new state
         // matches another step.
         let mut stepped: Vec<&Id> = Vec::new();
-        for &i in &world.rule_order {
+        let mut ran: Vec<usize> = Vec::new();
+        for (at, &i) in world.rule_order.iter().enumerate() {
             if self.stopped || self.state.ended {
                 break;
             }
             let rule = &world.story.rules[i];
-            if !event.matches(rule) || (rule.once && self.state.fired.contains(&rule.id)) {
+            if !event.matches(rule) || (reads_fired(rule) && self.state.fired.contains(&rule.id)) {
                 continue;
             }
             if rule.machine.as_ref().is_some_and(|m| stepped.contains(&m)) {
@@ -1702,6 +1703,10 @@ impl Game {
             {
                 continue;
             }
+            if any_verb(rule) && self.exact_verb_fires(event, at, &ran, &stepped) {
+                continue;
+            }
+            ran.push(i);
             turn.log.push(LogEntry {
                 kind: "rule".into(),
                 text: rule.id.to_string(),
@@ -1739,6 +1744,28 @@ impl Game {
         out.stopped = self.stopped;
         self.stopped = outer;
         out
+    }
+
+    /// Does a rule with an exact verb in the scope of the `*` rule at place
+    /// `at` of the rule order fire for the event? Then it holds the `*` rule
+    /// back (#192). `ran` holds the rules that ran for the event so far.
+    /// shortcut: a rule after `at` is judged by its condition now, before the
+    /// rules between change the state; upgrade if that bites.
+    fn exact_verb_fires(&self, event: &Event, at: usize, ran: &[usize], stepped: &[&Id]) -> bool {
+        let world = &self.world;
+        let order = &world.rule_order;
+        let within = &world.rules[order[at]].within;
+        let exact = |j: usize| !any_verb(&world.story.rules[j]) && world.rules[j].within == *within;
+        // The rules in `ran` matched the event already.
+        ran.iter().any(|&j| exact(j))
+            || order[at + 1..].iter().any(|&j| {
+                let rule = &world.story.rules[j];
+                exact(j)
+                    && event.matches(rule)
+                    && !(reads_fired(rule) && self.state.fired.contains(&rule.id))
+                    && !rule.machine.as_ref().is_some_and(|m| stepped.contains(&m))
+                    && self.eval().holds_opt(&world.rules[j].when)
+            })
     }
 
     /// Does the scope of a rule hold for the event? A thing rule needs the
@@ -1916,7 +1943,7 @@ impl Game {
             CompiledEffect::Add(values) => {
                 for (k, n) in values {
                     let cur = self.state.facts.get(k).and_then(Value::as_int).unwrap_or(0);
-                    self.set_fact(turn, k, Value::Int(cur + n));
+                    self.set_fact(turn, k, Value::Int(cur.saturating_add(*n)));
                 }
             }
             CompiledEffect::Calc(sums) => {
@@ -2473,6 +2500,15 @@ impl Game {
     }
 }
 
+/// True when the game reads `State.fired` for this rule: a `once` rule that
+/// fired does not fire again. This is the only read of `fired` that changes
+/// what happens (the others only drop ids of rules that are gone), and the
+/// explorer relies on that to leave the other fired rules out of its state
+/// key.
+pub(crate) fn reads_fired(rule: &loremaster_model::Rule) -> bool {
+    rule.once
+}
+
 pub(crate) fn rule_run(text: String, rule: &Id) -> Run {
     Run {
         text,
@@ -2562,6 +2598,11 @@ fn default_arg(ty: &loremaster_model::ArgType) -> Value {
         // The least value: the interface hash does not see the order.
         ArgType::Enum(values) => Value::Text(values.iter().min().cloned().unwrap_or_default()),
     }
+}
+
+/// A rule on a verb event whose pattern matches any verb (`*`).
+fn any_verb(rule: &loremaster_model::Rule) -> bool {
+    matches!(&rule.on, loremaster_model::EventPattern::Verb(p) | loremaster_model::EventPattern::Check(p) if p.any_verb())
 }
 
 #[cfg(test)]
