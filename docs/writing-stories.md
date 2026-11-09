@@ -457,7 +457,22 @@ The effect `combat` runs a fight by built-in rules. The player needs the number 
 
 `win`, `loss` and `escape` are rooms. `escape` is optional. With `together: true`, all enemies fight in the same round; without it, they fight one after the other. Effects after `combat` run in the room where the combat ends.
 
-In each round, the player selects "Attack" or, if the combat has `escape`, "Escape". The enemy and the player each roll 2d6 and add their `skill`. The enemy rolls first. The higher total hits and takes 2 `stamina`. In an all-at-once combat, each enemy rolls and the player rolls once. The player attacks the first living enemy, and the other enemies only attack.
+In each round, the player selects "Attack" or, if the combat has `escape`, "Escape". The enemy and the player each roll 2d6 and add their `skill`. The enemy rolls first. The higher total hits and takes 2 `stamina`, unless the enemy has a special rule (`deals` or `takes`, below). In an all-at-once combat, each enemy rolls and the player rolls once. While more than one enemy lives, the player selects the target: "Attack GATE WARDEN" (`attack`, the first living enemy) or "Attack HOUND" (`attack.hound`). The other enemies only attack.
+
+Special rules of one enemy are its number properties `deals` (the `stamina` a hit of the enemy costs the player, instead of 2) and `takes` (the `stamina` a hit of the player costs the enemy, instead of 2). Both are 0 or more: `loremaster check` rejects a negative value, and the combat counts a negative value that a rule sets as 0. A Luck test shifts these values as it shifts the 2, and is not offered for a wound that costs nothing. For a rule of one combat, a rule sets the property before the combat starts, for example "the troll takes 1 extra damage from fire". The troll declares `takes: 2` in its `props`, and:
+
+```yaml
+- id: torch_burns_troll
+  on: { enter: bridge }
+  when: "carried(torch)"
+  priority: 1
+  then:
+    - set: { troll.takes: 3 }
+- id: fight_troll
+  on: { enter: bridge }
+  then:
+    - combat: { enemies: [troll], win: far_bank, loss: fallen }
+```
 
 After a hit, the player can select "Test your Luck" or "Go on", when `luck` is more than 0. The roll is 2d6 against `luck`, and the test costs 1 `luck`. A lucky result on a hit: the enemy loses 2 more. An unlucky one: the enemy loses 1 less. A lucky result on a wound: the player loses 1 less. An unlucky one: the player loses 1 more. If more than one hit happens in a round, the test changes the last one. A test is not offered for a hit that already kills the enemy, or for a wound when the player has 1 `stamina`.
 
@@ -469,6 +484,8 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: attack, rolls: [5, 11] }
 - { do: "Test your Luck", rolls: [4] }
 ```
+
+With `set_host_rolls(true)`, the host rolls the dice of a combat too: after the answer to the round, the session waits for one `roll` await (2d6) for each enemy that fights, in the order of `enemies`, then one for the player. "Test your Luck" waits for one more. The dice display shows the totals when the round is over.
 
 In `world!`, the effects are `await roll "2d6" into r against luck;`, `await choice [left, right "the right door"] into path;`, `await walk_to dock;`, `await action open_sluice { force = 2 } results [open, stuck] into sluice;` and `combat [warden] win yard loss fallen escape road;` (with `together` for all at once). The builder has `.awaits(AwaitSpec { .. })` and `.combat(CombatSpec { .. })`.
 
