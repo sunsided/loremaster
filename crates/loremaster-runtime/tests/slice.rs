@@ -260,9 +260,10 @@ fn slice_keeper_agenda() {
 fn ending_checks(project: &Project) -> Vec<Diagnostic> {
     let world = Arc::new(World::compile(project.story.clone()).unwrap());
     // The whole slice (the talk, the stove, the keeper rule) has more states
-    // than the default budget of 2000 walks; the checks need the walk done.
+    // than the default budget of 2000 walks, and the turns left of the lock's
+    // timer split them more; the checks need the walk done.
     let budget = authoring::Budget {
-        max_states: 5000,
+        max_states: 20_000,
         ..Default::default()
     };
     let explored = authoring::explore(world, budget);

@@ -1,0 +1,8 @@
+# The water clock: when it runs out, the river takes the station.
+- id: river_wins
+  on: { timer: water }
+  then:
+    - say: "The river comes over the wall for good, and the pumps go under."
+    - end: flooded
+  closes: [drained]
+  reason: "The river rises on a clock: robots that are too slow lose the station."
