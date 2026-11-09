@@ -12,8 +12,10 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::process::{Command, Stdio};
+
+mod registry;
+use registry::Registry;
 
 /// How far a job is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -135,8 +137,7 @@ pub struct Jobs {
     /// The MCP configuration that points the agent at this server.
     mcp_config: String,
     next: u64,
-    jobs: Arc<Mutex<BTreeMap<String, Job>>>,
-    children: Arc<Mutex<BTreeMap<String, Child>>>,
+    state: Registry,
 }
 
 impl Jobs {
@@ -149,8 +150,7 @@ impl Jobs {
             agent,
             mcp_config,
             next: 1,
-            jobs: Arc::default(),
-            children: Arc::default(),
+            state: Registry::default(),
         }
     }
 
@@ -188,8 +188,7 @@ impl Jobs {
             .map_err(|e| format!("cannot start {}: {e}", self.agent.program))?;
         let stdout = child.stdout.take().expect("piped");
         let stderr = child.stderr.take().expect("piped");
-        self.jobs.lock().unwrap().insert(
-            id.clone(),
+        self.state.insert(
             Job {
                 id: id.clone(),
                 task: task.into(),
@@ -202,9 +201,9 @@ impl Jobs {
                 model: pick_model(model, self.agent.model.as_deref()).map(str::to_string),
                 cost_usd: None,
             },
+            child,
         );
-        self.children.lock().unwrap().insert(id.clone(), child);
-        let (jobs, children, job) = (self.jobs.clone(), self.children.clone(), id.clone());
+        let (state, job) = (self.state.clone(), id.clone());
         // Read stderr on its own thread, so that a full pipe cannot block the agent.
         let err_text = std::thread::spawn(move || {
             let mut err = String::new();
@@ -217,59 +216,28 @@ impl Jobs {
         std::thread::spawn(move || {
             let mut reader = StreamReader::default();
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-                if let Some(j) = jobs.lock().unwrap().get_mut(&job) {
-                    reader.line(&line, j);
-                }
+                state.update(&job, |j| reader.line(&line, j));
             }
             let err = err_text.join().unwrap_or_default();
-            // Hold the children lock until the status is final, so that a
-            // cancel() in between does not see a job that runs but has no child.
-            let mut children = children.lock().unwrap();
-            let success = children
-                .remove(&job)
-                .and_then(|mut c| c.wait().ok())
-                .is_some_and(|s| s.success());
-            if let Some(j) = jobs.lock().unwrap().get_mut(&job)
-                && j.status == JobStatus::Running
-            {
-                j.status = if success && j.result.is_some() {
-                    JobStatus::Done
-                } else {
-                    JobStatus::Failed
-                };
-                if !success && !err.trim().is_empty() {
-                    j.events.push(JobEvent {
-                        kind: "error".into(),
-                        text: err.trim().to_string(),
-                    });
-                }
-            }
+            state.finish(&job, &err);
         });
         Ok(id)
     }
 
     pub fn get(&self, id: &str) -> Option<Job> {
-        self.jobs.lock().unwrap().get(id).cloned()
+        self.state.get(id)
     }
 
     /// All jobs, oldest first.
     pub fn list(&self) -> Vec<Job> {
-        let mut list: Vec<Job> = self.jobs.lock().unwrap().values().cloned().collect();
+        let mut list = self.state.all();
         list.sort_by_key(|j| j.id[1..].parse::<u64>().unwrap_or(u64::MAX));
         list
     }
 
     /// Stop a running job. Proposals it made stay.
     pub fn cancel(&self, id: &str) -> bool {
-        let Some(mut child) = self.children.lock().unwrap().remove(id) else {
-            return false;
-        };
-        let _ = child.kill();
-        let _ = child.wait();
-        if let Some(j) = self.jobs.lock().unwrap().get_mut(id) {
-            j.status = JobStatus::Cancelled;
-        }
-        true
+        self.state.cancel(id)
     }
 }
 
@@ -376,7 +344,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn job() -> Job {
+    pub(super) fn job() -> Job {
         Job {
             id: "j1".into(),
             task: "imagine_exit".into(),
@@ -470,7 +438,7 @@ mod tests {
         for n in [10, 2, 1] {
             let mut j = job();
             j.id = format!("j{n}");
-            jobs.jobs.lock().unwrap().insert(j.id.clone(), j);
+            jobs.state.jobs.lock().unwrap().insert(j.id.clone(), j);
         }
         let ids: Vec<String> = jobs.list().into_iter().map(|j| j.id).collect();
         assert_eq!(ids, ["j1", "j2", "j10"]);

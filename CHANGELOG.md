@@ -13,6 +13,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - Host event arguments are their own namespace in conditions and text (#208). Before, an event read like a thing, so `present(killed)`, `killed.name` or `seen_by(killed)` passed the check. Now they are errors, and `killed.bos` says the event has no such argument, with a hint to `killed.boss`. An event still cannot have the id of a thing, a variable, a room or a built-in path: `killed.level` would still read as a thing's property or a room's `visits`, and the fact keys would clash.
 - **Breaking (library):** `loremaster_lang::Scope` has the new field `events`, and `Scope::things` no longer has the host events.
 
+### Fixed
+
+- A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
