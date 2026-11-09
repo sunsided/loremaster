@@ -237,7 +237,7 @@ pub enum AwaitRequest {
         who: Option<String>,
         /// The `against` of the await, for example `luck`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        target: Option<String>,
+        against: Option<String>,
     },
     /// Walk the player to a room; answer `arrived` or `refused`. With a
     /// `thing` or an `exit`, the walk is in this room, before a command on
@@ -290,7 +290,7 @@ impl AwaitRequest {
                 min: dice.min(),
                 max: dice.max(),
                 who: None,
-                target: spec.against.clone(),
+                against: spec.against.clone(),
             });
         }
         spec.walk_to.as_ref().map(|room| AwaitRequest::WalkTo {

@@ -142,7 +142,7 @@ impl Game {
             min: ROLL.min(),
             max: ROLL.max(),
             who: Some(who),
-            target: None,
+            against: None,
         };
         self.open_await(turn, rule, next, request, None)
     }

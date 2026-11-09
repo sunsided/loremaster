@@ -554,7 +554,7 @@ Conditions compare a variable with a constant. For `$r + skill >= 9`, write the 
 
 Then a later rule tests `total >= 9`.
 
-`against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). When the host rolls, the `roll` await has `target: luck` and `who` with the label of the stat (`LUCK`), so the host can show "Roll for LUCK" before the roll. It names a number variable and changes nothing else: the story still compares the values.
+`against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). When the host rolls, the `roll` await has `against: luck` and `who` with the label of the stat (`LUCK`), so the host can show "Roll for LUCK" before the roll. It names a number variable and changes nothing else: the story still compares the values.
 
 ### Action phases
 

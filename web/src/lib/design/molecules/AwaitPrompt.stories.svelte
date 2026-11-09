@@ -42,6 +42,14 @@ The prompt names what the story asks and offers the answers as buttons. The answ
 	<AwaitPrompt awaiting={at({ kind: 'roll', dice: '2d6', min: 2, max: 12, who: 'GATE WARDEN' })} onanswer={answer} />
 </Story>
 
+<Story name="Your roll">
+	<AwaitPrompt awaiting={at({ kind: 'roll', dice: '2d6', min: 2, max: 12, who: 'You' })} onanswer={answer} />
+</Story>
+
+<Story name="Roll against Luck">
+	<AwaitPrompt awaiting={at({ kind: 'roll', dice: '2d6', min: 2, max: 12, who: 'LUCK', against: 'luck' })} onanswer={answer} />
+</Story>
+
 <Story name="Action">
 	<AwaitPrompt awaiting={at({ kind: 'action', name: 'pick_lock', results: ['opened', 'broke'] })} onanswer={answer} />
 </Story>

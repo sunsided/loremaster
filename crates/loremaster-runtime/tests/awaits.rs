@@ -170,7 +170,7 @@ fn the_session_answers_a_roll_unless_the_host_asks_to() {
             min: 2,
             max: 12,
             who: None,
-            target: None,
+            against: None,
         }
     );
     assert!(s.resume(&id, Value::Int(13)).is_err());

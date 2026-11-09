@@ -317,11 +317,11 @@ fn a_roll_against_a_variable_names_its_target() {
     let Status::Await { awaiting } = &step.status else {
         panic!("no await: {:?}", step.status)
     };
-    let AwaitRequest::Roll { who, target, .. } = &awaiting.request else {
+    let AwaitRequest::Roll { who, against, .. } = &awaiting.request else {
         panic!("not a roll: {:?}", awaiting.request)
     };
     assert_eq!(who.as_deref(), Some("SKILL"));
-    assert_eq!(target.as_deref(), Some("skill"));
+    assert_eq!(against.as_deref(), Some("skill"));
 }
 
 #[test]
@@ -332,7 +332,7 @@ fn a_roll_await_without_labels_still_loads() {
         &request,
         AwaitRequest::Roll {
             who: None,
-            target: None,
+            against: None,
             ..
         }
     ));

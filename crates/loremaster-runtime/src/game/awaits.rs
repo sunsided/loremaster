@@ -70,7 +70,7 @@ impl Game {
         };
         if let AwaitRequest::Roll {
             who,
-            target: Some(var),
+            against: Some(var),
             ..
         } = &mut request
         {
