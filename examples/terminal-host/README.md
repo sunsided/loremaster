@@ -41,8 +41,28 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
    that shows more than the player's room. Like `snapshot`, it sees
    everything (concealed things, closed containers); the host decides what
    to show.
-6. `Effect`, `Status` and `AwaitRequest` are `non_exhaustive`. Keep a fallback arm.
-7. Save with `Session::save`, and load with `Session::load`. After a load, set
+6. Read the text by its runs, not by its words:
+   - A run with a `Thing` link is a mention of a thing in scope, in any
+     block but the command echo, the title and the exits: room prose too, and
+     the room after `undo` and `restore`. The engine links each name and
+     alias apart, so "Hester Reed, Amos's daughter" has two links, "Hester
+     Reed" and "daughter". A host that marks words itself would miss the
+     aliases and the name stages.
+   - A word with a link is a noun, also when a verb has the same word
+     ("lock"). The engine links no verbs.
+   - `VerbInfo::slots` says how many objects a verb takes (`none`, `one`,
+     `two`), not which things it applies to: any verb with a slot takes any
+     thing in scope, and a rule or the default response answers. A verb bar
+     offers each `bar` verb; `preview(text)` says what a half-typed command
+     refers to.
+   - `ThingInfo::aliases` lists a thing's aliases and the names of its
+     earlier name stages.
+7. Queries take no step: `scene()` (the room, the time as `time` and as
+   `minutes`, the things, the exits), `thing(id)` (any thing), `fact(name)` (one variable, property
+   or machine state, without a copy of the state), `verbs()`, `journal()`,
+   `stats()`, `media()`, `choices()`, `combat()`.
+8. `Effect`, `Status` and `AwaitRequest` are `non_exhaustive`. Keep a fallback arm.
+9. Save with `Session::save`, and load with `Session::load`. After a load, set
    `set_host_rolls` again: it belongs to the session, not to the save. `load`
    returns no step, so restore the session's own `snapshot` to show the room.
    Then call `Session::reseed` with a fresh, unpredictable number: for a story with

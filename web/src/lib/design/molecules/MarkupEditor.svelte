@@ -100,7 +100,7 @@
 			from: word.from,
 			options: usable.map((s) => ({
 				label: s.name,
-				type: s.kind === 'variable' || s.kind === 'property' ? 'variable' : s.kind === 'name' ? 'text' : 'keyword',
+				type: s.kind === 'variable' || s.kind === 'property' || s.kind === 'argument' ? 'variable' : s.kind === 'name' ? 'text' : 'keyword',
 				detail: s.value != null && s.value !== '' ? `= ${s.value}` : undefined,
 				info: s.detail
 			})),

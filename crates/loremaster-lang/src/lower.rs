@@ -256,6 +256,20 @@ fn resolve_path(parts: &[String], span: &Span, scope: &Scope) -> Result<(Operand
             format!("unknown timer `{id}`"),
             span.clone(),
         )),
+        // Before the story's own names, so none of them shadows an argument.
+        [event, arg] if scope.events.contains_key(*event) => match scope.events[*event].get(*arg) {
+            Some(ty) => Ok((Operand::Fact(format!("{event}.{arg}")), ty.clone())),
+            None => {
+                let hint =
+                    crate::scope::closest(arg, scope.events[*event].keys().map(String::as_str))
+                        .map(|a| format!("; did you mean `{event}.{a}`?"))
+                        .unwrap_or_default();
+                Err(LangError::new(
+                    format!("the event `{event}` has no argument `{arg}`{hint}"),
+                    span.clone(),
+                ))
+            }
+        },
         [var] if scope.vars.contains_key(*var) => {
             Ok((Operand::Fact(var.to_string()), scope.vars[*var].clone()))
         }

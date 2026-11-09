@@ -30,6 +30,16 @@ fn the_map_has_every_room_and_one_link_per_pair_of_exits() {
 }
 
 #[test]
+fn the_atlas_lists_the_aliases_of_things() {
+    let mut game = lighthouse();
+    game.start();
+    let atlas = game.atlas();
+    let cottage = atlas.iter().find(|r| r.id == "cottage").unwrap();
+    let drawer = cottage.things.iter().find(|t| t.id == "drawer").unwrap();
+    assert_eq!(drawer.aliases, ["dresser"]);
+}
+
+#[test]
 fn inline_branches_are_marked_active_or_not() {
     use loremaster_runtime::SourceRole;
     let mut game = lighthouse();

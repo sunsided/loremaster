@@ -235,6 +235,11 @@ export class Session {
 		return this.#session.thing(id);
 	}
 
+	/** The value of one fact now (a variable, a property or a machine's state), or null. */
+	fact(name: string): Value | null {
+		return this.#session.fact(name);
+	}
+
 	/** The quest journal: open quests first, then finished ones. */
 	journal(): JournalEntry[] {
 		return this.#session.journal();
@@ -369,6 +374,11 @@ export class Workbench {
 
 	scene(): Scene {
 		return this.#bench.scene();
+	}
+
+	/** The value of one fact now (a variable, a property or a machine's state), or null. */
+	fact(name: string): Value | null {
+		return this.#bench.fact(name);
 	}
 
 	/** The quest journal of the session. */

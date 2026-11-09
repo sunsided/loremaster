@@ -83,6 +83,11 @@ pub struct ThingInfo {
     /// Where the thing is now: a room, carried, in or on another thing, or
     /// nowhere.
     pub location: Location,
+    /// The thing's aliases now, lowercased: its aliases, and the names and
+    /// aliases of earlier name stages. The parser also takes single words
+    /// of `name` ("reed" for "Hester Reed").
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,7 +102,11 @@ pub struct ExitInfo {
 pub struct Scene {
     pub room: String,
     pub room_name: String,
+    /// The time of day, `HH:MM`.
     pub time: String,
+    /// The clock as a number: minutes since midnight of day 1. The time of
+    /// day is `minutes % 1440`.
+    pub minutes: u32,
     pub phase: String,
     pub day: u32,
     pub turns: u32,
@@ -496,6 +505,7 @@ impl Game {
         let mut turn = Turn::default();
         self.describe_room(&mut turn);
         self.state = state;
+        self.link_things(&mut turn.blocks);
         turn
     }
 
@@ -1181,12 +1191,25 @@ impl Game {
         }
     }
 
-    /// A thing of the story, wherever it is; `None` for an unknown id.
+    /// A thing of the story, wherever it is: its current name, its aliases
+    /// and its location. `None` for an unknown id.
     pub(crate) fn thing_info(&self, id: &str) -> Option<ThingInfo> {
         let id = &self.world.thing(id)?.id;
+        let name = self.name_of(id);
+        let lower = name.to_lowercase();
+        let mut aliases = Vec::new();
+        for noun in (self.world.thing(id.as_str()).into_iter())
+            .flat_map(|t| self.nouns_of(t))
+            .filter(|n| *n != lower)
+        {
+            if !aliases.contains(&noun) {
+                aliases.push(noun);
+            }
+        }
         Some(ThingInfo {
             id: id.to_string(),
-            name: self.name_of(id),
+            name,
+            aliases,
             location: (self.state.location_of(id.as_str()).cloned()).unwrap_or(Location::Nowhere),
         })
     }
@@ -1201,6 +1224,7 @@ impl Game {
             time: ev.time_of_day().to_string(),
             phase: ev.phase(),
             day: self.state.minutes / TimeOfDay::MINUTES_PER_DAY + 1,
+            minutes: self.state.minutes,
             turns: self.state.turns,
             dark: self.is_dark(),
             things: scope

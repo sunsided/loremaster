@@ -9,7 +9,9 @@
 //!
 //! An order runs in the same way: each turn, the actor with an order becomes
 //! active for one step, and the player's actor comes back after it. The
-//! player sees what the actor perceives while it acts.
+//! player sees what the actor perceives while it acts. So the step is the
+//! player's action (WO-5): its events have the actor `player`, and it counts
+//! in `action.*`, `once` and the interactions, as after a switch (#209).
 
 use super::{Game, parse};
 use crate::{BlockKind, Input, Turn};

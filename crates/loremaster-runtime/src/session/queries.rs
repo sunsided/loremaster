@@ -23,6 +23,13 @@ impl Session {
         self.game.thing_info(id)
     }
 
+    /// The value of one fact now, without a copy of the state: a story
+    /// variable (`gold`), a thing property (`lamp.lit`) or the state of a
+    /// machine (`lock`). `None` when it is not set.
+    pub fn fact(&self, name: &str) -> Option<&loremaster_model::Value> {
+        self.game.state().facts.get(name)
+    }
+
     /// The verbs of the story, for a verb bar.
     pub fn verbs(&self) -> Vec<VerbInfo> {
         self.game.verbs()

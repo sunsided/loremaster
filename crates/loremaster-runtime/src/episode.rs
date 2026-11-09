@@ -117,13 +117,7 @@ impl Game {
             let name = format!("fact:{key}");
             if !import.facts.contains(&key) {
                 out.skipped.push(name);
-            } else if !fits(
-                world.scope.vars.get(&key).or_else(|| {
-                    let (thing, prop) = key.split_once('.')?;
-                    world.scope.things.get(thing)?.get(prop)
-                }),
-                &value,
-            ) {
+            } else if !fits(world.scope.fact_type(&key), &value) {
                 out.misfits.push(name);
             } else {
                 self.state_mut().facts.insert(key.clone(), value);

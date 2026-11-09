@@ -1728,7 +1728,12 @@ impl Checker<'_> {
             && actor.as_str() != PLAYER_SPEAKER
             && self.story().agenda_of(actor.as_str()).is_none()
         {
-            let message = if self.story().thing(actor.as_str()).is_some() {
+            // A playable actor acts as the player (WO-5), also in an order.
+            let message = if self.story().playable.contains(actor) {
+                format!(
+                    "`{actor}` is playable: its commands are the player's; leave out `actor`, declare `active` in its `props` and test `{actor}.active` in `when`"
+                )
+            } else if self.story().thing(actor.as_str()).is_some() {
                 format!("`{actor}` is a thing, but not an actor: give it an agenda in agendas/")
             } else {
                 format!("unknown actor `{actor}`: an actor is `player` or a thing with an agenda")
@@ -2059,11 +2064,7 @@ impl Checker<'_> {
     }
 
     fn ty_of(&self, name: &str) -> Option<loremaster_lang::Ty> {
-        if let Some(ty) = self.scope.vars.get(name) {
-            return Some(ty.clone());
-        }
-        let (thing, prop) = name.split_once('.')?;
-        self.scope.things.get(thing)?.get(prop).cloned()
+        self.scope.fact_type(name).cloned()
     }
 
     fn settable(&self, name: &str, value: &loremaster_model::Value) -> bool {
