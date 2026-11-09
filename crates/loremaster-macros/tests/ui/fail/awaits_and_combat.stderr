@@ -1,0 +1,41 @@
+error: `combat` needs `win <room>` and `loss <room>`
+ --> tests/ui/fail/awaits_and_combat.rs:7:20
+  |
+7 |             combat [warden] win yard;
+  |                    ^
+
+error: expected `roll`, `choice`, `walk_to` or `action` after `await`
+  --> tests/ui/fail/awaits_and_combat.rs:16:19
+   |
+16 |             await dice "2d6";
+   |                   ^^^^
+
+error: `2x6` is not dice such as `2d6` or `1d20+3`
+  --> tests/ui/fail/awaits_and_combat.rs:28:13
+   |
+28 |             await roll "2x6" into r;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `short` is given twice
+  --> tests/ui/fail/awaits_and_combat.rs:36:69
+   |
+36 |         story "Twice" { start: hall, stats { luck "LUCK" short "LK" short "L" } }
+   |                                                                     ^^^^^
+
+error: `win` is given twice
+  --> tests/ui/fail/awaits_and_combat.rs:45:38
+   |
+45 |             combat [warden] win yard win hall loss fallen;
+   |                                      ^^^
+
+error: the argument `difficulty` is given twice
+  --> tests/ui/fail/awaits_and_combat.rs:54:54
+   |
+54 |             await action pick_lock { difficulty = 3, difficulty = 4 };
+   |                                                      ^^^^^^^^^^
+
+error: `into` is given twice
+  --> tests/ui/fail/awaits_and_combat.rs:63:37
+   |
+63 |             await roll "2d6" into r into s;
+   |                                     ^^^^

@@ -4,7 +4,7 @@ use crate::convert::{IntoTime, IntoVarValue, id, strings};
 use crate::pack::register;
 use crate::{HasFrames, HasNotes, IntoFragment};
 use loremaster_model::{
-    ClockConfig, Frames, Id, Limit, Note, Phase, Rank, Score, Value, VarDef, VarType,
+    ClockConfig, Frames, Id, Limit, Note, Phase, Rank, Score, Stat, Value, VarDef, VarType,
 };
 use loremaster_project::{Pack, StoryHeader};
 
@@ -180,6 +180,40 @@ impl<'a> StoryBuilder<'a> {
     pub fn relation(mut self, relation: impl AsRef<str>) -> Self {
         self.header().relations.push(id(relation));
         self
+    }
+
+    /// A line of the adventure sheet (`stats:`): a variable or a property
+    /// such as `codeword.hearth`, and its label.
+    pub fn stat(mut self, var: impl Into<String>, label: impl Into<String>) -> Self {
+        self.header().stats.push(Stat {
+            var: var.into(),
+            label: label.into(),
+            short: None,
+            max: None,
+        });
+        self
+    }
+
+    /// The `short` name of a stat in the one-line sheet. Call after [`stat`](Self::stat).
+    #[track_caller]
+    pub fn stat_short(mut self, var: &str, short: impl Into<String>) -> Self {
+        self.stat_mut(var).short = Some(short.into());
+        self
+    }
+
+    /// The `max` of a stat: a number, or a number variable. Call after [`stat`](Self::stat).
+    #[track_caller]
+    pub fn stat_max(mut self, var: &str, max: impl Into<Limit>) -> Self {
+        self.stat_mut(var).max = Some(max.into());
+        self
+    }
+
+    #[track_caller]
+    fn stat_mut(&mut self, var: &str) -> &mut Stat {
+        let Some(s) = self.header().stats.iter_mut().find(|s| s.var == var) else {
+            panic!("the stat `{var}` is not on the sheet: call `stat` first");
+        };
+        s
     }
 
     /// `score:`: the maximum score, in the variable `score`.
