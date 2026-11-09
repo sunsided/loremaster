@@ -91,7 +91,8 @@ impl<'a> Inspector<'a> {
         self.game.eval().thing_name(id, form)
     }
 
-    /// The index of the thing's name stage now; `None` without stages.
+    /// The index of the thing's name stage now; `None` without stages, or
+    /// when no stage holds.
     pub fn name_stage(&self, id: &str) -> Option<usize> {
         self.game.eval().name_stage(id)
     }

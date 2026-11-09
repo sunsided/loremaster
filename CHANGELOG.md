@@ -8,6 +8,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening and the turn passing (`on: turn`, timers, time rules, agendas, orders). A graphical host can draw the player's own text over the player and the rest as ambient narration.
+- `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.
+- **Breaking (library):** `Block` has the new field `cause`, and `ThingInfo` has the new field `location`; code that builds them with a struct literal needs them.
+
+### Fixed
+
+- A thing whose `names:` stages all have a `when` that does not hold now has its `name`. Before, it showed the text of the first stage (#178).
+- `Command::verb("go", vec!["up".into()])` now moves the player like `Command::Go`. Before, it ran as a verb that did nothing (#178).
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

@@ -42,9 +42,14 @@ export type BlockKind =
 	/** The line of the character the player talks to. */
 	| 'speech';
 
+/** Why a block appeared: the player's input, or the world (the opening, `on: turn`, timers, time rules, agendas). */
+export type Cause = 'command' | 'world';
+
 export interface Block {
 	kind: BlockKind;
 	runs: Run[];
+	/** The engine always sets it; a block from elsewhere (a fixture, an old transcript) may lack it, which means `command`. */
+	cause?: Cause;
 }
 
 export interface LogEntry {
@@ -227,9 +232,14 @@ export interface OutlineOption {
 	outcomes: string[];
 }
 
+/** Where a thing is: a room, carried, in or on another thing, or nowhere. */
+export type ThingLocation = { room: string } | 'carried' | 'nowhere' | { in: string } | { on: string };
+
 export interface ThingInfo {
 	id: string;
+	/** The current name. */
 	name: string;
+	location: ThingLocation;
 }
 
 export interface ExitInfo {

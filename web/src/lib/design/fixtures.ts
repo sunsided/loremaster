@@ -122,13 +122,13 @@ export const verbs: VerbInfo[] = [
 ];
 
 export const things: ThingInfo[] = [
-	{ id: 'drawer', name: 'drawer' },
-	{ id: 'oil_lamp', name: 'oil lamp' },
-	{ id: 'matches', name: 'box of matches' },
-	{ id: 'cottage_door', name: 'cottage door' }
+	{ id: 'drawer', name: 'drawer', location: { room: 'cottage' } },
+	{ id: 'oil_lamp', name: 'oil lamp', location: { room: 'cottage' } },
+	{ id: 'matches', name: 'box of matches', location: { in: 'drawer' } },
+	{ id: 'cottage_door', name: 'cottage door', location: { room: 'cottage' } }
 ];
 
-export const inventory: ThingInfo[] = [{ id: 'iron_key', name: 'iron key' }];
+export const inventory: ThingInfo[] = [{ id: 'iron_key', name: 'iron key', location: 'carried' }];
 
 export const exits: ExitInfo[] = [
 	{ direction: 'north', to: 'cottage', to_name: "Keeper's Cottage" },
@@ -510,7 +510,7 @@ export const towerRooms: AtlasRoom[] = towerMap.rooms.map((r) => ({
 	level: r.level,
 	visited: r.visited,
 	current: r.current,
-	things: r.id === 'bell_chamber' ? [{ id: 'bell', name: 'bronze bell' }] : [],
+	things: r.id === 'bell_chamber' ? [{ id: 'bell', name: 'bronze bell', location: { room: 'bell_chamber' } }] : [],
 	exits: towerMap.links.filter((l) => l.from === r.id).map((l) => [l.direction, l.to] as [string, string]),
 	fragments: 1
 }));

@@ -13,6 +13,13 @@ impl Session {
         self.game.scene()
     }
 
+    /// One thing of the story, wherever it is: its current name and its
+    /// location. `None` for an unknown id. For a host that shows more than
+    /// the player's room.
+    pub fn thing(&self, id: &str) -> Option<crate::ThingInfo> {
+        self.game.thing_info(id)
+    }
+
     /// The verbs of the story, for a verb bar.
     pub fn verbs(&self) -> Vec<VerbInfo> {
         self.game.verbs()

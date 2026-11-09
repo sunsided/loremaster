@@ -39,27 +39,26 @@ pub struct PhaseView {
 pub(crate) fn inspect_thing(ins: Inspector<'_>, id: &str) -> Option<Inspect> {
     let t = ins.thing(id)?;
     let mut facts: Vec<(String, String)> = vec![("id".into(), t.id.to_string())];
-    match ins.name_stage(id) {
-        Some(current) => {
-            let stages: Vec<String> = t
-                .names
-                .iter()
-                .enumerate()
-                .map(|(i, n)| {
-                    let when = n
-                        .when
-                        .as_deref()
-                        .map(|w| format!(" when {w}"))
-                        .unwrap_or_default();
-                    let now = if i == current { " (now)" } else { "" };
-                    format!("{}{when}{now}", n.text)
-                })
-                .collect();
-            facts.push(("names".into(), stages.join(" → ")));
-            facts.push(("player calls it".into(), ins.nouns(id).join(", ")));
-        }
-        None if !t.aliases.is_empty() => facts.push(("also called".into(), t.aliases.join(", "))),
-        None => {}
+    if !t.names.is_empty() {
+        let current = ins.name_stage(id);
+        let stages: Vec<String> = t
+            .names
+            .iter()
+            .enumerate()
+            .map(|(i, n)| {
+                let when = n
+                    .when
+                    .as_deref()
+                    .map(|w| format!(" when {w}"))
+                    .unwrap_or_default();
+                let now = if Some(i) == current { " (now)" } else { "" };
+                format!("{}{when}{now}", n.text)
+            })
+            .collect();
+        facts.push(("names".into(), stages.join(" → ")));
+        facts.push(("player calls it".into(), ins.nouns(id).join(", ")));
+    } else if !t.aliases.is_empty() {
+        facts.push(("also called".into(), t.aliases.join(", ")));
     }
     let location = match ins.state().location_of(id) {
         Some(Location::Room(r)) => ins

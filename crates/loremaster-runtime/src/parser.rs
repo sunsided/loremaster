@@ -104,6 +104,29 @@ impl Command {
         }
     }
 
+    /// The verb `go` with one direction, for the player, is the move
+    /// [`Command::Go`]: `Command::verb("go", vec!["up".into()])` moves the
+    /// player. Other commands stay as they are.
+    pub(crate) fn into_move(self) -> Self {
+        match self {
+            Command::Verb {
+                verb,
+                objects,
+                actor,
+                preposition: None,
+                topic: None,
+            } if verb.as_str() == "go"
+                && objects.len() == 1
+                && actor.as_ref().is_none_or(|a| a.as_str() == PLAYER) =>
+            {
+                Command::Go {
+                    direction: objects[0].to_string(),
+                }
+            }
+            cmd => cmd,
+        }
+    }
+
     /// The Command record of a verb or a move; `None` for the answers of a
     /// talk.
     pub fn record(&self) -> Option<CommandRecord> {

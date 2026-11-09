@@ -314,6 +314,12 @@ impl JsSession {
         to_js(&self.session.scene())
     }
 
+    /// One thing of the story, wherever it is: `{ id, name, location }`, or
+    /// null for an unknown id.
+    pub fn thing(&self, id: &str) -> Result<JsValue, JsValue> {
+        or_null(self.session.thing(id))
+    }
+
     /// The quest journal: open quests first, then finished ones.
     pub fn journal(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.journal())

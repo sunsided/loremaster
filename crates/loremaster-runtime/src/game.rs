@@ -78,7 +78,11 @@ pub struct VerbInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ThingInfo {
     pub id: String,
+    /// The current name: the name stage that holds now, or the name.
     pub name: String,
+    /// Where the thing is now: a room, carried, in or on another thing, or
+    /// nowhere.
+    pub location: Location,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -481,6 +485,7 @@ impl Game {
             // A `stop` in a chain ends only that chain.
             self.stopped = false;
         }
+        turn.caused_by_world(0);
         self.finish(turn)
     }
 
@@ -661,6 +666,7 @@ impl Game {
 
     /// Run a command, or first wait for the host to walk there.
     fn perform(&mut self, turn: &mut Turn, cmd: Command) {
+        let cmd = cmd.into_move();
         if self.host_walks
             && self.state.talk.is_none()
             && let Some(request) = self.walk_for(&cmd)
@@ -716,6 +722,7 @@ impl Game {
     /// `None` when it took no turn. An order runs through here too, so the
     /// clock moves once a turn.
     fn action(&mut self, turn: &mut Turn, cmd: Command) -> Option<u16> {
+        let cmd = cmd.into_move();
         // A talk stays open until the player leaves: other commands do not run.
         match (&cmd, self.state.talk.is_some()) {
             (Command::Choose { index }, true) => {
@@ -1128,12 +1135,19 @@ impl Game {
         }
     }
 
-    pub fn scene(&self) -> Scene {
-        let ev = self.eval();
-        let info = |id: &Id| ThingInfo {
+    /// A thing of the story, wherever it is; `None` for an unknown id.
+    pub(crate) fn thing_info(&self, id: &str) -> Option<ThingInfo> {
+        let id = &self.world.thing(id)?.id;
+        Some(ThingInfo {
             id: id.to_string(),
             name: self.name_of(id),
-        };
+            location: (self.state.location_of(id.as_str()).cloned()).unwrap_or(Location::Nowhere),
+        })
+    }
+
+    pub fn scene(&self) -> Scene {
+        let ev = self.eval();
+        let info = |id: &Id| self.thing_info(id.as_str());
         let scope = self.in_scope();
         Scene {
             room: self.state.room.to_string(),
@@ -1146,12 +1160,12 @@ impl Game {
             things: scope
                 .iter()
                 .filter(|id| !self.state.is_carried(id.as_str()))
-                .map(info)
+                .filter_map(info)
                 .collect(),
             inventory: scope
                 .iter()
                 .filter(|id| self.state.is_carried(id.as_str()))
-                .map(info)
+                .filter_map(info)
                 .collect(),
             // A message exit leads nowhere, so the player does not see it as a way out.
             exits: self
@@ -2007,6 +2021,7 @@ impl Game {
         if self.state.ended {
             return;
         }
+        let first = turn.blocks.len();
         let before = self.state.minutes;
         self.state.minutes += u32::from(minutes);
         self.state.turns += 1;
@@ -2018,6 +2033,7 @@ impl Game {
         // that reaches midnight.
         self.run_agendas(turn);
         self.run_orders(turn);
+        turn.caused_by_world(first);
     }
 
     /// Each running timer whose `runs_while` holds goes down by one. A timer at

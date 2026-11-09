@@ -49,6 +49,7 @@ import type {
 	MachineView,
 	Scene,
 	SourceFile,
+	ThingInfo,
 	Turn,
 	VerbInfo
 } from './types.ts';
@@ -218,6 +219,11 @@ export class Session {
 
 	scene(): Scene {
 		return this.#session.scene();
+	}
+
+	/** One thing of the story, wherever it is, or null for an unknown id. */
+	thing(id: string): ThingInfo | null {
+		return this.#session.thing(id);
 	}
 
 	/** The quest journal: open quests first, then finished ones. */

@@ -86,6 +86,8 @@ pub(crate) fn atlas(ins: Inspector<'_>) -> Vec<AtlasRoom> {
                 .map(|t| ThingInfo {
                     id: t.id.to_string(),
                     name: ins.thing_name(t.id.as_str(), NameForm::Bare),
+                    location: (ins.state().location_of(t.id.as_str()).cloned())
+                        .unwrap_or(loremaster_model::Location::Nowhere),
                 })
                 .collect(),
             exits: r

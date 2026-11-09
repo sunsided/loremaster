@@ -161,7 +161,7 @@ The room description that shows when the player enters a room is not an action. 
 
 ## Name stages
 
-A thing or a character can have names that change with the state. The last stage whose condition is true is the current name.
+A thing or a character can have names that change with the state. The last stage whose condition is true is the current name. When no stage is true, `name` (with `aliases`) is the current name, so a first stage without `when` is not needed.
 
 ```yaml
 # things/blackbeard.yaml
