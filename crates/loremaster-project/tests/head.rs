@@ -23,9 +23,9 @@ fn diagnostics(thing: &str) -> Vec<loremaster_project::Diagnostic> {
 }
 
 #[test]
-fn a_head_from_the_name_or_an_alias_is_fine() {
+fn a_head_from_the_name_or_a_word_of_an_alias_is_fine() {
     let d = diagnostics(
-        "name: pair of boots\naliases: [footwear]\nhead: Boots\nnames:\n  - { when: true, text: old shoes, head: footwear, aliases: [footwear] }\nlocation: { room: hall }\n",
+        "name: pair of boots\naliases: [footwear]\nhead: Boots\nnames:\n  - { when: true, text: old shoes, head: handle, aliases: [iron handle] }\n  - { when: true, text: rags, head: \" \" }\nlocation: { room: hall }\n",
     );
     check!(d == vec![]);
 }
@@ -38,7 +38,8 @@ fn a_head_that_is_not_a_word_of_the_name_is_an_error() {
     check!(d.len() == 2, "{d:#?}");
     check!(d[0].at == "head");
     check!(
-        d[0].message == "the head `shoes` is not a word of \"pair of boots\" or one of its aliases"
+        d[0].message
+            == "the head `shoes` is not a word of \"pair of boots\" or of one of its aliases"
     );
     check!(d[1].at == "names[0].head");
 }

@@ -524,16 +524,19 @@ impl Checker<'_> {
         }
     }
 
-    /// A declared head noun is a word of the name or one of the aliases.
+    /// A declared head noun is a word of the name or of one of the aliases.
     fn head(&mut self, file: &str, at: &str, head: &str, name: &str, aliases: &[String]) {
-        let lower = head.to_lowercase();
-        let fits = name.split_whitespace().any(|w| w.to_lowercase() == lower)
-            || aliases.iter().any(|a| a.to_lowercase() == lower);
+        let lower = head.trim().to_lowercase();
+        // A blank head counts as none: the runtime falls back to the last word.
+        let fits = lower.is_empty()
+            || (std::iter::once(name).chain(aliases.iter().map(String::as_str)))
+                .flat_map(str::split_whitespace)
+                .any(|w| w.to_lowercase() == lower);
         if !fits {
             self.error(
                 file,
                 at,
-                format!("the head `{head}` is not a word of \"{name}\" or one of its aliases"),
+                format!("the head `{head}` is not a word of \"{name}\" or of one of its aliases"),
             );
         }
     }

@@ -91,7 +91,7 @@ pub struct ThingInfo {
     /// The main word of the current name, for a host that marks it: the
     /// `head` of the name stage that holds now (or of the thing without a
     /// stage), else the last word of `name` ("lamp" for "oil lamp"). An
-    /// author sets `head` where the last word is wrong ("pair of boots").
+    /// author sets `head` where the last word is wrong ("bottle of wine").
     #[serde(default)]
     pub head: String,
 }
@@ -1209,7 +1209,7 @@ impl Game {
             Some(i) => thing.names[i].head.clone(),
             None => thing.head.clone(),
         };
-        let head = declared
+        let head = (declared.filter(|h| !h.trim().is_empty()))
             .or_else(|| name.split_whitespace().last().map(str::to_string))
             .unwrap_or_default();
         let lower = name.to_lowercase();

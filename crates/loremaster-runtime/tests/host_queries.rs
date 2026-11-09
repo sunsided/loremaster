@@ -22,8 +22,16 @@ fn lockhouse() -> Arc<World> {
             "name: Hester Reed\naliases: [hester, daughter]\nproper: true\nlocation: { room: kitchen }\n",
         ),
         (
-            "things/boots.yaml",
-            "name: pair of boots\nhead: boots\nnames:\n  - { when: lock == empty, text: boots of Amos, head: boots }\nlocation: { room: kitchen }\n",
+            "things/bottle.yaml",
+            "name: bottle of wine\nhead: bottle\nnames:\n  - { when: lock == empty, text: flask of nothing, head: flask }\nlocation: { room: kitchen }\n",
+        ),
+        (
+            "things/rag.yaml",
+            "name: old rag\nhead: \" \"\nlocation: { room: kitchen }\n",
+        ),
+        (
+            "things/jug.yaml",
+            "name: jug of milk\nhead: jug\nnames:\n  - { when: lock == empty, text: spilt milk }\nlocation: { room: kitchen }\n",
         ),
         (
             "machines/lock.yaml",
@@ -105,9 +113,14 @@ fn a_thing_has_its_head_noun() {
     let head = |s: &Session, id: &str| s.thing(id).unwrap().head;
     // The last word of the name, and the author's head.
     assert_eq!(head(&s, "hester"), "Reed");
-    assert_eq!(head(&s, "boots"), "boots");
-    // The head of the name stage that holds now.
+    assert_eq!(head(&s, "bottle"), "bottle");
+    assert_eq!(head(&s, "jug"), "jug");
+    // A blank head counts as none.
+    assert_eq!(head(&s, "rag"), "rag");
+    // A stage's own head, and the last word of a stage without one.
     s.submit(Input::Text("examine hester".into()));
-    assert_eq!(s.thing("boots").unwrap().name, "boots of Amos");
-    assert_eq!(head(&s, "boots"), "boots");
+    assert_eq!(s.thing("bottle").unwrap().name, "flask of nothing");
+    assert_eq!(head(&s, "bottle"), "flask");
+    assert_eq!(s.thing("jug").unwrap().name, "spilt milk");
+    assert_eq!(head(&s, "jug"), "milk");
 }
