@@ -25,10 +25,12 @@ pub struct LiveStory {
     builder: Loremaster,
     behaviors: Vec<HostBehaviors>,
     files: Vec<Result<Vec<SourceFile>, String>>,
+    /// A folder could not be read at the start, and no poll has said so yet.
+    report_unreadable: bool,
 }
 
 /// Registers host behaviors on a new world.
-type HostBehaviors = Box<dyn Fn(&mut World)>;
+type HostBehaviors = Box<dyn Fn(&mut World) + Send + Sync>;
 
 /// A world built after a change, with what a session reload needs.
 #[derive(Debug)]
@@ -41,19 +43,22 @@ pub struct Rebuilt {
 
 impl LiveStory {
     /// Read the YAML folders once. A later [`poll`](Self::poll) reports a
-    /// change against these files.
+    /// change against these files; the first poll reports a folder that
+    /// could not be read.
     pub fn new(builder: Loremaster) -> Self {
         let files = builder.read_dirs();
+        let report_unreadable = files.iter().any(Result::is_err);
         Self {
             builder,
             behaviors: Vec::new(),
             files,
+            report_unreadable,
         }
     }
 
     /// Host behaviors: `f` runs on every new world, after the behaviors of
     /// the Rust packs are registered.
-    pub fn behaviors(mut self, f: impl Fn(&mut World) + 'static) -> Self {
+    pub fn behaviors(mut self, f: impl Fn(&mut World) + Send + Sync + 'static) -> Self {
         self.behaviors.push(Box::new(f));
         self
     }
@@ -65,15 +70,20 @@ impl LiveStory {
     pub fn poll(&mut self) -> Option<Result<Rebuilt, Vec<Diagnostic>>> {
         // shortcut: re-reads all files per poll; switch to notify if stories get large
         let files = self.builder.read_dirs();
-        if files == self.files {
+        let report_unreadable = std::mem::take(&mut self.report_unreadable);
+        if files == self.files && !report_unreadable {
             return None;
         }
+        let rebuilt = self.rebuild(&files);
         self.files = files;
-        Some(self.rebuild())
+        Some(rebuilt)
     }
 
-    fn rebuild(&self) -> Result<Rebuilt, Vec<Diagnostic>> {
-        let (mut world, project, warnings) = self.builder.clone().built()?;
+    fn rebuild(
+        &self,
+        files: &[Result<Vec<SourceFile>, String>],
+    ) -> Result<Rebuilt, Vec<Diagnostic>> {
+        let (mut world, project, warnings) = self.builder.with_read_dirs(files).built()?;
         for f in &self.behaviors {
             f(&mut world);
         }
@@ -82,8 +92,8 @@ impl LiveStory {
             .into_iter()
             .map(|id| {
                 Diagnostic::error(
-                    "",
-                    format!("behavior:{id}"),
+                    "story.yaml",
+                    "behaviors",
                     format!("the behavior `{id}` is not registered"),
                 )
             })
