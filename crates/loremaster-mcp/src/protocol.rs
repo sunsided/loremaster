@@ -7,7 +7,8 @@
 //! interface (IF-5). The others need a started session: `session/submit`
 //! `{ input }`, `session/resume` `{ await_id, value }`, `session/event`
 //! `{ name, args? }`, `session/snapshot`, `session/restore` `{ snapshot }`,
-//! `session/status`, and the queries `session/scene`, `session/verbs`,
+//! `session/status`, and the queries `session/scene`, `session/fact`
+//! `{ name }`, `session/verbs`,
 //! `session/journal`, `session/stats`, `session/choices` and `session/combat`.
 
 use crate::{error_reply, read_sorted};
@@ -144,6 +145,10 @@ impl Protocol {
             }
             "session/status" => to_result(self.session()?.status()),
             "session/scene" => to_result(self.session()?.scene()),
+            "session/fact" => {
+                let name: String = field(&params, "name")?;
+                to_result(self.session()?.fact(&name))
+            }
             "session/verbs" => to_result(self.session()?.verbs()),
             "session/journal" => to_result(self.session()?.journal()),
             "session/stats" => to_result(self.session()?.stats()),

@@ -30,7 +30,8 @@ pub struct TextError {
 pub struct Symbol {
     /// For example `oil_lamp.lit`, `time.phase`, `oil_lamp.the`.
     pub name: String,
-    /// `variable`, `property`, `name`, `derived`, `phase` or `markup`.
+    /// `variable`, `property`, `argument` (of a host event), `name`,
+    /// `derived`, `phase` or `markup`.
     pub kind: String,
     /// What it is, in a few words.
     pub detail: String,
@@ -95,17 +96,17 @@ pub(crate) fn symbols(ins: Inspector<'_>) -> Vec<Symbol> {
         });
     };
     let rooms: Vec<String> = scope.rooms.iter().cloned().collect();
+    let values = |ty: &loremaster_lang::Ty| match ty {
+        loremaster_lang::Ty::Enum(v) => v.clone(),
+        loremaster_lang::Ty::Bool => vec!["true".into(), "false".into()],
+        _ => Vec::new(),
+    };
     for (name, ty) in &scope.vars {
-        let values = match ty {
-            loremaster_lang::Ty::Enum(v) => v.clone(),
-            loremaster_lang::Ty::Bool => vec!["true".into(), "false".into()],
-            _ => Vec::new(),
-        };
         add(
             name.clone(),
             "variable",
             format!("variable, {}", ty.describe()),
-            values,
+            values(ty),
         );
     }
     for (thing, props) in &scope.things {
@@ -152,6 +153,16 @@ pub(crate) fn symbols(ins: Inspector<'_>) -> Vec<Symbol> {
             "a room id, carried or nowhere".into(),
             places,
         );
+    }
+    for (event, args) in &scope.events {
+        for (arg, ty) in args {
+            add(
+                format!("{event}.{arg}"),
+                "argument",
+                format!("last argument of the host event {event}, {}", ty.describe()),
+                values(ty),
+            );
+        }
     }
     for room in &rooms {
         add(

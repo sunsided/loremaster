@@ -320,6 +320,12 @@ impl JsSession {
         to_js(&self.session.scene())
     }
 
+    /// The value of one fact now: a variable (`gold`), a property
+    /// (`lamp.lit`) or a machine's state (`lock`); null when it is not set.
+    pub fn fact(&self, name: &str) -> Result<JsValue, JsValue> {
+        or_null(self.session.fact(name))
+    }
+
     /// The quest journal: open quests first, then finished ones.
     pub fn journal(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.journal())
@@ -471,6 +477,11 @@ impl JsWorkbench {
 
     pub fn scene(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().scene())
+    }
+
+    /// The value of one fact now, or null; see `Session.fact`.
+    pub fn fact(&self, name: &str) -> Result<JsValue, JsValue> {
+        or_null(self.bench.session().fact(name))
     }
 
     /// The quest journal of the session.
