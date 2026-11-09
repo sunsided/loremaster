@@ -631,6 +631,7 @@ dependencies = [
 name = "loremaster-terminal-host"
 version = "0.3.0"
 dependencies = [
+ "loremaster-dsl",
  "loremaster-model",
  "loremaster-project",
  "loremaster-runtime",
