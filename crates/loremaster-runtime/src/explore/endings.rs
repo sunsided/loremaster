@@ -9,6 +9,11 @@
 //!   `reason`): then the check compares the list with the endings that really
 //!   drop out. A closer is named by its rule id, or by
 //!   `agenda:<id>/steps[<i>]` for an agenda step.
+//! - A closer that fires on the turn accepts the drop. A closer that only
+//!   fires later accepts it silently when the turn was only late: the state
+//!   after it still reaches the ending when time does not count, over the
+//!   turns of its twins (states that differ only in time). Otherwise the drop is accepted, but reported at info level, since
+//!   the turn itself may cause it and the closer ahead hides that (#245).
 //!
 //! A reached ending, even a bad one, resolves the game, so a turn into an
 //! ended state is neither. When the budget stopped the walk, a state whose
@@ -68,6 +73,8 @@ pub struct NoReturn {
     pub room: String,
     /// The rule that the turn blames: a rule with `closes` that fired or can
     /// still fire, or else the first rule that fired and changes the state.
+    /// With `only_ahead`, the turn's own rule that changes the state comes
+    /// first.
     pub rule: Option<String>,
     /// All rules that fired on the turn.
     pub fired: Vec<String>,
@@ -85,6 +92,11 @@ pub struct NoReturn {
     pub unaccepted: Vec<String>,
     /// The rules whose `closes` accept the drop.
     pub accepted_by: Vec<String>,
+    /// The ranked endings in `lost` that only a closer which fires after the
+    /// turn accepts, while no state that differs only in time still reaches
+    /// them: the drop is not proven to be lateness. Reported at info level.
+    #[serde(default)]
+    pub only_ahead: Vec<String>,
     /// The `reason` of each rule in `accepted_by`, in the same order.
     pub reasons: Vec<String>,
     /// How many explored turns have this cause.
@@ -131,8 +143,9 @@ fn ranked(ending: Option<&String>, rank: Option<u32>) -> String {
 impl EndingCheck {
     /// The findings as diagnostics: a dead end is an error, a point of no
     /// return that no `closes` accepts and a stale `closes` are warnings,
-    /// and so is a check that the budget stopped. `file` is empty: `at`
-    /// names the entity (`rule:<id>`, or `story:explore`), and
+    /// and so is a check that the budget stopped. A drop that only a closer
+    /// ahead accepts, and that is not proven late, is an info. `file` is
+    /// empty: `at` names the entity (`rule:<id>`, or `story:explore`), and
     /// `Project::locate` gives the file.
     pub fn diagnostics(&self) -> Vec<Diagnostic> {
         let mut out = Vec::new();
@@ -183,6 +196,30 @@ impl EndingCheck {
                 ),
             ));
         }
+        // A drop that also warns says so there.
+        for p in self
+            .no_return
+            .iter()
+            .filter(|p| p.accepted() && !p.only_ahead.is_empty())
+        {
+            let by = p.rule.as_ref().map(|r| blame(r)).unwrap_or_default();
+            let more = if p.turns > 1 {
+                format!(" ({} explored turns)", p.turns)
+            } else {
+                String::new()
+            };
+            out.push(Diagnostic::info(
+                "",
+                at(&p.rule, "/closes"),
+                format!(
+                    "point of no return, accepted only by a step that fires later: after {} in `{}`{by}, {} can no longer be reached{more}, and no state that differs only in time still reaches them, so the turn itself may close them. If it does, name them in `closes: [{}]` of the step, with a `reason`",
+                    quoted(&p.path),
+                    p.room,
+                    names(&p.only_ahead),
+                    p.only_ahead.join(", "),
+                ),
+            ));
+        }
         for s in &self.stale {
             out.push(Diagnostic::warning(
                 "",
@@ -223,6 +260,8 @@ pub(super) struct Graph<'a> {
     pub closers: &'a HashMap<String, u32>,
     /// The turns on which a rule with `closes` fired: (state, command, rule).
     pub closed: &'a [(u32, u32, u32)],
+    /// For each state, its group of twins: states that differ only in time.
+    pub twins: &'a [u32],
 }
 
 pub(super) struct Outcome {
@@ -453,6 +492,18 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
         }
     }
     reach.close(&preds);
+    // The endings that a state reaches when time does not count: over the
+    // graph of twin groups, where a group has the turns of all its twins.
+    let groups = g.twins.iter().max().map_or(0, |m| *m as usize + 1);
+    let mut twin_edges: Vec<Vec<(u32, u32)>> = vec![Vec::new(); groups];
+    let mut twin_reach = Sets::new(groups, ids.len());
+    for (i, &t) in g.twins.iter().enumerate() {
+        twin_edges[t as usize].extend(g.edges[i].iter().map(|&(j, c)| (g.twins[j as usize], c)));
+        if let Some(e) = ended_as[i] {
+            twin_reach.insert(t as usize, e);
+        }
+    }
+    twin_reach.close(&Preds::new(&twin_edges));
 
     // States that can reach a state the walk did not finish: not proven.
     let mut unproven: Vec<bool> = g.open.to_vec();
@@ -567,8 +618,9 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
     // not ended and not dead, after which the best rank is worse. A state
     // that can reach a cut state has an incomplete set: it proves nothing.
     let mut no_return: Vec<NoReturn> = Vec::new();
-    // By cause: the blamed rule, the lost endings, the unaccepted ones.
-    type Cause = (Option<String>, Vec<usize>, Vec<usize>);
+    // By cause: the blamed rule, the lost endings, the unaccepted ones, and
+    // the ones only a closer ahead accepts.
+    type Cause = (Option<String>, Vec<usize>, Vec<usize>, Vec<usize>);
     let mut no_return_at: BTreeMap<Cause, usize> = BTreeMap::new();
     let mut lost_by: Vec<Vec<bool>> = vec![vec![false; ids.len()]; closer_ids.len()];
     for i in (0..n).filter(|&i| !ended[i] && !unproven[i]) {
@@ -589,6 +641,7 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                 .get(&(i as u32, c))
                 .map(|v| v.iter().map(|&r| r as usize).collect())
                 .unwrap_or_default();
+            let firing = candidates.len();
             for r in members(ahead.of(ju)) {
                 if !candidates.contains(&r) {
                     candidates.push(r);
@@ -619,12 +672,36 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                 .copied()
                 .filter(|e| ranks[*e].is_some() && !named.contains(e))
                 .collect();
+            // Named only by closers ahead, and no twin of the state after
+            // the turn reaches it: not proven to be lateness.
+            let named_now: Vec<usize> = covering
+                .iter()
+                .filter(|&&r| candidates[..firing].contains(&r))
+                .flat_map(|&r| closes_of(r))
+                .collect();
+            let only_ahead: Vec<usize> = lost
+                .iter()
+                .copied()
+                .filter(|e| {
+                    ranks[*e].is_some()
+                        && named.contains(e)
+                        && !named_now.contains(e)
+                        && !members(twin_reach.of(g.twins[ju] as usize)).any(|x| x == *e)
+                })
+                .collect();
             let fired = replay(i, c);
-            let rule = covering
-                .first()
-                .map(|&r| closer_ids[r].clone())
-                .or_else(|| fired.iter().find(|r| changes(r)).cloned());
-            let key = (rule.clone(), lost.clone(), unaccepted.clone());
+            let own = fired.iter().find(|r| changes(r)).cloned();
+            let rule = if only_ahead.is_empty() {
+                covering.first().map(|&r| closer_ids[r].clone()).or(own)
+            } else {
+                own.or_else(|| covering.first().map(|&r| closer_ids[r].clone()))
+            };
+            let key = (
+                rule.clone(),
+                lost.clone(),
+                unaccepted.clone(),
+                only_ahead.clone(),
+            );
             match no_return_at.get(&key) {
                 Some(&k) => no_return[k].turns += 1,
                 None => {
@@ -654,6 +731,7 @@ pub(super) fn check(world: &World, g: &Graph<'_>) -> Outcome {
                         lost: lost.iter().map(|&e| ids[e].clone()).collect(),
                         unaccepted: unaccepted.iter().map(|&e| ids[e].clone()).collect(),
                         accepted_by,
+                        only_ahead: only_ahead.iter().map(|&e| ids[e].clone()).collect(),
                         reasons,
                         turns: 1,
                     });

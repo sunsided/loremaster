@@ -669,6 +669,11 @@ export interface NoReturn {
 	unaccepted: string[];
 	/** The rules whose `closes` accept the drop. */
 	accepted_by: string[];
+	/**
+	 * The ranked endings in `lost` that only a closer firing after the turn accepts, while no state that
+	 * differs only in time still reaches them: not proven to be lateness. An info, not a warning.
+	 */
+	only_ahead?: string[];
 	/** The `reason` of each rule in `accepted_by`, in the same order. */
 	reasons: string[];
 	turns: number;
