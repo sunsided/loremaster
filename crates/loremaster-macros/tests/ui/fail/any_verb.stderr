@@ -1,0 +1,11 @@
+error: `*` (any verb) goes only first in `verb(..)` or `check(..)`
+ --> tests/ui/fail/any_verb.rs:5:30
+  |
+5 |         rule r on verb(take, *) {
+  |                              ^
+
+error: `*` (any verb) goes only first in `verb(..)` or `check(..)`
+  --> tests/ui/fail/any_verb.rs:14:24
+   |
+14 |         rule r on talk(*) {
+   |                        ^

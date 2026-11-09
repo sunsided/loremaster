@@ -188,6 +188,7 @@
 //!   `after ..`: the frames around the response to a verb. In a thing,
 //!   `name [when <cond> =>] "<text>" [aliases [..]] [proper];`: a stage of
 //!   its name.
+//! - `verb(*, darkness)` and `check(*)`: `*` in the verb place is any verb.
 //! - In the story header, `relations: [trust]`, `score: <max>`,
 //!   `score_var: <var>` and `ranks { 0 "Beginner", 26 "Amateur" }`.
 //! - After the text of a fragment, `id <name>`, `replaces` and `note "…"`.

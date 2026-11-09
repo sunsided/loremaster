@@ -1052,3 +1052,49 @@ fn await_combat_and_stats_are_the_yaml_and_the_builder() {
     // The pack builds: the runtime checks accept the awaits, the combat and the sheet.
     Loremaster::new().pack(p).build().unwrap();
 }
+
+mod dark {
+    use loremaster::prelude::*;
+    world! {
+        story "Dark" { start: cave }
+        room cave "Cave" {}
+        thing darkness "darkness" in cave {}
+        rule grope on verb(*, darkness) instead {
+            line "You grope in the dark.";
+        }
+        rule stuck on check(*) {
+            stop;
+        }
+    }
+}
+
+const DARK_RULES_YAML: &str = r#"
+- id: grope
+  on: { verb: ["*", darkness] }
+  instead: true
+  then:
+    - say: "You grope in the dark."
+- id: stuck
+  on: { check: ["*"] }
+  then:
+    - stop
+"#;
+
+#[test]
+fn a_star_is_any_verb_as_in_yaml_and_the_builder() {
+    use loremaster::dsl::project::SourceFile;
+    let yaml = Pack::from_files(vec![SourceFile {
+        path: "rules/dark.yaml".into(),
+        text: DARK_RULES_YAML.into(),
+    }])
+    .unwrap();
+    let p = dark::pack();
+    let mut built = Pack::new("built");
+    built.rule("grope", on::verb(["*", "darkness"]));
+    built.rule("stuck", on::check(["*"]));
+    for i in 0..2 {
+        assert_eq!(p.rules[i].on, yaml.rules[i].on);
+        assert_eq!(p.rules[i].on, built.rules[i].on);
+    }
+    Loremaster::new().pack(p).build().unwrap();
+}
