@@ -264,6 +264,11 @@ export class Session {
 		return this.#session.verbs();
 	}
 
+	/** The verbs that apply to a thing now, sorted by id: rules and frames that name it, and standard verbs whose default does something for it. Empty out of scope. */
+	verbsFor(id: string): VerbInfo[] {
+		return this.#session.verbsFor(id);
+	}
+
 	/** What a command that is still being typed refers to. */
 	preview(text: string): Preview {
 		return this.#session.preview(text);
@@ -403,6 +408,11 @@ export class Workbench {
 
 	verbs(): VerbInfo[] {
 		return this.#bench.verbs();
+	}
+
+	/** The verbs that apply to a thing now; see `Session.verbsFor`. */
+	verbsFor(id: string): VerbInfo[] {
+		return this.#bench.verbsFor(id);
 	}
 
 	preview(text: string): Preview {

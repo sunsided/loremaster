@@ -9,7 +9,7 @@
 //! `{ name, args? }`, `session/snapshot`, `session/restore` `{ snapshot }`,
 //! `session/status`, and the queries `session/scene`, `session/thing`
 //! `{ id }`, `session/fact` `{ name }`, `session/verbs`,
-//! `session/journal`, `session/stats`, `session/choices` and `session/combat`.
+//! `session/verbs_for` `{ id }`, `session/journal`, `session/stats`, `session/choices` and `session/combat`.
 
 use crate::{error_reply, read_sorted};
 use loremaster_project::check_files;
@@ -154,6 +154,10 @@ impl Protocol {
                 to_result(self.session()?.fact(&name))
             }
             "session/verbs" => to_result(self.session()?.verbs()),
+            "session/verbs_for" => {
+                let id: String = field(&params, "id")?;
+                to_result(self.session()?.verbs_for(&id))
+            }
             "session/journal" => to_result(self.session()?.journal()),
             "session/stats" => to_result(self.session()?.stats()),
             "session/choices" => to_result(self.session()?.choices()),
