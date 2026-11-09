@@ -8,6 +8,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Combat (#190): in an all-at-once combat with more than one living enemy, the player selects the target ("Attack HOUND", `attack.hound`; `attack` is still the first living enemy). The enemy properties `deals` and `takes` are special rules of one enemy: the STAMINA a hit costs the player or the enemy, instead of 2; Luck shifts them as it shifts the 2, and `loremaster check` rejects a value that is not a number. With `set_host_rolls(true)`, the host answers the dice of a combat as `roll` awaits: one per enemy that fights, then the player, and one for "Test your Luck". A save while a round waits for its rolls keeps the totals so far.
+- **Breaking (library):** `CombatState` has the new fields `by`, `target` and `rolls`. Saves stay compatible: the fields default to empty.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

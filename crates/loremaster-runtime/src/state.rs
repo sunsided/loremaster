@@ -131,6 +131,16 @@ pub struct CombatState {
     /// The hit that waits for "Test your Luck": an enemy, or `player`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pending: Option<Id>,
+    /// The enemy that made the pending hit on the player, for its `deals`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<Id>,
+    /// The enemy the player chose to attack in this round (all at once).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<Id>,
+    /// The totals the host rolled so far for this round or Luck test
+    /// (`set_host_rolls`), in the order the rolls take them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rolls: Vec<i64>,
     /// The last lines of the combat, for the panel.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub log: Vec<String>,

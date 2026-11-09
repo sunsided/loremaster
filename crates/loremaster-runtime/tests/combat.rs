@@ -305,6 +305,22 @@ fn the_checks_reject_a_bad_combat() {
     assert!(errors.iter().any(|m| m.contains("nowhere")), "{errors:?}");
 }
 
+#[test]
+fn the_checks_reject_a_special_rule_that_is_no_number() {
+    let mut f = files(ONE, 0);
+    f[5] = file(
+        "things/warden.yaml",
+        "name: X\nlocation: { room: gate }\nprops: { skill: 7, stamina: 8, deals: lots }\n",
+    );
+    let diags = check(&load(f).unwrap());
+    assert!(
+        (diags.iter()).any(|d| d.severity == Severity::Error
+            && d.message
+                .contains("`deals` of the enemy `warden` is not a number")),
+        "{diags:?}"
+    );
+}
+
 fn compiled(f: Vec<SourceFile>) -> Arc<World> {
     Arc::new(World::compile(load(f).unwrap().story).unwrap())
 }
@@ -509,4 +525,97 @@ fn an_ending_clears_a_combat_that_a_rule_started_on_the_same_event() {
     s.start();
     assert!(s.state().ended);
     assert!(s.state().combat.is_none());
+}
+
+const TOGETHER: &str = "{ enemies: [warden, hound], win: yard, loss: fallen, together: true }";
+
+#[test]
+fn the_player_chooses_the_target_of_an_all_at_once_combat() {
+    let (mut s, step) = session(TOGETHER, 0);
+    assert_eq!(options(&step), ["attack", "attack.hound"]);
+    assert_eq!(s.choices()[1].text, "Attack HOUND");
+    // Both enemies roll low; the player's hit goes to the hound.
+    let step = play(&mut s, &step, "attack.hound", &[2, 2, 12]);
+    assert_eq!(stat(&s, "hound.stamina"), 0);
+    assert_eq!(stat(&s, "warden.stamina"), 8);
+    assert_eq!(options(&step), ["attack"], "one enemy left: no choice");
+}
+
+/// The one-enemy combat, with these extra properties of the warden.
+fn special(props: &str, luck: i64) -> Session {
+    let mut f = files(ONE, luck);
+    f[5] = file(
+        "things/warden.yaml",
+        &format!(
+            "name: GATE WARDEN\nlocation: {{ room: gate }}\nprops: {{ skill: 7, stamina: 8, {props} }}\n"
+        ),
+    );
+    Session::new(compiled(f))
+}
+
+#[test]
+fn an_enemy_can_deal_and_take_other_damage() {
+    let mut s = special("deals: 3, takes: 1", 0);
+    let step = s.start();
+    let step = play(&mut s, &step, "attack", &LOSE);
+    assert_eq!(stat(&s, "stamina"), 9, "the warden deals 3");
+    play(&mut s, &step, "attack", &WIN);
+    assert_eq!(stat(&s, "warden.stamina"), 7, "the warden takes 1");
+}
+
+#[test]
+fn a_rule_before_the_combat_sets_a_special_rule_for_it() {
+    let mut f = files(ONE, 0);
+    f[5] = file(
+        "things/warden.yaml",
+        "name: GATE WARDEN\nlocation: { room: gate }\nprops: { skill: 7, stamina: 8, takes: 2 }\n",
+    );
+    f.push(file(
+        "rules/fire.yaml",
+        "- id: fire\n  on: { event: go }\n  when: \"stamina > 0\"\n  priority: 1\n  then:\n    - set: { warden.takes: 3 }\n",
+    ));
+    let mut s = Session::new(compiled(f));
+    let step = s.start();
+    play(&mut s, &step, "attack", &WIN);
+    assert_eq!(stat(&s, "warden.stamina"), 5);
+}
+
+#[test]
+fn luck_shifts_the_special_damage() {
+    let mut s = special("takes: 3", 8);
+    let step = s.start();
+    let step = play(&mut s, &step, "attack", &WIN);
+    play(&mut s, &step, "luck", &[2]);
+    assert_eq!(stat(&s, "warden.stamina"), 3, "lucky: 3 + 2");
+}
+
+fn answer(s: &mut Session, step: &Step, value: Value) -> Step {
+    s.resume(&await_id(step), value).unwrap()
+}
+
+fn is_roll(step: &Step) -> bool {
+    matches!(&step.status, Status::Await { awaiting } if matches!(awaiting.request, AwaitRequest::Roll { .. }))
+}
+
+#[test]
+fn the_host_can_roll_the_dice_of_a_combat() {
+    let (mut s, step) = session(ONE, 8);
+    s.set_host_rolls(true);
+    let step = answer(&mut s, &step, Value::Text("attack".into()));
+    assert!(is_roll(&step), "the warden's roll: {:?}", step.status);
+    let step = answer(&mut s, &step, Value::Int(2));
+    assert!(is_roll(&step), "the player's roll");
+    // A save while the round waits for its rolls keeps the totals so far.
+    let save = serde_json::to_value(s.save()).unwrap();
+    let (mut s, _) = Session::load(world(ONE, 8), save).unwrap();
+    s.set_host_rolls(true);
+    let step = answer(&mut s, &step, Value::Int(12));
+    assert_eq!(options(&step), ["luck", "go_on"]);
+    assert_eq!(s.combat().unwrap().player_strength, Some(22));
+    assert_eq!(rolls(&step).len(), 2, "both rolls show on the dice");
+    let step = answer(&mut s, &step, Value::Text("luck".into()));
+    assert!(is_roll(&step), "the Luck roll");
+    let step = answer(&mut s, &step, Value::Int(2));
+    assert_eq!(stat(&s, "warden.stamina"), 4, "lucky hit");
+    assert_eq!(options(&step), ["attack", "escape"]);
 }
