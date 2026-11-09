@@ -45,7 +45,6 @@ fn typed_undo_during_a_talk_goes_to_the_talk() {
 #[test]
 fn explorer_paths_replay_through_talks_and_answers() {
     let mut kinds = std::collections::BTreeSet::new();
-    let mut rounds = 0;
     for name in [
         "cantina",
         "gatehouse",
@@ -71,14 +70,11 @@ fn explorer_paths_replay_through_talks_and_answers() {
             game.restart();
             for step in path {
                 kinds.insert(step.split(' ').next().unwrap_or_default().to_string());
-                rounds += usize::from(step.ends_with(" (win the round)"));
-                assert!(
-                    game.replay_step(step).is_some(),
-                    "{name}: no step `{step}` in {path:?}"
-                );
+                let Some((_, errors)) = replay(&mut game, step) else {
+                    panic!("{name}: no step `{step}` in {path:?}");
+                };
+                assert!(errors.is_empty(), "{name}: `{step}`: {errors:?}");
             }
-            let errors = loremaster_runtime::authoring::forced_roll_errors(game.session_mut());
-            assert!(errors.is_empty(), "{name}: forced rolls left: {errors:?}");
             match room {
                 Some((room, facts)) => {
                     assert_eq!(game.scene().room, room, "{name}: {path:?}");
@@ -103,18 +99,31 @@ fn explorer_paths_replay_through_talks_and_answers() {
     for kind in ["say", "answer"] {
         assert!(kinds.contains(kind), "no `{kind}` step: {kinds:?}");
     }
-    assert!(rounds > 0, "no combat round with forced rolls was replayed");
+    // A combat round replays with the rolls that the walk forced: the
+    // warden 2, the player 12.
+    let mut game = example("salt-tower");
+    game.start();
+    for step in ["go roll your character", "go ring the bell", "go refuse"] {
+        assert!(game.replay_step(step).is_some(), "no step `{step}`");
+    }
+    let (turn, errors) = replay(&mut game, "answer Attack (win the round)").expect("no round");
+    assert!(errors.is_empty(), "{errors:?}");
+    let totals: Vec<i64> = turn.rolls.iter().map(|r| r.total).collect();
+    assert_eq!(totals, [2, 12], "{:#?}", turn.rolls);
     // No shortest path above leaves a talk.
     let mut game = example("cantina");
     game.start();
-    // A forced total that no roll of the step takes is reported, not dropped.
-    loremaster_runtime::authoring::force_rolls(game.session_mut(), &[7]);
-    assert!(game.replay_step("go in").is_some(), "no step `go in`");
-    let errors = loremaster_runtime::authoring::forced_roll_errors(game.session_mut());
-    assert_eq!(errors, ["no roll took the forced rolls 7"]);
-    for step in ["talk blackbeard", "leave"] {
+    for step in ["go in", "talk blackbeard", "leave"] {
         assert!(game.replay_step(step).is_some(), "no step `{step}`");
     }
     assert!(game.session().talk().is_none(), "the talk is over");
     assert!(game.replay_step("leave").is_none(), "no talk to leave");
+}
+
+/// A replay step with the errors of its forced rolls.
+fn replay(
+    game: &mut loremaster_workbench::Workbench,
+    step: &str,
+) -> Option<(loremaster_runtime::Turn, Vec<String>)> {
+    loremaster_runtime::authoring::replay_step(game.session_mut(), step)
 }
