@@ -859,8 +859,15 @@ fn speech(input: ParseStream) -> Error {
 /// In a dialogue (`dialogue`), the line also ends at `{`, `=>`, `,` and a
 /// `when` without `then`: the node's body, the
 /// option's target, the next effect of `then` and the option's condition.
+///
+/// Spike (#112), in a dialogue only: a stage direction `(…)` is narration,
+/// and it makes the line a screenplay line, whose bare strings are speech:
+/// `keeper: "Nobody." (turns the poker in his hands);` is
+/// `keeper: says "Nobody." narrate "turns the poker in his hands";`. A
+/// direction before any speech is a bare string, as a writer spells it.
 fn line_until(input: ParseStream, dialogue: bool) -> Result<Vec<Segment>> {
     let mut segments: Vec<Segment> = Vec::new();
+    let mut directions = Vec::new();
     let end = |input: ParseStream| {
         input.peek(Token![;])
             || input.is_empty()
@@ -871,6 +878,11 @@ fn line_until(input: ParseStream, dialogue: bool) -> Result<Vec<Segment>> {
                     || (peek_kw(input, "when") && !when_then(input))))
     };
     while !end(input) {
+        if dialogue && input.peek(syn::token::Paren) {
+            directions.push(segments.len());
+            segments.push(stage_direction(input)?);
+            continue;
+        }
         if segments.is_empty()
             && input.peek(Ident::peek_any)
             && !peek_kw(input, "when")
@@ -902,7 +914,67 @@ fn line_until(input: ParseStream, dialogue: bool) -> Result<Vec<Segment>> {
     if segments.is_empty() {
         return Err(input.error("the line needs a text or at least one segment"));
     }
+    if !directions.is_empty() {
+        let mut spoken = false;
+        for (i, s) in segments.iter_mut().enumerate() {
+            if directions.contains(&i) {
+                // After speech, a bare string reads like more speech (the
+                // lint above, a YAML warning): the direction is `narrate`.
+                if spoken {
+                    s.voice = SegmentVoice::Narrate;
+                }
+            } else if matches!(s.voice, SegmentVoice::Plain) {
+                s.voice = SegmentVoice::Says(None);
+            }
+            spoken |= matches!(s.voice, SegmentVoice::Says(_));
+        }
+    }
     Ok(segments)
+}
+
+/// A stage direction `(…)`: a string, or words with `. , ! ? ; :` (a word
+/// with an apostrophe needs the string). It is narration.
+fn stage_direction(input: ParseStream) -> Result<Segment> {
+    let start = input.cursor();
+    let content;
+    parenthesized!(content in input);
+    let span = content.span();
+    let value = if content.peek(LitStr) {
+        let t = text(&content)?;
+        if !content.is_empty() {
+            return Err(content.error("a stage direction is one string or words, not both"));
+        }
+        t.value
+    } else {
+        let mut value = String::new();
+        while !content.is_empty() {
+            if content.peek(Ident::peek_any) {
+                if !value.is_empty() {
+                    value.push(' ');
+                }
+                value.push_str(&unraw(&content.call(Ident::parse_any)?));
+            } else if let Ok(p) = content.fork().parse::<proc_macro2::Punct>()
+                && ".,!?;:".contains(p.as_char())
+            {
+                content.parse::<proc_macro2::Punct>()?;
+                value.push(p.as_char());
+            } else {
+                return Err(content.error(
+                    "a stage direction is words and `. , ! ? ; :`; write anything else as a string: `(\"…\")`",
+                ));
+            }
+        }
+        value
+    };
+    if value.is_empty() {
+        return Err(Error::new(span, "the stage direction is empty"));
+    }
+    Ok(Segment {
+        voice: SegmentVoice::Plain,
+        text: Text { value, span },
+        when: None,
+        tokens: since(start, input),
+    })
 }
 
 /// `when <cond> then`: the condition of a segment, not of an option. It

@@ -34,7 +34,10 @@ world! {
             says "And paper?" => who_fed_it;
             says "Good night." => end;
         }
-        who_fed_it: "He turns the poker in his hands." says "Nobody. The stove was cold all night." {
+        // Screenplay form (spike, #112): `(…)` is a stage direction, and the
+        // bare string of such a line is speech. It is
+        // `"He turns the poker in his hands." says "Nobody. …"`.
+        who_fed_it: (He turns the poker in his hands.) "Nobody. The stove was cold all night." {
             says "Good night." => end;
         }
     }

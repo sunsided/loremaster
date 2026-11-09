@@ -205,6 +205,34 @@ mod keeper_dialogue_inline {
     }
 }
 
+/// keeper_dialogue_inline with the node who_fed_it in the screenplay form
+/// of dsl/dialogue.rs (spike, #112).
+mod keeper_dialogue_screenplay {
+    use loremaster::prelude::*;
+
+    world! {
+        extern {
+            thing keeper;
+            var ash_is_fresh;
+        }
+
+        dialogue with keeper start [stove] {
+            stove: "Mind your step." {
+                says "Who fed it?" when ash_is_fresh => who_fed_it;
+                says "What do you burn at night?" => what_burns;
+                says "Good night." => end;
+            }
+            what_burns: says "Coal, when the company sends it. Driftwood, when it does not." {
+                says "And paper?" => who_fed_it;
+                says "Good night." => end;
+            }
+            who_fed_it: (He turns the poker in his hands.) "Nobody. The stove was cold all night." {
+                says "Good night." => end;
+            }
+        }
+    }
+}
+
 /// The keeper's dialogue in world! is the one of dialogues/keeper.yaml, with
 /// the same inline line in place of the text pool in both forms.
 #[test]
@@ -221,6 +249,7 @@ fn the_dsl_dialogue_equals_the_yaml_dialogue() {
     let yaml = loremaster::dsl::Pack::from_files(vec![file]).unwrap_or_else(|e| panic!("{e:#?}"));
     let dsl = keeper_dialogue_inline::pack();
     assert_eq!(dsl.dialogues, yaml.dialogues);
+    assert_eq!(keeper_dialogue_screenplay::pack().dialogues, yaml.dialogues);
 }
 
 #[test]
