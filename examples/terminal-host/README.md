@@ -20,10 +20,15 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
    version is checked and the hint ladder is set. A story with Rust behaviors
    uses `session_with(|world| { world.register(..); })`.
 2. Show each `Effect` of the `Step`, in order:
-   - `Text`: a block of runs. A run in speech names its `speaker`. A run
-     with `emphasis` is `*emphasis*` in the story; its text has no stars.
-     `Block::plain_text` puts the stars back. The answers of a talk
-     (`Choice::text`) are plain strings and keep their stars.
+   - `Text`: a block of runs. A run in speech names its `speaker`. The
+     block's `cause` says why it showed: `Command` for the player's input
+     (its response, the rules it fired, the room after a move), `World` for
+     the opening and the turn passing (`on: turn`, timers, time rules,
+     agendas). A stage host can draw the first over the player and the
+     second as ambient narration. `Run::source` says who wrote the text, not
+     why it showed. A run with `emphasis` is `*emphasis*` in the story; its
+     text has no stars. `Block::plain_text` puts the stars back. The answers
+     of a talk (`Choice::text`) are plain strings and keep their stars.
    - `Notice`: a change of state. A host may skip it.
    - `Choices`: the answers of a talk. Answer with `Input::Choice(index)`.
    - `Roll`: dice to show.
@@ -35,7 +40,15 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
      - `Roll`: an integer. It comes up only with `set_host_rolls(true)` (`--own-dice` here).
      - `DeathPrompt`: `undo` and `restart` go to `resume`. For `restore`, the host loads a save.
    - `Ended`: stop. `ending` is `None` for a save restored into a changed story.
-4. Read the text by its runs, not by its words:
+4. A move as a command record is `Command::Go { direction }`; `Command::verb("go", vec![dir])`
+   with a compass word or an exit of the room is the same move. `go` with a
+   thing stays a verb.
+5. `scene()` covers the player's room and the inventory. `thing(id)` gives
+   any thing of the story with its current name and location, for a host
+   that shows more than the player's room. Like `snapshot`, it sees
+   everything (concealed things, closed containers); the host decides what
+   to show.
+6. Read the text by its runs, not by its words:
    - A run with a `Thing` link is a mention of a thing in scope, in any
      block but the command echo, the title and the exits: room prose too, and
      the room after `undo` and `restore`. The engine links each name and
@@ -49,14 +62,14 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
      thing in scope, and a rule or the default response answers. A verb bar
      offers each `bar` verb; `preview(text)` says what a half-typed command
      refers to.
-   - `ThingInfo::aliases` lists the other words the parser accepts for a
-     thing now.
-5. Queries take no step: `scene()` (the room, the time as `time` and as
-   `minutes`, the things, the exits), `fact(name)` (one variable, property
+   - `ThingInfo::aliases` lists a thing's aliases and the names of its
+     earlier name stages.
+7. Queries take no step: `scene()` (the room, the time as `time` and as
+   `minutes`, the things, the exits), `thing(id)` (any thing), `fact(name)` (one variable, property
    or machine state, without a copy of the state), `verbs()`, `journal()`,
    `stats()`, `media()`, `choices()`, `combat()`.
-6. `Effect`, `Status` and `AwaitRequest` are `non_exhaustive`. Keep a fallback arm.
-7. Save with `Session::save`, and load with `Session::load`. After a load, set
+8. `Effect`, `Status` and `AwaitRequest` are `non_exhaustive`. Keep a fallback arm.
+9. Save with `Session::save`, and load with `Session::load`. After a load, set
    `set_host_rolls` again: it belongs to the session, not to the save. `load`
    returns no step, so restore the session's own `snapshot` to show the room.
    Then call `Session::reseed` with a fresh, unpredictable number: for a story with

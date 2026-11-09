@@ -1,6 +1,7 @@
 //! Read-only queries of the Session API (ADR 0003, point 8): what the player
 //! can see and reach, the verbs, and the answers of a talk. They change
-//! nothing.
+//! nothing. `thing` and `fact` are host queries: like `snapshot`, they see
+//! the whole state, also what the player does not know.
 
 use super::Session;
 use crate::{Choice, JournalEntry, Preview, Scene, Talk, VerbInfo};
@@ -11,6 +12,15 @@ impl Session {
     /// the player sees them now: for side panels and a verb bar.
     pub fn scene(&self) -> Scene {
         self.game.scene()
+    }
+
+    /// One thing of the story, wherever it is: its current name and its
+    /// location. `None` for an unknown id. For a host that shows more than
+    /// the player's room. It sees everything, like `snapshot`: also a
+    /// concealed thing, the contents of a closed container and a dark room.
+    /// A host decides what of it to show the player.
+    pub fn thing(&self, id: &str) -> Option<crate::ThingInfo> {
+        self.game.thing_info(id)
     }
 
     /// The value of one fact now, without a copy of the state: a story
