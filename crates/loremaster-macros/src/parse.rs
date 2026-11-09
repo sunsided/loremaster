@@ -1439,6 +1439,7 @@ fn rule(input: ParseStream) -> Result<Rule> {
         instead: false,
         once: false,
         once_group: None,
+        free: false,
         priority: None,
         within: None,
         when: None,
@@ -1459,6 +1460,10 @@ fn rule(input: ParseStream) -> Result<Rule> {
                     rule.once_group = Some(name(&content)?);
                 }
             }
+            Some("free") => {
+                name(input)?;
+                rule.free = true;
+            }
             Some("priority") => {
                 name(input)?;
                 rule.priority = Some(int(input)?);
@@ -1476,7 +1481,7 @@ fn rule(input: ParseStream) -> Result<Rule> {
     }
     if !input.peek(syn::token::Brace) {
         return Err(input.error(
-            "expected `instead`, `once`, `priority`, `within`, `when` or the rule body `{ .. }`",
+            "expected `instead`, `once`, `free`, `priority`, `within`, `when` or the rule body `{ .. }`",
         ));
     }
     rule.effects = effects(input)?;

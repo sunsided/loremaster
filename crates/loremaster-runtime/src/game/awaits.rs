@@ -53,9 +53,7 @@ impl Game {
             let roll = spec.roll.as_deref().unwrap_or_default();
             let total = self.take_roll(turn, dice, roll);
             if let Some(var) = &spec.against {
-                let story = &self.world.story;
-                let stat = story.stats.iter().find(|s| s.var.as_str() == var);
-                let who = stat.map_or_else(|| var.to_uppercase(), |s| s.label.clone());
+                let who = self.stat_label(var);
                 let target = self.state.facts.get(var.as_str()).and_then(Value::as_int);
                 if let Some(r) = turn.rolls.last_mut() {
                     r.who = Some(who);
@@ -67,10 +65,29 @@ impl Game {
             }
             return AwaitStep::Answered;
         }
-        let Some(request) = AwaitRequest::of(spec) else {
+        let Some(mut request) = AwaitRequest::of(spec) else {
             return AwaitStep::Answered;
         };
+        if let AwaitRequest::Roll {
+            who,
+            against: Some(var),
+            ..
+        } = &mut request
+        {
+            *who = Some(self.stat_label(var));
+        }
         self.open_await(turn, rule, next, request, spec.into.clone())
+    }
+
+    /// The label of the stat `var`, for example `LUCK`.
+    fn stat_label(&self, var: &str) -> String {
+        let stat = self
+            .world
+            .story
+            .stats
+            .iter()
+            .find(|s| s.var.as_str() == var);
+        stat.map_or_else(|| var.to_uppercase(), |s| s.label.clone())
     }
 
     /// Roll, or take the next forced total, and log the roll.

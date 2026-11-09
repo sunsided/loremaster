@@ -34,6 +34,7 @@ impl<'a> RuleBuilder<'a> {
             when: None,
             then: Vec::new(),
             once: Default::default(),
+            free: false,
             instead: false,
             within: None,
             priority: 0,
@@ -65,6 +66,12 @@ impl<'a> RuleBuilder<'a> {
     /// `once: <key>`: all rules with this key fire at most once in total.
     pub fn once_group(mut self, key: impl AsRef<str>) -> Self {
         self.rule().once = loremaster_model::Once::Group(id(key));
+        self
+    }
+
+    /// `free: true`: the player's command that fires the rule takes no time.
+    pub fn free(mut self) -> Self {
+        self.rule().free = true;
         self
     }
 

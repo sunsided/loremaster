@@ -1249,6 +1249,7 @@ fn machine_rules(m: &Machine) -> Vec<Rule> {
                 when: Some(when),
                 then,
                 once: Default::default(),
+                free: false,
                 instead: step.instead,
                 within: None,
                 priority: 0,

@@ -622,14 +622,27 @@ fn is_roll(step: &Step) -> bool {
     matches!(&step.status, Status::Await { awaiting } if matches!(awaiting.request, AwaitRequest::Roll { .. }))
 }
 
+/// Who the open roll await is for.
+fn roll_for(step: &Step) -> Option<&str> {
+    match &step.status {
+        Status::Await { awaiting } => match &awaiting.request {
+            AwaitRequest::Roll { who, .. } => who.as_deref(),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 #[test]
 fn the_host_can_roll_the_dice_of_a_combat() {
     let (mut s, step) = session(ONE, 8);
     s.set_host_rolls(true);
     let step = answer(&mut s, &step, Value::Text("attack".into()));
     assert!(is_roll(&step), "the warden's roll: {:?}", step.status);
+    assert_eq!(roll_for(&step), Some("GATE WARDEN"));
     let step = answer(&mut s, &step, Value::Int(2));
     assert!(is_roll(&step), "the player's roll");
+    assert_eq!(roll_for(&step), Some("You"));
     // A save while the round waits for its rolls keeps the totals so far.
     let save = serde_json::to_value(s.save()).unwrap();
     let (mut s, _) = Session::load(world(ONE, 8), save).unwrap();
@@ -640,6 +653,7 @@ fn the_host_can_roll_the_dice_of_a_combat() {
     assert_eq!(rolls(&step).len(), 2, "both rolls show on the dice");
     let step = answer(&mut s, &step, Value::Text("luck".into()));
     assert!(is_roll(&step), "the Luck roll");
+    assert_eq!(roll_for(&step), Some("LUCK"));
     let step = answer(&mut s, &step, Value::Int(2));
     assert_eq!(stat(&s, "warden.stamina"), 4, "lucky hit");
     assert_eq!(options(&step), ["attack", "escape"]);

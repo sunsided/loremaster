@@ -721,6 +721,13 @@ impl Checker<'_> {
                     ),
                 );
             }
+            if rule.free && !matches!(rule.on, EventPattern::Verb(_) | EventPattern::Check(_)) {
+                self.warning(
+                    &file,
+                    "free",
+                    "`free` works only for a `verb` or `check` rule: other events are not commands",
+                );
+            }
             self.closes(
                 &file,
                 "",

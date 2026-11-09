@@ -277,6 +277,7 @@ pub struct Rule {
     pub once: bool,
     /// `once(key)`: the once-group.
     pub once_group: Option<Name>,
+    pub free: bool,
     pub priority: Option<i32>,
     pub within: Option<Name>,
     pub when: Option<Cond>,
