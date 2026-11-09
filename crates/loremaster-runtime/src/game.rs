@@ -1539,17 +1539,80 @@ impl Game {
     }
 
     pub(crate) fn verbs(&self) -> Vec<VerbInfo> {
-        self.world
-            .verbs
-            .iter()
-            .map(|v| VerbInfo {
-                id: v.id.to_string(),
-                label: v.label.clone(),
-                words: v.words.clone(),
-                slots: v.slots,
-                preposition: v.preposition.clone(),
-                bar: v.bar,
+        self.world.verbs.iter().map(verb_info).collect()
+    }
+
+    /// The verbs that apply to a thing now (#235): see [`crate::Session::verbs_for`].
+    pub(crate) fn verbs_for(&self, id: &str) -> Vec<VerbInfo> {
+        use loremaster_model::EventPattern;
+        let Some(t) = self.world.thing(id) else {
+            return Vec::new();
+        };
+        if !self.reachable(id) {
+            return Vec::new();
+        }
+        let named = |o: &Option<Id>| o.as_ref().is_some_and(|o| o.as_str() == id);
+        let mut ids: std::collections::BTreeSet<&str> = (self.world.story.rules.iter())
+            .filter_map(|r| match &r.on {
+                EventPattern::Verb(p) | EventPattern::Check(p)
+                    if named(&p.direct) || named(&p.indirect) =>
+                {
+                    Some(p.verb.as_str())
+                }
+                _ => None,
             })
+            .collect();
+        ids.extend(t.frames.keys().map(Id::as_str));
+        let has = |p: &str| self.state.facts.contains_key(&format!("{id}.{p}"));
+        let flag = |p: &str| self.state.flag(&format!("{id}.{p}"));
+        let lock_verb = |target: &str| {
+            if self.state.flag(&format!("{target}.locked")) {
+                "unlock"
+            } else {
+                "lock"
+            }
+        };
+        ids.insert("examine");
+        if t.portable && !self.state.is_held(id) {
+            ids.insert("take");
+        }
+        if self.state.is_carried(id) {
+            ids.extend(["drop", "put"]);
+        }
+        if t.container || t.supporter {
+            ids.insert("put");
+        }
+        if has("open") && !self.is_playable(id) {
+            if flag("open") {
+                ids.insert("close");
+            } else if !flag("locked") {
+                ids.insert("open");
+            }
+        }
+        if t.key.is_some() && has("locked") {
+            ids.extend([lock_verb(id), "use"]);
+        }
+        for door in self.world.story.things.iter() {
+            let locks = self
+                .state
+                .facts
+                .contains_key(&format!("{}.locked", door.id));
+            if locks && door.key.as_ref().is_some_and(|k| k.as_str() == id) {
+                ids.extend([lock_verb(door.id.as_str()), "use"]);
+            }
+        }
+        if has("lit") {
+            ids.extend([if flag("lit") { "turn_off" } else { "turn_on" }, "use"]);
+        }
+        if self.world.dialogue_with(id).is_some() {
+            ids.insert("talk");
+        }
+        if !self.searchable(id).is_empty() {
+            ids.insert("search");
+        }
+        // A frame or rule for a verb the story does not have adds nothing.
+        ids.into_iter()
+            .filter_map(|v| self.world.verb(v).map(verb_info))
             .collect()
     }
 
@@ -2571,6 +2634,17 @@ impl Game {
                 say(turn, text);
             }
         }
+    }
+}
+
+fn verb_info(v: &loremaster_model::VerbDef) -> VerbInfo {
+    VerbInfo {
+        id: v.id.to_string(),
+        label: v.label.clone(),
+        words: v.words.clone(),
+        slots: v.slots,
+        preposition: v.preposition.clone(),
+        bar: v.bar,
     }
 }
 
