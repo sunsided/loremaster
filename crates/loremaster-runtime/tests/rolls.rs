@@ -206,8 +206,51 @@ fn reload_rolls_fresh_takes_the_hosts_randomness() {
         .collect();
     assert!(rolls.iter().all(|(reseeded, _)| *reseeded));
     assert!(rolls.iter().any(|(_, r)| *r != first), "{rolls:?}");
+    // The roll depends on the entropy, not only on the reseed.
+    let totals: std::collections::BTreeSet<_> = rolls.iter().map(|(_, r)| *r).collect();
+    assert!(totals.len() > 1, "{rolls:?}");
     // The same entropy gives the same roll: the game stays deterministic.
     assert_eq!(roll_after_load(&world, &save, 5), rolls[4]);
+    // `restore` of a snapshot reseeds the same way.
+    let mut s = Session::with_seed(world.clone(), 7);
+    s.start();
+    let snapshot = s.snapshot();
+    s.submit(Input::Text("pull lever".into()));
+    s.restore(&snapshot).unwrap();
+    assert!(s.reseed(5));
+    s.submit(Input::Text("pull lever".into()));
+    assert_eq!(fact(&s, "r"), rolls[4].1);
+}
+
+fn fresh_world() -> Arc<World> {
+    let story = load(files(&format!("{STAMINA}reload_rolls: fresh\n")))
+        .unwrap()
+        .story;
+    Arc::new(World::compile(story).unwrap())
+}
+
+#[test]
+fn switching_reload_rolls_does_not_change_the_story_of_a_save() {
+    let (save, _) = saved(&world());
+    let (_, loaded) = Session::load(fresh_world(), save).unwrap();
+    assert!(!loaded.story_changed);
+}
+
+#[test]
+fn a_story_header_writes_reload_rolls_only_when_fresh() {
+    let header = |extra: serde_json::Value| {
+        let mut json = serde_json::json!({ "title": "T", "start": "hall" });
+        json.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let header: loremaster_project::StoryHeader = serde_json::from_value(json).unwrap();
+        serde_json::to_value(header).unwrap()["reload_rolls"].clone()
+    };
+    assert_eq!(header(serde_json::json!({})), serde_json::Value::Null);
+    assert_eq!(
+        header(serde_json::json!({ "reload_rolls": "fresh" })),
+        serde_json::json!("fresh")
+    );
 }
 
 #[test]

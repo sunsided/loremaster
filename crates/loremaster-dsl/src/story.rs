@@ -77,6 +77,13 @@ impl<'a> StoryBuilder<'a> {
         self
     }
 
+    /// `reload_rolls: fresh`: after a load, the next roll is new when the
+    /// host reseeds (`Session::reseed`). Without it, `same`.
+    pub fn fresh_rolls(mut self) -> Self {
+        self.header().reload_rolls = loremaster_model::ReloadRolls::Fresh;
+        self
+    }
+
     /// `seed:`, for shuffled and sticky fragments.
     pub fn seed(mut self, seed: u64) -> Self {
         self.header().seed = seed;

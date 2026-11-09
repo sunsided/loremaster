@@ -99,6 +99,8 @@ pub struct Story {
     pub seed: Option<u64>,
     pub intro: Vec<Frag>,
     pub death_prompt: Option<bool>,
+    /// `reload_rolls: fresh` (true) or `same`.
+    pub fresh_rolls: Option<bool>,
     pub clock_start: Option<Text>,
     pub minutes_per_turn: Option<u16>,
     pub phases: Option<Vec<(Name, Text)>>,

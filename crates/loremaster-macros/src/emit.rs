@@ -261,6 +261,9 @@ fn story(st: &Story, vars: &[&Var], world: &World) -> TokenStream {
     if st.death_prompt == Some(false) {
         chain.extend(quote_spanned!(span=> .no_death_prompt()));
     }
+    if st.fresh_rolls == Some(true) {
+        chain.extend(quote_spanned!(span=> .fresh_rolls()));
+    }
     if let Some(t) = &st.clock_start {
         let t = text(t);
         chain.extend(quote_spanned!(span=> .clock_start(#t)));

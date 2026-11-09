@@ -389,8 +389,10 @@ impl Session {
     }
 
     /// A fresh roll after a load, for a story with `reload_rolls: fresh`:
-    /// mix `entropy` from the host (any random number) into the RNG. Call
-    /// it after `load`, `from_save` or `restore`. With `reload_rolls: same`
+    /// mix `entropy` from the host into the RNG. It must be a fresh,
+    /// unpredictable value on each load (for example from the OS or
+    /// `crypto.getRandomValues`): a constant replays the same roll on every
+    /// reload of a save. Call it after `load`, `from_save` or `restore`. With `reload_rolls: same`
     /// (strict, the default) it changes nothing, so the next roll is the
     /// one before the save. Returns whether it changed the RNG.
     pub fn reseed(&mut self, entropy: u64) -> bool {
@@ -398,8 +400,9 @@ impl Session {
             return false;
         }
         let state = self.game.state_mut();
-        let mut mixed = state.rng ^ entropy;
-        state.rng = crate::rng::next(&mut mixed);
+        // `rng` is the SplitMix64 state: mix the entropy in, then step it once.
+        state.rng ^= entropy;
+        crate::rng::next(&mut state.rng);
         true
     }
 

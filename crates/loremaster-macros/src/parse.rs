@@ -455,6 +455,7 @@ fn story(input: ParseStream) -> Result<Story> {
         seed: None,
         intro: Vec::new(),
         death_prompt: None,
+        fresh_rolls: None,
         clock_start: None,
         minutes_per_turn: None,
         phases: None,
@@ -492,13 +493,21 @@ fn story(input: ParseStream) -> Result<Story> {
                     "death_prompt" => {
                         story.death_prompt = Some(content.parse::<syn::LitBool>()?.value)
                     }
+                    "reload_rolls" => {
+                        let mode = name(&content)?;
+                        story.fresh_rolls = Some(match mode.value.as_str() {
+                            "same" => false,
+                            "fresh" => true,
+                            _ => return Err(Error::new(mode.span, "expected `same` or `fresh`")),
+                        });
+                    }
                     "relations" => story.relations = names(&content)?,
                     "score" => story.score = Some(int(&content)?),
                     "score_var" => story.score_var = Some(name(&content)?),
                     _ => {
                         return Err(Error::new(
                             field.span,
-                            "expected `author`, `start`, `seed`, `intro`, `death_prompt`, `relations`, `score`, `score_var`, `ranks` or `clock`",
+                            "expected `author`, `start`, `seed`, `intro`, `death_prompt`, `reload_rolls`, `relations`, `score`, `score_var`, `ranks` or `clock`",
                         ));
                     }
                 }

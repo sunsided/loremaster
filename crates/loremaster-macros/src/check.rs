@@ -720,6 +720,9 @@ fn story(p: &mut Pack, s: &Story, vars: &[&Var], world: &World, spans: &mut Span
     if s.death_prompt == Some(false) {
         b = b.no_death_prompt();
     }
+    if s.fresh_rolls == Some(true) {
+        b = b.fresh_rolls();
+    }
     if let Some(t) = &s.clock_start {
         b = b.clock_start(t.value.as_str());
     }

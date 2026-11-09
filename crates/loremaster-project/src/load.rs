@@ -119,7 +119,10 @@ pub struct StoryHeader {
     #[serde(default)]
     pub seed: u64,
     /// `same` (strict) or `fresh` (forgiving): the next roll after a load.
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "loremaster_model::ReloadRolls::is_same"
+    )]
     pub reload_rolls: loremaster_model::ReloadRolls,
     /// `false` turns off the death prompt (SE-9).
     #[serde(default = "yes")]

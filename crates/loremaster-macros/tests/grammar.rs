@@ -21,6 +21,7 @@ mod lock {
             seed: 11,
             intro: "You arrive at night.",
             death_prompt: false,
+            reload_rolls: fresh,
             clock { start: "22:30", minutes_per_turn: 5, phases { night "00:00", day "07:00" } },
         }
 
@@ -152,6 +153,7 @@ fn the_story_header_and_vars() {
     assert_eq!(h.start.as_str(), "chamber");
     assert_eq!(h.seed, 11);
     assert!(!h.death_prompt);
+    assert_eq!(h.reload_rolls, loremaster::dsl::model::ReloadRolls::Fresh);
     assert_eq!(h.clock.minutes_per_turn, 5);
     assert_eq!(h.clock.start, "22:30".parse().unwrap());
     assert_eq!(h.clock.phases.len(), 2);
