@@ -10,15 +10,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- The wildcard verb in rule events (#192): `on: { verb: ["*", darkness] }` matches any verb on the darkness, also for `check`. An exact-verb rule that fires in the same scope and phase holds the `*` rule back, so only its text shows. `loremaster check` accepts `*` in rules and refuses it in an agenda step's `do` and as the id of a story verb, and the explorer tries each verb that fits the objects. `CommandPattern::any_verb` and `ANY_VERB` are in `loremaster-model`. `world!` syntax waits for #220.
+- `ask <person> about <topic>` (#169): the parser fills the `topic` slot of the Command record with the words after `about`, without articles, and preview stops at `about`. A rule matches it with `on: { verb: ask, direct: bert, topic: lantern }`, and the explorer tries the topics that rules name. `loremaster check` reports a `topic:` that the parser never gives (`the lantern` for `lantern`); `topic_words` and `ARTICLES` in `loremaster-model` are the parser's form. `ask` and `show` (`show <thing> to <person>`, two objects) are custom verbs; `docs/writing-stories.md` has both. "He ran" and Hester's alibi in the Lock-Keeper demo wait for #216.
 - Combat (#190): in an all-at-once combat with more than one living enemy, the player selects the target ("Attack HOUND", `attack.hound`; `attack` is still the first living enemy). The enemy properties `deals` and `takes` are special rules of one enemy: the STAMINA a hit costs the player or the enemy, instead of 2; Luck shifts them as it shifts the 2, and `loremaster check` rejects a value that is not a number. With `set_host_rolls(true)`, the host answers the dice of a combat as `roll` awaits: one per enemy that fights, then the player, and one for "Test your Luck". A save while a round waits for its rolls keeps the totals so far.
 - **Breaking (library):** `CombatState` has the new fields `by`, `target` and `rolls`. Saves stay compatible: the fields default to empty.
 - `await`, `combat` and `stats` in `world!` and the builder (#191), so a story with rolls or fights does not need YAML. `world!` has the effects `await roll "2d6" into r against luck;`, `await choice [..] into ..;`, `await walk_to ..;`, `await action .. { .. } results [..] into ..;` and `combat [warden] win yard loss fallen escape road together;` (`escape` and `together` are optional), and `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }` in the story header. The builder has `Effects::awaits`, `Effects::combat` and `StoryBuilder::stat`, `stat_short` and `stat_max`. `AwaitSpec` now derives `Default`.
+- `Workbench::replay_step` (WASM `replayStep`) plays one step of a path from the state explorer, as a whole turn, or gives `None` when the game has no such step now. It reads each step as the explorer wrote it, with the rolls of a combat round as the walk forced them, and with host rolls and host walks off for the step, as in the walk. After the end of the story it gives `None`. Two answers with one text in a talk or a paused rule now have different labels in the explorer's paths (`say Yes.`, `say Yes. (2)`), so a path replays the answer it took.
+
+### Changed
+
+- The two-robot demo has its water clock: the timer `water` floods the station after eight turns, and its rule `river_wins` names `closes: [drained]`. The explorer needs more than the default budget for it now (#210).
+- The state explorer tells states apart only by the `once` rules that fired, not by every rule that ever fired: the game reads `fired` only to keep a `once` rule from firing again, so the results stay exact. A rule that only says a text no longer splits states. The id of the ending is in the key now, so two endings reached from one state stay two (before, the fired rules kept them apart). The explore output of the examples changes: lighthouse has 119 states instead of 287, and the Lock-Keeper demo 38,885 instead of about 60,000. The demo keeps its 15-minute turns; time bands wait for a decision (#239). (#168)
 
 ### Fixed
 
 - A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 - A condition with a character other than a letter outside the ASCII range, such as `€` or an emoji, made `loremaster check`, the editor and the engine loop for ever; now it is an error at that character (#186).
 - An `add` past the range of a whole number no longer stops the game (a debug build) or wraps round; the value stays at the largest or smallest number (#186).
+- The "Replay this path" buttons of the explorer in the web editor play `say`, `answer` and `leave` steps, and steps with a preposition or a topic, through `Workbench::replay_step`. Before, a path through a talk or a paused rule stopped working at that step (#163).
+- The state explorer tells states apart by the turns left of each timer. Before, an ending that a timer triggers was never reached, and the ending checks missed the points of no return that a timer makes (#210).
 
 ## [0.2.0] - 2026-11-09
 
