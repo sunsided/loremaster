@@ -84,8 +84,10 @@ impl Checker<'_> {
                     self.error(&header, &format!("{at}.args.{arg}"), format!("`{}.{arg}` would read the property `{arg}`, not the argument; rename it", e.id));
                 }
             }
-            // `event.arg` reads like `thing.prop`: an id that conditions
-            // already read another way would hide the arguments.
+            // Arguments are their own namespace in conditions, but `event.arg`
+            // reads like `thing.prop` and `room.visits`, a thing's facts share
+            // the key `id.prop`, and built-in paths come first: such an id
+            // would make one name mean two things.
             if self.story().thing(e.id.as_str()).is_some()
                 || self.story().var(e.id.as_str()).is_some()
                 || self.story().room(e.id.as_str()).is_some()

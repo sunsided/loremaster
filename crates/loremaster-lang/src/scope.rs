@@ -57,6 +57,9 @@ pub struct Scope {
     pub memories: BTreeSet<String>,
     /// Timer ids, for `timer.id`.
     pub timers: BTreeSet<String>,
+    /// Host event id to its arguments' types: `event.arg` reads the last
+    /// reported value. Not things: `present(event)` is unknown.
+    pub events: BTreeMap<String, BTreeMap<String, Ty>>,
     /// dramaturge ids for the player, the things and the memories. Built in
     /// story order, so the same story always gets the same numbers.
     pub symbols: SymbolTable,
@@ -82,7 +85,7 @@ impl Scope {
             })
             .collect();
         let rooms = story.rooms.iter().map(|r| r.id.to_string()).collect();
-        let mut things: BTreeMap<String, BTreeMap<String, Ty>> = story
+        let things = story
             .things
             .iter()
             .map(|t| {
@@ -94,11 +97,12 @@ impl Scope {
                 (t.id.to_string(), props)
             })
             .collect();
-        // Conditions read the last arguments of a host event as `event.arg`.
-        for e in story.interface.iter().flat_map(|i| &i.events) {
-            let args = e.args.iter().map(|(k, t)| (k.clone(), Ty::of_arg(t)));
-            things.entry(e.id.to_string()).or_default().extend(args);
-        }
+        let events = (story.interface.iter().flat_map(|i| &i.events))
+            .map(|e| {
+                let args = e.args.iter().map(|(k, t)| (k.clone(), Ty::of_arg(t)));
+                (e.id.to_string(), args.collect())
+            })
+            .collect();
         let phases = story
             .clock
             .phase_names()
@@ -142,6 +146,7 @@ impl Scope {
         let timers = story.timers.iter().map(|t| t.id.to_string()).collect();
         Self {
             timers,
+            events,
             vars,
             rooms,
             things,
@@ -168,6 +173,7 @@ impl Scope {
             .keys()
             .chain(self.rooms.iter())
             .chain(self.things.keys())
+            .chain(self.events.keys())
             .map(String::as_str)
     }
 

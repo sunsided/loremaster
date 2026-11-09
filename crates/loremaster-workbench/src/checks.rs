@@ -153,6 +153,16 @@ pub(crate) fn symbols(ins: Inspector<'_>) -> Vec<Symbol> {
             places,
         );
     }
+    for (event, args) in &scope.events {
+        for (arg, ty) in args {
+            add(
+                format!("{event}.{arg}"),
+                "argument",
+                format!("last argument of the host event {event}, {}", ty.describe()),
+                Vec::new(),
+            );
+        }
+    }
     for room in &rooms {
         add(
             format!("{room}.visits"),

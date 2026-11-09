@@ -470,3 +470,25 @@ fn an_event_step_is_done_only_by_its_event_with_its_args() {
     s.host_event("killed", report("ogre")).unwrap();
     assert_eq!(s.hints().len(), 1, "{:?}", s.hints());
 }
+
+#[test]
+fn an_event_is_no_thing() {
+    // Event arguments are their own namespace: thing reads on an event fail.
+    for read in [
+        "present(killed)",
+        "carried(killed)",
+        "seen_by(killed)",
+        "killed.present",
+        "killed.location == hall",
+    ] {
+        let rules =
+            format!("{RULES}- id: probe\n  on: start\n  when: \"{read}\"\n  then: [stop]\n");
+        let e = errors(&rules);
+        assert!(e.iter().any(|m| m.contains("killed")), "{read}: {e:?}");
+    }
+    let e = errors(&RULES.replace("{killed.boss}", "{killed.name}"));
+    assert!(e.iter().any(|m| m.contains("killed")), "{e:?}");
+    // A misspelt argument gets a hint to the declared one.
+    let e = errors(&RULES.replace("{killed.boss}", "{killed.bos}"));
+    assert!(e.iter().any(|m| m.contains("`killed.boss`")), "{e:?}");
+}
