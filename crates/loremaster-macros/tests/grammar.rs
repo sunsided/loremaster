@@ -780,12 +780,14 @@ fn threads_frames_names_and_the_score() {
             NameStage {
                 text: "iron rod".into(),
                 aliases: vec!["rod".into()],
+                head: None,
                 when: None,
                 proper: false,
             },
             NameStage {
                 text: "Poker".into(),
                 aliases: vec![],
+                head: None,
                 when: Some("poker.cleaned".into()),
                 proper: true,
             },

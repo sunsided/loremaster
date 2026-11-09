@@ -22,6 +22,7 @@ impl<'a> ThingBuilder<'a> {
             id,
             name,
             aliases: Vec::new(),
+            head: None,
             location: Location::Nowhere,
             portable: false,
             key: None,
@@ -51,6 +52,12 @@ impl<'a> ThingBuilder<'a> {
     /// More nouns for the parser.
     pub fn aliases(mut self, aliases: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
         self.thing().aliases.extend(strings(aliases));
+        self
+    }
+
+    /// `head`: the main word of the name for hosts, such as "bottle" for "bottle of wine".
+    pub fn head(mut self, head: impl Into<String>) -> Self {
+        self.thing().head = Some(head.into());
         self
     }
 

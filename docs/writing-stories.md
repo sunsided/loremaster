@@ -177,6 +177,21 @@ names:
 - Set `proper: true` for a proper name. A proper name gets no article.
 - The author tooltip shows all stages and the current stage.
 
+### The head noun
+
+A host that marks the main word of a name reads `ThingInfo::head`. It is the last word of the current name ("lamp" for "oil lamp", "Reed" for "Hester Reed"). Where the last word is wrong, set `head` on the thing, or on a name stage for that stage. It must be a word of the name or text, or a word of one of its aliases; `loremaster check` reports any other word. A blank `head` counts as none.
+
+```yaml
+# things/bottle.yaml
+name: bottle of wine
+head: bottle
+names:
+  - { when: bottle.empty, text: flask of nothing, head: flask }
+  - { when: bottle.broken, text: broken glass }
+```
+
+The `head` of the thing counts while no stage holds; a stage without `head` uses the last word of its text ("glass" for "broken glass"). The parser does not use `head`: it accepts every word of a name.
+
 ## Dialogues
 
 A dialogue is a talk with a thing, for example a character. Put it in `dialogues/<id>.yaml`. The player starts it with "Talk to" and the thing.

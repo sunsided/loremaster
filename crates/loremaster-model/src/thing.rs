@@ -64,6 +64,11 @@ pub struct Thing {
     /// Extra nouns the parser accepts for this thing.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// The main word of the name for hosts, such as "bottle" for "bottle of
+    /// wine": a word of the name or of an alias. Without it, the head is the
+    /// last word of the name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<String>,
     pub location: Location,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub portable: bool,
@@ -131,6 +136,9 @@ pub struct NameStage {
     /// Extra nouns for this stage.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// The main word of this stage's text, as [`Thing::head`] for the name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<String>,
     /// Condition source. A stage without a condition always applies.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
