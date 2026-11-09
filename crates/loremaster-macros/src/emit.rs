@@ -294,7 +294,8 @@ fn story(st: &Story, vars: &[&Var], world: &World) -> TokenStream {
             chain.extend(quote_spanned!(span=> .rank(#from, #rank)));
         }
     }
-    for (_, stat) in &st.stats {
+    for (at, stat) in &st.stats {
+        let span = at.span;
         let (var, label) = (s(&stat.var, span), s(&stat.label, span));
         chain.extend(quote_spanned!(span=> .stat(#var, #label)));
         if let Some(short) = &stat.short {

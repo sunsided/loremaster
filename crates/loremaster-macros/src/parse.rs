@@ -482,19 +482,23 @@ fn story(input: ParseStream) -> Result<Story> {
                         short: None,
                         max: None,
                     };
-                    if peek_kw(&list, "short") {
-                        name(&list)?;
-                        stat.short = Some(text(&list)?.value);
-                    }
-                    if peek_kw(&list, "max") {
-                        name(&list)?;
-                        stat.max = Some(if list.peek(LitInt) || list.peek(Token![-]) {
-                            loremaster_model::Limit::Value(int(&list)?)
+                    while let Some(key @ ("short" | "max")) = peek_word(&list).as_deref() {
+                        let at = name(&list)?.span;
+                        let taken = if key == "short" {
+                            stat.short.replace(text(&list)?.value).is_some()
                         } else {
-                            loremaster_model::Limit::Var(loremaster_model::Id::new(
-                                name(&list)?.value,
-                            ))
-                        });
+                            let max = if list.peek(LitInt) || list.peek(Token![-]) {
+                                loremaster_model::Limit::Value(int(&list)?)
+                            } else {
+                                loremaster_model::Limit::Var(loremaster_model::Id::new(
+                                    path(&list)?.value,
+                                ))
+                            };
+                            stat.max.replace(max).is_some()
+                        };
+                        if taken {
+                            return Err(Error::new(at, format!("`{key}` is given twice")));
+                        }
                     }
                     story.stats.push((var, stat));
                     if !list.is_empty() {
@@ -1697,14 +1701,19 @@ fn await_spec(input: ParseStream) -> Result<loremaster_model::AwaitSpec> {
                 let args;
                 braced!(args in input);
                 while !args.is_empty() {
-                    let arg = name(&args)?.value;
+                    let arg = name(&args)?;
                     args.parse::<Token![=]>()?;
                     let v = match value(&args)? {
                         Value::Bool(b) => loremaster_model::Value::Bool(b),
                         Value::Int(i) => loremaster_model::Value::Int(i),
                         Value::Text(t) => loremaster_model::Value::Text(t),
                     };
-                    spec.args.insert(arg, v);
+                    if spec.args.insert(arg.value.clone(), v).is_some() {
+                        return Err(Error::new(
+                            arg.span,
+                            format!("the argument `{}` is given twice", arg.value),
+                        ));
+                    }
                     if !args.is_empty() {
                         args.parse::<Token![,]>()?;
                     }
@@ -1725,13 +1734,17 @@ fn await_spec(input: ParseStream) -> Result<loremaster_model::AwaitSpec> {
             ));
         }
     }
-    if peek_kw(input, "into") {
-        name(input)?;
-        spec.into = Some(path(input)?.value);
-    }
-    if peek_kw(input, "against") {
-        name(input)?;
-        spec.against = Some(path(input)?.value);
+    while let Some(key @ ("into" | "against")) = peek_word(input).as_deref() {
+        let at = name(input)?.span;
+        let var = Some(path(input)?.value);
+        let slot = if key == "into" {
+            &mut spec.into
+        } else {
+            &mut spec.against
+        };
+        if std::mem::replace(slot, var).is_some() {
+            return Err(Error::new(at, format!("`{key}` is given twice")));
+        }
     }
     Ok(spec)
 }
@@ -1752,12 +1765,15 @@ fn combat(input: ParseStream) -> Result<loremaster_model::CombatSpec> {
                 together = true;
             }
             Some(w @ ("win" | "loss" | "escape")) => {
-                name(input)?;
+                let at = name(input)?.span;
                 let room = Some(Id::new(name(input)?.value));
-                match w {
-                    "win" => win = room,
-                    "loss" => loss = room,
-                    _ => escape = room,
+                let slot = match w {
+                    "win" => &mut win,
+                    "loss" => &mut loss,
+                    _ => &mut escape,
+                };
+                if std::mem::replace(slot, room).is_some() {
+                    return Err(Error::new(at, format!("`{w}` is given twice")));
                 }
             }
             _ => break,

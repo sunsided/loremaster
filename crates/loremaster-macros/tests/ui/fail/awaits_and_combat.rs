@@ -30,4 +30,39 @@ mod bad_dice {
     }
 }
 
+mod twice {
+    use loremaster::prelude::*;
+    world! {
+        story "Twice" { start: hall, stats { luck "LUCK" short "LK" short "L" } }
+        room hall "Hall" {}
+    }
+}
+
+mod twice_win {
+    use loremaster::prelude::*;
+    world! {
+        rule fight on turn {
+            combat [warden] win yard win hall loss fallen;
+        }
+    }
+}
+
+mod twice_arg {
+    use loremaster::prelude::*;
+    world! {
+        rule pick on turn {
+            await action pick_lock { difficulty = 3, difficulty = 4 };
+        }
+    }
+}
+
+mod twice_into {
+    use loremaster::prelude::*;
+    world! {
+        rule roll on turn {
+            await roll "2d6" into r into s;
+        }
+    }
+}
+
 fn main() {}

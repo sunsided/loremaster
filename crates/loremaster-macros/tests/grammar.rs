@@ -905,9 +905,10 @@ mod fight {
         story "Fight" {
             start: gate,
             stats {
-                stamina "STAMINA" short "ST" max stamina_initial,
+                stamina "STAMINA" max stamina_initial short "ST",
                 skill "SKILL" max 12,
                 luck "LUCK",
+                warden.skill "WARDEN" max warden.stamina,
             },
         }
         var skill = 9;
@@ -926,7 +927,7 @@ mod fight {
             prop stamina = 6;
         }
         rule test_luck on enter(gate) {
-            await roll "2d6" into r against luck;
+            await roll "2d6" against luck into r;
             await choice [left, right "the right door"] into path;
             combat [warden] win yard loss fallen escape road together;
         }
@@ -952,6 +953,7 @@ stats:
   - { var: stamina, label: STAMINA, short: ST, max: stamina_initial }
   - { var: skill, label: SKILL, max: 12 }
   - { var: luck, label: LUCK }
+  - { var: warden.skill, label: WARDEN, max: warden.stamina }
 "#;
 
 const FIGHT_RULES_YAML: &str = r#"
@@ -991,7 +993,9 @@ fn await_combat_and_stats_are_the_yaml_and_the_builder() {
         .stat_max("stamina", "stamina_initial")
         .stat("skill", "SKILL")
         .stat_max("skill", 12)
-        .stat("luck", "LUCK");
+        .stat("luck", "LUCK")
+        .stat("warden.skill", "WARDEN")
+        .stat_max("warden.skill", "warden.stamina");
     built
         .rule("test_luck", on::enter("gate"))
         .awaits(AwaitSpec {
@@ -1018,6 +1022,23 @@ fn await_combat_and_stats_are_the_yaml_and_the_builder() {
             escape: Some("road".into()),
             together: true,
         });
+    built
+        .rule("pick", on::enter("road"))
+        .awaits(AwaitSpec {
+            action: Some("pick_lock".into()),
+            args: [
+                ("difficulty".into(), Value::Int(3)),
+                ("loud".into(), Value::Bool(true)),
+            ]
+            .into(),
+            results: vec!["open".into(), "broken".into()],
+            into: Some("lock".into()),
+            ..Default::default()
+        })
+        .awaits(AwaitSpec {
+            walk_to: Some("yard".into()),
+            ..Default::default()
+        });
     let p = fight::pack();
     let stats = |p: &Pack| p.header.as_ref().unwrap().stats.clone();
     assert_eq!(stats(&p), stats(&yaml));
@@ -1025,6 +1046,7 @@ fn await_combat_and_stats_are_the_yaml_and_the_builder() {
     assert_eq!(p.rules[0].then, yaml.rules[0].then);
     assert_eq!(built.rules[0].then, yaml.rules[0].then);
     assert_eq!(p.rules[1].then, yaml.rules[1].then);
+    assert_eq!(built.rules[1].then, yaml.rules[1].then);
     // The pack builds: the runtime checks accept the awaits, the combat and the sheet.
     Loremaster::new().pack(p).build().unwrap();
 }
