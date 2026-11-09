@@ -1792,7 +1792,9 @@ impl Game {
             });
             self.state.fired.insert(rule.id.clone());
             out.instead |= rule.instead;
-            self.free |= rule.free;
+            // Only a rule on the command itself makes it free, not an
+            // enter, leave or custom event rule that the command sets off.
+            self.free |= rule.free && matches!(event, Event::Verb { .. });
             stepped.extend(rule.machine.as_ref());
             // A paused rule waits; the other rules of the event still run.
             if self.run_effects(turn, i, 0, depth + 1)

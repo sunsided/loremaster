@@ -85,6 +85,33 @@ fn a_free_rule_does_not_move_the_clock_or_the_timers() {
 }
 
 #[test]
+fn a_free_enter_rule_does_not_make_the_move_free() {
+    let rules = format!(
+        "{RULES}- id: hello\n  on: {{ enter: yard }}\n  free: true\n  then: [{{ say: \"A yard.\" }}]\n"
+    );
+    let mut files = files(&rules, None);
+    files[1].text =
+        "name: Hall\ndescription: [\"A hall.\"]\nexits:\n  - { direction: north, to: yard }\n"
+            .into();
+    files.push(SourceFile {
+        path: "rooms/yard.yaml".into(),
+        text: "name: Yard\ndescription: [\"A yard.\"]\n".into(),
+    });
+    let project = load(files).unwrap();
+    // `loremaster check` warns about it; the game ignores it.
+    assert!(
+        check(&project).iter().any(|d| d.at == "free"),
+        "{:#?}",
+        check(&project)
+    );
+    let mut game = Session::new(Arc::new(World::compile(project.story).unwrap()));
+    authoring::start(&mut game);
+    let turns = game.state().turns;
+    assert!(say(&mut game, "n").contains("A yard."));
+    assert_eq!(game.state().turns, turns + 1);
+}
+
+#[test]
 fn a_walkthrough_counts_a_free_command_as_no_turn() {
     // Three turns run the fuse out: the opening and two waits, not the refusals.
     let walk = "steps:\n  - open box\n  - open box\n  - open box\n  - open box\n  - wait\n  - { do: open box, see: already open }\nexpect: { ended: false }\n";
