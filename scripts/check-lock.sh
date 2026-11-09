@@ -29,9 +29,12 @@ registry = "registry+https://github.com/rust-lang/crates.io-index"
 
 
 def allows(req, version):
-    """Cargo's rule for `=x.y.z` (exact) and a plain `x.y` (caret)."""
+    """Cargo's rule for `=x.y.z[-pre]` (exact) and a plain `x[.y[.z]]`
+    (caret). Other forms raise `ValueError`."""
     version = version.split("+")[0]  # build metadata does not count
-    if not re.fullmatch(r"=?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?", req):
+    # `=x.y.z[-pre]` (exact) or `x[.y[.z]]` (caret); other forms raise.
+    pre = r"[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*"  # dot-separated, no empty part
+    if not re.fullmatch(rf"=\d+\.\d+\.\d+(-{pre})?|\d+(\.\d+){{0,2}}", req):
         raise ValueError(req)
     if req.startswith("="):
         return version == req[1:]
@@ -48,6 +51,13 @@ assert allows("0.3", "0.3.1") and allows("0.3", "0.3.0") and not allows("0.3", "
 assert not allows("0.3", "0.3.0-alpha.5") and allows("=0.3.0-alpha.5", "0.3.0-alpha.5")
 assert allows("1.2", "1.9.0") and not allows("1.2", "1.1.9") and not allows("1.2", "2.0.0")
 assert allows("0.3", "0.3.1+build")
+assert allows("=0.4.0-alpha-1", "0.4.0-alpha-1")
+for unsupported in ("=0.3", "0.3.0-alpha.5", ">=0.3.0", "~0.3", "*", "", "=0.3.0-", "=0.3.0-..", "=0.3.0-.5"):
+    try:
+        allows(unsupported, "0.3.0")
+    except ValueError:
+        continue
+    raise AssertionError(f"accepted {unsupported!r}")
 
 bad = False
 for crate in (
@@ -71,7 +81,7 @@ for crate in (
         try:
             ok = allows(want, p["version"])
         except ValueError:
-            print(f"error: check-lock.sh only reads `=x.y.z` and `x.y[.z]`; {crate} asks for {want!r}")
+            print(f"error: check-lock.sh only reads `=x.y.z[-pre]` and `x[.y[.z]]`; {crate} asks for {want!r}")
             bad = True
             continue
         if not ok:

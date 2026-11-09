@@ -10,10 +10,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- `await`, `combat` and `stats` in `world!` and the builder (#191), so a story with rolls or fights does not need YAML. `world!` has the effects `await roll "2d6" into r against luck;`, `await choice [..] into ..;`, `await walk_to ..;`, `await action .. { .. } results [..] into ..;` and `combat [warden] win yard loss fallen escape road together;` (`escape` and `together` are optional), and `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }` in the story header. The builder has `Effects::awaits`, `Effects::combat` and `StoryBuilder::stat`, `stat_short` and `stat_max`. `AwaitSpec` now derives `Default`.
 - `Workbench::replay_step` (WASM `replayStep`) plays one step of a path from the state explorer, as a whole turn, or gives `None` when the game has no such step now. It reads each step as the explorer wrote it, with the rolls of a combat round as the walk forced them.
 
 ### Fixed
 
+- A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 - The "Replay this path" buttons of the explorer in the web editor play `say`, `answer` and `leave` steps, and steps with a preposition or a topic, through `Workbench::replay_step`. Before, a path through a talk or a paused rule stopped working at that step (#163).
 
 ## [0.2.0] - 2026-11-09
