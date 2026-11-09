@@ -19,7 +19,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-version = "0.1.0"
+version = "0.2.0"
 license = "EUPL-1.2"
 authors = ["Markus Mayer"]
 repository = "https://github.com/sunsided/loremaster"
@@ -27,15 +27,15 @@ homepage = "https://sunsided.github.io/loremaster/"
 rust-version = "1.89"
 
 [workspace.dependencies]
-loremaster-dsl = { version = "0.1.0", path = "crates/loremaster-dsl" }
-loremaster-lang = { version = "0.1.0", path = "crates/loremaster-lang" }
-loremaster-macros = { version = "0.1.0", path = "crates/loremaster-macros" }
-loremaster-model = { version = "0.1.0", path = "crates/loremaster-model" }
-loremaster-project = { version = "0.1.0", path = "crates/loremaster-project" }
-loremaster-runtime = { version = "0.1.0", path = "crates/loremaster-runtime" }
-loremaster-tools = { version = "0.1.0", path = "crates/loremaster-tools" }
-loremaster-workbench = { version = "0.1.0", path = "crates/loremaster-workbench" }
-loremaster-mcp = { version = "0.1.0", path = "crates/loremaster-mcp" }
+loremaster-dsl = { version = "0.2.0", path = "crates/loremaster-dsl" }
+loremaster-lang = { version = "0.2.0", path = "crates/loremaster-lang" }
+loremaster-macros = { version = "0.2.0", path = "crates/loremaster-macros" }
+loremaster-model = { version = "0.2.0", path = "crates/loremaster-model" }
+loremaster-project = { version = "0.2.0", path = "crates/loremaster-project" }
+loremaster-runtime = { version = "0.2.0", path = "crates/loremaster-runtime" }
+loremaster-tools = { version = "0.2.0", path = "crates/loremaster-tools" }
+loremaster-workbench = { version = "0.2.0", path = "crates/loremaster-workbench" }
+loremaster-mcp = { version = "0.2.0", path = "crates/loremaster-mcp" }
 dramaturge-model = "0.3"
 dramaturge-runtime = "0.3"
 dramaturge-authoring = "0.3"

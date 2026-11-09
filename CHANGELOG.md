@@ -8,6 +8,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.0] - 2026-11-09
+
 ### Added
 
 - Scenes with hotspots and walks for stage hosts (P6-02, #96). A variant of a room's `illustration` has `regions`: `{ thing: iron_gate, rect: [31, 33, 38, 67] }` or `{ exit: north, rect: [..] }`, in percent of the image. `Session::media()` has the field `regions` with the hotspots the player can see now, each with its name. `Session::set_host_walks(true)` (WASM `setHostWalks`) makes a command on a thing in the room, or a move, first wait for `walk_to` with that `thing` or `exit`; `arrived` runs the command and `refused` drops it. Without it, nothing changes. `loremaster check` reports regions that point to nothing. The web player shows the hotspots as buttons over the illustration, and the gatehouse example has them.
@@ -138,5 +140,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - The public API of `loremaster-lang` and `loremaster-runtime` uses types from dramaturge 0.2. A new major version of dramaturge thus can also be a breaking change of loremaster.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/sunsided/loremaster/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/sunsided/loremaster/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/sunsided/loremaster/releases/tag/v0.2.0
 [0.1.0]: https://github.com/sunsided/loremaster/releases/tag/v0.1.0
