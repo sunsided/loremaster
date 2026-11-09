@@ -3,11 +3,10 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use loremaster_lang::{Scope, compile_markup, markup_tokens};
+use loremaster_lang::{compile_markup, markup_tokens};
 
 fuzz_target!(|src: &str| {
-    let scope = Scope::from_story(&loremaster_fuzz::lighthouse().story);
-    if let Err(e) = compile_markup(src, &scope) {
+    if let Err(e) = compile_markup(src, loremaster_fuzz::lighthouse_scope()) {
         assert!(src.get(e.span.clone()).is_some(), "{e:?}");
     }
     for t in markup_tokens(src) {

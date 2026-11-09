@@ -1,20 +1,13 @@
-//! Condition text, as in a `when`: parse, compile against the Lighthouse,
-//! and the editor tokens.
+//! Condition text, as in a `when`: compile against the Lighthouse (which
+//! parses it first), and the editor tokens.
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use loremaster_lang::{Scope, compile_condition, condition_tokens, parse_expr};
+use loremaster_lang::{compile_condition, condition_tokens};
 
 fuzz_target!(|src: &str| {
-    let scope = Scope::from_story(&loremaster_fuzz::lighthouse().story);
-    for span in [
-        parse_expr(src).err().map(|e| e.span),
-        compile_condition(src, &scope).err().map(|e| e.span),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        assert!(src.get(span.clone()).is_some(), "{span:?}");
+    if let Err(e) = compile_condition(src, loremaster_fuzz::lighthouse_scope()) {
+        assert!(src.get(e.span.clone()).is_some(), "{e:?}");
     }
     for t in condition_tokens(src) {
         assert!(src.get(t.span.clone()).is_some(), "{t:?}");

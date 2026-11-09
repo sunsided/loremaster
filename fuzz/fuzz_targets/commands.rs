@@ -1,6 +1,6 @@
 //! Player commands: each line of the input is one command in the Lighthouse
-//! (even input) or the Salt Tower (odd input), with undo and a save and load
-//! at the end.
+//! (even input) or the Salt Tower (odd input), with a save and load at the
+//! end. `undo` comes in as a typed command.
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

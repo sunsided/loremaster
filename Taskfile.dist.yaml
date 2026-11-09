@@ -83,7 +83,8 @@ tasks:
       TARGETS: '{{.TARGETS | default "save protocol mcp commands story_yaml condition markup dice_and_sums"}}'
     cmds:
       - for: { var: TARGETS }
-        cmd: mkdir -p corpus/{{.ITEM}} seeds/{{.ITEM}} && cargo +nightly fuzz run {{.ITEM}} corpus/{{.ITEM}} seeds/{{.ITEM}} -- -max_total_time={{.DURATION}} -timeout=10
+        # The seeds of a target, when it has any (fuzz/seeds/<target>/).
+        cmd: mkdir -p corpus/{{.ITEM}} && {{.CARGO}} +nightly fuzz run {{.ITEM}} corpus/{{.ITEM}} $(test -d seeds/{{.ITEM}} && echo seeds/{{.ITEM}}) -- -max_total_time={{.DURATION}} -timeout=10
 
   walkthroughs:
     desc: Run the walkthrough tests (tests/*.yaml) of every example

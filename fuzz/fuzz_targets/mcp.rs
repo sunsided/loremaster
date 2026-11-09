@@ -9,6 +9,16 @@ use loremaster_mcp::Server;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+/// Remove a folder. Only a missing one is fine: a leftover would leak into the next input.
+fn remove(dir: &Path) {
+    match std::fs::remove_dir_all(dir) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            panic!("cannot remove {}: {e}", dir.display())
+        }
+        _ => {}
+    }
+}
+
 fn copy(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
     for entry in std::fs::read_dir(from).unwrap() {
@@ -27,7 +37,7 @@ fn folder() -> &'static PathBuf {
     static DIR: OnceLock<PathBuf> = OnceLock::new();
     DIR.get_or_init(|| {
         let dir = std::env::temp_dir().join(format!("loremaster-fuzz-mcp-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        remove(&dir);
         copy(&loremaster_fuzz::example_dir("lighthouse"), &dir);
         dir
     })
@@ -35,8 +45,8 @@ fn folder() -> &'static PathBuf {
 
 fuzz_target!(|text: &str| {
     let dir = folder();
-    let _ = std::fs::remove_dir_all(dir.join(".loremaster"));
-    let mut server = Server::new(dir.clone()).unwrap();
+    remove(&dir.join(".loremaster"));
+    let mut server = Server::new(dir.clone()).expect("the copy of the Lighthouse reads");
     for line in text.lines().take(16) {
         server.handle_line(line);
     }

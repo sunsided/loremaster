@@ -164,7 +164,7 @@ The registry takes `Arc` and `Mutex` from loom when the crate is built with `--c
 
 ### Fuzzing
 
-The fuzz targets in `fuzz/` feed random input to the code that reads input from outside: no input may make it panic or hang. They use [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) and need a nightly toolchain, so `fuzz/` is a crate of its own, outside the workspace (its `Cargo.lock` is not committed).
+The fuzz targets in `fuzz/` feed random input to the code that reads input from outside: no input may make it panic or hang. They use [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) and need a nightly toolchain, so `fuzz/` is a crate of its own, outside the workspace. Its `Cargo.lock` is the root `Cargo.lock` plus the fuzz dependencies, so the targets build the versions that the tests use: after a change of the root lock, copy it to `fuzz/Cargo.lock` and run `cargo metadata --manifest-path fuzz/Cargo.toml --format-version 1 > /dev/null`.
 
 | Target | Input |
 | --- | --- |
