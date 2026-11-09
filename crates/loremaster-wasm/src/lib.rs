@@ -269,6 +269,12 @@ impl JsSession {
         to_js(&self.session.snapshot())
     }
 
+    /// After `load` or `restore`: mix the host's randomness into the RNG,
+    /// when the story has `reload_rolls: fresh`. Returns whether it did.
+    pub fn reseed(&mut self, entropy: u64) -> bool {
+        self.session.reseed(entropy)
+    }
+
     /// Put a snapshot back. Throws for a snapshot of another story.
     pub fn restore(&mut self, snapshot: JsValue) -> Result<JsValue, JsValue> {
         let snapshot: Snapshot = from_js(snapshot)?;
@@ -312,6 +318,12 @@ impl JsSession {
 
     pub fn scene(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.scene())
+    }
+
+    /// The value of one fact now: a variable (`gold`), a property
+    /// (`lamp.lit`) or a machine's state (`lock`); null when it is not set.
+    pub fn fact(&self, name: &str) -> Result<JsValue, JsValue> {
+        or_null(self.session.fact(name))
     }
 
     /// The quest journal: open quests first, then finished ones.
@@ -467,6 +479,11 @@ impl JsWorkbench {
         to_js(&self.bench.session().scene())
     }
 
+    /// The value of one fact now, or null; see `Session.fact`.
+    pub fn fact(&self, name: &str) -> Result<JsValue, JsValue> {
+        or_null(self.bench.session().fact(name))
+    }
+
     /// The quest journal of the session.
     pub fn journal(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().journal())
@@ -513,6 +530,12 @@ impl JsWorkbench {
         self.bench = Workbench::from_session(session);
         self.bench.set_walkthroughs(self.walkthroughs.clone());
         Ok(loaded)
+    }
+
+    /// After `load`: mix the host's randomness into the RNG, when the story
+    /// has `reload_rolls: fresh`. Returns whether it did.
+    pub fn reseed(&mut self, entropy: u64) -> bool {
+        self.bench.session_mut().reseed(entropy)
     }
 
     /// Continue the game of a workbench with an earlier version of the story, after an edit.

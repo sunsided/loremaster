@@ -109,6 +109,11 @@ export function markupTokens(text: string, condition: boolean): { from: number; 
 	return wasmMarkupTokens(text, condition);
 }
 
+/** Fresh randomness for `reseed`: a story with `reload_rolls: fresh` rolls anew after a load. */
+function entropy(): bigint {
+	return crypto.getRandomValues(new BigUint64Array(1))[0];
+}
+
 /** Build an engine object from project files; turn the thrown diagnostics into a `ProjectError`. */
 async function build<T>(make: () => T): Promise<T> {
 	await loadEngine();
@@ -198,7 +203,9 @@ export class Session {
 
 	/** Put a snapshot back. Throws for a snapshot of another story. */
 	restore(snapshot: Snapshot): Step {
-		return this.#session.restore(snapshot);
+		const step = this.#session.restore(snapshot);
+		this.#session.reseed(entropy());
+		return step;
 	}
 
 	/** The save state, as JSON-compatible data. */
@@ -208,7 +215,9 @@ export class Session {
 
 	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
 	load(save: unknown): Loaded {
-		return this.#session.load(save);
+		const loaded = this.#session.load(save);
+		this.#session.reseed(entropy());
+		return loaded;
 	}
 
 	/** What the session waits for now. */
@@ -218,6 +227,11 @@ export class Session {
 
 	scene(): Scene {
 		return this.#session.scene();
+	}
+
+	/** The value of one fact now (a variable, a property or a machine's state), or null. */
+	fact(name: string): Value | null {
+		return this.#session.fact(name);
 	}
 
 	/** The quest journal: open quests first, then finished ones. */
@@ -356,6 +370,11 @@ export class Workbench {
 		return this.#bench.scene();
 	}
 
+	/** The value of one fact now (a variable, a property or a machine's state), or null. */
+	fact(name: string): Value | null {
+		return this.#bench.fact(name);
+	}
+
 	/** The quest journal of the session. */
 	journal(): JournalEntry[] {
 		return this.#bench.journal();
@@ -411,7 +430,9 @@ export class Workbench {
 
 	/** Continue from a save, also one from an earlier version of the story. Throws when the save cannot be read. */
 	load(save: unknown): Loaded {
-		return this.#bench.load(save);
+		const loaded = this.#bench.load(save);
+		this.#bench.reseed(entropy());
+		return loaded;
 	}
 
 	/** Continue the game of an earlier version of the story in this one. Values still at their start value take the new start value. */

@@ -465,7 +465,7 @@ With the section, `loremaster check` fails when:
 - an action with two or more results has no `into`, or no condition or text names `into` and a result (`lock == broken_pick`). Each result needs a branch;
 - a rule listens for an event that nothing emits and that is not declared, or emits one that no rule hears and that is not declared. An event that the story both emits and hears is its own and needs no declaration.
 
-Rules hear a host event with `on: { event: killed }`. Its arguments read as `killed.boss`: the last reported value. The host reports it with `Session::host_event`. The session refuses an undeclared event, a wrong argument, a false `when`, and an event while a rule waits. An event is not a turn: the clock does not move.
+Rules hear a host event with `on: { event: killed }`. Its arguments read as `killed.boss`: the last reported value. An event is no thing: `present(killed)` or `killed.name` is an error, and so is an argument the event does not declare. The host reports it with `Session::host_event`. The session refuses an undeclared event, a wrong argument, a false `when`, and an event while a rule waits. An event is not a turn: the clock does not move.
 
 `Session::for_host` refuses to start when the host was built for another interface: the message names the added, removed and changed entries. In a walkthrough, an `await` of an action takes only a declared result, by name, and a step `{ event: killed, args: { boss: ogre } }` reports an event. A step has `do` or `event`, not both.
 
@@ -810,7 +810,7 @@ props: { active: true }
 - The active actor is the player's body: `State.room`, the carried things and the default actions are its own. The active actor is not listed in the room. The things another playable actor carries are `in` it, so they are out of reach and do not count for `carried`.
 - `seen_by(bilge)` shows text only to Bilge. The perceiver of a text is the active actor.
 - `bilge.active` is true while the player steers Bilge, for rule conditions. Declare it as a property to use it in a rule.
-- An order to another actor: `bilge, take spanner` or `bilge, s then turn port wheel`, or a `Command` record with `actor: bilge`. An order takes the player's turn; each step then runs in one turn, after the agendas, as that actor. The player reads what the actor perceives as it acts, and the actor reports when it is done. A new order replaces the old one. A switch to the actor cancels its orders. A step that the parser cannot read ends the order.
+- An order to another actor: `bilge, take spanner` or `bilge, s then turn port wheel`, or a `Command` record with `actor: bilge`. An order takes the player's turn; each step then runs in one turn, after the agendas, as that actor. The player reads what the actor perceives as it acts, and the actor reports when it is done. A new order replaces the old one. A switch to the actor cancels its orders. A step that the parser cannot read ends the order. A step is the player's action, as after a switch: the rules for the player fire, with `bilge.active` true, and the step counts in `action.*`, `.interactions` and `.talked`. A `once` rule or text that the step uses is used up for the player as well, because the player read it. A rule cannot name a playable actor as its `actor`; declare `active` in its `props` and test `bilge.active` in `when`.
 - `loremaster check` wants each playable actor in a room, `container: true`, not `portable`, and without an agenda.
 
 The active actor is in the save (`State.active`, `State.orders`). The state explorer tries a `switch`, but not orders: they reach the same states. Read `examples/two-robots`.
@@ -1239,6 +1239,13 @@ A save game keeps the state of a game, together with the version of its format a
 - The save keeps what each actor has done of its agenda. A step that the story no longer has is dropped, for example `agenda:keeper#1`. A save from before agendas (version 1) starts each agenda at its first step.
 
 Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
+
+The save keeps the state of the RNG. `reload_rolls` in story.yaml decides what the next roll gives after the player loads a save:
+
+- `same` (strict, the default): the roll from before the save. The player cannot reload for a better roll.
+- `fresh` (forgiving): a new roll. The host calls `Session::reseed` after `load`, `from_save` or `restore`, with a fresh, unpredictable value for each load; a constant value gives the same roll on each reload. The web engine wrapper (`web/src/lib/engine`) and the terminal host do this.
+
+`loremaster new` writes `reload_rolls: same` into story.yaml, so that the author decides. The setting is not part of the story's fingerprint in the save: switching it does not make old saves look like saves of a changed story.
 
 ## Episodes
 

@@ -544,7 +544,18 @@ fn is_empty_story(files: &[loremaster_project::SourceFile]) -> bool {
     };
     let mut fresh = loremaster_project::scaffold(&project.story.title);
     fresh.sort_by(|a, b| a.path.cmp(&b.path));
-    fresh == files
+    // A story from an older scaffold has no `reload_rolls` lines yet.
+    let older: Vec<_> = (fresh.iter().cloned())
+        .map(|mut f| {
+            if f.path == "story.yaml" {
+                f.text = f
+                    .text
+                    .replace(loremaster_project::SCAFFOLD_RELOAD_ROLLS, "");
+            }
+            f
+        })
+        .collect();
+    fresh == files || older == files
 }
 
 /// The project files in a fixed order, so that two reads of an unchanged folder compare equal.
@@ -609,6 +620,18 @@ mod tests {
         assert!(story.contains("\"Second\""), "{story}");
         std::fs::write(dir.join("rooms/start.yaml"), "name: Changed\n").unwrap();
         assert!(matches!(s.bootstrap("Third"), Err(Refusal::Conflict(_))));
+    }
+
+    #[test]
+    fn a_new_story_of_the_older_scaffold_can_start_again() {
+        let dir = empty_folder("bootstrap-old");
+        let mut s = Server::new(dir.clone()).unwrap();
+        s.bootstrap("First").unwrap();
+        let story = std::fs::read_to_string(dir.join("story.yaml")).unwrap();
+        let older = story.replace(loremaster_project::SCAFFOLD_RELOAD_ROLLS, "");
+        assert_ne!(older, story);
+        std::fs::write(dir.join("story.yaml"), older).unwrap();
+        s.bootstrap("Second").unwrap();
     }
 
     #[test]

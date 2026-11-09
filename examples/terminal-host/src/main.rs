@@ -257,6 +257,7 @@ fn show(step: &Step) {
 fn show_block(block: &Block) {
     let mut text = String::new();
     let mut speaker = None;
+    let mut emphasis = false;
     for run in &block.runs {
         // Runs of speech name their speaker. The text has the quotes already.
         if run.speaker.is_some() && run.speaker != speaker {
@@ -264,7 +265,16 @@ fn show_block(block: &Block) {
         }
         // Narration between two lines of one speaker names the speaker again.
         speaker.clone_from(&run.speaker);
+        // A plain terminal has no italics: emphasis keeps its stars, one
+        // pair for runs that a link split.
+        if run.emphasis != emphasis {
+            text.push('*');
+            emphasis = run.emphasis;
+        }
         text.push_str(&run.text);
+    }
+    if emphasis {
+        text.push('*');
     }
     match block.kind {
         // The echo of the player's own line: the terminal has it already.
@@ -300,5 +310,11 @@ fn restore_file(world: Arc<World>, own_dice: bool, file: &str) -> Result<(Sessio
     // `load` returns no step. Restoring its own state shows the room, without a turn.
     let snapshot = session.snapshot();
     let step = session.restore(&snapshot).map_err(|e| e.to_string())?;
+    // A story with `reload_rolls: fresh` rolls anew after a load. The value must be
+    // fresh and unpredictable on each load; `RandomState` has new OS-seeded keys each time.
+    session.reseed(std::hash::BuildHasher::hash_one(
+        &std::collections::hash_map::RandomState::new(),
+        0,
+    ));
     Ok((session, step))
 }

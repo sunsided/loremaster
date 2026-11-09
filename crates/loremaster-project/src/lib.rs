@@ -47,7 +47,7 @@ pub use origin::Origin;
 pub use quality::{
     Deferred, Finding, PuzzleWidth, QualityCheck, QualityReport, VerbCoverage, quality,
 };
-pub use scaffold::{START_TEXT, scaffold};
+pub use scaffold::{SCAFFOLD_RELOAD_ROLLS, START_TEXT, scaffold};
 
 #[cfg(not(target_family = "wasm"))]
 pub use load::{missing_asset_files, read_dir};

@@ -388,6 +388,24 @@ impl Session {
         Ok(self.step(turn))
     }
 
+    /// A fresh roll after a load, for a story with `reload_rolls: fresh`:
+    /// mix `entropy` from the host into the RNG. It must be a fresh,
+    /// unpredictable value on each load (for example from the OS or
+    /// `crypto.getRandomValues`): a constant replays the same roll on every
+    /// reload of a save. Call it after `load`, `from_save` or `restore`. With `reload_rolls: same`
+    /// (strict, the default) it changes nothing, so the next roll is the
+    /// one before the save. Returns whether it changed the RNG.
+    pub fn reseed(&mut self, entropy: u64) -> bool {
+        if self.game.world().story.reload_rolls.is_same() {
+            return false;
+        }
+        let state = self.game.state_mut();
+        // `rng` is the SplitMix64 state: mix the entropy in, then step it once.
+        state.rng ^= entropy;
+        crate::rng::next(&mut state.rng);
+        true
+    }
+
     /// Start the story again with the seed of this session. `undo` can go
     /// back to the state before it.
     pub fn restart(&mut self) -> Step {
@@ -592,7 +610,9 @@ impl Session {
         }
     }
 
-    fn step(&self, turn: Turn) -> Step {
+    fn step(&self, mut turn: Turn) -> Step {
+        // The session's own blocks (the journal, notes) did not go through the game.
+        crate::output::split_emphasis(&mut turn.blocks);
         let mut effects: Vec<Effect> = turn
             .blocks
             .into_iter()

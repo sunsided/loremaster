@@ -22,6 +22,8 @@ export interface Run {
 	link?: Link;
 	/** Who speaks the run, when it is speech: a thing id or `player`. The text has its quotes already. */
 	speaker?: string;
+	/** The story marks the run as emphasis (`*Kestrel*`); the text has no stars. Show it in italics. */
+	emphasis?: boolean;
 }
 
 export type BlockKind =
@@ -230,6 +232,8 @@ export interface OutlineOption {
 export interface ThingInfo {
 	id: string;
 	name: string;
+	/** The thing's aliases and the names and aliases of earlier name stages, lowercased. The parser also takes single words of `name`. Absent when there are none. */
+	aliases?: string[];
 }
 
 export interface ExitInfo {
@@ -250,7 +254,10 @@ export interface JournalEntry {
 export interface Scene {
 	room: string;
 	room_name: string;
+	/** The time of day, `HH:MM`. */
 	time: string;
+	/** Minutes since midnight of day 1; the time of day is `minutes % 1440`. */
+	minutes: number;
 	phase: string;
 	day: number;
 	turns: number;
