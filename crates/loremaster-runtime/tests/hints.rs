@@ -194,11 +194,25 @@ fn a_command_the_player_saw_stays_shown_after_a_reload() {
 #[test]
 fn a_step_that_is_gone_forgets_its_level() {
     let mut s = on_the_long_ladder(2);
-    let (world, _) = world_with(SHORT_LADDER);
-    s.reload(world, &[]).unwrap();
+    let (world, walks) = world_with("steps:\n  - { id: go, do: n, hints: [\"North.\"] }\n");
+    s.reload(world, &walks).unwrap();
     let (world, walks) = world_with(SHORT_LADDER);
     s.reload(world, &walks).unwrap();
     assert!(s.hints().remove(0).shown.is_empty());
+}
+
+#[test]
+fn a_reload_without_walkthroughs_keeps_the_hint_progress() {
+    let mut s = on_the_long_ladder(2);
+    assert!(s.state().steps_done.contains("go"));
+    let (world, walks) = world_with(LONG_LADDER);
+    let reloaded = s.reload(world.clone(), &[]).unwrap();
+    assert!(reloaded.dropped.is_empty(), "{:?}", reloaded.dropped);
+    assert!(s.state().steps_done.contains("go"));
+    assert!(s.hints().is_empty());
+    // When the walkthroughs come back, so does what the player saw.
+    s.reload(world, &walks).unwrap();
+    assert_eq!(s.hints().remove(0).shown.len(), 2);
 }
 
 #[test]

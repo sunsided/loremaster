@@ -134,7 +134,8 @@ pub struct Loaded {
 #[non_exhaustive]
 pub struct Reloaded {
     /// What the new world no longer has, sorted, in the keys of
-    /// [`Loaded::dropped`], for example `fact:lamp.lit` or `thing:key`.
+    /// [`Loaded::dropped`], for example `fact:lamp.lit` or `thing:key`, and
+    /// `step:…` for a done walkthrough step that the new hint book lacks.
     pub dropped: Vec<String>,
 }
 
@@ -240,6 +241,9 @@ impl Session {
     /// Continue this game in a changed world, for example after an edit of
     /// the story files (SE-14): live reload in a dev build. Pass the
     /// walkthroughs of the new story; the hint book is built again from them.
+    /// With no walkthroughs (`&[]`), or none with hint steps, the book is empty
+    /// and there is no ladder to compare against: the done steps and revealed
+    /// levels stay as they are, and none is listed as dropped.
     ///
     /// The caller passes a rebuilt version of the same story. Unlike a save,
     /// a reload does not compare the story id: the id is a slug of the title,
@@ -282,11 +286,8 @@ impl Session {
                 .compare(built_for)
                 .map_err(ReloadError::InterfaceChanged)?;
         }
-        let (next, mut dropped) = self.carried_over(world);
+        let (next, dropped) = self.carried_over_with(world, walkthroughs);
         *self = next;
-        // The hint book plays the walkthroughs in its world: build it again.
-        self.rebuild_hints(walkthroughs, &mut dropped);
-        dropped.sort();
         Ok(Reloaded { dropped })
     }
 
