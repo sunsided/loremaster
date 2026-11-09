@@ -107,8 +107,9 @@ jobs:
             || { echo "error: could not resolve dramaturge main (got '$rev')"; exit 1; }
           version=$(curl -fsSL "https://raw.githubusercontent.com/sunsided/dramaturge/$rev/Cargo.toml" \
             | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1)
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] \
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] \
             || { echo "error: could not read the dramaturge version at $rev (got '$version')"; exit 1; }
+          version=${version%%+*}  # build metadata does not take part in matching
           echo "dramaturge main: $rev, version $version"
           sed -i -E "s/^(dramaturge-[a-z]+ = (\\{ version = )?)\"[^\"]+\"/\\1\"=$version\"/" Cargo.toml
           mkdir -p .cargo
