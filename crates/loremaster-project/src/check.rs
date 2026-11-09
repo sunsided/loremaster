@@ -706,6 +706,13 @@ impl Checker<'_> {
             if !seen.insert(rule.id.as_str()) && reported.insert(rule.id.as_str()) {
                 self.error(&file, "id", format!("rule `{}` is defined twice", rule.id));
             }
+            if rule.free && !matches!(rule.on, EventPattern::Verb(_) | EventPattern::Check(_)) {
+                self.warning(
+                    &file,
+                    "free",
+                    "`free` works only for a `verb` or `check` rule: other events are no command",
+                );
+            }
             self.closes(
                 &file,
                 "",

@@ -10,6 +10,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Free rules (#223): `free: true` on a `verb` or `check` rule lets the player's command that fires it take no time: no clock, no turn count, no timers, no agendas, as for a command the game refuses. For a refusal that changes nothing ("It is already open."); default refusals still take a turn. Walkthroughs and the explorer play it as the game does. `loremaster check` warns about `free` on another event. `world!` writes `free` after the event, the builder `.free()`.
+- **Breaking (library):** `Rule` has the new field `free`; code that builds it with a struct literal needs it.
 - `world!` writes the wildcard verb bare (#220): `rule grope on verb(*, darkness) { .. }` and `on check(*)`, the same as `on::verb(["*", "darkness"])` in the builder. `*` goes only in the verb place.
 - Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening, the turn passing (`on: turn`, timers, time rules, agendas, orders) and the rules of a host event. A graphical host can draw the player's own text over the player and the rest as ambient narration.
 - `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Like `snapshot`, it sees everything, also concealed things. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.
