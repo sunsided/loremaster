@@ -710,7 +710,7 @@ impl Checker<'_> {
                 self.warning(
                     &file,
                     "free",
-                    "`free` works only for a `verb` or `check` rule: other events are no command",
+                    "`free` works only for a `verb` or `check` rule: other events are not commands",
                 );
             }
             self.closes(
