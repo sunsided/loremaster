@@ -44,6 +44,8 @@ mod convert;
 mod dialogue;
 mod ending;
 mod fragment;
+#[cfg(not(target_family = "wasm"))]
+mod live;
 mod loremaster;
 mod machine;
 mod pack;
@@ -61,6 +63,8 @@ pub use convert::{IntoDirection, IntoStates, IntoTime, IntoValue, IntoVarValue};
 pub use dialogue::DialogueBuilder;
 pub use ending::EndingBuilder;
 pub use fragment::{FragmentExt, IntoFragment, frag, variants};
+#[cfg(not(target_family = "wasm"))]
+pub use live::{LiveStory, Rebuilt};
 pub use loremaster::Loremaster;
 pub use machine::MachineBuilder;
 pub use pack::{BuildPack, HasFrames, HasNotes};
@@ -85,6 +89,8 @@ pub mod prelude {
         IntoStates, IntoTime, IntoValue, IntoVarValue, Loremaster, Origin, Pack, frag, on,
         variants,
     };
+    #[cfg(not(target_family = "wasm"))]
+    pub use crate::{LiveStory, Rebuilt};
     pub use loremaster_model::{
         AwaitOption, AwaitSpec, CombatSpec, CommandPattern, Direction, Effect, EndingKind,
         EventPattern, Fragment, FragmentMode, Layer, NameStage, Note, NoteRole, States,

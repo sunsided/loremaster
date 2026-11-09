@@ -40,7 +40,9 @@ pub struct Loremaster {
 #[derive(Debug, Clone)]
 enum Source {
     Pack(Box<Pack>),
-    Files(Vec<SourceFile>),
+    /// The files, and the path that stands for the folder when there is
+    /// more than one YAML source (`yaml<n>` when `None`).
+    Files(Vec<SourceFile>, Option<String>),
     #[cfg(not(target_family = "wasm"))]
     Dir(std::path::PathBuf),
 }
@@ -68,7 +70,7 @@ impl Loremaster {
     /// The files of a YAML folder, already in memory (for the browser, or
     /// `include_str!`). Paths use `/` and are relative to the folder.
     pub fn yaml_files(mut self, files: Vec<SourceFile>) -> Self {
-        self.sources.push(Source::Files(files));
+        self.sources.push(Source::Files(files, None));
         self
     }
 
@@ -161,11 +163,10 @@ impl Loremaster {
                     packs.push(*pack);
                     continue;
                 }
-                Source::Files(files) => (files, format!("yaml{n}")),
+                Source::Files(files, root) => (files, root.unwrap_or_else(|| format!("yaml{n}"))),
                 #[cfg(not(target_family = "wasm"))]
                 Source::Dir(dir) => {
-                    let root = dir.display().to_string().replace('\\', "/");
-                    let root = root.trim_end_matches('/').to_string();
+                    let root = dir_root(&dir);
                     match loremaster_project::read_dir(&dir) {
                         Ok(files) => (files, root),
                         Err(e) => {
@@ -250,7 +251,45 @@ impl Loremaster {
         }
     }
 
-    fn built(self) -> Result<(World, Project, Vec<Diagnostic>), Vec<Diagnostic>> {
+    /// The files of each YAML folder, read now and sorted by path, in source
+    /// order. An unreadable folder gives its error text, so a fix shows as a
+    /// change.
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) fn read_dirs(&self) -> Vec<Result<Vec<SourceFile>, String>> {
+        self.sources
+            .iter()
+            .filter_map(|s| match s {
+                Source::Dir(dir) => Some(
+                    loremaster_project::read_dir(dir)
+                        .map(|mut files| {
+                            files.sort_by(|a, b| a.path.cmp(&b.path));
+                            files
+                        })
+                        .map_err(|e| e.to_string()),
+                ),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// A copy that builds from `read` ([`read_dirs`](Self::read_dirs)) with
+    /// the same paths as from the folders. A folder that could not be read
+    /// stays a folder, so that the build reports it.
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) fn with_read_dirs(&self, read: &[Result<Vec<SourceFile>, String>]) -> Self {
+        let mut copy = self.clone();
+        let mut read = read.iter();
+        for source in &mut copy.sources {
+            if let Source::Dir(dir) = source
+                && let Some(Ok(files)) = read.next()
+            {
+                *source = Source::Files(files.clone(), Some(dir_root(dir)));
+            }
+        }
+        copy
+    }
+
+    pub(crate) fn built(self) -> Result<(World, Project, Vec<Diagnostic>), Vec<Diagnostic>> {
         let behaviors: Vec<Arc<dyn Behavior>> = self
             .sources
             .iter()
@@ -295,6 +334,13 @@ fn list(found: &[Diagnostic]) -> String {
         .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// The path that stands for a YAML folder in the paths of its files.
+#[cfg(not(target_family = "wasm"))]
+fn dir_root(dir: &std::path::Path) -> String {
+    let root = dir.display().to_string().replace('\\', "/");
+    root.trim_end_matches('/').to_string()
 }
 
 /// Start each path of a YAML pack with `prefix`.
