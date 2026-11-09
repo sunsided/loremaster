@@ -250,7 +250,22 @@ impl Loremaster {
         }
     }
 
-    fn built(self) -> Result<(World, Project, Vec<Diagnostic>), Vec<Diagnostic>> {
+    /// The files of each YAML folder, read now, in source order. An
+    /// unreadable folder gives its error text, so a fix shows as a change.
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) fn read_dirs(&self) -> Vec<Result<Vec<SourceFile>, String>> {
+        self.sources
+            .iter()
+            .filter_map(|s| match s {
+                Source::Dir(dir) => {
+                    Some(loremaster_project::read_dir(dir).map_err(|e| e.to_string()))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub(crate) fn built(self) -> Result<(World, Project, Vec<Diagnostic>), Vec<Diagnostic>> {
         let behaviors: Vec<Arc<dyn Behavior>> = self
             .sources
             .iter()

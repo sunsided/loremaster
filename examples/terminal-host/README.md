@@ -91,3 +91,32 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
    Then call `Session::reseed` with a fresh, unpredictable number: for a story with
    `reload_rolls: fresh` the next roll is new; for `same` it changes nothing.
    `snapshot` and `restore` also keep a state in memory.
+
+## Live reload in dev builds
+
+A native host can rebuild the world when the author saves a YAML file.
+`loremaster_dsl::LiveStory` wraps the `Loremaster` builder; `behaviors(..)`
+registers the host's Rust behaviors on each new world, as `session_with`
+does. Poll it from the host loop, for example twice a second, and hand a new
+world to the running session with `Session::reload`:
+
+```rust
+let mut live = LiveStory::new(Loremaster::new().yaml("story/"))
+    .behaviors(|world| { world.register(MyBehavior); });
+
+// In the loop:
+if let Some(r) = live.poll() {
+    match r {
+        Ok(b) => {
+            let rep = session.reload(b.world, &b.walkthroughs)?;
+            /* refresh views */
+        }
+        Err(d) => { /* show d, keep playing */ }
+    }
+}
+```
+
+`poll` gives `None` when no file changed. A broken change reports its
+diagnostics once, and the session keeps the old world until a fix builds.
+Release and web builds load the story as before (`LiveStory` is not on
+`wasm32`).

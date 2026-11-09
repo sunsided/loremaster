@@ -8,6 +8,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- `LiveStory` in `loremaster-dsl` (native only): live reload in dev builds. `poll()` re-reads the YAML folders of a `Loremaster` builder and, when a file changed, builds a new world with the Rust-pack behaviors and the host's `behaviors(..)` registered. It returns `Rebuilt { world, walkthroughs, warnings }`, or the diagnostics once per broken change; `None` when nothing changed.
+
 ## [0.3.0] - 2026-11-09
 
 ### Upgrading from 0.2
