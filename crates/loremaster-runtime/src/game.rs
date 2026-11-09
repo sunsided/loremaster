@@ -1902,7 +1902,7 @@ impl Game {
             CompiledEffect::Add(values) => {
                 for (k, n) in values {
                     let cur = self.state.facts.get(k).and_then(Value::as_int).unwrap_or(0);
-                    self.set_fact(turn, k, Value::Int(cur + n));
+                    self.set_fact(turn, k, Value::Int(cur.saturating_add(*n)));
                 }
             }
             CompiledEffect::Calc(sums) => {

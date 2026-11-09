@@ -8,6 +8,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Fixed
+
+- A condition with a character other than a letter outside the ASCII range, such as `€` or an emoji, made `loremaster check`, the editor and the engine loop for ever; now it is an error at that character (#186).
+- An `add` past the range of a whole number no longer stops the game (a debug build) or wraps round; the value stays at the largest or smallest number (#186).
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

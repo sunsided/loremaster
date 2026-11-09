@@ -3,14 +3,22 @@
 //! not hang or panic, replays the same way, survives a save, and keeps its
 //! invariants: places end in a room, carried or nowhere; timers only count
 //! down; machines stay in one of their states.
+//!
+//! Also: a save at any await of a combat or a roll test restores; a variable
+//! with limits stays in them; the dice, sum, condition and markup parsers
+//! read what they should and refuse the rest at a span in the text; and the
+//! YAML model of each example survives an export and a load.
 
 #[path = "../../../examples/zork1/thief.rs"]
 mod thief;
 
-use loremaster_model::{Id, Location};
-use loremaster_project::{SourceFile, load, read_dir};
+use loremaster_lang::{
+    Scope, compile_condition, compile_markup, condition_tokens, markup_tokens, parse_expr,
+};
+use loremaster_model::{Dice, Id, Location, Term, Value, parse_sum};
+use loremaster_project::{Pack, SourceFile, load, model_hash, read_dir};
 use loremaster_runtime::authoring;
-use loremaster_runtime::{Input, Session, State, Turn, World};
+use loremaster_runtime::{AwaitRequest, Input, Session, State, Status, Turn, World};
 use proptest::prelude::*;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
@@ -293,4 +301,394 @@ proptest! {
             last = now;
         }
     }
+}
+
+// ---- combat, rolls and `on: next` chains ------------------------------------
+
+/// The Salt Tower: a combat, Skill and Luck tests (an `await` of a roll, then
+/// `on: next` steps) and stats with limits, compiled once.
+fn salt_tower() -> Arc<World> {
+    static WORLD: OnceLock<Arc<World>> = OnceLock::new();
+    WORLD
+        .get_or_init(|| Arc::new(example("salt-tower")))
+        .clone()
+}
+
+const SALT_COMMANDS: &[&str] = &[
+    "roll your character",
+    "ring the bell",
+    "refuse",
+    "pay 3 gold",
+    "open the grate",
+    "crawl on",
+    "test your skill",
+    "test your luck",
+    "take brass lantern",
+    "climb the stairs",
+    "say the word hearth",
+    "show the letter",
+    "look",
+    "wait",
+];
+
+/// One move of a pick: answer the await (a choice, or a roll total in range
+/// when the host rolls), or else type a command. Nothing after the end.
+fn salt_move(game: &mut Session, pick: usize) -> String {
+    let awaiting = match game.status() {
+        Status::Ended { .. } => return String::new(),
+        Status::Await { awaiting } => awaiting,
+        _ => {
+            let cmd = SALT_COMMANDS[pick % SALT_COMMANDS.len()];
+            return game.submit(Input::Text(cmd.into())).plain_text();
+        }
+    };
+    let answer = match &awaiting.request {
+        AwaitRequest::Choice { options } => {
+            Value::Text(options[pick % options.len()].id.to_string())
+        }
+        AwaitRequest::Roll { min, max, .. } => Value::Int(min + pick as i64 % (max - min + 1)),
+        other => panic!("unexpected await {other:?}"),
+    };
+    game.resume(&awaiting.id, answer).unwrap().plain_text()
+}
+
+/// The stats stay within their `min` and `max`; the `max` names another variable.
+fn check_salt_limits(game: &Session) {
+    let int = |name: &str| {
+        game.state()
+            .facts
+            .get(name)
+            .and_then(Value::as_int)
+            .unwrap()
+    };
+    for (stat, cap) in [
+        ("skill", "skill_initial"),
+        ("stamina", "stamina_initial"),
+        ("luck", "luck_initial"),
+    ] {
+        let (n, cap) = (int(stat), int(cap));
+        assert!((0..=cap.max(0)).contains(&n), "{stat} = {n} of {cap}");
+    }
+    assert!(int("gold") >= 0, "gold = {}", int("gold"));
+}
+
+fn salt_session(host_rolls: bool, seed: u64) -> Session {
+    let mut game = Session::with_seed(salt_tower(), seed);
+    game.set_host_rolls(host_rolls);
+    game.start();
+    game
+}
+
+/// A story whose start rule makes the given writes, then adds 0 to both
+/// limited variables, so that their last write comes after every change of `cap`.
+fn limited(writes: &[String]) -> World {
+    let mut then: String = writes.iter().map(|w| format!("    - {w}\n")).collect();
+    then.push_str("    - add: { hp: 0, st: 0 }\n");
+    let files = [
+        (
+            "story.yaml",
+            "title: Limits\nstart: hall\nvars:\n  - { id: hp, type: int, initial: 5, min: -3, max: 10 }\n  - { id: cap, type: int, initial: 4 }\n  - { id: st, type: int, initial: 2, min: 0, max: cap }\n"
+                .to_string(),
+        ),
+        (
+            "rooms/hall.yaml",
+            "name: Hall\ndescription: [\"A hall.\"]\n".to_string(),
+        ),
+        (
+            "rules/start.yaml",
+            format!("- id: writes\n  on: start\n  then:\n{then}"),
+        ),
+    ]
+    .map(|(path, text)| SourceFile {
+        path: path.into(),
+        text,
+    });
+    let project = load(files.into()).unwrap_or_else(|e| panic!("{e:#?}"));
+    World::compile(project.story).unwrap()
+}
+
+const LIMITED: &[&str] = &["hp", "st", "cap"];
+
+/// A write to `hp`, `st` or `cap`: `set`, `add` (of any `i64` too) or `calc`.
+fn write() -> impl Strategy<Value = String> {
+    let var = || prop::sample::select(LIMITED);
+    prop_oneof![
+        (var(), -20i64..20).prop_map(|(v, n)| format!("set: {{ {v}: {n} }}")),
+        (var(), any::<i64>()).prop_map(|(v, n)| format!("add: {{ {v}: {n} }}")),
+        (var(), -20i64..20).prop_map(|(v, n)| format!("add: {{ {v}: {n} }}")),
+        (
+            var(),
+            var(),
+            prop::sample::select(&["+", "-"][..]),
+            0i64..20
+        )
+            .prop_map(|(v, w, op, n)| format!("calc: {{ {v}: \"{w} {op} {n}\" }}")),
+    ]
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(48))]
+
+    /// A save at any point of the Salt Tower, at the await of a combat round or
+    /// a roll test too, goes on exactly like the game it saved; the stats stay
+    /// in their limits.
+    #[test]
+    fn a_saved_salt_tower_game_goes_on_like_the_game_it_saved(
+        picks in prop::collection::vec(0usize..64, 0..40),
+        split in 0usize..40,
+        host_rolls in any::<bool>(),
+        seed in any::<u64>(),
+    ) {
+        let mut game = salt_session(host_rolls, seed);
+        let split = split.min(picks.len());
+        for &p in &picks[..split] {
+            salt_move(&mut game, p);
+            check_salt_limits(&game);
+        }
+        let save = serde_json::to_value(game.save()).unwrap();
+        let (mut restored, _) = Session::load(salt_tower(), save).unwrap();
+        restored.set_host_rolls(host_rolls);
+        prop_assert_eq!(restored.status(), game.status());
+        for &p in &picks[split..] {
+            prop_assert_eq!(salt_move(&mut game, p), salt_move(&mut restored, p));
+            check_salt_limits(&restored);
+        }
+        prop_assert_eq!(game.state(), restored.state());
+    }
+
+    /// The same seed and moves give the same game.
+    #[test]
+    fn the_salt_tower_replays(picks in prop::collection::vec(0usize..64, 0..40), seed in any::<u64>()) {
+        let (mut a, mut b) = (salt_session(false, seed), salt_session(false, seed));
+        for &p in &picks {
+            prop_assert_eq!(salt_move(&mut a, p), salt_move(&mut b, p));
+        }
+        prop_assert_eq!(a.state(), b.state());
+    }
+
+    /// Any writes, huge `add`s too: a variable with `min` and `max` ends in its
+    /// range, also when a limit is another variable (when the limits cross, `min` wins).
+    #[test]
+    fn a_limited_variable_stays_in_range(writes in prop::collection::vec(write(), 0..12)) {
+        let mut game = Session::new(Arc::new(limited(&writes)));
+        authoring::start(&mut game);
+        let int = |name: &str| game.state().facts.get(name).and_then(Value::as_int).unwrap();
+        prop_assert!((-3..=10).contains(&int("hp")), "hp = {}", int("hp"));
+        let (st, cap) = (int("st"), int("cap"));
+        prop_assert!(st >= 0 && (st <= cap || st == 0), "st = {st}, cap = {cap}");
+    }
+}
+
+/// Two huge `add`s once overflowed (a panic in a debug build); now they saturate.
+#[test]
+fn a_huge_add_saturates() {
+    let max = format!("add: {{ cap: {} }}", i64::MAX);
+    let min = format!("add: {{ cap: {} }}", i64::MIN);
+    for writes in [[max.clone(), max], [min.clone(), min]] {
+        let mut game = Session::new(Arc::new(limited(&writes)));
+        authoring::start(&mut game);
+        let cap = game.state().facts["cap"].as_int().unwrap();
+        assert!(cap == i64::MAX || cap == i64::MIN, "cap = {cap}");
+    }
+}
+
+// ---- parsers ----------------------------------------------------------------
+
+/// A span of an error or a token lies in the text, on char boundaries.
+fn in_text(src: &str, span: &std::ops::Range<usize>) -> bool {
+    src.get(span.clone()).is_some()
+}
+
+/// A valid condition over the names of the museum.
+fn condition() -> impl Strategy<Value = String> {
+    let atom = prop::sample::select(
+        &[
+            "true",
+            "false",
+            "case.open",
+            "box.open",
+            "visited(hall)",
+            "carried(gem)",
+            "alarm == quiet",
+            "turns >= 3",
+        ][..],
+    )
+    .prop_map(str::to_string);
+    atom.prop_recursive(4, 16, 2, |inner| {
+        prop_oneof![
+            inner.clone().prop_map(|a| format!("not {a}")),
+            inner.clone().prop_map(|a| format!("({a})")),
+            (inner.clone(), inner.clone()).prop_map(|(a, b)| format!("{a} and {b}")),
+            (inner.clone(), inner).prop_map(|(a, b)| format!("{a} or {b}")),
+        ]
+    })
+}
+
+/// Text of the pieces that matter to the parsers, and any other characters.
+fn noise() -> impl Strategy<Value = String> {
+    let piece = prop_oneof![
+        prop::sample::select(
+            &[
+                "{",
+                "}",
+                "{{",
+                "}}",
+                "|",
+                ":",
+                "?",
+                "*",
+                "(",
+                ")",
+                ".",
+                ",",
+                "\"",
+                "'",
+                "=",
+                "!",
+                "<",
+                ">",
+                "-",
+                "+",
+                "d",
+                "0",
+                "9",
+                " ",
+                "and",
+                "or",
+                "not",
+                "first",
+                "case.open",
+                "night",
+                "visited",
+                "ä",
+                "€",
+                "\u{1F600}",
+            ][..]
+        )
+        .prop_map(str::to_string),
+        any::<char>().prop_map(String::from),
+    ];
+    prop::collection::vec(piece, 0..24).prop_map(|parts| parts.concat())
+}
+
+/// A term of a sum, as `parse_sum` reads it.
+fn term() -> impl Strategy<Value = Term> {
+    prop_oneof![
+        (0i64..=i64::MAX).prop_map(Term::Int),
+        "[a-z_][a-z0-9_]{0,6}(\\.[a-z_]{1,4})?".prop_map(Term::Name),
+    ]
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(256))]
+
+    /// Dice within the limits read back as written; any text is read or refused.
+    #[test]
+    fn dice_round_trip(
+        count in 1u32..=Dice::MAX_COUNT,
+        sides in 1u32..=Dice::MAX_SIDES,
+        bonus in -Dice::MAX_BONUS..=Dice::MAX_BONUS,
+        junk in noise(),
+    ) {
+        let text = match bonus {
+            0 => format!("{count}d{sides}"),
+            b => format!(" {count}D{sides}{b:+} "),
+        };
+        prop_assert_eq!(Dice::parse(&text), Some(Dice { count, sides, bonus }));
+        if let Some(d) = Dice::parse(&junk) {
+            prop_assert!(d.min() <= d.max());
+        }
+    }
+
+    /// A sum reads back its terms and signs; a bad sum names a part of its text.
+    #[test]
+    fn sums_round_trip(terms in prop::collection::vec((any::<bool>(), term()), 1..6), junk in noise()) {
+        let mut text = String::new();
+        for (i, (neg, term)) in terms.iter().enumerate() {
+            match (i, neg) {
+                (0, true) => text.push('-'),
+                (0, false) => {}
+                (_, true) => text.push_str(" - "),
+                (_, false) => text.push_str(" + "),
+            }
+            match term {
+                Term::Int(n) => text.push_str(&n.to_string()),
+                Term::Name(n) => text.push_str(n),
+            }
+        }
+        let expected: Vec<_> = terms.iter().map(|(neg, t)| (if *neg { -1 } else { 1 }, t.clone())).collect();
+        prop_assert_eq!(parse_sum(&text), Ok(expected));
+        if let Err((_, span)) = parse_sum(&junk) {
+            prop_assert!(in_text(&junk, &span), "{junk:?}: {span:?}");
+        }
+    }
+
+    /// A valid condition compiles; any text compiles or is refused at a span in it.
+    #[test]
+    fn conditions_compile_or_refuse_cleanly(good in condition(), junk in noise()) {
+        let scope = Scope::from_story(&museum().story);        let compiled = compile_condition(&good, &scope);
+        prop_assert!(compiled.is_ok(), "{good}: {compiled:?}");
+        for src in [junk.clone(), format!("{good} {junk}")] {
+            if let Err(e) = parse_expr(&src) {
+                prop_assert!(in_text(&src, &e.span), "{src:?}: {e:?}");
+            }
+            if let Err(e) = compile_condition(&src, &scope) {
+                prop_assert!(in_text(&src, &e.span), "{src:?}: {e:?}");
+            }
+            for t in condition_tokens(&src) {
+                prop_assert!(in_text(&src, &t.span), "{src:?}: {t:?}");
+            }
+        }
+    }
+
+    /// Markup compiles or is refused at a span in it, and its tokens lie in it.
+    #[test]
+    fn markup_compiles_or_refuses_cleanly(good in condition(), junk in noise()) {
+        let scope = Scope::from_story(&museum().story);
+        let valid = format!("A {{{good}: lit | dark}} room{{first: , new,}}.");
+        let compiled = compile_markup(&valid, &scope);
+        prop_assert!(compiled.is_ok(), "{valid}: {compiled:?}");
+        for src in [junk.clone(), format!("{valid}{junk}")] {
+            if let Err(e) = compile_markup(&src, &scope) {
+                prop_assert!(in_text(&src, &e.span), "{src:?}: {e:?}");
+            }
+            for t in markup_tokens(&src) {
+                prop_assert!(in_text(&src, &t.span), "{src:?}: {t:?}");
+            }
+        }
+    }
+}
+
+// ---- the YAML model ---------------------------------------------------------
+
+/// Each example as one pack, exported to YAML and loaded again, gives the
+/// same story by `model_hash`.
+#[test]
+fn every_example_round_trips_through_an_exported_pack() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    let mut seen = Vec::new();
+    for dir in std::fs::read_dir(&root).unwrap() {
+        let dir = dir.unwrap().path();
+        let Ok(files) = read_dir(&dir) else { continue };
+        // Examples with Rust parts need their packs; they have their own tests.
+        let Ok(direct) = load(files.clone()) else {
+            continue;
+        };
+        let mut pack = Pack::from_files(files).unwrap();
+        pack.name = "export".into();
+        let exported = vec![SourceFile {
+            path: "packs/export.yaml".into(),
+            text: pack.to_yaml(),
+        }];
+        let again = load(exported).unwrap_or_else(|e| panic!("{}: {e:#?}", dir.display()));
+        assert_eq!(
+            model_hash(&again.story),
+            model_hash(&direct.story),
+            "{}",
+            dir.display()
+        );
+        seen.push(dir.file_name().unwrap().to_string_lossy().into_owned());
+    }
+    seen.sort();
+    assert!(seen.len() >= 7, "only {seen:?} load");
 }
