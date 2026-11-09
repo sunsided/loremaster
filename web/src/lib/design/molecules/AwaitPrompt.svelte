@@ -24,7 +24,7 @@
 	const rollOk = $derived(request.kind === 'roll' && typeof roll === 'number' && Number.isInteger(roll) && roll >= request.min && roll <= request.max);
 
 	/** "Your roll" for the player's own combat roll, "Roll for GATE WARDEN" for another, or just "Roll". */
-	const rollHead = $derived(request.kind !== 'roll' || !request.who ? 'Roll' : request.who === 'You' ? 'Your roll:' : `Roll for ${request.who}`);
+	const rollHead = $derived(request.kind !== 'roll' || !request.who ? 'Roll' : request.who === 'You' ? 'Your roll' : `Roll for ${request.who}`);
 
 	function submitRoll(event: SubmitEvent) {
 		event.preventDefault();
