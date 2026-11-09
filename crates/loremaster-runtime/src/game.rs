@@ -1548,18 +1548,95 @@ impl Game {
         self.finish(turn)
     }
 
+    /// The player holds as many things as the story's carry limit allows.
+    pub(crate) fn hands_full(&self) -> bool {
+        (self.world.story.carry_limit).is_some_and(|limit| self.state.held_count() >= limit)
+    }
+
     pub(crate) fn verbs(&self) -> Vec<VerbInfo> {
-        self.world
-            .verbs
-            .iter()
-            .map(|v| VerbInfo {
-                id: v.id.to_string(),
-                label: v.label.clone(),
-                words: v.words.clone(),
-                slots: v.slots,
-                preposition: v.preposition.clone(),
-                bar: v.bar,
+        self.world.verbs.iter().map(verb_info).collect()
+    }
+
+    /// The verbs that apply to a thing now (#235): see [`crate::Session::verbs_for`].
+    pub(crate) fn verbs_for(&self, id: &str) -> Vec<VerbInfo> {
+        use loremaster_model::EventPattern;
+        let Some(t) = self.world.thing(id) else {
+            return Vec::new();
+        };
+        if !self.reachable(id) {
+            return Vec::new();
+        }
+        let named = |o: &Option<Id>| o.as_ref().is_some_and(|o| o.as_str() == id);
+        let mut ids: std::collections::BTreeSet<&str> = (self.world.story.rules.iter())
+            .filter_map(|r| match &r.on {
+                EventPattern::Verb(p) | EventPattern::Check(p)
+                    if crate::explore::for_player(p)
+                        && (named(&p.direct) || named(&p.indirect)) =>
+                {
+                    Some(p.verb.as_str())
+                }
+                _ => None,
             })
+            .collect();
+        ids.extend(t.frames.keys().map(Id::as_str));
+        let has = |p: &str| self.state.facts.contains_key(&format!("{id}.{p}"));
+        let flag = |p: &str| self.state.flag(&format!("{id}.{p}"));
+        let lock_verb = |target: &str| {
+            if self.state.flag(&format!("{target}.locked")) {
+                "unlock"
+            } else {
+                "lock"
+            }
+        };
+        let scope = self.in_scope();
+        let in_scope = |o: &Id| scope.contains(o);
+        ids.insert("examine");
+        // As the default take: not behind a closed container, hands not full.
+        if t.portable
+            && !self.state.is_held(id)
+            && self.state.closed_around(id, false).is_none()
+            && !self.hands_full()
+        {
+            ids.insert("take");
+        }
+        if self.state.is_carried(id) {
+            ids.extend(["drop", "put"]);
+        }
+        if t.container || t.supporter {
+            ids.insert("put");
+        }
+        if has("open") && !self.is_playable(id) {
+            if flag("open") {
+                ids.insert("close");
+            } else if !flag("locked") {
+                ids.insert("open");
+            }
+        }
+        // A lock and its key, both in scope (in_scope leaves out concealed things).
+        if t.key.as_ref().is_some_and(in_scope) && has("locked") {
+            ids.extend([lock_verb(id), "use"]);
+        }
+        for door in scope.iter().filter_map(|d| self.world.thing(d.as_str())) {
+            let locks = self
+                .state
+                .facts
+                .contains_key(&format!("{}.locked", door.id));
+            if locks && door.key.as_ref().is_some_and(|k| k.as_str() == id) {
+                ids.extend([lock_verb(door.id.as_str()), "use"]);
+            }
+        }
+        if has("lit") {
+            ids.extend([if flag("lit") { "turn_off" } else { "turn_on" }, "use"]);
+        }
+        if self.can_talk(id) {
+            ids.insert("talk");
+        }
+        if !self.searchable(id).is_empty() {
+            ids.insert("search");
+        }
+        // A frame or rule for a verb the story does not have adds nothing.
+        ids.into_iter()
+            .filter_map(|v| self.world.verb(v).map(verb_info))
             .collect()
     }
 
@@ -2434,12 +2511,7 @@ impl Game {
                     say(turn, format!("{} is closed.", self.the(&c, true)));
                 } else if !t.portable {
                     say(turn, format!("{the_cap} won't budge."));
-                } else if self
-                    .world
-                    .story
-                    .carry_limit
-                    .is_some_and(|limit| self.state.held_count() >= limit)
-                {
+                } else if self.hands_full() {
                     say(turn, "Your hands are full.".into());
                 } else {
                     self.move_thing(&t.id, Location::Carried);
@@ -2591,6 +2663,17 @@ impl Game {
                 say(turn, text);
             }
         }
+    }
+}
+
+fn verb_info(v: &loremaster_model::VerbDef) -> VerbInfo {
+    VerbInfo {
+        id: v.id.to_string(),
+        label: v.label.clone(),
+        words: v.words.clone(),
+        slots: v.slots,
+        preposition: v.preposition.clone(),
+        bar: v.bar,
     }
 }
 
