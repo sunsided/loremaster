@@ -11,6 +11,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 ### Added
 
 - `world!` writes the wildcard verb bare (#220): `rule grope on verb(*, darkness) { .. }` and `on check(*)`, the same as `on::verb(["*", "darkness"])` in the builder. `*` goes only in the verb place.
+- Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening, the turn passing (`on: turn`, timers, time rules, agendas, orders) and the rules of a host event. A graphical host can draw the player's own text over the player and the rest as ambient narration.
+- `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Like `snapshot`, it sees everything, also concealed things. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.
+- **Breaking (library):** `Block` has the new field `cause`, and `ThingInfo` has the new field `location`; code that builds them with a struct literal needs them.
 - Emphasis as a run attribute (#194): `*Kestrel*` in story text is now a run with `emphasis: true` and the text `Kestrel`, without the stars, also when a thing link splits it. A pair of stars with a space just inside (`2 * 3 * 4`) stays text, and so does `**`. `Block::plain_text` puts the stars back, so transcripts and walkthrough checks do not change. `loremaster play` and the web player show emphasis from the attribute; `Choice::text` keeps its stars.
 - The story bundle (#194): `Bundle` (format `loremaster-bundle`, version 1) holds a story, its walkthroughs and the loremaster version that wrote it. `Bundle::from_json` refuses another format, a missing version and a newer version. `Bundle::session` compiles the story and sets the hint ladder; a story with Rust behaviors starts with `Bundle::session_with`, which registers them, and a behavior left unregistered is a `BundleError`. A host writes it in its `build.rs` in place of its own `(Story, walkthroughs)` JSON.
 - **Breaking (library):** `Run` has the new field `emphasis`; code that builds it with a struct literal needs it. A host that reads `Run::text` gets emphasized text without its stars.
@@ -41,6 +44,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Fixed
 
+- A thing whose `names:` stages all have a `when` that does not hold now has its `name`. Before, it showed the text of the first stage (#178).
+- `Command::verb("go", vec!["up".into()])` now moves the player like `Command::Go`, also for the active actor, when the object is a compass word or an exit of the room. Before, it ran as a verb that did nothing. `go` with a thing, and a story's own verb `go`, stay verbs (#178).
 - The room that `undo` and `restore` show now has its thing links, like every other room description (#194).
 - A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 - A condition with a character other than a letter outside the ASCII range, such as `€` or an emoji, made `loremaster check`, the editor and the engine loop for ever; now it is an error at that character (#186).

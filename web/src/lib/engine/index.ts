@@ -49,6 +49,7 @@ import type {
 	MachineView,
 	Scene,
 	SourceFile,
+	ThingInfo,
 	Turn,
 	VerbInfo
 } from './types.ts';
@@ -227,6 +228,11 @@ export class Session {
 
 	scene(): Scene {
 		return this.#session.scene();
+	}
+
+	/** One thing of the story, wherever it is, or null for an unknown id. It sees everything, also concealed things. */
+	thing(id: string): ThingInfo | null {
+		return this.#session.thing(id);
 	}
 
 	/** The value of one fact now (a variable, a property or a machine's state), or null. */

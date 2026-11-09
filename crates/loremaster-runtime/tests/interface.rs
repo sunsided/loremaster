@@ -140,6 +140,12 @@ fn a_host_event_runs_rules_and_its_arguments_read_as_facts() {
         "{}",
         step.plain_text()
     );
+    // What the host reports happened in the world, not as a command.
+    assert!(step.effects.iter().all(|e| match e {
+        loremaster_runtime::Effect::Text { block } =>
+            block.cause == loremaster_runtime::Cause::World,
+        _ => true,
+    }));
 }
 
 #[test]

@@ -119,12 +119,25 @@ pub struct Choice {
 impl Turn {
     pub(crate) fn push(&mut self, kind: BlockKind, runs: Vec<Run>) {
         if runs.iter().any(|r| !r.text.trim().is_empty()) {
-            self.blocks.push(Block { kind, runs });
+            self.blocks.push(Block {
+                kind,
+                runs,
+                cause: Cause::Command,
+            });
         }
     }
 
     pub(crate) fn say(&mut self, kind: BlockKind, text: impl Into<String>) {
         self.push(kind, vec![Run::plain(text)]);
+    }
+
+    /// The blocks from `first` on came from the world, not the player:
+    /// `first` is `blocks.len()` before the world phase.
+    pub(crate) fn caused_by_world(&mut self, first: usize) {
+        debug_assert!(first <= self.blocks.len());
+        for block in self.blocks.iter_mut().skip(first) {
+            block.cause = Cause::World;
+        }
     }
 
     /// The turn as plain text, paragraphs separated by blank lines.
@@ -142,6 +155,28 @@ impl Turn {
 pub struct Block {
     pub kind: BlockKind,
     pub runs: Vec<Run>,
+    /// Why the block appeared: the player's input, or the world.
+    #[serde(default)]
+    pub cause: Cause,
+}
+
+/// Why a block appeared. [`Source::owner`] says who wrote the text; the
+/// cause says what made it show.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Cause {
+    /// The input the host sent for the player: a command and its echo,
+    /// response and rules, the room after a move, an answer to a talk or an
+    /// await, and the session's own replies (a tick or a command refused
+    /// while the story waits or has ended, an author command, `undo`,
+    /// `restore`, a hint, the journal).
+    #[default]
+    Command,
+    /// The world: the opening of the story, the turn passing after an
+    /// action or a tick (`on: turn` rules, timers, time rules, agendas,
+    /// orders of other actors), and the rules of a host event
+    /// (`Session::host_event`).
+    World,
 }
 
 impl Block {

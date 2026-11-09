@@ -320,6 +320,12 @@ impl JsSession {
         to_js(&self.session.scene())
     }
 
+    /// One thing of the story, wherever it is: `{ id, name, location }`, or
+    /// null for an unknown id. It sees everything, also concealed things.
+    pub fn thing(&self, id: &str) -> Result<JsValue, JsValue> {
+        or_null(self.session.thing(id))
+    }
+
     /// The value of one fact now: a variable (`gold`), a property
     /// (`lamp.lit`) or a machine's state (`lock`); null when it is not set.
     pub fn fact(&self, name: &str) -> Result<JsValue, JsValue> {

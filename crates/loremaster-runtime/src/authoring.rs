@@ -91,15 +91,15 @@ impl<'a> Inspector<'a> {
         self.game.eval().thing_name(id, form)
     }
 
-    /// The index of the thing's name stage now; `None` without stages.
+    /// The index of the thing's name stage now; `None` without stages, or
+    /// when no stage holds.
     pub fn name_stage(&self, id: &str) -> Option<usize> {
         self.game.eval().name_stage(id)
     }
 
     /// A thing as the scene shows it: its current name and aliases.
     pub fn thing_info(&self, id: &str) -> Option<crate::ThingInfo> {
-        let thing = self.game.world().story.thing(id)?;
-        Some(self.game.thing_info(&thing.id))
+        self.game.thing_info(id)
     }
 
     /// The nouns the player can use for a thing now. Empty for an unknown thing.

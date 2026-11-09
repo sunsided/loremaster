@@ -28,8 +28,8 @@ A changed value has a short mark, and a live region says the change. Below 900px
 		{ var: 'ember', label: 'EMBER', value: false }
 	];
 	const items = [
-		{ id: 'sword', name: 'sword', takeable: true },
-		{ id: 'lantern', name: 'brass lantern', takeable: true }
+		{ id: 'sword', name: 'sword', takeable: true, location: 'carried' as const },
+		{ id: 'lantern', name: 'brass lantern', takeable: true, location: 'carried' as const }
 	];
 
 	let live = $state(full);

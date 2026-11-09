@@ -569,6 +569,7 @@ impl Session {
             Block {
                 kind: BlockKind::Note,
                 runs: vec![crate::output::Run::plain(note)],
+                cause: crate::Cause::Command,
             },
         );
         turn
@@ -591,6 +592,7 @@ impl Session {
             .map(|line| Block {
                 kind: BlockKind::Response,
                 runs: vec![crate::output::Run::plain(line)],
+                cause: crate::Cause::Command,
             })
             .collect();
         Turn {
@@ -605,6 +607,7 @@ impl Session {
             blocks: vec![Block {
                 kind: BlockKind::Note,
                 runs: vec![crate::output::Run::plain(text)],
+                cause: crate::Cause::Command,
             }],
             ..Turn::default()
         }

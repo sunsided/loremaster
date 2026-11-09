@@ -294,6 +294,8 @@ impl Game {
             self.set_fact(&mut turn, &format!("{name}.{arg}"), value.clone());
         }
         self.fire(&mut turn, &Event::Custom(Id::new(name)), 0);
+        // The host reports what happened in the world, not a command.
+        turn.caused_by_world(0);
         Ok(self.finish(turn))
     }
 
