@@ -366,7 +366,7 @@ The effects:
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
-More fields: `once: true` lets the rule fire only one time in a game. `once: <key>` puts the rule in a once-group: all rules with the same key fire one time in total, and the first that fires closes the group for the others. Two variants of one event share a key, so the pair needs no extra variable:
+More fields: `once: true` lets the rule fire only one time in a game. `once: <key>` puts the rule in a once-group: all rules with the same key fire at most once in total, and the first that fires closes the group for the others. Two variants of one event share a key, so the pair needs no extra variable:
 
 ```yaml
 - id: greet_day
