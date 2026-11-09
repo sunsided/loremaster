@@ -405,7 +405,7 @@ fn an_edited_story_keeps_the_game_state() {
     }
     let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
     let mut next = game;
-    next.reload(world);
+    next.reload(world).unwrap();
     assert_eq!(next.state().room.as_str(), "cottage");
     assert!(next.state().is_carried("oil_lamp"));
     assert!(next.describe().plain_text().contains("A NEW LINE."));
@@ -577,7 +577,7 @@ fn the_walkthrough_gives_the_chart_and_the_hints() {
     assert_eq!(next.charts().len(), 1);
     assert!(next.session().has_hints());
     // A reload builds the hint book again in the new world, and keeps what the player saw.
-    game.reload(Arc::new(game.world().clone()));
+    game.reload(Arc::new(game.world().clone())).unwrap();
     assert!(game.session().has_hints());
     assert_eq!(game.session().hints()[0].shown.len(), 1);
 }

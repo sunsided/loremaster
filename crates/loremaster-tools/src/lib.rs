@@ -120,7 +120,9 @@ impl Workspace {
     fn carry_sessions(&mut self) {
         if let Some(world) = &self.world {
             for bench in self.sessions.values_mut() {
-                bench.reload(world.clone());
+                // These sessions never come from `for_host`, so this is not
+                // refused; the tools do not report what a reload dropped.
+                let _ = bench.reload(world.clone());
             }
         }
     }

@@ -8,6 +8,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- `Session::reload(world, walkthroughs)`: continue a running game in a changed world, for live reload in native dev builds. The room, values, things, timers, fired rules, talk and agendas carry over, and the hint book is built again from the walkthroughs. It returns `Reloaded { dropped }`, what the new world no longer has, in the keys of `Loaded::dropped` (`fact:…`, `thing:…`, `room:…`, `rule:…`, `once:…`, …). A session from `Session::for_host` refuses a world with another interface with `ReloadError::InterfaceChanged` and stays unchanged: the host must be rebuilt. `Workbench::reload` and `authoring::carry_over` use the same code. On a reload the hint progress follows the new walkthroughs: steps they no longer have are forgotten (done ones are listed as `step:…`), and a shorter ladder does not show its command unasked.
+- **Breaking (library):** `Workbench::reload` returns `Result<Reloaded, ReloadError>` instead of `()`, so a refused reload and the dropped list reach the caller.
+
+### Fixed
+
+- A reload in the editor moves a thing `in` or `on` a thing that is no longer a container or supporter back to its start location, as loading a save does; it also trims the dialogue nodes for `go: back` that the dialogue no longer has.
+
 ## [0.3.0] - 2026-11-09
 
 ### Upgrading from 0.2

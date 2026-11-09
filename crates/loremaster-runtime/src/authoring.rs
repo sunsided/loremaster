@@ -278,7 +278,7 @@ pub fn author(session: &mut Session, command: AuthorCommand) -> Turn {
 /// still at its start value takes the new start value, and what the new world
 /// does not have is dropped.
 pub fn carry_over(session: &Session, world: Arc<World>) -> Session {
-    session.carried_over(world)
+    session.carried_over(world).0
 }
 
 /// A `combat` effect in words, for the rules view.

@@ -129,6 +129,37 @@ pub struct Loaded {
     pub dropped: Vec<String>,
 }
 
+/// What [`Session::reload`] had to change.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct Reloaded {
+    /// What the new world no longer has, sorted, in the keys of
+    /// [`Loaded::dropped`], for example `fact:lamp.lit` or `thing:key`.
+    pub dropped: Vec<String>,
+}
+
+/// Why [`Session::reload`] refused the new world. The session is unchanged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ReloadError {
+    /// The session was made with [`Session::for_host`], and the new world
+    /// has another interface (custom actions or host events) than the host
+    /// was built for. Its generated bindings are stale: rebuild the host.
+    InterfaceChanged(InterfaceMismatch),
+}
+
+impl std::fmt::Display for ReloadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReloadError::InterfaceChanged(m) => {
+                write!(f, "the story's interface changed, rebuild the host: {m}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ReloadError {}
+
 /// The state of a running game, to keep in memory and put back with
 /// [`Session::restore`]. For a save file, use [`Session::save`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -159,6 +190,9 @@ pub struct Session {
     hints: Arc<hints::HintBook>,
     /// How many levels of each step's hint ladder the player has seen.
     revealed: BTreeMap<String, usize>,
+    /// The interface of a host from [`Session::for_host`], which a reload
+    /// must keep.
+    built_for: Option<Interface>,
 }
 
 /// The kinds of log entries that are changes of state, which hosts get as
@@ -176,8 +210,9 @@ impl Session {
     /// A new game for a host built for `built_for` (IF-5). Refuses to make
     /// the session when the story has another interface.
     pub fn for_host(world: Arc<World>, built_for: &Interface) -> Result<Self, InterfaceMismatch> {
-        let session = Self::new(world);
+        let mut session = Self::new(world);
         session.check_interface(built_for)?;
+        session.built_for = Some(built_for.clone());
         Ok(session)
     }
 
@@ -198,7 +233,61 @@ impl Session {
             started: false,
             hints: Arc::default(),
             revealed: BTreeMap::new(),
+            built_for: None,
         }
+    }
+
+    /// Continue this game in a changed world, for example after an edit of
+    /// the story files (SE-14): live reload in a dev build. Pass the
+    /// walkthroughs of the new story; the hint book is built again from them.
+    ///
+    /// The caller passes a rebuilt version of the same story. Unlike a save,
+    /// a reload does not compare the story id: the id is a slug of the title,
+    /// and editing the title is a legitimate live edit.
+    ///
+    /// What carries over: the current room, the values, where the things are,
+    /// the timers, fired rules and once groups, an open talk, the agendas,
+    /// relations, memories, the seed, the undo depth, the revealed hint
+    /// levels, and whether the host answers rolls and walks. A value or a
+    /// location still at its start value in the old world takes the start
+    /// value of the new world, so an edit of a start value shows at once. New
+    /// values, things and timers start at their start value.
+    ///
+    /// What is dropped and listed in [`Reloaded::dropped`]: values, things,
+    /// rooms, timers, rules, once groups, dialogues (or their nodes), the
+    /// ending, relations, memories and agenda steps that the new world does
+    /// not have, and a rule that waits for the host when that rule changed
+    /// or its combat is no longer valid: an enemy without its stats, or a win,
+    /// loss or escape room that is gone (`await:…`). Done walkthrough steps
+    /// that the new hint book does not have are listed as `step:…`. A revealed
+    /// hint level follows the new ladder: a step that is gone is forgotten,
+    /// and a shorter ladder does not show its command unasked. The other keys
+    /// are those of [`Loaded::dropped`]. When the
+    /// current room is gone, the player goes to the start room. A thing `in`
+    /// or `on` a thing that is no longer a container or supporter goes back
+    /// to its start location. The undo history is cleared: its states belong
+    /// to the old world.
+    ///
+    /// A session made with [`Session::for_host`] refuses a world with another
+    /// interface ([`ReloadError::InterfaceChanged`]) and stays unchanged:
+    /// the host's generated bindings are stale and it needs a rebuild.
+    pub fn reload(
+        &mut self,
+        world: Arc<World>,
+        walkthroughs: &[(String, loremaster_model::Walkthrough)],
+    ) -> Result<Reloaded, ReloadError> {
+        if let Some(built_for) = &self.built_for {
+            let story = world.story.interface.clone().unwrap_or_default();
+            story
+                .compare(built_for)
+                .map_err(ReloadError::InterfaceChanged)?;
+        }
+        let (next, mut dropped) = self.carried_over(world);
+        *self = next;
+        // The hint book plays the walkthroughs in its world: build it again.
+        self.rebuild_hints(walkthroughs, &mut dropped);
+        dropped.sort();
+        Ok(Reloaded { dropped })
     }
 
     /// Restore a save game (ADR 0001). The report says what the restore had
