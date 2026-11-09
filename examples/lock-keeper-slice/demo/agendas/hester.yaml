@@ -4,7 +4,11 @@
 # at half past twelve (five rooms back, so she is there near a quarter to
 # two). The design's 22:30 step to her room is left out: from there the
 # barge is five rooms away, too far to be on board at midnight.
+#
+# If she trusts the player (dialogues/hester.yaml), she stays in the
+# kitchen: both steps are skipped. A player on the barge at midnight sees
+# her with Crane (rules/hester.yaml).
 actor: hester
 steps:
-  - { id: barge, at: "23:15", place: barge_cabin }
-  - { id: back, at: "00:30", place: hester_room }
+  - { id: barge, at: "23:15", place: barge_cabin, when: not hester.trusts }
+  - { id: back, at: "00:30", place: hester_room, when: not hester.trusts }

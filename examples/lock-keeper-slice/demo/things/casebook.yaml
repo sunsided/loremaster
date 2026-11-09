@@ -1,0 +1,7 @@
+# The constable's own notebook: the case notebook of `journal`. Showing it
+# to Marsh shows him every clue in it at once (rules/marsh.yaml).
+name: your notebook
+aliases: [notes, casebook, case notebook, my notebook, constable's notebook]
+location: carried
+description:
+  - "Your constable's notebook. `journal` reads what is in it."

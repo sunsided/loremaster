@@ -1,0 +1,43 @@
+# Show Marsh two clues, and he runs (design: "Clock and agendas"). The
+# clues of the demo do not travel (the boots, the windlass in the chest,
+# Amos's notebook in the coat), so the player shows them through the case
+# notebook: `show notes to marsh` shows every clue in it at once. Two kinds
+# of proof are two clues, and enough.
+- id: show_notes_to_marsh
+  on: { verb: show, direct: casebook, indirect: marsh }
+  when: not marsh_fled and ((means == proven and opportunity == proven) or (means == proven and motive != open) or (opportunity == proven and motive != open))
+  instead: true
+  then:
+    # He leaves his agenda: each of its steps reads `marsh_fled`. A rule,
+    # not an agenda step: the steps run in order, so a step cannot cut in
+    # before the one that is due.
+    - set: { marsh_fled: true }
+    - start: marsh_flight
+    - say: "Marsh reads the page, and his hands go still for the first time tonight. Then he is on his feet, his eyes on the door. In a moment he will be out on the towpath."
+
+- id: show_thin_notes_to_marsh
+  on: { verb: show, direct: casebook, indirect: marsh }
+  when: not marsh_fled and not ((means == proven and opportunity == proven) or (means == proven and motive != open) or (opportunity == proven and motive != open))
+  instead: true
+  then:
+    - say: ["Marsh reads a line or two and hands the notebook back.", { says: "Is that all, constable?", by: marsh }]
+
+# Stopped, he is held in the parlour, and his agenda is over: he never
+# goes to the lock. (Back on his agenda, the steps that fell due while he
+# ran would be skipped, and the night would have more states, not fewer.)
+- id: stop_marsh
+  on: { verb: stop, direct: marsh }
+  when: timer.marsh_flight.running
+  instead: true
+  then:
+    - cancel: marsh_flight
+    - move: { marsh: parlour }
+    - say: "You catch Marsh by the collar at the door. He does not fight you. You walk him to the parlour and turn the key on him."
+  closes: [ran]
+  reason: "Held in the parlour, Marsh cannot run."
+
+- id: marsh_gone
+  on: { timer: marsh_flight }
+  then:
+    - say: "Marsh is out of the door before you can turn. Running feet go east along the towpath, into the dark."
+    - end: ran

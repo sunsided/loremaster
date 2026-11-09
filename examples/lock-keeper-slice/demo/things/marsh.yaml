@@ -3,6 +3,6 @@ aliases: [marsh, ivo, clerk, toll clerk]
 proper: true
 location: { room: parlour }
 presence:
-  - "Ivo Marsh, the toll clerk, is here."
+  - "Ivo Marsh, the toll clerk, is here{timer.marsh_flight.running ? , on his feet, his eyes on the door | }."
 description:
   - "A thin man in a good coat, here for the company's audit. His hands are never still."

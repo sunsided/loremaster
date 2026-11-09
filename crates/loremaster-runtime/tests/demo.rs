@@ -1,5 +1,5 @@
 //! The Lock-Keeper demo (P4-07, #84) in `examples/lock-keeper-slice/demo`:
-//! the three walkthroughs of the design, their transcripts, the ending
+//! the walkthroughs of the design and of #216, their transcripts, the ending
 //! checks over the whole night, and the hints and the chart that the
 //! walkthroughs give. Read `examples/lock-keeper-slice/README.md`.
 
@@ -57,7 +57,18 @@ fn demo_walkthroughs_pass() {
         assert_transcript(&format!("demo_{name}"), &result.transcript);
         names.push(name);
     }
-    assert_eq!(names, ["ashes", "best", "wrong_man"]);
+    assert_eq!(
+        names,
+        [
+            "ashes",
+            "best",
+            "follow",
+            "ran",
+            "stopped",
+            "trust",
+            "wrong_man"
+        ]
+    );
 }
 
 /// Play commands from the start; the text of all of them.
@@ -107,12 +118,12 @@ fn the_pages_count_only_while_the_player_holds_them() {
 #[test]
 fn demo_endings_are_reachable() {
     // The ending checks walk every state of the night. The demo has about
-    // 39,000 states, more than the default budget of 2000; the default
-    // depth (40 commands) is enough, since the coroner ends the night
-    // after 20 turns.
+    // 72,000 states (39,000 before Marsh's flight and Hester's trust,
+    // #216), more than the default budget of 2000; the default depth (40
+    // commands) is enough, since the coroner ends the night after 20 turns.
     let (project, world) = demo();
     let budget = authoring::Budget {
-        max_states: 70_000,
+        max_states: 80_000,
         ..Default::default()
     };
     let explored = authoring::explore(world, budget);
@@ -150,7 +161,7 @@ fn demo_endings_are_reachable() {
             .flat_map(|p| &p.reasons)
             .all(|r| !r.is_empty())
     );
-    // All five endings are reached.
+    // All six endings are reached.
     for ending in &project.story.endings {
         assert!(
             explored
@@ -184,7 +195,7 @@ fn a_drop_that_only_the_coroner_accepts_is_an_info() {
     let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
     let world = Arc::new(World::compile(project.story.clone()).unwrap());
     let budget = authoring::Budget {
-        max_states: 70_000,
+        max_states: 80_000,
         ..Default::default()
     };
     let checks = authoring::explore(world, budget).ending_checks;

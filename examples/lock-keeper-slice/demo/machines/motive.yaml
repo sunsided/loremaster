@@ -10,6 +10,10 @@ steps:
     on: { verb: [examine, notebook] }
     to: weak
     say: "You write it in your notebook: the ledger, and \"M\"."
+    # With the weapon and the chance, the case is made: no accusation of
+    # Marsh releases him now, and the coroner charges him.
+    closes: [accident, released]
+    reason: "With means and opportunity proven, a motive makes the case against Marsh."
   - from: open
     on: { verb: [examine, stove] }
     when: stove.ash

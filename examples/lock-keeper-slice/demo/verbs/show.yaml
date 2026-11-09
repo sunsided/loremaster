@@ -1,0 +1,6 @@
+# `show <thing> to <person>`: rules match `{ verb: show, direct: <clue>, indirect: marsh }`.
+label: Show
+words: [show]
+slots: two
+preposition: to
+default: "You hold it up. Nobody has anything to say about it."

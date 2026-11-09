@@ -1,0 +1,22 @@
+# Hester's trust (design: "Clock and agendas"): a kind word in the kitchen
+# before eleven, and she tells the truth in the same talk. Her alibi clears
+# Crane, and she stays in the kitchen instead of going to the barge.
+name: Hester's alibi, told
+steps:
+  - w
+  - { do: talk to hester, see: "I was in my room all evening." }
+  - { do: "1", see: "I was on the *Kestrel*, with Silas Crane", facts: { hester.trusts: true, opportunity: proven } }
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - wait
+  - { do: look, see: "Hester Reed, Amos's daughter, is here." }
+  - { do: talk to hester, see: "I told you the truth" }
+expect:
+  ended: false
+  not_see: "Hester Reed goes east."
