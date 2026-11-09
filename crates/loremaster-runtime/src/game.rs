@@ -587,6 +587,8 @@ impl Game {
     pub fn act(&mut self, cmd: Command) -> Turn {
         self.last_frame = None;
         let mut turn = Turn::default();
+        // The echo of `verb("go", ["east"])` is the same as of `Go`.
+        let cmd = self.as_move(cmd);
         if !matches!(cmd, Command::Choose { .. }) {
             turn.say(BlockKind::Command, self.describe_command(&cmd));
         }
@@ -664,9 +666,53 @@ impl Game {
         }
     }
 
+    /// The standard verb `go` with one direction, for the player or the
+    /// active actor, is the move [`Command::Go`]: `Command::verb("go",
+    /// vec!["up".into()])` moves the player. The direction is a compass word
+    /// or an exit of the room; `go` with a thing, and a story's own verb
+    /// `go`, stay verbs and run their rules.
+    fn as_move(&self, cmd: Command) -> Command {
+        let Command::Verb {
+            verb,
+            objects,
+            actor,
+            preposition: None,
+            topic: None,
+        } = &cmd
+        else {
+            return cmd;
+        };
+        let player = actor
+            .as_ref()
+            .is_none_or(|a| a.as_str() == crate::PLAYER || Some(a) == self.state.active.as_ref());
+        let [object] = objects.as_slice() else {
+            return cmd;
+        };
+        if verb.as_str() != "go"
+            || !player
+            || self.world.story.verbs.iter().any(|v| v.id == *verb)
+            || self.world.thing(object.as_str()).is_some()
+        {
+            return cmd;
+        }
+        let word = object.as_str();
+        let direction = match loremaster_model::Direction::from_word(word) {
+            Some(d) => d.name().to_string(),
+            None if self
+                .visible_exits()
+                .iter()
+                .any(|(_, e)| e.direction.name() == word) =>
+            {
+                word.to_string()
+            }
+            None => return cmd,
+        };
+        Command::Go { direction }
+    }
+
     /// Run a command, or first wait for the host to walk there.
     fn perform(&mut self, turn: &mut Turn, cmd: Command) {
-        let cmd = cmd.into_move();
+        let cmd = self.as_move(cmd);
         if self.host_walks
             && self.state.talk.is_none()
             && let Some(request) = self.walk_for(&cmd)
@@ -722,7 +768,7 @@ impl Game {
     /// `None` when it took no turn. An order runs through here too, so the
     /// clock moves once a turn.
     fn action(&mut self, turn: &mut Turn, cmd: Command) -> Option<u16> {
-        let cmd = cmd.into_move();
+        let cmd = self.as_move(cmd);
         // A talk stays open until the player leaves: other commands do not run.
         match (&cmd, self.state.talk.is_some()) {
             (Command::Choose { index }, true) => {

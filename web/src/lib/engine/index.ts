@@ -230,7 +230,7 @@ export class Session {
 		return this.#session.scene();
 	}
 
-	/** One thing of the story, wherever it is, or null for an unknown id. */
+	/** One thing of the story, wherever it is, or null for an unknown id. It sees everything, also concealed things. */
 	thing(id: string): ThingInfo | null {
 		return this.#session.thing(id);
 	}

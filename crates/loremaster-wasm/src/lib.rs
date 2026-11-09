@@ -321,7 +321,7 @@ impl JsSession {
     }
 
     /// One thing of the story, wherever it is: `{ id, name, location }`, or
-    /// null for an unknown id.
+    /// null for an unknown id. It sees everything, also concealed things.
     pub fn thing(&self, id: &str) -> Result<JsValue, JsValue> {
         or_null(self.session.thing(id))
     }

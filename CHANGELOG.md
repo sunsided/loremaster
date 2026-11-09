@@ -10,8 +10,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
-- Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening and the turn passing (`on: turn`, timers, time rules, agendas, orders). A graphical host can draw the player's own text over the player and the rest as ambient narration.
-- `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.
+- Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening, the turn passing (`on: turn`, timers, time rules, agendas, orders) and the rules of a host event. A graphical host can draw the player's own text over the player and the rest as ambient narration.
+- `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Like `snapshot`, it sees everything, also concealed things. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.
 - **Breaking (library):** `Block` has the new field `cause`, and `ThingInfo` has the new field `location`; code that builds them with a struct literal needs them.
 - `reload_rolls` in story.yaml (#189): `same` (strict, the default) keeps the next roll after a load, `fresh` (forgiving) rolls anew. `Session::reseed(entropy)` (WASM `reseed`) mixes the host's randomness into the RNG after `load`, `from_save` or `restore`, and changes nothing for `same`. The host passes a fresh, unpredictable value on each load. The web engine wrapper and the terminal host call it after each load. `loremaster new` writes `reload_rolls: same` into story.yaml, the builder has `fresh_rolls()` and `world!` the header key `reload_rolls: fresh`. The setting is not part of the save's story fingerprint, so switching it does not make old saves look like saves of a changed story.
 - **Breaking (library):** `Story` and `StoryHeader` have the new field `reload_rolls`.
@@ -30,7 +30,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 ### Fixed
 
 - A thing whose `names:` stages all have a `when` that does not hold now has its `name`. Before, it showed the text of the first stage (#178).
-- `Command::verb("go", vec!["up".into()])` now moves the player like `Command::Go`. Before, it ran as a verb that did nothing (#178).
+- `Command::verb("go", vec!["up".into()])` now moves the player like `Command::Go`, also for the active actor, when the object is a compass word or an exit of the room. Before, it ran as a verb that did nothing. `go` with a thing, and a story's own verb `go`, stay verbs (#178).
 - A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 - A condition with a character other than a letter outside the ASCII range, such as `€` or an emoji, made `loremaster check`, the editor and the engine loop for ever; now it is an error at that character (#186).
 - An `add` past the range of a whole number no longer stops the game (a debug build) or wraps round; the value stays at the largest or smallest number (#186).

@@ -55,7 +55,12 @@ pub(crate) fn inspect_thing(ins: Inspector<'_>, id: &str) -> Option<Inspect> {
                 format!("{}{when}{now}", n.text)
             })
             .collect();
-        facts.push(("names".into(), stages.join(" → ")));
+        // No stage holds: the plain name is the current one.
+        let base = match current {
+            None => format!("{} (now) → ", t.name),
+            Some(_) => String::new(),
+        };
+        facts.push(("names".into(), format!("{base}{}", stages.join(" → "))));
         facts.push(("player calls it".into(), ins.nouns(id).join(", ")));
     } else if !t.aliases.is_empty() {
         facts.push(("also called".into(), t.aliases.join(", ")));

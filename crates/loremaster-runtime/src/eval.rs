@@ -158,10 +158,9 @@ impl Eval<'_> {
         }
     }
 
-    /// The index of the thing's current name stage: the last one whose condition holds.
-    /// None when the thing has no stages.
-    /// The last name stage whose condition holds; `None` without stages or
-    /// when none holds, and then `name` is the current name.
+    /// The index of the thing's current name stage: the last one whose
+    /// condition holds. `None` without stages or when none holds; then
+    /// `name` is the current name.
     pub fn name_stage(&self, id: &str) -> Option<usize> {
         let ti = self.world.thing_idx(id)?;
         self.world.things[ti]

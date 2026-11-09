@@ -34,10 +34,13 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
      - `DeathPrompt`: `undo` and `restart` go to `resume`. For `restore`, the host loads a save.
    - `Ended`: stop. `ending` is `None` for a save restored into a changed story.
 4. A move as a command record is `Command::Go { direction }`; `Command::verb("go", vec![dir])`
-   is the same move.
+   with a compass word or an exit of the room is the same move. `go` with a
+   thing stays a verb.
 5. `scene()` covers the player's room and the inventory. `thing(id)` gives
    any thing of the story with its current name and location, for a host
-   that shows more than the player's room.
+   that shows more than the player's room. Like `snapshot`, it sees
+   everything (concealed things, closed containers); the host decides what
+   to show.
 6. `Effect`, `Status` and `AwaitRequest` are `non_exhaustive`. Keep a fallback arm.
 7. Save with `Session::save`, and load with `Session::load`. After a load, set
    `set_host_rolls` again: it belongs to the session, not to the save. `load`

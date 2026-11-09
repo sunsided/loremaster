@@ -25,7 +25,7 @@ fn kitchen() -> Arc<World> {
         ("things/bucket.yaml", "name: bucket\nlocation: { room: yard }\n"),
         (
             "rules/clock.yaml",
-            "- id: clock\n  on: turn\n  then:\n    - say: \"The clock ticks.\"\n- id: shout\n  on: { verb: [examine, kettle] }\n  then:\n    - say: \"You hum.\"\n",
+            "- id: clock\n  on: turn\n  then:\n    - say: \"The clock ticks.\"\n- id: shout\n  on: { verb: [examine, kettle] }\n  then:\n    - say: \"You hum.\"\n- id: step\n  on: { verb: [go, kettle] }\n  then:\n    - say: \"You step to the kettle.\"\n",
         ),
     ]
     .map(|(path, text)| SourceFile {
@@ -57,6 +57,7 @@ fn cause_of(step: &Step, text: &str) -> Cause {
 fn a_block_says_whether_the_command_or_the_world_made_it() {
     let mut s = Session::new(kitchen());
     let opening = s.start();
+    assert!(!blocks(&opening).is_empty());
     assert!(blocks(&opening).iter().all(|b| b.cause == Cause::World));
 
     let step = s.submit(Input::Text("examine kettle".into()));
@@ -68,7 +69,10 @@ fn a_block_says_whether_the_command_or_the_world_made_it() {
     assert_eq!(cause_of(&tick, "The clock ticks."), Cause::World);
 
     // The JSON of a block names its cause.
-    let json = serde_json::to_value(blocks(&tick)[0]).unwrap();
+    let clock = (blocks(&tick).into_iter())
+        .find(|b| b.plain_text().contains("The clock ticks."))
+        .unwrap();
+    let json = serde_json::to_value(clock).unwrap();
     assert_eq!(json["cause"], "world");
 }
 
@@ -91,6 +95,25 @@ fn the_verb_go_with_a_direction_moves_the_player() {
     s.start();
     let step = s.submit(Input::Command(Command::verb("go", vec![Id::new("east")])));
     assert_eq!(s.scene().room, "yard", "{}", step.plain_text());
+    // The echo is the same as for `Command::Go`.
+    assert!(
+        step.plain_text().starts_with("go east"),
+        "{}",
+        step.plain_text()
+    );
+}
+
+#[test]
+fn the_verb_go_with_a_thing_stays_a_verb_and_runs_its_rules() {
+    let mut s = Session::new(kitchen());
+    s.start();
+    let step = s.submit(Input::Command(Command::verb("go", vec![Id::new("kettle")])));
+    assert!(
+        step.plain_text().contains("You step to the kettle."),
+        "{}",
+        step.plain_text()
+    );
+    assert_eq!(s.scene().room, "kitchen");
 }
 
 #[test]
