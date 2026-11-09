@@ -3,7 +3,7 @@
 //! checks over the whole night, and the hints and the chart that the
 //! walkthroughs give. Read `examples/lock-keeper-slice/README.md`.
 
-use loremaster_model::step_chart;
+use loremaster_model::{Severity, step_chart};
 use loremaster_project::{Project, load, read_dir};
 use loremaster_runtime::{HintBook, Input, Session, World, authoring, run_walkthrough};
 use std::path::{Path, PathBuf};
@@ -120,9 +120,12 @@ fn demo_endings_are_reachable() {
     assert!(checks.ran && checks.proven, "{checks:#?}");
     assert!(checks.dead_ends.is_empty(), "{:#?}", checks.dead_ends);
     assert!(checks.stale.is_empty(), "{:#?}", checks.stale);
+    // Drops that only the coroner accepts, and that no earlier twin of the
+    // state avoids, are infos: they do not fail the check (#245).
     let diagnostics: Vec<_> = checks
         .diagnostics()
         .into_iter()
+        .filter(|d| d.severity != Severity::Info)
         .map(|d| project.locate(d))
         .collect();
     assert!(diagnostics.is_empty(), "{diagnostics:#?}");
@@ -158,6 +161,57 @@ fn demo_endings_are_reachable() {
             ending.id
         );
     }
+}
+
+#[test]
+fn a_drop_that_only_the_coroner_accepts_is_an_info() {
+    // Without its own `closes`, Marsh's step at the lock still loses
+    // `committed`, and the coroner at three names it. No state that differs
+    // only in time keeps the pages, so this is no lateness: the check
+    // reports it at info level, at Marsh's step, and does not fail (#245).
+    let marsh = "    closes: [committed]\n    reason: \"Marsh takes the true pages from the gear housing. A late player can still charge him, with a weaker case.\"\n";
+    let files: Vec<_> = read_dir(&slice("demo"))
+        .unwrap()
+        .into_iter()
+        .map(|mut f| {
+            if f.path == "agendas/marsh.yaml" {
+                assert!(f.text.contains(marsh), "{}", f.text);
+                f.text = f.text.replace(marsh, "");
+            }
+            f
+        })
+        .collect();
+    let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
+    let world = Arc::new(World::compile(project.story.clone()).unwrap());
+    let budget = authoring::Budget {
+        max_states: 70_000,
+        ..Default::default()
+    };
+    let checks = authoring::explore(world, budget).ending_checks;
+    assert!(checks.proven, "{checks:#?}");
+    let step = "agenda:marsh/steps[2]";
+    assert!(
+        checks.no_return.iter().any(|p| p.accepted()
+            && p.rule.as_deref() == Some(step)
+            && p.only_ahead.iter().any(|e| e == "committed")),
+        "{:#?}",
+        checks.no_return
+    );
+    let diagnostics: Vec<_> = checks
+        .diagnostics()
+        .into_iter()
+        .map(|d| project.locate(d))
+        .collect();
+    assert!(
+        diagnostics.iter().all(|d| d.severity == Severity::Info),
+        "{diagnostics:#?}"
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.at == format!("{step}.closes") && d.file == "agendas/marsh.yaml"),
+        "{diagnostics:#?}"
+    );
 }
 
 #[test]

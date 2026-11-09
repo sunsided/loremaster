@@ -46,6 +46,9 @@ pub(crate) struct Game {
     pub(crate) host_walks: bool,
     /// The totals that the next rolls take, for tests. Not in the save.
     pub(crate) forced: ForcedRolls,
+    /// The room of an `end_combat` that a combat event's rule ran. The
+    /// combat takes it in the same step, so it is not in the save.
+    pub(crate) combat_exit: Option<Id>,
 }
 
 /// Forced rolls of a walkthrough step, and the totals that did not fit
@@ -90,6 +93,12 @@ pub struct ThingInfo {
     /// of `name` ("reed" for "Hester Reed").
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// The main word of the current name, for a host that marks it: the
+    /// `head` of the name stage that holds now (or of the thing without a
+    /// stage), else the last word of `name` ("lamp" for "oil lamp"). An
+    /// author sets `head` where the last word is wrong ("bottle of wine").
+    #[serde(default)]
+    pub head: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -429,6 +438,7 @@ impl Game {
             host_rolls: false,
             host_walks: false,
             forced: ForcedRolls::default(),
+            combat_exit: None,
         }
     }
 
@@ -1206,8 +1216,16 @@ impl Game {
     /// A thing of the story, wherever it is: its current name, its aliases
     /// and its location. `None` for an unknown id.
     pub(crate) fn thing_info(&self, id: &str) -> Option<ThingInfo> {
-        let id = &self.world.thing(id)?.id;
+        let thing = self.world.thing(id)?;
+        let id = &thing.id;
         let name = self.name_of(id);
+        let declared = match self.eval().name_stage(id.as_str()) {
+            Some(i) => thing.names[i].head.clone(),
+            None => thing.head.clone(),
+        };
+        let head = (declared.filter(|h| !h.trim().is_empty()))
+            .or_else(|| name.split_whitespace().last().map(str::to_string))
+            .unwrap_or_default();
         let lower = name.to_lowercase();
         let mut aliases = Vec::new();
         for noun in (self.world.thing(id.as_str()).into_iter())
@@ -1222,6 +1240,7 @@ impl Game {
             id: id.to_string(),
             name,
             aliases,
+            head,
             location: (self.state.location_of(id.as_str()).cloned()).unwrap_or(Location::Nowhere),
         })
     }
@@ -1548,18 +1567,95 @@ impl Game {
         self.finish(turn)
     }
 
+    /// The player holds as many things as the story's carry limit allows.
+    pub(crate) fn hands_full(&self) -> bool {
+        (self.world.story.carry_limit).is_some_and(|limit| self.state.held_count() >= limit)
+    }
+
     pub(crate) fn verbs(&self) -> Vec<VerbInfo> {
-        self.world
-            .verbs
-            .iter()
-            .map(|v| VerbInfo {
-                id: v.id.to_string(),
-                label: v.label.clone(),
-                words: v.words.clone(),
-                slots: v.slots,
-                preposition: v.preposition.clone(),
-                bar: v.bar,
+        self.world.verbs.iter().map(verb_info).collect()
+    }
+
+    /// The verbs that apply to a thing now (#235): see [`crate::Session::verbs_for`].
+    pub(crate) fn verbs_for(&self, id: &str) -> Vec<VerbInfo> {
+        use loremaster_model::EventPattern;
+        let Some(t) = self.world.thing(id) else {
+            return Vec::new();
+        };
+        if !self.reachable(id) {
+            return Vec::new();
+        }
+        let named = |o: &Option<Id>| o.as_ref().is_some_and(|o| o.as_str() == id);
+        let mut ids: std::collections::BTreeSet<&str> = (self.world.story.rules.iter())
+            .filter_map(|r| match &r.on {
+                EventPattern::Verb(p) | EventPattern::Check(p)
+                    if crate::explore::for_player(p)
+                        && (named(&p.direct) || named(&p.indirect)) =>
+                {
+                    Some(p.verb.as_str())
+                }
+                _ => None,
             })
+            .collect();
+        ids.extend(t.frames.keys().map(Id::as_str));
+        let has = |p: &str| self.state.facts.contains_key(&format!("{id}.{p}"));
+        let flag = |p: &str| self.state.flag(&format!("{id}.{p}"));
+        let lock_verb = |target: &str| {
+            if self.state.flag(&format!("{target}.locked")) {
+                "unlock"
+            } else {
+                "lock"
+            }
+        };
+        let scope = self.in_scope();
+        let in_scope = |o: &Id| scope.contains(o);
+        ids.insert("examine");
+        // As the default take: not behind a closed container, hands not full.
+        if t.portable
+            && !self.state.is_held(id)
+            && self.state.closed_around(id, false).is_none()
+            && !self.hands_full()
+        {
+            ids.insert("take");
+        }
+        if self.state.is_carried(id) {
+            ids.extend(["drop", "put"]);
+        }
+        if t.container || t.supporter {
+            ids.insert("put");
+        }
+        if has("open") && !self.is_playable(id) {
+            if flag("open") {
+                ids.insert("close");
+            } else if !flag("locked") {
+                ids.insert("open");
+            }
+        }
+        // A lock and its key, both in scope (in_scope leaves out concealed things).
+        if t.key.as_ref().is_some_and(in_scope) && has("locked") {
+            ids.extend([lock_verb(id), "use"]);
+        }
+        for door in scope.iter().filter_map(|d| self.world.thing(d.as_str())) {
+            let locks = self
+                .state
+                .facts
+                .contains_key(&format!("{}.locked", door.id));
+            if locks && door.key.as_ref().is_some_and(|k| k.as_str() == id) {
+                ids.extend([lock_verb(door.id.as_str()), "use"]);
+            }
+        }
+        if has("lit") {
+            ids.extend([if flag("lit") { "turn_off" } else { "turn_on" }, "use"]);
+        }
+        if self.can_talk(id) {
+            ids.insert("talk");
+        }
+        if !self.searchable(id).is_empty() {
+            ids.insert("search");
+        }
+        // A frame or rule for a verb the story does not have adds nothing.
+        ids.into_iter()
+            .filter_map(|v| self.world.verb(v).map(verb_info))
             .collect()
     }
 
@@ -2106,6 +2202,13 @@ impl Game {
             CompiledEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             // Only a rule can pause (the fire loop handles it there); the checks
             // reject `await` in timers and dialogues.
+            CompiledEffect::EndCombat(room) if self.state.combat.is_some() => {
+                self.combat_exit = Some(room.clone());
+            }
+            CompiledEffect::EndCombat(_) => turn.log.push(LogEntry {
+                kind: "combat".into(),
+                text: format!("{rule}: `end_combat` without a combat"),
+            }),
             CompiledEffect::Await(_) | CompiledEffect::Combat(_) => turn.log.push(LogEntry {
                 kind: "await".into(),
                 text: format!("{rule}: `await` and `combat` work only in rules"),
@@ -2439,12 +2542,7 @@ impl Game {
                     say(turn, format!("{} is closed.", self.the(&c, true)));
                 } else if !t.portable {
                     say(turn, format!("{the_cap} won't budge."));
-                } else if self
-                    .world
-                    .story
-                    .carry_limit
-                    .is_some_and(|limit| self.state.held_count() >= limit)
-                {
+                } else if self.hands_full() {
                     say(turn, "Your hands are full.".into());
                 } else {
                     self.move_thing(&t.id, Location::Carried);
@@ -2596,6 +2694,17 @@ impl Game {
                 say(turn, text);
             }
         }
+    }
+}
+
+fn verb_info(v: &loremaster_model::VerbDef) -> VerbInfo {
+    VerbInfo {
+        id: v.id.to_string(),
+        label: v.label.clone(),
+        words: v.words.clone(),
+        slots: v.slots,
+        preposition: v.preposition.clone(),
+        bar: v.bar,
     }
 }
 

@@ -155,6 +155,9 @@ pub enum Effect {
     /// A fight by the built-in rules (P5-03): the rule waits for the player
     /// round by round, then goes on in the `win`, `loss` or `escape` room.
     Combat(Box<CombatSpec>),
+    /// In a rule on a combat event: end the combat and move the player to
+    /// the room. The effects after `combat` go on there.
+    EndCombat(Id),
     /// Start timers, or start them again from the beginning.
     Start(StartTimers),
     /// Stop a timer. Its rules do not fire.

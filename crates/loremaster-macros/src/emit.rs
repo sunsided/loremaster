@@ -513,6 +513,7 @@ fn thing(t: &Thing) -> TokenStream {
                 quote_spanned!(span=> .name_stage(::loremaster::dsl::model::NameStage {
                     text: ::std::string::String::from(#t),
                     aliases: ::std::vec![#(::std::string::String::from(#aliases)),*],
+                    head: ::core::option::Option::None,
                     when: #when,
                     proper: #proper,
                 }))
@@ -654,6 +655,10 @@ fn effects(list: &[Effect], span: Span) -> TokenStream {
             EffectKind::End(r) => {
                 let r = name(r);
                 quote_spanned!(span=> .end(#r))
+            }
+            EffectKind::EndCombat(r) => {
+                let r = name(r);
+                quote_spanned!(span=> .end_combat(#r))
             }
             EffectKind::Stop => quote_spanned!(span=> .stop()),
             EffectKind::Emit(r) => {

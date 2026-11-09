@@ -6,7 +6,9 @@ use loremaster_model::Value;
 use loremaster_project::{SourceFile, check, load};
 use loremaster_runtime::authoring;
 use loremaster_runtime::authoring::{Budget, explore};
-use loremaster_runtime::{Command, Input, PLAYER, SAVE_VERSION, Session, StepOutcome, Turn, World};
+use loremaster_runtime::{
+    Command, Effect, Input, PLAYER, SAVE_VERSION, Session, StepOutcome, Turn, World,
+};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -148,6 +150,42 @@ fn an_actor_walks_one_room_per_turn_and_runs_the_step_at_its_place() {
     // The agenda is over.
     let later = input(&mut game, "wait").plain_text();
     assert!(!later.contains("burns"), "{later}");
+}
+
+#[test]
+fn an_agenda_walk_gives_a_typed_move_and_the_notice() {
+    let mut game = Session::new(world(AGENDA));
+    game.start();
+    let mut moves = Vec::new();
+    let mut notices = 0;
+    for _ in 0..4 {
+        let step = game.submit(Input::Text("wait".into()));
+        for e in &step.effects {
+            match e {
+                Effect::Moved { moved } => moves.push((
+                    moved.actor.to_string(),
+                    moved.name.clone(),
+                    moved.from.as_ref().map(|r| r.to_string()),
+                    moved.to.to_string(),
+                )),
+                Effect::Notice { entry } if entry.kind == "move" => {
+                    assert!(entry.text.starts_with("keeper -> "), "{}", entry.text);
+                    notices += 1;
+                }
+                _ => {}
+            }
+        }
+    }
+    let walk = |from: &str, to: &str| {
+        (
+            "keeper".to_string(),
+            "keeper".to_string(),
+            Some(from.to_string()),
+            to.to_string(),
+        )
+    };
+    assert_eq!(moves, [walk("shed", "yard"), walk("yard", "hall")]);
+    assert_eq!(notices, moves.len(), "one move notice per walk");
 }
 
 #[test]

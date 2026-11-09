@@ -139,6 +139,8 @@ export interface Turn {
 	log: LogEntry[];
 	/** The dice of this turn, in order. */
 	rolls?: RollDetail[];
+	/** The actors that walked in this turn, in order. */
+	moves?: MoveDetail[];
 	/** The sounds of this turn, in order. */
 	sounds?: MediaCue[];
 	/** The talk in progress after this turn. Absent outside a talk. */
@@ -244,6 +246,8 @@ export interface ThingInfo {
 	location: ThingLocation;
 	/** The thing's aliases and the names and aliases of earlier name stages, lowercased. The parser also takes single words of `name`. Absent when there are none. */
 	aliases?: string[];
+	/** The main word of the current name: the `head` of the name stage that holds now (or of the thing while no stage holds), else the last word of `name`. */
+	head: string;
 }
 
 export interface ExitInfo {
@@ -669,6 +673,11 @@ export interface NoReturn {
 	unaccepted: string[];
 	/** The rules whose `closes` accept the drop. */
 	accepted_by: string[];
+	/**
+	 * The ranked endings in `lost` that only a closer firing after the turn accepts, while no state that
+	 * differs only in time still reaches them: not proven to be lateness. An info, not a warning.
+	 */
+	only_ahead: string[];
 	/** The `reason` of each rule in `accepted_by`, in the same order. */
 	reasons: string[];
 	turns: number;
@@ -764,11 +773,22 @@ export type Status =
 	| { type: 'ended'; ending: EndingInfo | null }
 	| { type: 'await'; awaiting: Awaiting };
 
+/** An actor's walk of an agenda step. `from` is missing when the actor was in no room. */
+export interface MoveDetail {
+	actor: string;
+	/** Its current name. */
+	name: string;
+	from?: string;
+	to: string;
+}
+
 /** One thing the session shows or tells the host. */
 export type Effect =
 	| { type: 'text'; block: Block }
 	| { type: 'notice'; entry: LogEntry }
 	| { type: 'roll'; roll: RollDetail }
+	/** An actor walked to a room (an agenda step); the `move` notice has it as text. */
+	| { type: 'moved'; moved: MoveDetail }
 	| { type: 'choices'; talk: TalkInfo; choices: Choice[] }
 	| { type: 'ending'; ending: EndingInfo };
 

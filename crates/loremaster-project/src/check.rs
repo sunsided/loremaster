@@ -4,8 +4,8 @@ use loremaster_lang::{
     LangError, SEEN_BY_ELSEWHERE, Scope, compile_condition, compile_markup, has_seen_by,
 };
 use loremaster_model::{
-    DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
-    ThreadStatus, standard_verbs,
+    COMBAT_END, COMBAT_HIT, COMBAT_ROUND, DialogueId, Effect, EventPattern, Fragment, Line,
+    LineSegment, Location, PLAYER_SPEAKER, Story, ThreadStatus, standard_verbs,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -524,6 +524,23 @@ impl Checker<'_> {
         }
     }
 
+    /// A declared head noun is a word of the name or of one of the aliases.
+    fn head(&mut self, file: &str, at: &str, head: &str, name: &str, aliases: &[String]) {
+        let lower = head.trim().to_lowercase();
+        // A blank head counts as none: the runtime falls back to the last word.
+        let fits = lower.is_empty()
+            || (std::iter::once(name).chain(aliases.iter().map(String::as_str)))
+                .flat_map(str::split_whitespace)
+                .any(|w| w.to_lowercase() == lower);
+        if !fits {
+            self.error(
+                file,
+                at,
+                format!("the head `{head}` is not a word of \"{name}\" or of one of its aliases"),
+            );
+        }
+    }
+
     fn run(&mut self) {
         let story = self.story().clone();
         // The header comes from story.yaml, or from a pack in Rust.
@@ -664,9 +681,16 @@ impl Checker<'_> {
             self.fragments(&file, "description", &thing.description);
             self.fragments(&file, "presence", &thing.presence);
             self.frames(&file, "frames", &thing.frames);
+            if let Some(head) = &thing.head {
+                self.head(&file, "head", head, &thing.name, &thing.aliases);
+            }
             for (i, stage) in thing.names.iter().enumerate() {
                 if let Some(when) = &stage.when {
                     self.condition(&file, &format!("names[{i}].when"), when);
+                }
+                if let Some(head) = &stage.head {
+                    let at = format!("names[{i}].head");
+                    self.head(&file, &at, head, &stage.text, &stage.aliases);
                 }
             }
         }
@@ -699,6 +723,7 @@ impl Checker<'_> {
                 .flat_map(|i| &i.events)
                 .map(|e| e.id.to_string()),
         );
+        let has_combat = all_effects(&story).any(|e| matches!(e, Effect::Combat(_)));
         let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         let mut group_sizes: BTreeMap<&str, usize> = BTreeMap::new();
         for g in story.rules.iter().filter_map(|r| r.once.group()) {
@@ -765,6 +790,28 @@ impl Checker<'_> {
                     },
                     None => self.error(&file, "on.talk", "name the dialogue"),
                 },
+                EventPattern::Event(name) if is_combat_event(name.as_str()) => {
+                    if !has_combat {
+                        self.warning(
+                            &file,
+                            "on.event",
+                            format!("rule on `{name}`, but the story has no `combat`"),
+                        );
+                    }
+                    for (i, e) in rule.then.iter().enumerate() {
+                        let what = match e {
+                            Effect::Goto(_) => "goto",
+                            Effect::Await(_) => "await",
+                            Effect::Combat(_) => "combat",
+                            _ => continue,
+                        };
+                        self.error(
+                            &file,
+                            &format!("then[{i}]"),
+                            format!("a rule on `{name}` cannot `{what}` while the combat runs; use `end_combat`"),
+                        );
+                    }
+                }
                 EventPattern::Event(name) => {
                     if !emitted.contains(name.as_str()) {
                         self.warning(
@@ -801,6 +848,18 @@ impl Checker<'_> {
                 self.condition(&file, "when", when);
             }
             self.effects(&file, "then", &rule.then);
+            // At `combat_end` the combat is over already.
+            let on_combat = matches!(&rule.on, EventPattern::Event(e)
+                if is_combat_event(e.as_str()) && e.as_str() != COMBAT_END);
+            for (i, e) in rule.then.iter().enumerate() {
+                if matches!(e, Effect::EndCombat(_)) && (!on_combat || !has_combat) {
+                    self.warning(
+                        &file,
+                        &format!("then[{i}]"),
+                        "`end_combat` works only in a rule on a combat event (`combat_hit`, `combat_round`) of a story with a `combat`",
+                    );
+                }
+            }
         }
         self.walkthroughs();
         self.media();
@@ -1198,7 +1257,9 @@ impl Checker<'_> {
                         );
                     }
                 }
-                Effect::Goto(room) => self.room_ref(file, &at, room.as_str()),
+                Effect::Goto(room) | Effect::EndCombat(room) => {
+                    self.room_ref(file, &at, room.as_str())
+                }
                 Effect::Move(moves) => {
                     for (thing, to) in moves {
                         self.thing_ref(file, &at, thing.as_str());
@@ -2042,11 +2103,14 @@ impl Checker<'_> {
     /// Only a rule can wait for the host: a timer or a dialogue has no place to go on from.
     fn no_await(&mut self, file: &str, at: &str, effects: &[Effect]) {
         for (i, e) in effects.iter().enumerate() {
-            if matches!(e, Effect::Await(_) | Effect::Combat(_)) {
+            if matches!(
+                e,
+                Effect::Await(_) | Effect::Combat(_) | Effect::EndCombat(_)
+            ) {
                 self.error(
                     file,
                     &format!("{at}[{i}]"),
-                    "`await` and `combat` work only in rules",
+                    "`await`, `combat` and `end_combat` work only in rules",
                 );
             }
         }
@@ -2124,6 +2188,11 @@ fn ended_endings(story: &Story) -> BTreeSet<String> {
             _ => None,
         })
         .collect()
+}
+
+/// One of the rule events that a combat sends (#230).
+fn is_combat_event(name: &str) -> bool {
+    [COMBAT_HIT, COMBAT_ROUND, COMBAT_END].contains(&name)
 }
 
 /// The names of the custom events that some `emit` sends.

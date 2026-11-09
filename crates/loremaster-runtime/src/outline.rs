@@ -152,6 +152,7 @@ pub(crate) fn describe(o: &Outcomes) -> Vec<String> {
                 .join(", ")
         ),
         Effect::Goto(r) => format!("go to {r}"),
+        Effect::EndCombat(r) => format!("end the combat in {r}"),
         Effect::End(id) => format!("end the story ({id})"),
         Effect::Say(_) => "say a line".into(),
         Effect::Set(m) => format!("set {}", m.keys().cloned().collect::<Vec<_>>().join(", ")),

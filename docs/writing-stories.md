@@ -177,6 +177,21 @@ names:
 - Set `proper: true` for a proper name. A proper name gets no article.
 - The author tooltip shows all stages and the current stage.
 
+### The head noun
+
+A host that marks the main word of a name reads `ThingInfo::head`. It is the last word of the current name ("lamp" for "oil lamp", "Reed" for "Hester Reed"). Where the last word is wrong, set `head` on the thing, or on a name stage for that stage. It must be a word of the name or text, or a word of one of its aliases; `loremaster check` reports any other word. A blank `head` counts as none.
+
+```yaml
+# things/bottle.yaml
+name: bottle of wine
+head: bottle
+names:
+  - { when: bottle.empty, text: flask of nothing, head: flask }
+  - { when: bottle.broken, text: broken glass }
+```
+
+The `head` of the thing counts while no stage holds; a stage without `head` uses the last word of its text ("glass" for "broken glass"). The parser does not use `head`: it accepts every word of a name.
+
 ## Dialogues
 
 A dialogue is a talk with a thing, for example a character. Put it in `dialogues/<id>.yaml`. The player starts it with "Talk to" and the thing.
@@ -522,6 +537,47 @@ After a hit, the player can select "Test your Luck" or "Go on", when `luck` is m
 
 Escape costs 2 `stamina`. If that is the last `stamina`, the combat ends in `loss`.
 
+Special rules that react to what happens in a round are rules on the combat events. They work as host events: `on: { event: combat_hit }`, and the arguments read as `combat_hit.damage`.
+
+| Event | When | Arguments |
+| --- | --- | --- |
+| `combat_hit` | A hit, before it counts, after a Luck test | `enemy`, `target` (`player` or the enemy), `damage`, `round` |
+| `combat_round` | The end of a round, before the end check | `enemy` (the enemy that the player attacked), `round`, `won` (the player hit it) |
+| `combat_end` | The combat is over, in its last room | `enemy` (the first of `enemies`), `outcome`: `win`, `loss`, `escape` or `ended` |
+
+`enemy` and `target` are text: `combat_hit.target == "troll"`. A rule on `combat_hit` can change the damage of this hit: `set: { combat_hit.damage: 0 }` (a negative value counts as 0). The effect `end_combat: <room>` ends the combat at once and moves the player to the room, any room; the hit of a `combat_hit` rule still counts, and `combat_end` has the outcome `ended`. The rule with `combat` goes on there, as after a win. When a `combat_hit` rule ends the combat, the other hits of the same round still count (without a Luck test), then the combat ends. Rules on the events can `set`, `add`, `say` and `end_combat`; `loremaster check` rejects `goto`, `await` and `combat` in them, and warns about `end_combat` outside a rule on `combat_hit` or `combat_round`. The ids `combat_hit`, `combat_round` and `combat_end` are reserved: no room, thing, variable or host event can take them.
+
+```yaml
+- id: troll_weakens
+  on: { event: combat_hit }
+  when: combat_hit.target == "troll"
+  then:
+    - add: { troll.skill: -1 }
+- id: count_wins
+  on: { event: combat_round }
+  when: combat_round.won
+  then:
+    - add: { streak: 1 }
+- id: reset_wins
+  on: { event: combat_round }
+  when: not combat_round.won
+  then:
+    - set: { streak: 0 }
+- id: two_in_a_row
+  on: { event: combat_round }
+  when: streak >= 2
+  then:
+    - end_combat: section_7
+- id: fog_lifts
+  on: { event: combat_round }
+  when: combat_round.round == 3
+  then:
+    - say: "The fog lifts, and the troll flees."
+    - end_combat: far_bank
+```
+
+The rules of an event run in rule order, so `two_in_a_row` sees the `streak` of this round. A combat sets the arguments only when a rule listens for the event, and `loremaster check` warns about a rule on one in a story without `combat`. In `world!`, the effect is `end_combat far_bank;`, and the builder has `.end_combat("far_bank")`.
+
 In a walkthrough, each step answers one question. `rolls:` has the enemy totals, then the player total:
 
 ```yaml
@@ -650,6 +706,8 @@ then:
 A walkthrough checks it with `sound:`, in a step or in `expect`: `{ do: open gate, sound: gate_creak }`.
 
 `loremaster check` reports an unknown asset, a file that does not exist and a path outside the project as errors. An asset without a licence, an unused asset and a missing caption are warnings.
+
+For a sound line, such as an NPC's "clank, clank", use `play_sound` with an asset that has a `caption`, not a `say` with a text prefix like `sfx:`. The host gets a typed sound with its caption, and each player shows it as it can: `loremaster play` and the terminal host print the caption, the web player plays the audio or shows the caption.
 
 The web player shows the images and plays the audio. The sound is off by default; Alt+M switches it. Audio starts after the first input of the player. Captions show while the sound is off, or with the Captions switch. The web player has the files of the bundled examples only: a story from a folder or a zip shows the captions in place of its media.
 
@@ -799,6 +857,7 @@ How a turn goes for an actor, after the clock moved and the timers and time rule
 - An actor does one thing per turn: it walks one room, runs one step, or tries a `do` that a `check` rule refuses. A step skipped for its `when` takes no time.
 - While the player talks with the actor, the actor waits. Its step runs late, in the turn that ends the talk.
 - The player sees an actor come into the room and leave it ("The lock-keeper comes in.").
+- Each walk gives the host an `Effect::Moved` (`{ "type": "moved", "moved": { "actor", "name", "from", "to" } }`, ids of the rooms, `from` missing when the actor was in no room). The `move` notice `<actor> -> <room>` comes in the same step, but not always right before it: match the two by `actor`, not by position. A host that shows actors reads it instead of parsing the text. It comes also when the player does not see the walk.
 - A step runs once. A save game keeps which steps ran and which were skipped.
 
 `closes` marks a point of no return, for the ending checks. It is not a dead end: after the keeper burns the pages, the best ending (`committed`) is gone, but the game can still end (`ashes`). A drop in the best reachable ending is a warning, unless the step names the ending in `closes`; a dead end, where no ending can be reached at all, is an error. `loremaster check` checks today that `closes` names known endings.

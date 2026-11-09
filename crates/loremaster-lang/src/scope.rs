@@ -97,7 +97,9 @@ impl Scope {
                 (t.id.to_string(), props)
             })
             .collect();
+        let combat = loremaster_model::combat_events();
         let events = (story.interface.iter().flat_map(|i| &i.events))
+            .chain(&combat)
             .map(|e| {
                 let args = e.args.iter().map(|(k, t)| (k.clone(), Ty::of_arg(t)));
                 (e.id.to_string(), args.collect())

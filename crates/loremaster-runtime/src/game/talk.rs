@@ -130,6 +130,12 @@ impl Game {
         })
     }
 
+    /// The thing has a dialogue with a start node that applies now.
+    pub(crate) fn can_talk(&self, thing: &str) -> bool {
+        (self.world.dialogue_with(thing))
+            .is_some_and(|d| select_entry(&d.graph, &evaluator(), self).is_some())
+    }
+
     /// Start the dialogue of a thing at its first start node that applies.
     /// False when the thing has no dialogue or no start node applies.
     pub(super) fn start_talk(&mut self, turn: &mut Turn, thing: &Id) -> bool {
