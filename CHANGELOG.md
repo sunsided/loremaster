@@ -8,6 +8,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Changed
+
+- The two-robot demo has its water clock: the timer `water` floods the station after eight turns, and its rule `river_wins` names `closes: [drained]`. The explorer needs more than the default budget for it now (#210).
+
+### Fixed
+
+- The state explorer tells states apart by the turns left of each timer. Before, an ending that a timer triggers was never reached, and the ending checks missed the points of no return that a timer makes (#210).
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

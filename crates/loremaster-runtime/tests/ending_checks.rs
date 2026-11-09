@@ -288,6 +288,25 @@ fn closes_accepts_the_turns_before_a_timed_step() {
 }
 
 #[test]
+fn a_timer_reaches_its_ending() {
+    // The guards come when the fuse runs out. The walk gets there only when
+    // it tells the turns left of the timer apart.
+    let timer = "turns: 3\nrunning: true\n";
+    let rules =
+        format!("{ESCAPE}- id: guards\n  on: {{ timer: fuse }}\n  then: [{{ end: caught }}]\n");
+    let (result, diagnostics) = full(&cell(&rules, &[("timers/fuse.yaml", timer)]));
+    assert!(result.ending_checks.proven, "{:#?}", result.ending_checks);
+    let caught = result
+        .endings
+        .iter()
+        .find(|e| e.text.starts_with("Caught"))
+        .unwrap_or_else(|| panic!("{:#?}", result.endings));
+    // Three turns of anything but `escape`.
+    assert_eq!(caught.path.len(), 3, "{:?}", caught.path);
+    assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+}
+
+#[test]
 fn a_stopped_walk_proves_nothing() {
     let rules = format!(
         "{ESCAPE}- id: burn_map\n  on: {{ verb: [burn] }}\n  when: not burned\n  then: [{{ set: {{ burned: true }} }}]\n"

@@ -92,8 +92,8 @@ pub struct Exploration {
 
 /// A state as the explorer compares it: the parts that change what can happen.
 /// The clock counts only by phase, and by the minutes until each agenda's
-/// next step is due. Counters count only up to 3, and only when the story
-/// reads them.
+/// next step is due. Timers count by the turns they have left. Counters
+/// count only up to 3, and only when the story reads them.
 fn fingerprint(game: &Game, counters: bool) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
@@ -125,7 +125,14 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         // Only the hit that waits for its Luck test; round and log are history.
         s.combat.as_ref().map(|c| (true, &c.pending)),
         // In one tuple: serde serializes tuples of 16 at most.
-        (&s.actors, game.agenda_waits(), &s.active, &s.orders),
+        // The turns left of each timer: a timer that runs out can end the game.
+        (
+            &s.actors,
+            game.agenda_waits(),
+            &s.active,
+            &s.orders,
+            &s.timers,
+        ),
     ))
     .unwrap_or_default()
 }
