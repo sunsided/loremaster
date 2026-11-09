@@ -179,17 +179,18 @@ names:
 
 ### The head noun
 
-A host that marks the main word of a name reads `ThingInfo::head`. It is the last word of the current name ("lamp" for "oil lamp", "Reed" for "Hester Reed"). Where the last word is wrong, set `head` on the thing, or on a name stage for that stage. It must be a word of the name or text, or one of its aliases; `loremaster check` reports any other word.
+A host that marks the main word of a name reads `ThingInfo::head`. It is the last word of the current name ("lamp" for "oil lamp", "Reed" for "Hester Reed"). Where the last word is wrong, set `head` on the thing, or on a name stage for that stage. It must be a word of the name or text, or a word of one of its aliases; `loremaster check` reports any other word. A blank `head` counts as none.
 
 ```yaml
-# things/boots.yaml
-name: pair of boots
-head: boots
+# things/bottle.yaml
+name: bottle of wine
+head: bottle
 names:
-  - { when: boots.muddy, text: muddy pair of boots, head: boots }
+  - { when: bottle.empty, text: flask of nothing, head: flask }
+  - { when: bottle.broken, text: broken glass }
 ```
 
-The `head` of the thing counts while no stage holds; a stage without `head` uses the last word of its text. The parser does not use `head`: it accepts every word of a name.
+The `head` of the thing counts while no stage holds; a stage without `head` uses the last word of its text ("glass" for "broken glass"). The parser does not use `head`: it accepts every word of a name.
 
 ## Dialogues
 

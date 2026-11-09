@@ -55,7 +55,7 @@ impl<'a> ThingBuilder<'a> {
         self
     }
 
-    /// `head`: the main word of the name for hosts, such as "boots".
+    /// `head`: the main word of the name for hosts, such as "bottle" for "bottle of wine".
     pub fn head(mut self, head: impl Into<String>) -> Self {
         self.thing().head = Some(head.into());
         self
