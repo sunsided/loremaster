@@ -34,10 +34,10 @@ The walkthroughs are the three paths of the design: `best` (committed for trial)
 | The accusation, five ranked endings, the case notebook (quests) | `rules/accuse.yaml`, `endings/`, `machines/means.yaml`, `machines/opportunity.yaml`, `machines/motive.yaml` | 6 |
 | Walkthroughs, hints, the ending checks | `tests/`, `closes` in `agendas/` | 7 |
 
-What changed from the design, so that the ending checks can walk every state of the night (about 60,000 with these choices; with the design's 5-minute turns the walk does not finish):
+What changed from the design, so that the ending checks can walk every state of the night (about 39,000 with these choices; with the design's 5-minute turns and the coroner at three it takes 432,000 states and a minute, too slow for the tests):
 
 - A turn is 15 minutes, not 5, and the coroner comes at three, not at four.
 - The coroner reads the case at three; with no case, the verdict is "accidental death". That ending ranks above a wrong accusation and above "released at dawn".
 - Bert tells of the two lanterns in the same talk in which you say that Amos was a good man; there is no stored trust.
 - `search chest` finds the windlass and proves the means; `examine windlass` shows the dent.
-- Not in the demo: `ask … about` and `show … to` (the parser has them since #169; the demo's questions are dialogue options), Marsh's flight ("He ran"), Hester's alibi and her trust (#216). Going back to 5-minute turns waits for time bands in the explorer (#168).
+- Not in the demo: `ask … about` and `show … to` (the parser has them since #169; the demo's questions are dialogue options), Marsh's flight ("He ran"), Hester's alibi and her trust (#216). Going back to 5-minute turns waits for a decision on time bands in the explorer (#239).

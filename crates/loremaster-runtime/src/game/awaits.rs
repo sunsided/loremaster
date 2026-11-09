@@ -88,6 +88,11 @@ impl Game {
             }
             None => self.roll_dice(dice),
         };
+        Self::record_roll(turn, roll, total, faces)
+    }
+
+    /// Log a roll and keep it for the dice display.
+    pub(crate) fn record_roll(turn: &mut Turn, roll: &str, total: i64, faces: Vec<i64>) -> i64 {
         turn.log.push(LogEntry {
             kind: "roll".into(),
             text: format!("{roll} = {total}"),

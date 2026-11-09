@@ -1677,7 +1677,7 @@ impl Game {
                 break;
             }
             let rule = &world.story.rules[i];
-            if !event.matches(rule) || (rule.once && self.state.fired.contains(&rule.id)) {
+            if !event.matches(rule) || (reads_fired(rule) && self.state.fired.contains(&rule.id)) {
                 continue;
             }
             if rule.machine.as_ref().is_some_and(|m| stepped.contains(&m)) {
@@ -2455,6 +2455,15 @@ impl Game {
             }
         }
     }
+}
+
+/// True when the game reads `State.fired` for this rule: a `once` rule that
+/// fired does not fire again. This is the only read of `fired` that changes
+/// what happens (the others only drop ids of rules that are gone), and the
+/// explorer relies on that to leave the other fired rules out of its state
+/// key.
+pub(crate) fn reads_fired(rule: &loremaster_model::Rule) -> bool {
+    rule.once
 }
 
 pub(crate) fn rule_run(text: String, rule: &Id) -> Run {
