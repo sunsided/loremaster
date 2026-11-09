@@ -340,14 +340,16 @@ export class Session {
 	}
 
 	/**
-	 * Start again and play a path from the state explorer. A step is `go <direction>`
-	 * or `<verb> <thing ids>`.
+	 * Start again and play a path from the state explorer. The engine reads each step as the
+	 * explorer wrote it, also `say`, `answer` and `leave`. It stops at a step the game no longer has.
 	 */
 	replay(path: string[]) {
 		this.restart();
+		this.draft = '';
 		for (const step of path) {
-			const [verb, ...objects] = step.split(' ');
-			this.act(verb === 'go' ? { type: 'go', direction: objects[0] } : { type: 'verb', verb, objects });
+			const turn = this.bench.replayStep(step);
+			if (!turn) break;
+			this.#push(turn);
 		}
 	}
 

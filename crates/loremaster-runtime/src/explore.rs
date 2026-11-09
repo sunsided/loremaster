@@ -330,6 +330,15 @@ fn force_round(game: &mut Game, label: &str) {
     game.forced.totals = totals.into();
 }
 
+/// The command of one step of an explorer path in this state, with the rolls
+/// of a combat round forced as the walk saw them. `None` when the state has
+/// no such step.
+pub(crate) fn step_command(game: &mut Game, step: &str) -> Option<Command> {
+    let (label, cmd) = commands(game).into_iter().find(|(l, _)| l == step)?;
+    force_round(game, &label);
+    Some(cmd)
+}
+
 /// A pattern that matches the player's commands: no `actor`, or the player.
 fn for_player(p: &loremaster_model::CommandPattern) -> bool {
     p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)

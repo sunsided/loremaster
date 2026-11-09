@@ -8,6 +8,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- `Workbench::replay_step` (WASM `replayStep`) plays one step of a path from the state explorer, as a whole turn, or gives `None` when the game has no such step now. It reads each step as the explorer wrote it, with the rolls of a combat round as the walk forced them.
+
+### Fixed
+
+- The "Replay this path" buttons of the explorer in the web editor play `say`, `answer` and `leave` steps, and steps with a preposition or a topic, through `Workbench::replay_step`. Before, a path through a talk or a paused rule stopped working at that step (#163).
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

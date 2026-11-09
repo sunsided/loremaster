@@ -220,6 +220,14 @@ pub fn play(session: &mut Session, input: Input) -> Turn {
     session.turn(input)
 }
 
+/// One step of an explorer path (`go north`, `say …`, `answer …`, `leave`)
+/// as a whole turn, with the rule log. `None` when the game has no such step
+/// now, for example after an edit of the story.
+pub fn replay_step(session: &mut Session, step: &str) -> Option<Turn> {
+    let input = session.explorer_step(step)?;
+    Some(session.turn(input))
+}
+
 /// The answer to a paused rule or the death prompt as a whole turn, with the
 /// rule log, for an editor transcript. Read [`Session::resume`].
 pub fn resume(

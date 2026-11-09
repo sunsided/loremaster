@@ -417,6 +417,12 @@ impl Session {
         self.game.forced.totals = totals.iter().copied().collect();
     }
 
+    /// The input of one step of an explorer path, or `None` when the game
+    /// has no such step now. A combat round gets the rolls the walk forced.
+    pub(crate) fn explorer_step(&mut self, step: &str) -> Option<Input> {
+        crate::explore::step_command(&mut self.game, step).map(Input::Command)
+    }
+
     /// What went wrong with the forced rolls: totals out of the range of
     /// their dice, and totals that no roll took. Clears the forced rolls.
     pub(crate) fn forced_roll_errors(&mut self) -> Vec<String> {
