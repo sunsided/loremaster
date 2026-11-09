@@ -1673,7 +1673,7 @@ impl Game {
         // matches another step.
         let mut stepped: Vec<&Id> = Vec::new();
         let mut ran: Vec<usize> = Vec::new();
-        for &i in &world.rule_order {
+        for (at, &i) in world.rule_order.iter().enumerate() {
             if self.stopped || self.state.ended {
                 break;
             }
@@ -1689,7 +1689,7 @@ impl Game {
             {
                 continue;
             }
-            if any_verb(rule) && self.exact_verb_fires(event, i, &ran) {
+            if any_verb(rule) && self.exact_verb_fires(event, at, &ran, &stepped) {
                 continue;
             }
             ran.push(i);
@@ -1732,22 +1732,26 @@ impl Game {
         out
     }
 
-    /// Does a rule with an exact verb in the scope of the `*` rule `wild`
-    /// fire for the event? Then it holds the `*` rule back (#192).
-    /// shortcut: a rule that has not run yet is judged by its condition now,
-    /// before the rules ahead of it change the state; upgrade if that bites.
-    fn exact_verb_fires(&self, event: &Event, wild: usize, ran: &[usize]) -> bool {
+    /// Does a rule with an exact verb in the scope of the `*` rule at place
+    /// `at` of the rule order fire for the event? Then it holds the `*` rule
+    /// back (#192). `ran` holds the rules that ran for the event so far.
+    /// shortcut: a rule after `at` is judged by its condition now, before the
+    /// rules between change the state; upgrade if that bites.
+    fn exact_verb_fires(&self, event: &Event, at: usize, ran: &[usize], stepped: &[&Id]) -> bool {
         let world = &self.world;
-        let within = &world.rules[wild].within;
-        world.rule_order.iter().any(|&j| {
-            let rule = &world.story.rules[j];
-            !any_verb(rule)
-                && world.rules[j].within == *within
-                && event.matches(rule)
-                && (ran.contains(&j)
-                    || (!(rule.once && self.state.fired.contains(&rule.id))
-                        && self.eval().holds_opt(&world.rules[j].when)))
-        })
+        let order = &world.rule_order;
+        let within = &world.rules[order[at]].within;
+        let exact = |j: usize| !any_verb(&world.story.rules[j]) && world.rules[j].within == *within;
+        // The rules in `ran` matched the event already.
+        ran.iter().any(|&j| exact(j))
+            || order[at + 1..].iter().any(|&j| {
+                let rule = &world.story.rules[j];
+                exact(j)
+                    && event.matches(rule)
+                    && !(rule.once && self.state.fired.contains(&rule.id))
+                    && !rule.machine.as_ref().is_some_and(|m| stepped.contains(&m))
+                    && self.eval().holds_opt(&world.rules[j].when)
+            })
     }
 
     /// Does the scope of a rule hold for the event? A thing rule needs the

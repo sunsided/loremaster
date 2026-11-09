@@ -533,6 +533,14 @@ impl Checker<'_> {
         self.frames(&header, "frames", &story.frames);
         let mut seen = BTreeSet::new();
         for v in &story.verbs {
+            if v.id.as_str() == loremaster_model::ANY_VERB {
+                let file = self.file_of(&format!("verb:{}", v.id));
+                self.error(
+                    &file,
+                    "id",
+                    "`*` is the verb of rules that match any verb; name the verb otherwise",
+                );
+            }
             if !seen.insert(v.id.as_str()) {
                 let file = self.file_of(&format!("verb:{}", v.id));
                 self.error(&file, "id", format!("verb `{}` is defined twice", v.id));
