@@ -13,6 +13,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening and the turn passing (`on: turn`, timers, time rules, agendas, orders). A graphical host can draw the player's own text over the player and the rest as ambient narration.
 - `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.
 - **Breaking (library):** `Block` has the new field `cause`, and `ThingInfo` has the new field `location`; code that builds them with a struct literal needs them.
+- `await`, `combat` and `stats` in `world!` and the builder (#191), so a story with rolls or fights does not need YAML. `world!` has the effects `await roll "2d6" into r against luck;`, `await choice [..] into ..;`, `await walk_to ..;`, `await action .. { .. } results [..] into ..;` and `combat [warden] win yard loss fallen escape road together;` (`escape` and `together` are optional), and `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }` in the story header. The builder has `Effects::awaits`, `Effects::combat` and `StoryBuilder::stat`, `stat_short` and `stat_max`. `AwaitSpec` now derives `Default`.
 
 ### Fixed
 
