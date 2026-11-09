@@ -1,0 +1,10 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"story.yaml"}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"try_condition","arguments":{"condition":"visited(shore) and not lamp.lit"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"try_markup","arguments":{"text":"The {night: dark | bright} shore."}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"session_start","arguments":{}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"input","arguments":{"text":"look"}}}
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"propose","arguments":{"summary":"x","files":[{"path":"rooms/x.yaml","text":"name: X\n"}]}}}
+{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"get_entity","arguments":{"kind":"room","id":"shore"}}}
+{"jsonrpc":"2.0","id":9,"method":"prompts/get","params":{"name":"review_room","arguments":{"room":"shore"}}}
+{"jsonrpc":"2.0","id":10,"method":"resources/read","params":{"uri":"loremaster://guide/writing-stories"}}
