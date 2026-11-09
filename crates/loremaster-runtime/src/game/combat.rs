@@ -4,12 +4,19 @@
 //! in builds that can not register a Rust behavior (the web player and
 //! `loremaster test`). The position is an ordinary `Awaiting` and the rest is
 //! in `State`, so a save in the middle of a combat restores.
+//!
+//! Special rules that react to a round are rules on the combat events
+//! (#230): `combat_hit` before a hit counts, `combat_round` at the end of a
+//! round and `combat_end` when the combat is over. A rule on `combat_hit`
+//! can change `combat_hit.damage`, and `end_combat` leaves to any room.
 
 use super::Game;
 use super::awaits::AwaitStep;
 use crate::state::{AwaitOptionInfo, AwaitRequest, CombatState, LastRound};
 use crate::{BlockKind, PLAYER, Turn};
-use loremaster_model::{CombatSpec, Dice, Id, Value};
+use loremaster_model::{
+    COMBAT_END, COMBAT_HIT, COMBAT_ROUND, CombatSpec, Dice, EventPattern, Id, Value,
+};
 use std::collections::BTreeMap;
 
 pub(crate) const ATTACK_TEXT: &str = "Attack";
@@ -53,6 +60,7 @@ impl Game {
             });
             return AwaitStep::Skipped;
         }
+        self.combat_exit = None;
         self.state.combat = Some(CombatState {
             spec: spec.clone(),
             round: 0,
@@ -81,9 +89,9 @@ impl Game {
             Value::Text(a) if a == GO_ON => {
                 if let Some(hit) = self.pending_hit() {
                     let damage = self.hit_damage(&hit);
-                    self.combat_damage(turn, &hit, damage);
+                    self.combat_hit(turn, &hit, damage);
                 }
-                self.combat_go_on(turn, rule, next, 1)
+                self.combat_round_over(turn, rule, next)
             }
             // A total that the host rolled, for the round or the Luck test.
             Value::Int(total) => {
@@ -204,11 +212,14 @@ impl Game {
         let Some(spec) = self.state.combat.as_ref().map(|c| c.spec.clone()) else {
             return AwaitStep::Answered;
         };
+        if let Some(room) = self.combat_exit.take() {
+            return self.combat_leave(turn, room, "ended", depth);
+        }
         if self.int("stamina") <= 0 {
-            return self.combat_leave(turn, spec.loss, depth);
+            return self.combat_leave(turn, spec.loss, "loss", depth);
         }
         if self.living(&spec).is_empty() {
-            return self.combat_leave(turn, spec.win, depth);
+            return self.combat_leave(turn, spec.win, "win", depth);
         }
         // All at once, the player chooses the target; `attack` is the first.
         let living = self.living(&spec);
@@ -248,10 +259,83 @@ impl Game {
         self.open_await(turn, rule, next, AwaitRequest::Choice { options }, None)
     }
 
-    fn combat_leave(&mut self, turn: &mut Turn, room: Id, depth: u8) -> AwaitStep {
-        self.state.combat = None;
+    /// End the combat in `room`, then send `combat_end` with the outcome.
+    fn combat_leave(&mut self, turn: &mut Turn, room: Id, outcome: &str, depth: u8) -> AwaitStep {
+        let enemy = (self.state.combat.take()).and_then(|c| c.spec.enemies.first().cloned());
         self.move_player(turn, room, depth);
+        if self.combat_heard(COMBAT_END) {
+            let args = [
+                (
+                    "enemy",
+                    Value::Text(enemy.map(|e| e.to_string()).unwrap_or_default()),
+                ),
+                ("outcome", Value::Text(outcome.into())),
+            ];
+            self.combat_event(turn, COMBAT_END, args, depth);
+        }
         AwaitStep::Answered
+    }
+
+    /// Does a rule listen for the combat event? Without one, the combat
+    /// sets no facts for it.
+    fn combat_heard(&self, name: &str) -> bool {
+        (self.world.story.rules.iter())
+            .any(|r| matches!(&r.on, EventPattern::Event(e) if e.as_str() == name))
+    }
+
+    /// Keep the arguments of a combat event as `event.arg`, as for a host
+    /// event, and run the rules that listen for it.
+    fn combat_event<const N: usize>(
+        &mut self,
+        turn: &mut Turn,
+        name: &str,
+        args: [(&str, Value); N],
+        depth: u8,
+    ) {
+        for (arg, value) in args {
+            self.set_fact(turn, &format!("{name}.{arg}"), value);
+        }
+        turn.log.push(crate::LogEntry {
+            kind: "event".into(),
+            text: name.to_string(),
+        });
+        self.fire(turn, &crate::Event::Custom(Id::new(name)), depth);
+    }
+
+    /// A hit: the rules on `combat_hit` can change its damage, then it counts.
+    fn combat_hit(&mut self, turn: &mut Turn, hit: &Id, damage: i64) {
+        if !self.combat_heard(COMBAT_HIT) {
+            return self.combat_damage(turn, hit, damage);
+        }
+        let c = self.state.combat.as_ref();
+        let round = c.map_or(0, |c| c.round);
+        let enemy = if hit.as_str() == PLAYER {
+            c.and_then(|c| c.by.clone()).unwrap_or_else(|| hit.clone())
+        } else {
+            hit.clone()
+        };
+        let args = [
+            ("enemy", Value::Text(enemy.to_string())),
+            ("target", Value::Text(hit.to_string())),
+            ("damage", Value::Int(damage)),
+            ("round", Value::Int(i64::from(round))),
+        ];
+        self.combat_event(turn, COMBAT_HIT, args, 1);
+        let damage = self.int(&format!("{COMBAT_HIT}.damage")).max(0);
+        self.combat_damage(turn, hit, damage);
+    }
+
+    /// The round is over: `combat_round` (its arguments are set when the
+    /// round rolls), then the end check.
+    fn combat_round_over(&mut self, turn: &mut Turn, rule: &Id, next: usize) -> AwaitStep {
+        if self.combat_exit.is_none() && self.combat_heard(COMBAT_ROUND) {
+            turn.log.push(crate::LogEntry {
+                kind: "event".into(),
+                text: COMBAT_ROUND.to_string(),
+            });
+            self.fire(turn, &crate::Event::Custom(Id::new(COMBAT_ROUND)), 1);
+        }
+        self.combat_go_on(turn, rule, next, 1)
     }
 
     fn combat_escape(&mut self, turn: &mut Turn) -> AwaitStep {
@@ -260,11 +344,11 @@ impl Game {
         };
         self.combat_say(turn, format!("You escape, and lose {HIT} STAMINA."));
         self.combat_damage(turn, &Id::new(PLAYER), HIT);
-        let room = match spec.escape {
-            Some(room) if self.int("stamina") > 0 => room,
-            _ => spec.loss,
+        let (room, outcome) = match spec.escape {
+            Some(room) if self.int("stamina") > 0 => (room, "escape"),
+            _ => (spec.loss, "loss"),
         };
-        self.combat_leave(turn, room, 1)
+        self.combat_leave(turn, room, outcome, 1)
     }
 
     /// One round: the enemies roll, then the player. The player attacks the
@@ -310,6 +394,16 @@ impl Game {
             });
             c.target = None;
         }
+        if self.combat_heard(COMBAT_ROUND) {
+            let args = [
+                ("enemy", Value::Text(target.to_string())),
+                ("round", Value::Int(i64::from(round))),
+                ("won", Value::Bool(player > enemies[&target])),
+            ];
+            for (arg, value) in args {
+                self.set_fact(turn, &format!("{COMBAT_ROUND}.{arg}"), value);
+            }
+        }
         // A Luck test changes the last hit of the round; the others count at once.
         let mut hit: Option<(Id, Id)> = None;
         for e in &fighting {
@@ -333,8 +427,12 @@ impl Game {
             }
         }
         let Some((hit, by)) = hit else {
-            return self.combat_go_on(turn, rule, next, 1);
+            return self.combat_round_over(turn, rule, next);
         };
+        // A rule on an earlier hit ended the combat.
+        if self.combat_exit.is_some() {
+            return self.combat_go_on(turn, rule, next, 1);
+        }
         if let Some(c) = &mut self.state.combat {
             c.by = Some(by);
         }
@@ -354,8 +452,8 @@ impl Game {
             let options = options.map(|(id, text)| (id.to_string(), text.to_string()));
             return self.combat_ask(turn, rule, next, options.into());
         }
-        self.combat_damage(turn, &hit, damage);
-        self.combat_go_on(turn, rule, next, 1)
+        self.combat_hit(turn, &hit, damage);
+        self.combat_round_over(turn, rule, next)
     }
 
     /// A hit of the round that no Luck test can change: `(hit, by)`.
@@ -364,7 +462,7 @@ impl Game {
             c.by = Some(by);
         }
         let damage = self.hit_damage(&hit);
-        self.combat_damage(turn, &hit, damage);
+        self.combat_hit(turn, &hit, damage);
     }
 
     /// The Luck test on the pending hit: it costs 1 LUCK and changes the
@@ -396,8 +494,8 @@ impl Game {
             (false, true) => base + 2,
             (false, false) => base - 1,
         };
-        self.combat_damage(turn, &hit, damage.max(0));
-        self.combat_go_on(turn, rule, next, 1)
+        self.combat_hit(turn, &hit, damage.max(0));
+        self.combat_round_over(turn, rule, next)
     }
 
     fn combat_damage(&mut self, turn: &mut Turn, target: &Id, damage: i64) {

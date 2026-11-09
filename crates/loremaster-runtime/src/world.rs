@@ -273,6 +273,7 @@ pub(crate) enum CompiledEffect {
     Await(Box<loremaster_model::AwaitSpec>),
     /// A fight; like `Await`, the fire loop handles it.
     Combat(Box<loremaster_model::CombatSpec>),
+    EndCombat(Id),
     Emit(Id),
     Call(Id),
     Start(Vec<(Id, Option<u32>)>),
@@ -607,6 +608,7 @@ impl Compiler {
                 CompiledEffect::Await(spec.clone())
             }
             Effect::Combat(spec) => CompiledEffect::Combat(spec.clone()),
+            Effect::EndCombat(r) => CompiledEffect::EndCombat(r.clone()),
             Effect::Set(m) => CompiledEffect::Set(m.clone()),
             Effect::Add(m) => CompiledEffect::Add(m.clone()),
             Effect::Calc(m) => {

@@ -205,7 +205,12 @@ impl Checker<'_> {
         let emits = std::mem::take(&mut self.contract.emits);
         let listens: Vec<_> = (self.story().rules.iter())
             .filter_map(|r| match &r.on {
-                EventPattern::Event(e) => Some((r.id.clone(), e.clone())),
+                // The combat sends its own events; `check.rs` warns without one.
+                EventPattern::Event(e)
+                    if !(loremaster_model::combat_events().iter()).any(|d| d.id == *e) =>
+                {
+                    Some((r.id.clone(), e.clone()))
+                }
                 _ => None,
             })
             .collect();

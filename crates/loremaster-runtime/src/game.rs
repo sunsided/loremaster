@@ -44,6 +44,9 @@ pub(crate) struct Game {
     pub(crate) host_walks: bool,
     /// The totals that the next rolls take, for tests. Not in the save.
     pub(crate) forced: ForcedRolls,
+    /// The room of an `end_combat` that a combat event's rule ran. The
+    /// combat takes it in the same step, so it is not in the save.
+    pub(crate) combat_exit: Option<Id>,
 }
 
 /// Forced rolls of a walkthrough step, and the totals that did not fit
@@ -422,6 +425,7 @@ impl Game {
             host_rolls: false,
             host_walks: false,
             forced: ForcedRolls::default(),
+            combat_exit: None,
         }
     }
 
@@ -2081,6 +2085,13 @@ impl Game {
             CompiledEffect::Call(id) => self.call_behavior(turn, rule, id, depth),
             // Only a rule can pause (the fire loop handles it there); the checks
             // reject `await` in timers and dialogues.
+            CompiledEffect::EndCombat(room) if self.state.combat.is_some() => {
+                self.combat_exit = Some(room.clone());
+            }
+            CompiledEffect::EndCombat(_) => turn.log.push(LogEntry {
+                kind: "combat".into(),
+                text: format!("{rule}: `end_combat` without a combat"),
+            }),
             CompiledEffect::Await(_) | CompiledEffect::Combat(_) => turn.log.push(LogEntry {
                 kind: "await".into(),
                 text: format!("{rule}: `await` and `combat` work only in rules"),

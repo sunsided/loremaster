@@ -1176,7 +1176,9 @@ impl Checker<'_> {
                         );
                     }
                 }
-                Effect::Goto(room) => self.room_ref(file, &at, room.as_str()),
+                Effect::Goto(room) | Effect::EndCombat(room) => {
+                    self.room_ref(file, &at, room.as_str())
+                }
                 Effect::Move(moves) => {
                     for (thing, to) in moves {
                         self.thing_ref(file, &at, thing.as_str());
@@ -2104,12 +2106,16 @@ fn ended_endings(story: &Story) -> BTreeSet<String> {
         .collect()
 }
 
-/// The names of the custom events that some `emit` sends.
+/// The names of the custom events that some `emit` or `combat` sends.
 fn emitted_events(story: &Story) -> BTreeSet<String> {
     all_effects(story)
-        .filter_map(|e| match e {
-            Effect::Emit(name) => Some(name.to_string()),
-            _ => None,
+        .flat_map(|e| match e {
+            Effect::Emit(name) => vec![name.to_string()],
+            // A combat sends its rule events (#230).
+            Effect::Combat(_) => (loremaster_model::combat_events().into_iter())
+                .map(|d| d.id.to_string())
+                .collect(),
+            _ => Vec::new(),
         })
         .collect()
 }
