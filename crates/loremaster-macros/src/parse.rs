@@ -1341,11 +1341,28 @@ fn location(input: ParseStream) -> Result<Location> {
 fn event(input: ParseStream) -> Result<Event> {
     let start = input.cursor();
     let word = name(input)?;
-    let args = |input: ParseStream| -> Result<Vec<Name>> {
+    // `star`: the verb can be `*`, any verb (`verb(*, darkness)`).
+    let args = |input: ParseStream, star: bool| -> Result<Vec<Name>> {
         let content;
         parenthesized!(content in input);
         let mut list = Vec::new();
         while !content.is_empty() {
+            if star && list.is_empty() && content.peek(Token![*]) {
+                let at = content.parse::<Token![*]>()?.span;
+                list.push(Name {
+                    value: loremaster_model::ANY_VERB.into(),
+                    span: at,
+                });
+                if !content.is_empty() {
+                    content.parse::<Token![,]>()?;
+                }
+                continue;
+            }
+            if content.peek(Token![*]) {
+                return Err(
+                    content.error("`*` (any verb) goes only first in `verb(..)` or `check(..)`")
+                );
+            }
             let n = name(&content)?;
             if content.peek(Token![:]) {
                 return Err(Error::new(
@@ -1384,11 +1401,11 @@ fn event(input: ParseStream) -> Result<Event> {
             }
             EventKind::Time(time)
         }
-        "verb" => EventKind::Verb(args(input)?),
-        "check" => EventKind::Check(args(input)?),
+        "verb" => EventKind::Verb(args(input, true)?),
+        "check" => EventKind::Check(args(input, true)?),
         "timer" => EventKind::Timer(one(input)?),
         "event" => EventKind::Event(one(input)?),
-        "talk" => EventKind::Talk(args(input)?),
+        "talk" => EventKind::Talk(args(input, false)?),
         _ => {
             return Err(Error::new(
                 word.span,
