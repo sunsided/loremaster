@@ -134,6 +134,73 @@ fn lighthouse_with(test: &str) -> Session {
     session
 }
 
+type Walks = Vec<(String, loremaster_model::Walkthrough)>;
+
+/// The lighthouse world and its walkthroughs, with this one as the only one.
+fn world_with(test: &str) -> (Arc<World>, Walks) {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/lighthouse");
+    let mut files = read_dir(&dir).unwrap();
+    files.retain(|f| !f.path.starts_with("tests/"));
+    files.push(loremaster_project::SourceFile {
+        path: "tests/extra.yaml".into(),
+        text: test.into(),
+    });
+    let project = load(files).unwrap();
+    (
+        Arc::new(World::compile(project.story).unwrap()),
+        project.walkthroughs,
+    )
+}
+
+const LONG_LADDER: &str = "steps:\n  - { id: go, do: n, hints: [\"North.\"] }\n  - { id: drawer, do: open drawer, hints: [\"A.\", \"B.\", \"C.\"] }\n";
+const SHORT_LADDER: &str = "steps:\n  - n\n  - { id: drawer, do: open drawer, hints: [\"A.\"] }\n";
+
+fn on_the_long_ladder(asked: usize) -> Session {
+    let (world, walks) = world_with(LONG_LADDER);
+    let mut s = Session::new(world);
+    s.set_hints_from(&walks);
+    s.start();
+    say(&mut s, "n");
+    for _ in 0..asked {
+        say(&mut s, "hint");
+    }
+    s
+}
+
+#[test]
+fn a_shorter_ladder_does_not_show_the_command_unasked() {
+    let mut s = on_the_long_ladder(2);
+    assert_eq!(s.hints().remove(0).shown.len(), 2);
+    let (world, walks) = world_with(SHORT_LADDER);
+    let reloaded = s.reload(world, &walks).unwrap();
+    assert_eq!(reloaded.dropped, ["step:go"]);
+    assert!(!s.state().steps_done.contains("go"));
+    let drawer = s.hints().remove(0);
+    assert_eq!(drawer.shown, ["A."]);
+    assert_eq!(drawer.command, None);
+    assert_eq!(say(&mut s, "hint"), "Hint 2 of 2: type \"open drawer\".");
+}
+
+#[test]
+fn a_command_the_player_saw_stays_shown_after_a_reload() {
+    let mut s = on_the_long_ladder(4);
+    assert!(s.hints().remove(0).command.is_some());
+    let (world, walks) = world_with(LONG_LADDER);
+    let reloaded = s.reload(world, &walks).unwrap();
+    assert!(reloaded.dropped.is_empty(), "{:?}", reloaded.dropped);
+    assert!(s.hints().remove(0).command.is_some());
+}
+
+#[test]
+fn a_step_that_is_gone_forgets_its_level() {
+    let mut s = on_the_long_ladder(2);
+    let (world, _) = world_with(SHORT_LADDER);
+    s.reload(world, &[]).unwrap();
+    let (world, walks) = world_with(SHORT_LADDER);
+    s.reload(world, &walks).unwrap();
+    assert!(s.hints().remove(0).shown.is_empty());
+}
+
 #[test]
 fn a_restart_starts_the_ladders_again() {
     let mut s = lighthouse();

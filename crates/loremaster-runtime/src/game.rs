@@ -314,7 +314,9 @@ impl Game {
     /// things that the new world does not have are dropped; new ones start at their start value.
     /// A current room that is gone becomes the start room. Rules, endings, relations and
     /// memories that the new world does not have are dropped too, and a rule that waits for the
-    /// host keeps waiting only when the new world has the same rule. A thing `in` or `on` a thing
+    /// host keeps waiting only when the new world has the same rule and its combat is still
+    /// valid: `await:…` also covers an enemy without its stats and a win, loss or escape room
+    /// that is gone. A thing `in` or `on` a thing
     /// that is no longer a container or supporter goes back to its start location.
     ///
     /// Returns the game and what was dropped, sorted, in the keys of `save::reconcile`

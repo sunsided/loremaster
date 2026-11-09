@@ -241,6 +241,10 @@ impl Session {
     /// the story files (SE-14): live reload in a dev build. Pass the
     /// walkthroughs of the new story; the hint book is built again from them.
     ///
+    /// The caller passes a rebuilt version of the same story. Unlike a save,
+    /// a reload does not compare the story id: the id is a slug of the title,
+    /// and editing the title is a legitimate live edit.
+    ///
     /// What carries over: the current room, the values, where the things are,
     /// the timers, fired rules and once groups, an open talk, the agendas,
     /// relations, memories, the seed, the undo depth, the revealed hint
@@ -253,7 +257,12 @@ impl Session {
     /// rooms, timers, rules, once groups, dialogues (or their nodes), the
     /// ending, relations, memories and agenda steps that the new world does
     /// not have, and a rule that waits for the host when that rule changed
-    /// (`await:…`). The keys are those of [`Loaded::dropped`]. When the
+    /// or its combat is no longer valid: an enemy without its stats, or a win,
+    /// loss or escape room that is gone (`await:…`). Done walkthrough steps
+    /// that the new hint book does not have are listed as `step:…`. A revealed
+    /// hint level follows the new ladder: a step that is gone is forgotten,
+    /// and a shorter ladder does not show its command unasked. The other keys
+    /// are those of [`Loaded::dropped`]. When the
     /// current room is gone, the player goes to the start room. A thing `in`
     /// or `on` a thing that is no longer a container or supporter goes back
     /// to its start location. The undo history is cleared: its states belong
@@ -273,10 +282,11 @@ impl Session {
                 .compare(built_for)
                 .map_err(ReloadError::InterfaceChanged)?;
         }
-        let (next, dropped) = self.carried_over(world);
+        let (next, mut dropped) = self.carried_over(world);
         *self = next;
         // The hint book plays the walkthroughs in its world: build it again.
-        self.set_hints_from(walkthroughs);
+        self.rebuild_hints(walkthroughs, &mut dropped);
+        dropped.sort();
         Ok(Reloaded { dropped })
     }
 

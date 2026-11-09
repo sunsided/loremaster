@@ -3,6 +3,7 @@
 use crate::{Host, root, world_of};
 use loremaster_model::{Location, Value};
 use loremaster_project::{load, read_dir};
+use loremaster_runtime::authoring::carry_over;
 use loremaster_runtime::{Input, ReloadError, Session, Status, World};
 use loremaster_workbench::{AuthorCommand, Workbench};
 use std::sync::Arc;
@@ -53,7 +54,7 @@ fn the_room_the_things_and_the_facts_carry_over() {
     let mut bench = played();
     let turns = bench.state().turns;
     let yard = "name: Yard\ndescription:\n  - \"A yard, newly swept.\"\nexits:\n  - { direction: south, to: hall }\n";
-    bench.reload(world_of(&files(true, yard)));
+    bench.reload(world_of(&files(true, yard))).unwrap();
 
     let state = bench.state();
     assert_eq!(state.room.as_str(), "yard");
@@ -70,7 +71,7 @@ fn the_room_the_things_and_the_facts_carry_over() {
 #[test]
 fn a_removed_thing_is_dropped() {
     let mut bench = played();
-    bench.reload(world_of(&files(false, YARD)));
+    bench.reload(world_of(&files(false, YARD))).unwrap();
 
     let state = bench.state();
     assert!(
@@ -97,7 +98,7 @@ fn a_removed_thing_is_dropped() {
 #[test]
 fn the_session_plays_on_after_a_reload() {
     let mut bench = played();
-    bench.reload(world_of(&files(false, YARD)));
+    bench.reload(world_of(&files(false, YARD))).unwrap();
     // The opening ran before the reload: it does not run again.
     assert!(bench.start().blocks.is_empty());
     let step = bench.session_mut().submit(Input::Text("s".into()));
@@ -145,7 +146,7 @@ fn a_value_still_at_its_start_takes_the_new_start_value() {
     let story = "title: Yard\nstart: hall\nvars:\n  - { id: rang, type: bool, initial: false }\n  - { id: mood, type: int, initial: 5 }\n";
     let mut changed = files(true, YARD);
     changed[0] = ("story.yaml", story);
-    bench.reload(world_of(&changed));
+    bench.reload(world_of(&changed)).unwrap();
     // `mood` was never changed: it takes the new start. `rang` was: it stays.
     assert_eq!(bench.state().facts["mood"], Value::Int(5));
     assert!(bench.state().flag("rang"));
@@ -160,7 +161,7 @@ fn a_room_that_is_gone_becomes_the_start_room() {
         ("rooms/hall.yaml", hall),
         ("things/lamp.yaml", LAMP),
     ];
-    bench.reload(world_of(&changed));
+    bench.reload(world_of(&changed)).unwrap();
     assert_eq!(bench.state().room.as_str(), "hall");
     assert!(!bench.state().visits.contains_key("yard"));
     assert!(bench.state().is_carried("lamp"));
@@ -170,7 +171,7 @@ fn a_room_that_is_gone_becomes_the_start_room() {
 fn the_undo_history_does_not_carry_over() {
     let mut bench = played();
     assert!(bench.session().undo_steps() > 0);
-    bench.reload(world_of(&files(true, YARD)));
+    bench.reload(world_of(&files(true, YARD))).unwrap();
     assert_eq!(bench.session().undo_steps(), 0);
     let step = bench.session_mut().undo();
     assert!(
@@ -209,12 +210,12 @@ fn a_waiting_rule_waits_on_only_while_the_rule_is_the_same() {
     let yard = "name: Yard\ndescription:\n  - \"A yard, swept.\"\nexits:\n  - { direction: south, to: hall }\n";
     let mut same = lever_files(LEVER);
     same[2] = ("rooms/yard.yaml", yard);
-    bench.reload(world_of(&same));
+    bench.reload(world_of(&same)).unwrap();
     assert!(bench.state().awaiting.is_some());
     // An edit of the rule drops the wait: its effects may have moved.
     let mut bench = waiting();
     let edited = "- id: pull_lever\n  on: { verb: [pull, lever] }\n  instead: true\n  then:\n    - await: { choice: [left, right] }\n    - say: \"You go.\"\n";
-    bench.reload(world_of(&lever_files(edited)));
+    bench.reload(world_of(&lever_files(edited))).unwrap();
     assert!(bench.state().awaiting.is_none());
 }
 
@@ -313,6 +314,32 @@ fn hints_work_after_a_session_reload() {
         "{}",
         step.plain_text()
     );
+}
+
+#[test]
+fn the_unchecked_carry_over_validates_the_host_interface() {
+    let world = |story: &'static str| {
+        let mut files = files(true, YARD);
+        files[0] = ("story.yaml", story);
+        world_of(&files)
+    };
+    let changed = "title: Yard\nstart: hall\ninterface:\n  events:\n    - { id: gone, args: { boss: text } }\n";
+    let before = world(CONTRACT);
+    let built_for = before.story.interface.clone().unwrap();
+    let session = Session::for_host(before, &built_for).unwrap();
+
+    // The same interface: the session stays bound to the host.
+    let mut same = carry_over(&session, world(CONTRACT));
+    assert!(matches!(
+        same.reload(world(changed), &[]),
+        Err(ReloadError::InterfaceChanged(_))
+    ));
+
+    // Another interface: the editor's path unbinds it, and a later reload is
+    // not refused against the stale interface.
+    let mut unbound = carry_over(&session, world(changed));
+    assert!(unbound.reload(world(changed), &[]).is_ok());
+    assert!(unbound.reload(world(CONTRACT), &[]).is_ok());
 }
 
 const CONTRACT: &str =
