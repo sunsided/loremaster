@@ -786,6 +786,9 @@ fn rule(r: &Rule) -> TokenStream {
     if r.instead {
         chain.extend(quote_spanned!(span=> .instead()));
     }
+    if r.free {
+        chain.extend(quote_spanned!(span=> .free()));
+    }
     if let Some(w) = &r.within {
         let w = name(w);
         chain.extend(quote_spanned!(span=> .within(#w)));
