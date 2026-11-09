@@ -8,6 +8,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Upgrading from 0.2
+
+Stories and saves from 0.2 load unchanged, except stories that use `combat_hit`, `combat_round` or `combat_end` as an id: rename them. Library code that builds these types with a struct literal, or matches them exhaustively, needs the changes:
+
+- model: `Rule` (`once` is now `Once`, new `free`), `Thing` and `NameStage` (`head`), `Story` (`reload_rolls`), `Effect` (new variant `EndCombat`); project: `StoryHeader` (`reload_rolls`)
+- runtime: `Turn` (`moves`), `Block` (`cause`), `Run` (`emphasis`), `ThingInfo` (`head`, `aliases`, `location`), `Scene` (`minutes`), `State` (`once_groups`), `CombatState` (`by`, `target`, `rolls`), `NoReturn` (`only_ahead`), `AwaitRequest::Roll` (`who`, `against`; match it with `..`)
+- `authoring::replay_step` returns `Option<(Turn, Vec<String>)>`; `loremaster_lang::Scope` has `events`, and `Scope::things` no longer has the host events
+
 ### Added
 
 - Once-groups (#225): `once: <key>` on a rule puts it in a once-group; all rules with the same key fire at most once in total, and the first that fires closes the group. `once: true` and `once: false` stay as they were. The save keeps the closed groups in the new state field `once_groups` (old saves load with none), and the explorer counts them in its state key. `loremaster check` warns about a group with only one rule. `world!` writes `once(greet)`, the builder `.once_group("greet")`.
@@ -49,15 +57,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 - The Lock-Keeper demo has "He ran" and Hester's alibi (#216). `show notes to marsh` shows Marsh the case notebook; with two kinds of proof in it he makes for the door, and the game ends in the new ending "He ran" (rank 3, between "charged" and "accidental death"; the ranks of `accident`, `released` and `wrong_man` move down by one) unless the next command is `stop marsh`, which holds him in the parlour for the rest of the night. Hester's trust is one fact, `hester.trusts`: a kind word in the kitchen before eleven sets it, she tells the truth and stays in the kitchen. Without it, a player on the barge at midnight sees her with Crane. Her alibi clears Crane and proves the opportunity. Four new walkthroughs (`ran`, `stopped`, `trust`, `follow`) with transcripts in `expected/`. The night has 72,148 states instead of 39,047, and `demo_endings_are_reachable` raises its budget to 80,000; the ending checks stay proven, with no warning.
 - The two-robot demo has its water clock: the timer `water` floods the station after eight turns, and its rule `river_wins` names `closes: [drained]`. The explorer needs more than the default budget for it now (#210).
-- The state explorer tells states apart only by the `once` rules that fired, not by every rule that ever fired: the game reads `fired` only to keep a `once` rule from firing again, so the results stay exact. A rule that only says a text no longer splits states. The id of the ending is in the key now, so two endings reached from one state stay two (before, the fired rules kept them apart). The explore output of the examples changes: lighthouse has 119 states instead of 287, and the Lock-Keeper demo 38,885 instead of about 60,000. The demo keeps its 15-minute turns; time bands wait for a decision (#239). (#168)
-
-### Changed
-
+- The state explorer tells states apart only by the `once` rules that fired, not by every rule that ever fired: the game reads `fired` only to keep a `once` rule from firing again, so the results stay exact. A rule that only says a text no longer splits states. The id of the ending is in the key now, so two endings reached from one state stay two (before, the fired rules kept them apart). The explore output of the examples changes: lighthouse has 119 states instead of 287, and the Lock-Keeper demo 38,885 instead of about 60,000. The demo keeps its 15-minute turns; time bands would not be exact, so the ending checks would miss the drops of a turn that comes too late (#239). (#168)
 - Host event arguments are their own namespace in conditions and text (#208). Before, an event read like a thing, so `present(killed)`, `killed.name` or `seen_by(killed)` passed the check. Now they are errors, and `killed.bos` says the event has no such argument, with a hint to `killed.boss`. An event still cannot have the id of a thing, a variable, a room or a built-in path: `killed.level` would still read as a thing's property or a room's `visits`, and the fact keys would clash.
 - **Breaking (library):** `loremaster_lang::Scope` has the new field `events`, and `Scope::things` no longer has the host events.
-
-### Changed
-
 - An order step is the player's action, decided in #209: the rules for the player fire for it (with `bilge.active` true), and it counts in `action.*`, `.interactions`, `.talked` and `once`, as a step after a switch does. `docs/writing-stories.md` says so. A rule with `actor: bilge` for a playable actor now gets an error that says to declare `active` in its `props` and test `bilge.active` instead; before, the error said to give it an agenda, which a playable actor cannot have.
 
 ### Fixed
