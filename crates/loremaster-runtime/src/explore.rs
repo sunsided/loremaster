@@ -96,7 +96,18 @@ pub struct Exploration {
 /// count only up to 3, and only when the story reads them. Of the rules
 /// that fired, only the `once` rules count: the game reads `fired` only to
 /// keep them from firing again.
-fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String {
+///
+/// With `timeless`, the key leaves out what only time changes: the clock,
+/// the timers, what the agendas have done, and the places of agenda actors
+/// that no `move` moves. Two states with one timeless key are twins that
+/// differ only in time: the ending checks use them to tell a late turn from
+/// a turn that changes the case.
+fn fingerprint(
+    game: &Game,
+    counters: bool,
+    once_ids: &BTreeSet<&Id>,
+    timeless: Option<&Timeless>,
+) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
         if !counters {
@@ -108,6 +119,38 @@ fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String 
     };
     let visited: BTreeSet<&Id> = s.visits.keys().collect();
     let fired_once: Vec<&Id> = s.fired.iter().filter(|id| once_ids.contains(id)).collect();
+    if let Some(t) = timeless {
+        let locations: BTreeMap<&Id, &Location> = s
+            .locations
+            .iter()
+            .filter(|(id, _)| !t.actors.contains(*id))
+            .collect();
+        // The visits count only when the story reads them; then as far as 3.
+        let visits: BTreeMap<&Id, u32> = if t.visits {
+            s.visits.iter().map(|(k, v)| (k, (*v).min(3))).collect()
+        } else {
+            BTreeMap::new()
+        };
+        return serde_json::to_string(&(
+            &s.room,
+            &s.facts,
+            locations,
+            visits,
+            fired_once,
+            (s.ended, &s.ending),
+            cap(&s.talked),
+            cap(&s.interactions),
+            &s.talk,
+            &s.relations,
+            &s.memories,
+            s.awaiting
+                .as_ref()
+                .map(|a| (&a.rule, a.next, &a.request, &a.into)),
+            s.combat.as_ref().map(|c| (true, &c.pending)),
+            (&s.active, &s.orders),
+        ))
+        .unwrap_or_default();
+    }
     serde_json::to_string(&(
         &s.room,
         &s.facts,
@@ -139,6 +182,51 @@ fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String 
         ),
     ))
     .unwrap_or_default()
+}
+
+/// What the timeless key of [`fingerprint`] keeps of the parts time changes.
+struct Timeless {
+    /// The story reads the visits (`first_visit`, `visits`, `visited`).
+    visits: bool,
+    /// The agenda actors that no `move` effect moves: their places are time.
+    actors: BTreeSet<Id>,
+}
+
+impl Timeless {
+    fn new(game: &Game) -> Self {
+        let story = &game.world().story;
+        let json = serde_json::to_value(story).unwrap_or_default();
+        let text = json.to_string();
+        let mut moved: BTreeSet<String> = BTreeSet::new();
+        moves(&json, &mut moved);
+        Self {
+            visits: ["first_visit", "visits", "visited"]
+                .iter()
+                .any(|w| text.contains(w)),
+            actors: story
+                .agendas
+                .iter()
+                .map(|a| a.actor.clone())
+                .filter(|a| !moved.contains(a.as_str()))
+                .collect(),
+        }
+    }
+}
+
+/// The things that a `move` effect anywhere in the story moves.
+fn moves(value: &serde_json::Value, into: &mut BTreeSet<String>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (k, v) in map {
+                if let (true, Some(targets)) = (k == "move", v.as_object()) {
+                    into.extend(targets.keys().cloned());
+                }
+                moves(v, into);
+            }
+        }
+        serde_json::Value::Array(list) => list.iter().for_each(|v| moves(v, into)),
+        _ => {}
+    }
 }
 
 /// True when any condition or markup in the story reads the talk or interaction counters.
@@ -527,7 +615,18 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         entry.states += 1;
     };
 
-    seen.insert(fingerprint(&game, counters, &once_ids), 0);
+    // The twins of each state for the ending checks: states with one timeless key.
+    let timeless = Timeless::new(&game);
+    let mut twins: HashMap<String, u32> = HashMap::new();
+    let mut twin_of: Vec<u32> = Vec::new();
+    let mut twin = |game: &Game| -> u32 {
+        let next = twins.len() as u32;
+        *twins
+            .entry(fingerprint(game, counters, &once_ids, Some(&timeless)))
+            .or_insert(next)
+    };
+    seen.insert(fingerprint(&game, counters, &once_ids, None), 0);
+    twin_of.push(twin(&game));
     record(&game, &[], &mut variants, &mut shown);
     histories.push(beats_of(
         &opening,
@@ -568,7 +667,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
                 fired.insert(entry.text.clone());
             }
-            let key = fingerprint(&next, counters, &once_ids);
+            let key = fingerprint(&next, counters, &once_ids, None);
             let mut next_path = path.clone();
             next_path.push(label);
             let history = beats_of(
@@ -601,6 +700,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                     }
                     record(&next, &next_path, &mut variants, &mut shown);
                     histories.push(history);
+                    twin_of.push(twin(&next));
                     let j = nodes.len();
                     seen.insert(key, j);
                     nodes.push((next, next_path));
@@ -624,6 +724,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             open: &open,
             closers: &closers,
             closed: &closed,
+            twins: &twin_of,
         },
     );
     let (stuck, stuck_path) = (ending_checks.stuck, ending_checks.stuck_path.clone());

@@ -56,7 +56,12 @@ fn all_sections_are_reachable_and_no_state_is_stuck() {
     let checks = &explored.ending_checks;
     assert!(checks.ran && checks.proven, "{checks:#?}");
     assert!(checks.dead_ends.is_empty(), "{:#?}", checks.dead_ends);
-    let diagnostics: Vec<_> = checks.diagnostics();
+    // Choices that only `sent_away` or `fallen` accept later are infos (#245).
+    let diagnostics: Vec<_> = checks
+        .diagnostics()
+        .into_iter()
+        .filter(|d| d.severity != loremaster_model::Severity::Info)
+        .collect();
     assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     // Every state goes to an ending. "Sent away" is the only one that is not
     // the win or the death at 0 STAMINA that combat needs.
