@@ -10,7 +10,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
-- `ask <person> about <topic>` (#169): the parser fills the `topic` slot of the Command record with the words after `about`, without articles, and preview stops at `about`. A rule matches it with `on: { verb: ask, direct: bert, topic: lantern }`, and the explorer tries the topics that rules name. `ask` and `show` (`show <thing> to <person>`, two objects) are custom verbs; `docs/writing-stories.md` has both. "He ran" and Hester's alibi in the Lock-Keeper demo wait for #216.
+- `ask <person> about <topic>` (#169): the parser fills the `topic` slot of the Command record with the words after `about`, without articles, and preview stops at `about`. A rule matches it with `on: { verb: ask, direct: bert, topic: lantern }`, and the explorer tries the topics that rules name. `loremaster check` reports a `topic:` that the parser never gives (`the lantern` for `lantern`); `topic_words` and `ARTICLES` in `loremaster-model` are the parser's form. `ask` and `show` (`show <thing> to <person>`, two objects) are custom verbs; `docs/writing-stories.md` has both. "He ran" and Hester's alibi in the Lock-Keeper demo wait for #216.
 
 ## [0.2.0] - 2026-11-09
 
