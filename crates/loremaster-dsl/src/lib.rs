@@ -86,8 +86,9 @@ pub mod prelude {
         variants,
     };
     pub use loremaster_model::{
-        CommandPattern, Direction, Effect, EndingKind, EventPattern, Fragment, FragmentMode, Layer,
-        NameStage, Note, NoteRole, States, ThreadStatus, TimeOfDay, Value, VerbSlots,
+        AwaitOption, AwaitSpec, CombatSpec, CommandPattern, Direction, Effect, EndingKind,
+        EventPattern, Fragment, FragmentMode, Layer, NameStage, Note, NoteRole, States,
+        ThreadStatus, TimeOfDay, Value, VerbSlots,
     };
     pub use loremaster_runtime::{Behavior, Cx, Event, Flow, Manifest};
 }
