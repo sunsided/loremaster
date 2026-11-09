@@ -12,6 +12,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 - The wildcard verb in rule events (#192): `on: { verb: ["*", darkness] }` matches any verb on the darkness, also for `check`. An exact-verb rule that fires in the same scope and phase holds the `*` rule back, so only its text shows. `loremaster check` accepts `*` in rules and refuses it in an agenda step's `do` and as the id of a story verb, and the explorer tries each verb that fits the objects. `CommandPattern::any_verb` and `ANY_VERB` are in `loremaster-model`. `world!` syntax waits for #220.
 
+### Fixed
+
+- A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
