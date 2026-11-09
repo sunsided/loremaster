@@ -17,6 +17,8 @@ path = "src/main.rs"
 [dependencies]
 # Loads the story from its folder.
 loremaster-project.workspace = true
+# `LiveStory`, for `--watch`.
+loremaster-dsl.workspace = true
 # The Session API.
 loremaster-runtime.workspace = true
 # `Value`, the type of the answer that `Session::resume` takes.

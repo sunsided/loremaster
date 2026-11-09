@@ -2,9 +2,9 @@
 
 use loremaster_model::WalkStep;
 use loremaster_project::{load, read_dir};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
@@ -142,4 +142,124 @@ fn a_sound_shows_as_its_caption() {
     let lines = ["pull rope", "pull rope", "open gate"].map(String::from);
     let out = host("gatehouse", &[], &lines);
     assert!(out.contains("[The gate creaks on its hinges.]"), "{out}");
+}
+
+/// A host on a private copy of a story, driven one prompt at a time: the host
+/// polls before each prompt, so an edit made between two prompts is seen at
+/// the next one, whatever the timing.
+struct Watched {
+    story: PathBuf,
+    child: Child,
+    stdin: ChildStdin,
+    stdout: ChildStdout,
+}
+
+fn copy_dir(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let path = entry.unwrap().path();
+        let target = to.join(path.file_name().unwrap());
+        if path.is_dir() {
+            copy_dir(&path, &target);
+        } else {
+            std::fs::copy(&path, &target).unwrap();
+        }
+    }
+}
+
+impl Watched {
+    /// Start on a copy of the lighthouse. Returns the host at its first prompt.
+    fn start(name: &str) -> (Self, String) {
+        let story = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+        let _ = std::fs::remove_dir_all(&story);
+        copy_dir(&example("lighthouse"), &story);
+        let mut child = Command::new(env!("CARGO_BIN_EXE_terminal-host"))
+            .arg(&story)
+            .arg("--watch")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stdin = child.stdin.take().unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let mut host = Self {
+            story,
+            child,
+            stdin,
+            stdout,
+        };
+        let out = host.until_prompt();
+        (host, out)
+    }
+
+    /// Everything the host prints up to its next prompt.
+    fn until_prompt(&mut self) -> String {
+        let mut out = Vec::new();
+        let mut buf = [0; 4096];
+        while !out.ends_with(b"\n> ") {
+            let n = self.stdout.read(&mut buf).unwrap();
+            let so_far = String::from_utf8_lossy(&out);
+            assert!(n > 0, "the host ended before a prompt: {so_far}");
+            out.extend_from_slice(&buf[..n]);
+        }
+        String::from_utf8(out).unwrap()
+    }
+
+    fn send(&mut self, line: &str) -> String {
+        writeln!(self.stdin, "{line}").unwrap();
+        self.until_prompt()
+    }
+
+    fn edit(&self, file: &str, change: impl FnOnce(String) -> String) {
+        let path = self.story.join(file);
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(&path, change(text)).unwrap();
+    }
+
+    fn quit(mut self) {
+        writeln!(self.stdin, ":quit").unwrap();
+        assert!(self.child.wait().unwrap().success());
+    }
+}
+
+const COTTAGE: &str = "One room, smelling of tar and pipe smoke.";
+const NEW_COTTAGE: &str = "One room, smelling of fresh paint.";
+
+#[test]
+fn watch_shows_an_edit_and_keeps_the_place() {
+    // Away from the start room, which a lost place would fall back to.
+    let (mut host, _) = Watched::start("watch-edit");
+    let moved = host.send("n");
+    assert!(moved.contains(COTTAGE), "{moved}");
+
+    host.edit("rooms/cottage.yaml", |t| t.replace(COTTAGE, NEW_COTTAGE));
+    let out = host.send("look");
+    assert!(out.contains("story reloaded"), "{out}");
+    let reloaded = out.split("story reloaded").nth(1).unwrap();
+    assert!(reloaded.contains("== Keeper's Cottage =="), "{out}");
+    assert!(reloaded.contains(NEW_COTTAGE), "{out}");
+
+    // One reload for one edit, and the new world stays.
+    let again = host.send("look");
+    assert!(!again.contains("story reloaded"), "{again}");
+    assert!(again.contains(NEW_COTTAGE), "{again}");
+    host.quit();
+}
+
+#[test]
+fn watch_reports_a_broken_file_and_plays_on() {
+    let (mut host, _) = Watched::start("watch-broken");
+    host.send("n");
+
+    host.edit("rooms/cottage.yaml", |_| "name: [\n".to_string());
+    let out = host.send("look");
+    assert!(!out.contains("story reloaded"), "{out}");
+    assert!(out.contains("The story has errors"), "{out}");
+    assert!(out.contains("cottage.yaml"), "{out}");
+
+    // Still the old world, and the errors are not repeated.
+    let next = host.send("look");
+    assert!(next.contains(COTTAGE), "{next}");
+    assert!(!next.contains("The story has errors"), "{next}");
+    host.quit();
 }

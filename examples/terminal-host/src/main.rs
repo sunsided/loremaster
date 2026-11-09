@@ -3,7 +3,8 @@
 //! Lines that start with `:` belong to the host, so they can not collide with
 //! the words of a story: `:save <file>`, `:load <file>`, `:quit`.
 
-use loremaster_model::Value;
+use loremaster_dsl::{LiveStory, Loremaster};
+use loremaster_model::{Value, Walkthrough};
 use loremaster_project::{load, read_dir};
 use loremaster_runtime::{
     AwaitRequest, Awaiting, Block, BlockKind, Effect, Input, RESTORE, Session, Status, Step, World,
@@ -16,25 +17,31 @@ use std::sync::Arc;
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let own_dice = args.iter().any(|a| a == "--own-dice");
+    let watched = args.iter().any(|a| a == "--watch");
     if let Some(flag) = args
         .iter()
-        .find(|a| a.starts_with("--") && *a != "--own-dice")
+        .find(|a| a.starts_with("--") && *a != "--own-dice" && *a != "--watch")
     {
         eprintln!("unknown option {flag}");
         return ExitCode::FAILURE;
     }
     let Some(dir) = args.iter().find(|a| !a.starts_with("--")) else {
-        eprintln!("usage: terminal-host <story folder> [--own-dice]");
+        eprintln!("usage: terminal-host <story folder> [--own-dice] [--watch]");
         return ExitCode::FAILURE;
     };
-    let world = match open(Path::new(dir)) {
-        Ok(world) => world,
+    let opened = if watched {
+        open_watched(Path::new(dir)).map(|(world, watch)| (world, Some(watch)))
+    } else {
+        open(Path::new(dir)).map(|world| (world, None))
+    };
+    let (world, watch) = match opened {
+        Ok(opened) => opened,
         Err(e) => {
             eprintln!("{dir}: {e}");
             return ExitCode::FAILURE;
         }
     };
-    if play(world, own_dice) {
+    if play(world, own_dice, watch) {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
@@ -48,14 +55,84 @@ fn open(dir: &Path) -> Result<Arc<World>, String> {
     Ok(Arc::new(world))
 }
 
+/// A running `--watch`: the source of new worlds, and the hints of the current one.
+struct Watch {
+    live: LiveStory,
+    walkthroughs: Vec<(String, Walkthrough)>,
+}
+
+/// Build the first world as `LiveStory::poll` builds the later ones: with the
+/// check, so a story that a reload would refuse does not start either.
+fn open_watched(dir: &Path) -> Result<(Arc<World>, Watch), String> {
+    // Read first: an edit made during the build then shows at the first poll.
+    let live = LiveStory::new(Loremaster::new().yaml(dir));
+    let (project, warnings) = Loremaster::new().yaml(dir).check().map_err(|found| {
+        let lines: Vec<_> = found.iter().map(ToString::to_string).collect();
+        lines.join("\n")
+    })?;
+    for warning in &warnings {
+        println!("{warning}");
+    }
+    let world = World::compile(project.story).map_err(|e| e.to_string())?;
+    let walkthroughs = project.walkthroughs;
+    Ok((Arc::new(world), Watch { live, walkthroughs }))
+}
+
+/// Take up a changed story, if there is one. Gives the step that shows the
+/// current room again when the session moved to a new world.
+fn reload(session: &mut Session, world: &mut Arc<World>, watch: &mut Watch) -> Option<Step> {
+    let rebuilt = match watch.live.poll()? {
+        Ok(rebuilt) => rebuilt,
+        Err(diagnostics) => {
+            println!("\nThe story has errors. Still playing the last good version:");
+            for diagnostic in &diagnostics {
+                println!("{diagnostic}");
+            }
+            return None;
+        }
+    };
+    let reloaded = match session.reload(rebuilt.world.clone(), &rebuilt.walkthroughs) {
+        Ok(reloaded) => reloaded,
+        Err(e) => {
+            println!("\nThe story needs a rebuild of the host: {e}");
+            return None;
+        }
+    };
+    *world = rebuilt.world;
+    watch.walkthroughs = rebuilt.walkthroughs;
+    println!("\nstory reloaded");
+    for warning in &rebuilt.warnings {
+        println!("{warning}");
+    }
+    if !reloaded.dropped.is_empty() {
+        println!("Dropped: {}", reloaded.dropped.join(", "));
+    }
+    // Restoring its own state shows the room without a turn, as after a load.
+    let snapshot = session.snapshot();
+    session.restore(&snapshot).ok()
+}
+
 /// The loop of a host: show the step, ask what its status asks, send the answer.
 /// False when the host met something it can not handle.
-fn play(world: Arc<World>, own_dice: bool) -> bool {
+fn play(mut world: Arc<World>, own_dice: bool, mut watch: Option<Watch>) -> bool {
     let mut session = Session::new(world.clone());
     session.set_host_rolls(own_dice);
+    if let Some(watch) = &watch {
+        session.set_hints_from(&watch.walkthroughs);
+    }
     let mut step = session.start();
     show(&step);
     loop {
+        // Only before a prompt: an edit shows with the next command.
+        if !matches!(step.status, Status::Ended { .. })
+            && let Some(first) = watch
+                .as_mut()
+                .and_then(|watch| reload(&mut session, &mut world, watch))
+        {
+            show(&first);
+            show_talk(&session);
+            step = first;
+        }
         // Only the status says what may come next. Effects are just shown.
         let awaiting = match &step.status {
             Status::Ready => None,
@@ -107,14 +184,12 @@ fn play(world: Arc<World>, own_dice: bool) -> bool {
             (":load", file) => match restore_file(world.clone(), own_dice, file) {
                 Ok((restored, first)) => {
                     session = restored;
-                    show(&first);
-                    // A save made in a talk: the restored step does not list the answers.
-                    if let Some(talk) = session.talk() {
-                        println!("\n(Still talking: {}. Type a number.)", talk.dialogue);
-                        for choice in session.choices() {
-                            println!("{}. {}", choice.index + 1, choice.text);
-                        }
+                    // A load gives a session without hints.
+                    if let Some(watch) = &watch {
+                        session.set_hints_from(&watch.walkthroughs);
                     }
+                    show(&first);
+                    show_talk(&session);
                     step = first;
                     continue;
                 }
@@ -140,6 +215,16 @@ fn play(world: Arc<World>, own_dice: bool) -> bool {
         };
         step = next;
         show(&step);
+    }
+}
+
+/// A restored step does not list the answers of a talk that is still open.
+fn show_talk(session: &Session) {
+    if let Some(talk) = session.talk() {
+        println!("\n(Still talking: {}. Type a number.)", talk.dialogue);
+        for choice in session.choices() {
+            println!("{}. {}", choice.index + 1, choice.text);
+        }
     }
 }
 

@@ -7,6 +7,7 @@ module. A game engine, a web page and this host do the same work.
 ```sh
 cargo run -p loremaster-terminal-host -- examples/lighthouse
 cargo run -p loremaster-terminal-host -- examples/salt-tower --own-dice
+cargo run -p loremaster-terminal-host -- --watch examples/lighthouse
 ```
 
 Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit`.
@@ -120,3 +121,10 @@ if let Some(r) = live.poll() {
 diagnostics once, and the session keeps the old world until a fix builds.
 Release and web builds load the story as before (`LiveStory` is not on
 `wasm32`).
+
+This host does it with `--watch`. Edit a YAML file of the story while it
+runs: it prints `story reloaded`, what the new world no longer has, and the
+current room, and the player keeps their place. A broken file prints its
+diagnostics, and the game goes on in the last good version. The host polls
+only before a prompt, because it then blocks on the input, so an edit shows
+after the next command you enter.
