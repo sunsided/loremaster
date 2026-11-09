@@ -745,7 +745,8 @@ export interface AwaitOptionInfo {
 export type AwaitRequest =
 	| { kind: 'choice'; options: AwaitOptionInfo[] }
 	| { kind: 'action'; name: string; args?: Record<string, Value>; results?: string[] }
-	| { kind: 'roll'; dice: string; min: number; max: number }
+	/** `who`: whom the roll is for (an enemy, `You`, `LUCK` or a stat label); `against`: the `against` variable. */
+	| { kind: 'roll'; dice: string; min: number; max: number; who?: string; against?: string }
 	/** With `thing` or `exit`, a walk in this room before a command (a stage host). */
 	| { kind: 'walk_to'; room: string; thing?: string; exit?: string }
 	/** The player died: answer `undo`, `restart` or `restore`. */
