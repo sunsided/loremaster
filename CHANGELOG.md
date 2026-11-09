@@ -14,6 +14,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - The story bundle (#194): `Bundle` (format `loremaster-bundle`, version 1) holds a story, its walkthroughs and the loremaster version that wrote it. `Bundle::from_json` refuses another format and a newer version, and `Bundle::session` compiles the story and sets the hint ladder. A host writes it in its `build.rs` in place of its own `(Story, walkthroughs)` JSON.
 - **Breaking (library):** `Run` has the new field `emphasis`; code that builds it with a struct literal needs it. A host that reads `Run::text` gets emphasized text without its stars.
 
+### Fixed
+
+- A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added
