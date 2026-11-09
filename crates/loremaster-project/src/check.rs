@@ -1670,6 +1670,17 @@ impl Checker<'_> {
         } else if !verbs.contains(verb) {
             self.error(file, at, format!("unknown verb `{verb}`"));
         }
+        if let Some(topic) = &pattern.topic {
+            // The parser gives the topic in this form; another one never matches.
+            let words = loremaster_model::topic_words(topic);
+            if words != topic.to_lowercase() {
+                self.error(
+                    file,
+                    &format!("{at}.topic"),
+                    format!("the parser reads this topic as `{words}`: write `topic: {words}`"),
+                );
+            }
+        }
         if pattern.indirect.is_some() && pattern.direct.is_none() {
             // A command has its objects in order; a rule could never match it.
             self.error(

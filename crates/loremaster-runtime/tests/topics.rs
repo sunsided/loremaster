@@ -51,7 +51,8 @@ fn say(game: &mut Session, text: &str) -> String {
 #[test]
 fn ask_about_and_show_to_are_playable() {
     let project = load(files()).unwrap();
-    assert!(check(&project).is_empty(), "{:#?}", check(&project));
+    let found = check(&project);
+    assert!(found.is_empty(), "{found:#?}");
     let world = Arc::new(World::compile(project.story).unwrap());
     let mut game = Session::new(world.clone());
     authoring::start(&mut game);
@@ -70,4 +71,21 @@ fn ask_about_and_show_to_are_playable() {
     // The explorer asks about the topics that the rules name.
     let found = explore(world, Budget::default());
     assert!(found.never_fired.is_empty(), "{found:#?}");
+}
+
+#[test]
+fn a_topic_that_the_parser_never_gives_is_reported() {
+    let mut files = files();
+    files
+        .iter_mut()
+        .find(|f| f.path == "rules/rules.yaml")
+        .unwrap()
+        .text = RULES.replace("topic: lantern", "topic: \"the lantern\"");
+    let found = check(&load(files).unwrap());
+    assert!(
+        found
+            .iter()
+            .any(|d| d.to_string().contains("write `topic: lantern`")),
+        "{found:#?}"
+    );
 }
