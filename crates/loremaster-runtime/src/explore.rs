@@ -7,7 +7,7 @@ use crate::game::{ATTACK_TEXT, LUCK_TEXT};
 use crate::{BlockKind, Command, Game, Turn};
 use loremaster_model::{EventPattern, Id, Location, Value, VerbSlots};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 mod endings;
 
@@ -95,7 +95,8 @@ pub struct Exploration {
 /// next step is due. Timers count by the turns they have left. Counters
 /// count only up to 3, and only when the story reads them. Of the rules
 /// that fired, only the `once` rules count: the game reads `fired` only to
-/// keep them from firing again.
+/// keep them from firing again. The closed once-groups all count, also
+/// in the timeless key: time does not open a group again.
 ///
 /// With `timeless`, the key leaves out what only time changes: the clock,
 /// the timers, what the agendas have done, and the places of agenda actors
@@ -147,7 +148,7 @@ fn fingerprint(
                 .as_ref()
                 .map(|a| (&a.rule, a.next, &a.request, &a.into)),
             s.combat.as_ref().map(|c| (true, &c.pending)),
-            (&s.active, &s.orders),
+            (&s.active, &s.orders, &s.once_groups),
         ))
         .unwrap_or_default();
     }
@@ -179,6 +180,7 @@ fn fingerprint(
             &s.active,
             &s.orders,
             &s.timers,
+            &s.once_groups,
         ),
     ))
     .unwrap_or_default()
@@ -371,9 +373,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
         // With a carry limit, full hands refuse the default take, and a drop
         // frees a hand: it is no longer only an undo. A rule on `take` can
         // still handle a take with full hands.
-        let full = story
-            .carry_limit
-            .is_some_and(|limit| game.state().held_count() >= limit);
+        let full = game.hands_full();
         if full && carried {
             out.push((
                 label("drop", std::slice::from_ref(&id)),
@@ -440,15 +440,20 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
 }
 
 /// Labels that a path can replay: of two answers with one text, the second
-/// gets ` (2)`, the third ` (3)`, and so on.
+/// gets ` (2)`, the third ` (3)`, and so on, skipping a suffix that another
+/// label already has.
 fn unique(mut out: Vec<(String, Command)>) -> Vec<(String, Command)> {
-    let mut seen: HashMap<String, usize> = HashMap::new();
+    let mut used: HashSet<String> = out.iter().map(|(l, _)| l.clone()).collect();
+    let mut seen: HashSet<String> = HashSet::new();
     for (label, _) in &mut out {
-        let n = seen.entry(label.clone()).or_insert(0);
-        *n += 1;
-        if *n > 1 {
-            label.push_str(&format!(" ({n})"));
+        if seen.insert(label.clone()) {
+            continue;
         }
+        let n = (2..)
+            .find(|n| !used.contains(&format!("{label} ({n})")))
+            .unwrap();
+        label.push_str(&format!(" ({n})"));
+        used.insert(label.clone());
     }
     out
 }
@@ -486,7 +491,7 @@ pub(crate) fn step_command(game: &mut Game, step: &str) -> Option<Command> {
 }
 
 /// A pattern that matches the player's commands: no `actor`, or the player.
-fn for_player(p: &loremaster_model::CommandPattern) -> bool {
+pub(crate) fn for_player(p: &loremaster_model::CommandPattern) -> bool {
     p.actor.as_ref().is_none_or(|a| a.as_str() == crate::PLAYER)
 }
 
@@ -938,5 +943,19 @@ mod tests {
             .map(|(l, _)| l)
             .collect();
         assert_eq!(labels, ["say Yes.", "say Yes. (2)", "say Yes. (3)"]);
+    }
+
+    #[test]
+    fn a_suffix_that_an_answer_has_is_not_taken_twice() {
+        let label = |text: &str, index| (text.to_string(), Command::Choose { index });
+        let labels: Vec<String> = unique(vec![
+            label("say Yes.", 0),
+            label("say Yes.", 1),
+            label("say Yes. (2)", 2),
+        ])
+        .into_iter()
+        .map(|(l, _)| l)
+        .collect();
+        assert_eq!(labels, ["say Yes.", "say Yes. (3)", "say Yes. (2)"]);
     }
 }

@@ -131,6 +131,8 @@ fn a_host_plays_the_story_over_the_pipe() {
     assert_eq!(scene["room"], "hall", "{scene}");
     let lever = host.result("session/thing", json!({ "id": "lever" }));
     assert_eq!(lever["location"], json!({ "room": "hall" }), "{lever}");
+    let verbs = host.result("session/verbs_for", json!({ "id": "lever" }));
+    assert_eq!(verbs[0]["id"], "examine", "{verbs}");
 
     let snapshot = host.result("session/snapshot", json!({}));
     let waiting = host.result(

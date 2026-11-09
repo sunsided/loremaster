@@ -610,6 +610,18 @@ fn print_step(step: &Step, style: bool) {
             _ => println!("{}", wrap(&text, 78)),
         }
     }
+    // The terminal plays no audio: a sound shows as its caption (#222).
+    let captions = step.effects.iter().filter_map(|e| match e {
+        Effect::Sound { sound } => sound.caption.as_deref(),
+        _ => None,
+    });
+    for caption in captions {
+        if !first {
+            println!();
+        }
+        first = false;
+        println!("{}", wrap(caption, 78));
+    }
     let choices = step.effects.iter().find_map(|e| match e {
         Effect::Choices { choices, .. } => Some(choices),
         _ => None,

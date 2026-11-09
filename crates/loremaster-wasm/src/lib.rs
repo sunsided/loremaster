@@ -356,6 +356,12 @@ impl JsSession {
         to_js(&self.session.verbs())
     }
 
+    /// The verbs that apply to a thing now, sorted by id; see `Session.verbs_for`.
+    #[wasm_bindgen(js_name = verbsFor)]
+    pub fn verbs_for(&self, id: &str) -> Result<JsValue, JsValue> {
+        to_js(&self.session.verbs_for(id))
+    }
+
     /// What a partial command refers to: `{ verb, objects, candidates, direction, complete }`.
     pub fn preview(&self, text: &str) -> Result<JsValue, JsValue> {
         to_js(&self.session.preview(text))
@@ -512,6 +518,12 @@ impl JsWorkbench {
 
     pub fn verbs(&self) -> Result<JsValue, JsValue> {
         to_js(&self.bench.session().verbs())
+    }
+
+    /// The verbs that apply to a thing now, sorted by id; see `Session.verbs_for`.
+    #[wasm_bindgen(js_name = verbsFor)]
+    pub fn verbs_for(&self, id: &str) -> Result<JsValue, JsValue> {
+        to_js(&self.bench.session().verbs_for(id))
     }
 
     /// What a partial command refers to: `{ verb, objects, candidates, direction, complete }`.

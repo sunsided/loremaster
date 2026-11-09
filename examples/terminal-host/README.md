@@ -32,6 +32,10 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
    - `Notice`: a change of state. A host may skip it.
    - `Choices`: the answers of a talk. Answer with `Input::Choice(index)`.
    - `Roll`: dice to show.
+   - `Sound`: a one-shot sound (`play_sound`), with the asset's `file` and
+     `caption`. This host plays no audio and prints the caption. A sound
+     line of an NPC is such a sound: float the caption beside the NPC, and
+     do not look for a text prefix such as `sfx:` in `say` text.
    - `Ending`: the story has ended.
 3. Act on the `Status` of the step. Only the status says what may come next:
    - `Ready`: send the next `Input`.
@@ -62,11 +66,23 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
      thing in scope, and a rule or the default response answers. A verb bar
      offers each `bar` verb; `preview(text)` says what a half-typed command
      refers to.
+   - `verbs_for(id)` lists the verbs that apply to a thing in scope now,
+     sorted by id, for a menu on a click: each verb whose rule for the
+     player (`verb` or `check`) names the thing as an object or that has a
+     frame on it, and each standard verb whose default does something for
+     it in this state (`examine` always, `take` when portable, not held,
+     not in a closed container and the hands are not full, `drop` and `put`
+     when carried, `open` when closed and unlocked, `close` when open,
+     `unlock`/`lock` for a lock whose key the player carries, and for a key whose lock is in scope,
+     `turn_on`/`turn_off` for a thing with `lit`, `use`, `talk` when a
+     start node of its dialogue applies, `search` when it hides
+     something). Rule conditions are not checked.
    - `ThingInfo::aliases` lists a thing's aliases and the names of its
-     earlier name stages.
+     earlier name stages. `ThingInfo::head` is the main word of the current
+     name: the author's `head`, or the last word of the name.
 7. Queries take no step: `scene()` (the room, the time as `time` and as
    `minutes`, the things, the exits), `thing(id)` (any thing), `fact(name)` (one variable, property
-   or machine state, without a copy of the state), `verbs()`, `journal()`,
+   or machine state, without a copy of the state), `verbs()`, `verbs_for(id)`, `journal()`,
    `stats()`, `media()`, `choices()`, `combat()`.
 8. `Effect`, `Status` and `AwaitRequest` are `non_exhaustive`. Keep a fallback arm.
 9. Save with `Session::save`, and load with `Session::load`. After a load, set

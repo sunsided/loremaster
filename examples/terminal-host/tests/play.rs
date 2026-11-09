@@ -136,3 +136,10 @@ fn the_host_stays_on_the_public_session_api() {
         assert!(!source.contains(word), "the host uses {word}");
     }
 }
+
+#[test]
+fn a_sound_shows_as_its_caption() {
+    let lines = ["pull rope", "pull rope", "open gate"].map(String::from);
+    let out = host("gatehouse", &[], &lines);
+    assert!(out.contains("[The gate creaks on its hinges.]"), "{out}");
+}

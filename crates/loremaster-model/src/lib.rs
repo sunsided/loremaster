@@ -33,7 +33,9 @@ mod verb;
 mod walkthrough;
 
 pub use agenda::{Agenda, AgendaStep};
-pub use awaits::{AwaitOption, AwaitSpec, CombatSpec, Dice};
+pub use awaits::{
+    AwaitOption, AwaitSpec, COMBAT_END, COMBAT_HIT, COMBAT_ROUND, CombatSpec, Dice, combat_events,
+};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
 pub use command::{ANY_VERB, ARTICLES, CommandPattern, topic_words};
 pub use diagnostic::{Diagnostic, Severity};
@@ -51,7 +53,7 @@ pub use media::{Asset, Licence, Media, MediaVariant, Region};
 pub use note::{Note, NoteRole, Thread, ThreadStatus};
 pub use plan::{ChartStep, SERIAL_RUN, StepChart, step_chart};
 pub use room::{Direction, Exit, Room};
-pub use rule::{Effect, EventPattern, Rule, SumError, SumTerm, Term, parse_sum};
+pub use rule::{Effect, EventPattern, Once, Rule, SumError, SumTerm, Term, parse_sum};
 pub use story::{EpisodeItems, Limit, Rank, ReloadRolls, Score, Stat, Story, VarDef, VarType};
 pub use thing::{Location, NameStage, Thing};
 pub use timer::{StartTimers, Timer};

@@ -162,6 +162,9 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                     loremaster_model::Effect::Goto(room) => {
                         format!("move the player to {}", thing_or_room(room))
                     }
+                    loremaster_model::Effect::EndCombat(room) => {
+                        format!("end the combat in {}", thing_or_room(room))
+                    }
                     loremaster_model::Effect::End(id) => {
                         match ins.world().story.ending(id.as_str()) {
                             Some(e) => {
@@ -226,7 +229,7 @@ pub(crate) fn rules(ins: Inspector<'_>) -> Vec<RuleView> {
                 condition: r.when.clone(),
                 condition_holds: ins.rule_holds(i),
                 then,
-                once: r.once,
+                once: r.once.is_on(),
                 instead: r.instead,
                 fired: ins.state().fired.contains(&r.id),
             }
@@ -306,7 +309,9 @@ fn relevance(ins: Inspector<'_>, rule: &loremaster_model::Rule) -> Option<String
     if ins.last_fired().contains(&rule.id) {
         return Some("fired in the last turn".into());
     }
-    if rule.once && ins.state().fired.contains(&rule.id) {
+    let s = ins.state();
+    let closed = rule.once.group().is_some_and(|g| s.once_groups.contains(g));
+    if (rule.once.is_on() && s.fired.contains(&rule.id)) || closed {
         return None;
     }
     let here = &ins.state().room;

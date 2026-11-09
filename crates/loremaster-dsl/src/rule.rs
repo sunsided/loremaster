@@ -33,7 +33,7 @@ impl<'a> RuleBuilder<'a> {
             on,
             when: None,
             then: Vec::new(),
-            once: false,
+            once: Default::default(),
             free: false,
             instead: false,
             within: None,
@@ -59,7 +59,13 @@ impl<'a> RuleBuilder<'a> {
 
     /// `once: true`: fire at most once per game.
     pub fn once(mut self) -> Self {
-        self.rule().once = true;
+        self.rule().once = loremaster_model::Once::Rule(true);
+        self
+    }
+
+    /// `once: <key>`: all rules with this key fire at most once in total.
+    pub fn once_group(mut self, key: impl AsRef<str>) -> Self {
+        self.rule().once = loremaster_model::Once::Group(id(key));
         self
     }
 
@@ -312,6 +318,12 @@ pub trait Effects: Sized {
     /// `combat:` a fight by the built-in rules. Only a rule can fight.
     fn combat(self, spec: CombatSpec) -> Self {
         self.effect(Effect::Combat(Box::new(spec)))
+    }
+
+    /// `end_combat:` a room. In a rule on a combat event: the combat ends,
+    /// and the player goes to the room.
+    fn end_combat(self, room: impl AsRef<str>) -> Self {
+        self.effect(Effect::EndCombat(id(room)))
     }
 
     /// Play a sound asset once: `play sound gate_creak`.

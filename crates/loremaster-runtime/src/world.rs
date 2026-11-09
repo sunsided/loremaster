@@ -10,7 +10,7 @@ use loremaster_model::{
     DialogueId, Effect, Fragment, FragmentMode, Id, Layer, Media, Story, Value, VerbDef,
     standard_verbs,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -29,6 +29,9 @@ pub struct World {
     /// Rule indexes in the order they run: more specific scope first, then
     /// higher priority, then file order.
     pub(crate) rule_order: Vec<usize>,
+    /// The combat events that some rule listens for (#230). A combat sets
+    /// the arguments and fires only these.
+    pub(crate) combat_heard: BTreeSet<String>,
     pub(crate) timers: Vec<CompiledTimer>,
     /// The agendas, in the order of the story's agendas.
     pub(crate) agendas: Vec<CompiledAgenda>,
@@ -273,6 +276,7 @@ pub(crate) enum CompiledEffect {
     Await(Box<loremaster_model::AwaitSpec>),
     /// A fight; like `Await`, the fire loop handles it.
     Combat(Box<loremaster_model::CombatSpec>),
+    EndCombat(Id),
     Emit(Id),
     Call(Id),
     Start(Vec<(Id, Option<u32>)>),
@@ -607,6 +611,7 @@ impl Compiler {
                 CompiledEffect::Await(spec.clone())
             }
             Effect::Combat(spec) => CompiledEffect::Combat(spec.clone()),
+            Effect::EndCombat(r) => CompiledEffect::EndCombat(r.clone()),
             Effect::Set(m) => CompiledEffect::Set(m.clone()),
             Effect::Add(m) => CompiledEffect::Add(m.clone()),
             Effect::Calc(m) => {
@@ -772,6 +777,16 @@ impl World {
                 })
             })
             .collect::<Result<_, CompileError>>()?;
+        let combat_heard = (story.rules.iter())
+            .filter_map(|r| match &r.on {
+                loremaster_model::EventPattern::Event(e)
+                    if loremaster_model::combat_events().iter().any(|d| d.id == *e) =>
+                {
+                    Some(e.to_string())
+                }
+                _ => None,
+            })
+            .collect();
         let mut rule_order: Vec<usize> = (0..story.rules.len()).collect();
         rule_order.sort_by_key(|&i| {
             let rank: &Option<Within> = &rules[i].within;
@@ -957,6 +972,7 @@ impl World {
             things,
             rules,
             rule_order,
+            combat_heard,
             timers,
             agendas,
             behaviors: Vec::new(),

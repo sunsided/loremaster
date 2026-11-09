@@ -275,6 +275,8 @@ pub struct Rule {
     pub on: Event,
     pub instead: bool,
     pub once: bool,
+    /// `once(key)`: the once-group.
+    pub once_group: Option<Name>,
     pub free: bool,
     pub priority: Option<i32>,
     pub within: Option<Name>,
@@ -318,6 +320,7 @@ pub enum EffectKind {
     /// `carried` or `nowhere`.
     Move(Vec<(Name, String)>),
     Goto(Name),
+    EndCombat(Name),
     End(Name),
     Stop,
     Emit(Name),

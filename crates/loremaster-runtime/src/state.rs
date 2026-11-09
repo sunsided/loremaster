@@ -29,6 +29,10 @@ pub struct State {
     /// with its id: `keeper_remark/1`.
     pub progress: BTreeMap<String, FragmentProgress>,
     pub fired: BTreeSet<Id>,
+    /// The once-groups (`once: <key>`) that a rule closed by firing. Old
+    /// saves have none.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub once_groups: BTreeSet<Id>,
     pub rng: u64,
     pub ended: bool,
     /// The ending that ended the game, from `endings/`. Old saves have none.

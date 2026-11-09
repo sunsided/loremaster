@@ -696,6 +696,7 @@ fn name_stage(n: &NameStage) -> ModelNameStage {
     ModelNameStage {
         text: n.text.value.clone(),
         aliases: n.aliases.iter().map(|a| a.value.clone()).collect(),
+        head: None,
         when: n.when.as_ref().map(|w| w.source.clone()),
         proper: n.proper,
     }
@@ -950,6 +951,7 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans
                 .iter()
                 .fold(b, |b, (n, to)| b.move_to(n.value.as_str(), to.as_str())),
             EffectKind::Goto(r) => b.goto(r.value.as_str()),
+            EffectKind::EndCombat(r) => b.end_combat(r.value.as_str()),
             EffectKind::End(r) => b.end(r.value.as_str()),
             EffectKind::Stop => b.stop(),
             EffectKind::Emit(r) => b.emit(r.value.as_str()),
@@ -984,7 +986,9 @@ fn rule(p: &mut Pack, r: &Rule, spans: &mut Spans) {
         spans.add(&key, "when", w.tokens.clone());
         b = b.when(w.source.as_str());
     }
-    if r.once {
+    if let Some(g) = &r.once_group {
+        b = b.once_group(g.value.as_str());
+    } else if r.once {
         b = b.once();
     }
     if r.instead {
