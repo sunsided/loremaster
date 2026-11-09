@@ -1994,11 +1994,7 @@ impl Checker<'_> {
     }
 
     fn ty_of(&self, name: &str) -> Option<loremaster_lang::Ty> {
-        if let Some(ty) = self.scope.vars.get(name) {
-            return Some(ty.clone());
-        }
-        let (thing, prop) = name.split_once('.')?;
-        self.scope.things.get(thing)?.get(prop).cloned()
+        self.scope.fact_type(name).cloned()
     }
 
     fn settable(&self, name: &str, value: &loremaster_model::Value) -> bool {

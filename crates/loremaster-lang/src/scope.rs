@@ -167,6 +167,16 @@ impl Scope {
         self.symbols.entity(thing)
     }
 
+    /// The type of a fact key: a variable, `thing.prop` or `event.arg`.
+    pub fn fact_type(&self, key: &str) -> Option<&Ty> {
+        self.vars.get(key).or_else(|| {
+            let (owner, prop) = key.split_once('.')?;
+            (self.things.get(owner))
+                .or_else(|| self.events.get(owner))?
+                .get(prop)
+        })
+    }
+
     /// Every name in scope, for "did you mean" hints and editor autocomplete.
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.vars
