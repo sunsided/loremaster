@@ -390,7 +390,34 @@ A `verb` or `check` event can name the slots:
 - A slot that the event does not name matches any command.
 - `actor` is different: an event without `actor` matches only the player's commands. Then the rules for the player do not fire when a character acts. `actor: player` says the same, and `actor: keeper` matches the commands of the keeper's agenda. Read [Actors and agendas](#actors-and-agendas).
 - The list form `verb: [unlock, door, key]` is the same as `{ verb: unlock, direct: door, indirect: key }`. Both forms load into one model.
-- The parser fills `preposition` with the word that you typed. Nothing fills `topic` yet; it is for a later `ask … about …`.
+- The verb `"*"` (with quotes: a bare `*` is YAML syntax) matches any verb. `verb: ["*", darkness]` fires for each command on the darkness. When a rule with an exact verb, such as `[examine, darkness]`, fires in the same scope (the same thing, room or region, or the rules folder) and phase (`check`, `instead` or `after`), the `*` rule does not fire for that command. A `*` rule with `once` fires once for all verbs. It also matches verbs that the story adds later. An agenda step's `do` takes one verb, not `*`.
+- The parser fills `preposition` with the word that you typed.
+- The parser fills `topic` with the words after `about`, in lower case, with punctuation as spaces and without articles: `ask Bert about the Lantern!` has the direct object `bert` and the topic `lantern`. The topic is words, not a thing, so it can name things that are not here. Write `topic:` in that form; `loremaster check` reports a topic such as `the lantern` that the parser never gives. A verb without objects has no topic, and for a two-object verb whose `preposition` is `about`, the words after it are the second object; `loremaster check` reports a `topic:` on such verbs. The explorer tries the topics that rules name.
+
+`ask` and `show` are custom verbs. `show` is a verb with two objects, as `give`:
+
+```yaml
+# verbs/ask.yaml
+label: Ask
+words: [ask]
+default: "They have nothing to say about that."
+
+# verbs/show.yaml
+label: Show
+words: [show]
+slots: two
+preposition: to
+default: "They look at it and say nothing."
+```
+
+```yaml
+- id: bert_lantern
+  on: { verb: ask, direct: bert, topic: lantern }
+  then: [{ say: "Two lights on the gate, sir." }]
+- id: bert_boots
+  on: { verb: show, direct: boots, indirect: bert }
+  then: [{ say: "Those are Mr Marsh's, sir." }]
+```
 
 ### Wait for the host
 
@@ -686,6 +713,7 @@ Some points of no return are on purpose. Name the endings that a rule or a machi
 - `loremaster check` gives an error for an unknown ending in `closes`, and for `closes` without a `reason`.
 - Agenda steps (`agendas/`, P4-02) take the same `closes` and `reason`.
 - When the budget stopped the walk, the checks are **not proven**: the explorer reports only dead ends and points of no return that it proved, and says that the rest is not proven. "No dead end" holds only for a walk that finished.
+- The explorer tells states apart by the turns left of each running timer, because a timer that runs out can change the story. A timer of n turns can make the walk up to n times larger: a story with a long timer needs a bigger budget, or a shorter timer, for proven checks.
 
 ## Timers
 
@@ -1211,6 +1239,13 @@ A save game keeps the state of a game, together with the version of its format a
 - The save keeps what each actor has done of its agenda. A step that the story no longer has is dropped, for example `agenda:keeper#1`. A save from before agendas (version 1) starts each agenda at its first step.
 
 Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
+
+The save keeps the state of the RNG. `reload_rolls` in story.yaml decides what the next roll gives after the player loads a save:
+
+- `same` (strict, the default): the roll from before the save. The player cannot reload for a better roll.
+- `fresh` (forgiving): a new roll. The host calls `Session::reseed` after `load`, `from_save` or `restore`, with a fresh, unpredictable value for each load; a constant value gives the same roll on each reload. The web engine wrapper (`web/src/lib/engine`) and the terminal host do this.
+
+`loremaster new` writes `reload_rolls: same` into story.yaml, so that the author decides. The setting is not part of the story's fingerprint in the save: switching it does not make old saves look like saves of a changed story.
 
 ## Episodes
 

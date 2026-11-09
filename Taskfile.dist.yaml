@@ -75,6 +75,17 @@ tasks:
       # Its own target folder: the cfg rebuilds every crate.
       - "{{.CARGO}} test -p loremaster-mcp --release --lib --target-dir target/loom loom"
 
+  fuzz:
+    desc: Run each fuzz target for a short time (needs nightly and cargo-fuzz; see CONTRIBUTING.md)
+    dir: fuzz
+    vars:
+      DURATION: '{{.DURATION | default "30"}}'
+      TARGETS: '{{.TARGETS | default "save protocol mcp commands story_yaml condition markup dice_and_sums"}}'
+    cmds:
+      - for: { var: TARGETS }
+        # The seeds of a target, when it has any (fuzz/seeds/<target>/).
+        cmd: mkdir -p corpus/{{.ITEM}} && {{.CARGO}} +nightly fuzz run {{.ITEM}} corpus/{{.ITEM}} $(test -d seeds/{{.ITEM}} && echo seeds/{{.ITEM}}) -- -max_total_time={{.DURATION}} -timeout=10
+
   walkthroughs:
     desc: Run the walkthrough tests (tests/*.yaml) of every example
     cmds:

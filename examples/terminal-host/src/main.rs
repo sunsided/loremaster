@@ -305,5 +305,11 @@ fn restore_file(world: Arc<World>, own_dice: bool, file: &str) -> Result<(Sessio
     // `load` returns no step. Restoring its own state shows the room, without a turn.
     let snapshot = session.snapshot();
     let step = session.restore(&snapshot).map_err(|e| e.to_string())?;
+    // A story with `reload_rolls: fresh` rolls anew after a load. The value must be
+    // fresh and unpredictable on each load; `RandomState` has new OS-seeded keys each time.
+    session.reseed(std::hash::BuildHasher::hash_one(
+        &std::collections::hash_map::RandomState::new(),
+        0,
+    ));
     Ok((session, step))
 }

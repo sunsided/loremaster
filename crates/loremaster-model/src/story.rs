@@ -4,6 +4,26 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+/// `reload_rolls` in story.yaml: what the next roll gives after the player
+/// loads a save.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReloadRolls {
+    /// Strict: the RNG is in the save, so the next roll is the same as
+    /// before. The player cannot reload for a better roll.
+    #[default]
+    Same,
+    /// Forgiving: the host mixes fresh randomness into the RNG on a load
+    /// (`Session::reseed`).
+    Fresh,
+}
+
+impl ReloadRolls {
+    pub fn is_same(&self) -> bool {
+        *self == ReloadRolls::Same
+    }
+}
+
 /// The type of a story variable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -209,6 +229,10 @@ pub struct Story {
     /// Seed for shuffled and sticky fragments; fixed so playthroughs replay.
     #[serde(default)]
     pub seed: u64,
+    /// What the next roll gives after a load: the same as before the save,
+    /// or a fresh one from the host's randomness.
+    #[serde(default, skip_serializing_if = "ReloadRolls::is_same")]
+    pub reload_rolls: ReloadRolls,
     /// Author notes. The player never sees them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<Note>,

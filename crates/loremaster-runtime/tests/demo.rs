@@ -107,7 +107,7 @@ fn the_pages_count_only_while_the_player_holds_them() {
 #[test]
 fn demo_endings_are_reachable() {
     // The ending checks walk every state of the night. The demo has about
-    // 60,000 states, more than the default budget of 2000; the default
+    // 39,000 states, more than the default budget of 2000; the default
     // depth (40 commands) is enough, since the coroner ends the night
     // after 20 turns.
     let (project, world) = demo();

@@ -5,6 +5,10 @@ use crate::SourceFile;
 /// The text of the start room until the author writes their own.
 pub const START_TEXT: &str = "You stare at an empty screen, the cursor blinking in expectation.";
 
+/// The `reload_rolls` lines of a new story.yaml: a scaffold before them
+/// had none, which `loremaster-mcp` still takes as an untouched story.
+pub const SCAFFOLD_RELOAD_ROLLS: &str = "\n# After a load: `same` gives the roll from before the save, `fresh` a new one.\nreload_rolls: same\n";
+
 /// The files of a new story with this title: `story.yaml` and `rooms/start.yaml`.
 pub fn scaffold(title: &str) -> Vec<SourceFile> {
     let title = title.trim();
@@ -12,7 +16,10 @@ pub fn scaffold(title: &str) -> Vec<SourceFile> {
     vec![
         SourceFile {
             path: "story.yaml".into(),
-            text: format!("title: {}\nstart: start\n\nintro: []\n", yaml_string(title)),
+            text: format!(
+                "title: {}\nstart: start\n{SCAFFOLD_RELOAD_ROLLS}\nintro: []\n",
+                yaml_string(title)
+            ),
         },
         SourceFile {
             path: "rooms/start.yaml".into(),
