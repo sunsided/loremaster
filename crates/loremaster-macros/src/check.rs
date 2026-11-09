@@ -696,6 +696,7 @@ fn name_stage(n: &NameStage) -> ModelNameStage {
     ModelNameStage {
         text: n.text.value.clone(),
         aliases: n.aliases.iter().map(|a| a.value.clone()).collect(),
+        head: None,
         when: n.when.as_ref().map(|w| w.source.clone()),
         proper: n.proper,
     }

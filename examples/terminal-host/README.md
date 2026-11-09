@@ -74,7 +74,8 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
      start node of its dialogue applies, `search` when it hides
      something). Rule conditions are not checked.
    - `ThingInfo::aliases` lists a thing's aliases and the names of its
-     earlier name stages.
+     earlier name stages. `ThingInfo::head` is the main word of the current
+     name: the author's `head`, or the last word of the name.
 7. Queries take no step: `scene()` (the room, the time as `time` and as
    `minutes`, the things, the exits), `thing(id)` (any thing), `fact(name)` (one variable, property
    or machine state, without a copy of the state), `verbs()`, `verbs_for(id)`, `journal()`,
