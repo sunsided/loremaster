@@ -34,6 +34,7 @@ impl<'a> RuleBuilder<'a> {
             when: None,
             then: Vec::new(),
             once: false,
+            free: false,
             instead: false,
             within: None,
             priority: 0,
@@ -59,6 +60,12 @@ impl<'a> RuleBuilder<'a> {
     /// `once: true`: fire at most once per game.
     pub fn once(mut self) -> Self {
         self.rule().once = true;
+        self
+    }
+
+    /// `free: true`: the player's command that fires the rule takes no time.
+    pub fn free(mut self) -> Self {
+        self.rule().free = true;
         self
     }
 

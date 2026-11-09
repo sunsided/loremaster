@@ -38,6 +38,8 @@ pub(crate) struct Game {
     last_frame: Option<FrameUse>,
     /// A `stop` effect ran in the rules that fire now.
     stopped: bool,
+    /// A rule with `free: true` fired in the command now: it takes no time.
+    free: bool,
     /// The host answers rolls itself (SE-7). Without it, the session rolls.
     pub(crate) host_rolls: bool,
     /// The host walks the player to a thing or an exit before a command.
@@ -419,6 +421,7 @@ impl Game {
             last_fired: Vec::new(),
             last_frame: None,
             stopped: false,
+            free: false,
             host_rolls: false,
             host_walks: false,
             forced: ForcedRolls::default(),
@@ -781,6 +784,8 @@ impl Game {
     /// clock moves once a turn.
     fn action(&mut self, turn: &mut Turn, cmd: Command) -> Option<u16> {
         let cmd = self.as_move(cmd);
+        // Rules of the turn before (`on: turn`) do not make this command free.
+        self.free = false;
         // A talk stays open until the player leaves: other commands do not run.
         match (&cmd, self.state.talk.is_some()) {
             (Command::Choose { index }, true) => {
@@ -913,7 +918,8 @@ impl Game {
             }
         }
         self.state.action = None;
-        Some(minutes)
+        // A free rule: no time passes, as for a command the game refuses.
+        (!std::mem::take(&mut self.free)).then_some(minutes)
     }
 
     /// Count an action before it runs, so `action.*` includes this time.
@@ -1863,6 +1869,9 @@ impl Game {
             });
             self.state.fired.insert(rule.id.clone());
             out.instead |= rule.instead;
+            // Only a rule on the command itself makes it free, not an
+            // enter, leave or custom event rule that the command sets off.
+            self.free |= rule.free && matches!(event, Event::Verb { .. });
             stepped.extend(rule.machine.as_ref());
             // A paused rule waits; the other rules of the event still run.
             if self.run_effects(turn, i, 0, depth + 1)
