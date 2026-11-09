@@ -23,6 +23,10 @@ serde_json.workspace = true
 tiny_http.workspace = true
 include_dir = { workspace = true, optional = true }
 
+# The loom tests of src/jobs/registry.rs (`task test:loom`).
+[target.'cfg(loom)'.dependencies]
+loom.workspace = true
+
 [features]
 # Embed the built web app (`ui/`, a copy of web/build) and serve it at `/`. Run `task release:ui` first.
 embed-ui = ["dep:include_dir"]

@@ -10,8 +10,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
-- `reload_rolls` in story.yaml (#189): `same` (strict, the default) keeps the next roll after a load, `fresh` (forgiving) rolls anew. `Session::reseed(entropy)` (WASM `reseed`) mixes the host's randomness into the RNG after `load`, `from_save` or `restore`, and changes nothing for `same`. The web engine wrapper and the terminal host call it after each load. `loremaster new` writes `reload_rolls: same` into story.yaml.
+- `reload_rolls` in story.yaml (#189): `same` (strict, the default) keeps the next roll after a load, `fresh` (forgiving) rolls anew. `Session::reseed(entropy)` (WASM `reseed`) mixes the host's randomness into the RNG after `load`, `from_save` or `restore`, and changes nothing for `same`. The host passes a fresh, unpredictable value on each load. The web engine wrapper and the terminal host call it after each load. `loremaster new` writes `reload_rolls: same` into story.yaml, the builder has `reload_rolls` and `world!` the header key `reload_rolls fresh;`. The setting is not part of the save's story fingerprint, so switching it does not make old saves look like saves of a changed story.
 - **Breaking (library):** `Story` and `StoryHeader` have the new field `reload_rolls`.
+
+### Fixed
+
+- A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 
 ## [0.2.0] - 2026-11-09
 
