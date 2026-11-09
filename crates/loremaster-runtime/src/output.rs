@@ -180,8 +180,23 @@ pub enum Cause {
 }
 
 impl Block {
+    /// The text with its markup: an emphasized run in stars, as the story
+    /// writes it.
     pub fn plain_text(&self) -> String {
-        self.runs.iter().map(|r| r.text.as_str()).collect()
+        let mut out = String::new();
+        let mut open = false;
+        for run in &self.runs {
+            // Runs that a link split stay in one pair of stars.
+            if run.emphasis != open {
+                out.push('*');
+                open = run.emphasis;
+            }
+            out.push_str(&run.text);
+        }
+        if open {
+            out.push('*');
+        }
+        out
     }
 }
 
@@ -229,6 +244,10 @@ pub struct Run {
     /// the run by its speaker. Speech in a rule without `by` has no speaker.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speaker: Option<String>,
+    /// The story marks the run as emphasis (`*Kestrel*`). The text has no
+    /// stars; a front end shows it in italics.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub emphasis: bool,
 }
 
 impl Run {
@@ -238,7 +257,57 @@ impl Run {
             source: None,
             link: None,
             speaker: None,
+            emphasis: false,
         }
+    }
+}
+
+/// Split the runs of each block at `*emphasis*`: the text between a pair
+/// of stars on one line, with no space just inside them, becomes a run with
+/// `emphasis`, without the stars. Other stars stay text, and so does `**`.
+pub(crate) fn split_emphasis(blocks: &mut [Block]) {
+    for block in blocks {
+        if matches!(block.kind, BlockKind::Command | BlockKind::Author) {
+            continue;
+        }
+        let runs = std::mem::take(&mut block.runs);
+        for run in runs {
+            emphasis_of(run, &mut block.runs);
+        }
+    }
+}
+
+fn emphasis_of(run: Run, out: &mut Vec<Run>) {
+    // A star next to another star (`**`) is no delimiter, so two spans
+    // never touch and `plain_text` can put every star back.
+    let bytes = run.text.as_bytes();
+    let stars: Vec<usize> = (run.text.match_indices('*').map(|(i, _)| i))
+        .filter(|&i| bytes.get(i + 1) != Some(&b'*') && (i == 0 || bytes[i - 1] != b'*'))
+        .collect();
+    // As in Markdown, `2 * 3 * 4` is no emphasis: the stars touch the word.
+    let pair = stars
+        .windows(2)
+        .map(|w| (w[0], w[1]))
+        .find(|&(open, close)| {
+            let inner = &run.text[open + 1..close];
+            !inner.is_empty() && inner.trim() == inner && !inner.contains('\n')
+        });
+    let Some((open, close)) = pair.filter(|_| !run.emphasis) else {
+        out.push(run);
+        return;
+    };
+    let piece = |text: &str, emphasis: bool| Run {
+        text: text.to_string(),
+        emphasis,
+        ..run.clone()
+    };
+    if open > 0 {
+        out.push(piece(&run.text[..open], false));
+    }
+    out.push(piece(&run.text[open + 1..close], true));
+    let rest = &run.text[close + 1..];
+    if !rest.is_empty() {
+        emphasis_of(piece(rest, false), out);
     }
 }
 

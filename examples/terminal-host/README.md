@@ -14,6 +14,11 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
 ## What a host must do
 
 1. Load a project, compile a `World`, make a `Session` and call `start`.
+   A host that ships the story in its binary writes a `Bundle` in its
+   `build.rs` (`Bundle::new(project.story, project.walkthroughs).to_json()`),
+   and at run time calls `Bundle::from_json(..)?.session()`: the format
+   version is checked and the hint ladder is set. A story with Rust behaviors
+   uses `session_with(|world| { world.register(..); })`.
 2. Show each `Effect` of the `Step`, in order:
    - `Text`: a block of runs. A run in speech names its `speaker`. The
      block's `cause` says why it showed: `Command` for the player's input
@@ -21,7 +26,9 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
      the opening and the turn passing (`on: turn`, timers, time rules,
      agendas). A stage host can draw the first over the player and the
      second as ambient narration. `Run::source` says who wrote the text, not
-     why it showed.
+     why it showed. A run with `emphasis` is `*emphasis*` in the story; its
+     text has no stars. `Block::plain_text` puts the stars back. The answers
+     of a talk (`Choice::text`) are plain strings and keep their stars.
    - `Notice`: a change of state. A host may skip it.
    - `Choices`: the answers of a talk. Answer with `Input::Choice(index)`.
    - `Roll`: dice to show.

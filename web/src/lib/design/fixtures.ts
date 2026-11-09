@@ -17,8 +17,10 @@ export const openingTurn: Turn = {
 			kind: 'narration',
 			runs: [
 				{
-					text: 'The ferry left you on the shingle an hour ago. Old Hal has not lit the lighthouse in three nights, and the *Marigold* is due in after dark.'
-				}
+					text: 'The ferry left you on the shingle an hour ago. Old Hal has not lit the lighthouse in three nights, and the '
+				},
+				{ text: 'Marigold', emphasis: true },
+				{ text: ' is due in after dark.' }
 			]
 		},
 		{ kind: 'title', runs: [{ text: 'The Shore' }] },
@@ -97,7 +99,11 @@ export const endTurn: Turn = {
 		},
 		{
 			kind: 'end',
-			runs: [{ text: "Far below, the *Marigold*'s masthead light turns, and steadies, and comes home." }]
+			runs: [
+				{ text: 'Far below, the ' },
+				{ text: 'Marigold', emphasis: true },
+				{ text: "'s masthead light turns, and steadies, and comes home." }
+			]
 		}
 	]
 };
