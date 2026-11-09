@@ -474,21 +474,42 @@ fn an_event_step_is_done_only_by_its_event_with_its_args() {
 #[test]
 fn an_event_is_no_thing() {
     // Event arguments are their own namespace: thing reads on an event fail.
-    for read in [
-        "present(killed)",
-        "carried(killed)",
-        "seen_by(killed)",
-        "killed.present",
-        "killed.location == hall",
+    for (read, error) in [
+        ("present(killed)", "unknown thing `killed`"),
+        ("carried(killed)", "unknown thing `killed`"),
+        ("seen_by(killed)", "unknown perceiver `killed`"),
+        (
+            "killed.present",
+            "the event `killed` has no argument `present`",
+        ),
+        (
+            "killed.location == hall",
+            "the event `killed` has no argument `location`",
+        ),
     ] {
         let rules =
             format!("{RULES}- id: probe\n  on: start\n  when: \"{read}\"\n  then: [stop]\n");
         let e = errors(&rules);
-        assert!(e.iter().any(|m| m.contains("killed")), "{read}: {e:?}");
+        assert!(e.iter().any(|m| m.contains(error)), "{read}: {e:?}");
     }
     let e = errors(&RULES.replace("{killed.boss}", "{killed.name}"));
-    assert!(e.iter().any(|m| m.contains("killed")), "{e:?}");
+    let error = "the event `killed` has no argument `name`";
+    assert!(e.iter().any(|m| m.contains(error)), "{e:?}");
     // A misspelt argument gets a hint to the declared one.
     let e = errors(&RULES.replace("{killed.boss}", "{killed.bos}"));
-    assert!(e.iter().any(|m| m.contains("`killed.boss`")), "{e:?}");
+    let error = "has no argument `bos`; did you mean `killed.boss`?";
+    assert!(e.iter().any(|m| m.contains(error)), "{e:?}");
+}
+
+#[test]
+fn an_event_argument_is_a_fact_to_set_and_export() {
+    let story = format!("{STORY}export:\n  facts: [killed.level]\n");
+    let rules =
+        format!("{RULES}- id: bump\n  on: start\n  then:\n    - set: {{ killed.level: 2 }}\n");
+    let e: Vec<_> = check(&load(files_with(&story, &rules)).unwrap())
+        .into_iter()
+        .filter(|d| d.severity == Severity::Error)
+        .map(|d| d.message)
+        .collect();
+    assert_eq!(e, Vec::<String>::new());
 }
