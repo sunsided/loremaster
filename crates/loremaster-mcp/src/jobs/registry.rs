@@ -115,14 +115,19 @@ impl<P: Process> Registry<P> {
 
     /// Stop a running job. Proposals it made stay. False when it does not run.
     pub(super) fn cancel(&self, id: &str) -> bool {
-        let Some(mut child) = self.children.lock().unwrap().remove(id) else {
-            return false;
+        // Take the child and mark the job cancelled under both locks, in the
+        // order of insert(): no reader sees a running job without its child,
+        // and update() drops what the agent writes while it dies.
+        let mut child = {
+            let mut children = self.children.lock().unwrap();
+            let Some(child) = children.remove(id) else {
+                return false;
+            };
+            if let Some(j) = self.jobs.lock().unwrap().get_mut(id) {
+                j.status = JobStatus::Cancelled;
+            }
+            child
         };
-        // Cancelled before the kill: update() then drops what the agent
-        // writes while it dies, and no reader sees it failed on the way.
-        if let Some(j) = self.jobs.lock().unwrap().get_mut(id) {
-            j.status = JobStatus::Cancelled;
-        }
         child.kill();
         child.wait();
         true
@@ -239,6 +244,28 @@ mod loom_tests {
             } else {
                 assert_eq!(end.status, JobStatus::Failed);
             }
+        });
+    }
+
+    /// cancel() takes the child and marks the job in one step: no reader sees
+    /// a running job whose child is gone (an update in that gap would land on
+    /// a job that is being cancelled).
+    #[test]
+    fn loom_cancel_is_one_step() {
+        loom::model(|| {
+            let r = registry();
+            let canceller = {
+                let r = r.clone();
+                thread::spawn(move || r.cancel("j1"))
+            };
+            {
+                // In the lock order of insert() and cancel().
+                let children = r.children.lock().unwrap();
+                let jobs = r.jobs.lock().unwrap();
+                let running = jobs["j1"].status == JobStatus::Running;
+                assert_eq!(running, children.contains_key("j1"));
+            }
+            assert!(canceller.join().unwrap());
         });
     }
 

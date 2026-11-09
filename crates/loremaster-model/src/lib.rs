@@ -35,7 +35,7 @@ mod walkthrough;
 pub use agenda::{Agenda, AgendaStep};
 pub use awaits::{AwaitOption, AwaitSpec, CombatSpec, Dice};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
-pub use command::{ANY_VERB, CommandPattern};
+pub use command::{ANY_VERB, ARTICLES, CommandPattern, topic_words};
 pub use diagnostic::{Diagnostic, Severity};
 pub use dialogue::{Dialogue, DialogueId, DialogueNode, DialogueOption, DialogueTarget, Outcomes};
 /// The dialogue AST of dramaturge (decision D3).

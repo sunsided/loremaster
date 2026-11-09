@@ -747,6 +747,16 @@ fn story(p: &mut Pack, s: &Story, vars: &[&Var], world: &World, spans: &mut Span
             spans.add("story", format!("score.ranks[{i}]"), text_tokens(rank));
         }
     }
+    for (i, (var, stat)) in s.stats.iter().enumerate() {
+        b = b.stat(stat.var.as_str(), stat.label.as_str());
+        if let Some(short) = &stat.short {
+            b = b.stat_short(&stat.var, short.as_str());
+        }
+        if let Some(max) = &stat.max {
+            b = b.stat_max(&stat.var, max.clone());
+        }
+        spans.add("story", format!("stats[{i}]"), name_tokens(var));
+    }
     for v in vars {
         let id = v.id.value.as_str();
         b = match (&v.ty, &v.initial) {
@@ -947,6 +957,8 @@ fn effects<B: Effects>(mut b: B, list: &[Effect], then: &Then, spans: &mut Spans
                 b.effect(loremaster_model::Effect::Call(Id::new(c.value.as_str())))
             }
             EffectKind::Rust(r) => b.effect(loremaster_model::Effect::Call(Id::new(r.id()))),
+            EffectKind::Await(spec) => b.awaits(spec.clone()),
+            EffectKind::Combat(spec) => b.combat(spec.clone()),
         };
         let i = then.offset + b.effects_mut().len().saturating_sub(1);
         let tokens = match &e.kind {

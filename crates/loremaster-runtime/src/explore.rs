@@ -92,9 +92,11 @@ pub struct Exploration {
 
 /// A state as the explorer compares it: the parts that change what can happen.
 /// The clock counts only by phase, and by the minutes until each agenda's
-/// next step is due. Counters count only up to 3, and only when the story
-/// reads them.
-fn fingerprint(game: &Game, counters: bool) -> String {
+/// next step is due. Timers count by the turns they have left. Counters
+/// count only up to 3, and only when the story reads them. Of the rules
+/// that fired, only the `once` rules count: the game reads `fired` only to
+/// keep them from firing again.
+fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
         if !counters {
@@ -105,13 +107,15 @@ fn fingerprint(game: &Game, counters: bool) -> String {
             .collect()
     };
     let visited: BTreeSet<&Id> = s.visits.keys().collect();
+    let fired_once: Vec<&Id> = s.fired.iter().filter(|id| once_ids.contains(id)).collect();
     serde_json::to_string(&(
         &s.room,
         &s.facts,
         &s.locations,
-        &s.fired,
+        fired_once,
         game.eval().phase(),
-        s.ended,
+        // Two endings from one state are two states.
+        (s.ended, &s.ending),
         visited,
         cap(&s.talked),
         cap(&s.interactions),
@@ -125,7 +129,14 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         // Only the hit that waits for its Luck test; round and log are history.
         s.combat.as_ref().map(|c| (true, &c.pending)),
         // In one tuple: serde serializes tuples of 16 at most.
-        (&s.actors, game.agenda_waits(), &s.active, &s.orders),
+        // The turns left of each timer: a timer that runs out can end the game.
+        (
+            &s.actors,
+            game.agenda_waits(),
+            &s.active,
+            &s.orders,
+            &s.timers,
+        ),
     ))
     .unwrap_or_default()
 }
@@ -157,14 +168,14 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             if combat && c.text == LUCK_TEXT {
                 continue;
             }
-            if combat && c.text == ATTACK_TEXT {
+            if combat && c.text.starts_with(ATTACK_TEXT) {
                 out.push((format!("answer {}{WIN_ROUND}", c.text), cmd.clone()));
                 out.push((format!("answer {}{LOSE_ROUND}", c.text), cmd));
             } else {
                 out.push((format!("answer {}", c.text), cmd));
             }
         }
-        return out;
+        return unique(out);
     }
     // In a talk, only the answers and leaving run.
     if game.talk().is_some() {
@@ -175,7 +186,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             )
         }));
         out.push(("leave".into(), Command::Leave));
-        return out;
+        return unique(out);
     }
     let verb = |v: &str, objects: Vec<Id>| Command::verb(v, objects);
     let label = |v: &str, objects: &[Id]| {
@@ -340,6 +351,20 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     out
 }
 
+/// Labels that a path can replay: of two answers with one text, the second
+/// gets ` (2)`, the third ` (3)`, and so on.
+fn unique(mut out: Vec<(String, Command)>) -> Vec<(String, Command)> {
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    for (label, _) in &mut out {
+        let n = seen.entry(label.clone()).or_insert(0);
+        *n += 1;
+        if *n > 1 {
+            label.push_str(&format!(" ({n})"));
+        }
+    }
+    out
+}
+
 /// Force the rolls of a combat round for its label in [`commands`], so that
 /// the walk sees both outcomes. The extreme rolls keep impossible outcomes
 /// out: with a big gap in SKILL, a forced "win" still loses.
@@ -358,6 +383,18 @@ fn force_round(game: &mut Game, label: &str) {
     let mut totals = vec![enemy; game.combat_fighters()];
     totals.push(player);
     game.forced.totals = totals.into();
+}
+
+/// The command of one step of an explorer path in this state, with the rolls
+/// of a combat round forced as the walk saw them. `None` when the state has
+/// no such step, also when the story has ended.
+pub(crate) fn step_command(game: &mut Game, step: &str) -> Option<Command> {
+    if game.state().ended {
+        return None;
+    }
+    let (label, cmd) = commands(game).into_iter().find(|(l, _)| l == step)?;
+    force_round(game, &label);
+    Some(cmd)
 }
 
 /// A pattern that matches the player's commands: no `actor`, or the player.
@@ -404,6 +441,14 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     game.host_walks = false;
     let opening = game.start();
     let counters = reads_counters(&game);
+    let once_ids: BTreeSet<&Id> = start
+        .world()
+        .story
+        .rules
+        .iter()
+        .filter(|r| crate::game::reads_fired(r))
+        .map(|r| &r.id)
+        .collect();
 
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut nodes: Vec<(Game, Vec<String>)> = Vec::new();
@@ -484,7 +529,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         entry.states += 1;
     };
 
-    seen.insert(fingerprint(&game, counters), 0);
+    seen.insert(fingerprint(&game, counters, &once_ids), 0);
     record(&game, &[], &mut variants, &mut shown);
     histories.push(beats_of(
         &opening,
@@ -525,7 +570,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
                 fired.insert(entry.text.clone());
             }
-            let key = fingerprint(&next, counters);
+            let key = fingerprint(&next, counters, &once_ids);
             let mut next_path = path.clone();
             next_path.push(label);
             let history = beats_of(
@@ -667,6 +712,7 @@ mod tests {
     use super::*;
     use crate::World;
     use loremaster_project::{SourceFile, load};
+    use std::path::Path;
     use std::sync::Arc;
 
     fn game(rules: &str) -> Game {
@@ -720,5 +766,76 @@ mod tests {
             "- id: any\n  on: { verb: [\"*\", coin] }\n  then: []\n",
         ));
         assert!(found.contains(&"take coin".to_string()), "{found:?}");
+    }
+
+    /// Every read of `State.fired` that changes play goes through
+    /// `reads_fired`, and the explorer builds its set from it: the
+    /// fingerprint keeps only those rules, so another read would merge
+    /// states that play differently.
+    #[test]
+    fn the_game_reads_fired_only_for_once_rules() {
+        fn walk(dir: &Path, out: &mut Vec<(String, String)>) {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    out.push((path.display().to_string(), text));
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut files,
+        );
+        let mut reads = Vec::new();
+        for (path, text) in &files {
+            let fingerprint = path.ends_with("explore.rs");
+            // Not this test.
+            let code = text.split("#[cfg(test)]").next().unwrap();
+            for (at, _) in code.match_indices(".fired") {
+                let line_start = code[..at].rfind('\n').map_or(0, |n| n + 1);
+                if code[line_start..at].trim_start().starts_with("//") {
+                    continue;
+                }
+                let after = &code[at + ".fired".len()..];
+                if after.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+                    continue; // `.fired_x`, not the field
+                }
+                let next = after.trim_start();
+                let mut from = at.saturating_sub(60);
+                while !code.is_char_boundary(from) {
+                    from -= 1;
+                }
+                let before = &code[from..at];
+                let allowed = next.starts_with(".insert(")
+                    || next.starts_with(".retain(")
+                    || before.contains("reads_fired(rule) &&")
+                    || (fingerprint && next.starts_with(".iter().filter(|id| once_ids.contains"));
+                if !allowed {
+                    let line = code[..at].lines().count();
+                    reads.push(format!("{path}:{line}"));
+                }
+            }
+        }
+        assert!(reads.is_empty(), "reads of `fired`: {reads:#?}");
+        let explore = &files
+            .iter()
+            .find(|(p, _)| p.ends_with("src/explore.rs"))
+            .unwrap()
+            .1;
+        assert!(explore.contains(".filter(|r| crate::game::reads_fired(r))"));
+    }
+
+    #[test]
+    fn two_answers_with_one_text_get_two_labels() {
+        let choose = |index| ("say Yes.".to_string(), Command::Choose { index });
+        let labels: Vec<String> = unique(vec![choose(0), choose(1), choose(2)])
+            .into_iter()
+            .map(|(l, _)| l)
+            .collect();
+        assert_eq!(labels, ["say Yes.", "say Yes. (2)", "say Yes. (3)"]);
     }
 }
