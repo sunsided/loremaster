@@ -1,0 +1,17 @@
+error: `combat` needs `win <room>` and `loss <room>`
+ --> tests/ui/fail/awaits_and_combat.rs:7:20
+  |
+7 |             combat [warden] win yard;
+  |                    ^
+
+error: expected `roll`, `choice`, `walk_to` or `action` after `await`
+  --> tests/ui/fail/awaits_and_combat.rs:16:19
+   |
+16 |             await dice "2d6";
+   |                   ^^^^
+
+error: `2x6` is not dice such as `2d6` or `1d20+3`
+  --> tests/ui/fail/awaits_and_combat.rs:28:13
+   |
+28 |             await roll "2x6" into r;
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^

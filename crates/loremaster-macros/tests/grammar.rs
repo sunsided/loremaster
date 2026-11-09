@@ -898,3 +898,133 @@ fn stats_limits_calc_seed_and_rolls() {
     assert_eq!(walk.seed, Some(42));
     assert_eq!(walk.steps[0].rolls(), [4, 11]);
 }
+
+mod fight {
+    use loremaster::prelude::*;
+    world! {
+        story "Fight" {
+            start: gate,
+            stats {
+                stamina "STAMINA" short "ST" max stamina_initial,
+                skill "SKILL" max 12,
+                luck "LUCK",
+            },
+        }
+        var skill = 9;
+        var stamina_initial = 12;
+        var stamina = 12 min 0 max stamina_initial;
+        var luck = 9;
+        var r = 0;
+        var path: [left, right] = left;
+        var lock: [shut, open, broken] = shut;
+        room gate "Gate" {}
+        room yard "Yard" {}
+        room road "Road" {}
+        room fallen "Fallen" {}
+        thing warden "warden" in gate {
+            prop skill = 7;
+            prop stamina = 6;
+        }
+        rule test_luck on enter(gate) {
+            await roll "2d6" into r against luck;
+            await choice [left, right "the right door"] into path;
+            combat [warden] win yard loss fallen escape road together;
+        }
+        rule pick on enter(road) {
+            await action pick_lock { difficulty = 3, loud = true } results [open, broken] into lock;
+            await walk_to yard;
+        }
+    }
+}
+
+const FIGHT_STORY_YAML: &str = r#"
+title: Fight
+start: gate
+vars:
+  - { id: skill, type: int, initial: 9 }
+  - { id: stamina_initial, type: int, initial: 12 }
+  - { id: stamina, type: int, initial: 12, min: 0, max: stamina_initial }
+  - { id: luck, type: int, initial: 9 }
+  - { id: r, type: int, initial: 0 }
+  - { id: path, type: { enum: [left, right] }, initial: left }
+  - { id: lock, type: { enum: [shut, open, broken] }, initial: shut }
+stats:
+  - { var: stamina, label: STAMINA, short: ST, max: stamina_initial }
+  - { var: skill, label: SKILL, max: 12 }
+  - { var: luck, label: LUCK }
+"#;
+
+const FIGHT_RULES_YAML: &str = r#"
+- id: test_luck
+  on: { enter: gate }
+  then:
+    - await: { roll: 2d6, into: r, against: luck }
+    - await: { choice: [left, { id: right, text: "the right door" }], into: path }
+    - combat: { enemies: [warden], win: yard, loss: fallen, escape: road, together: true }
+- id: pick
+  on: { enter: road }
+  then:
+    - await: { action: pick_lock, args: { difficulty: 3, loud: true }, results: [open, broken], into: lock }
+    - await: { walk_to: yard }
+"#;
+
+#[test]
+fn await_combat_and_stats_are_the_yaml_and_the_builder() {
+    use loremaster::dsl::model::{AwaitOption, AwaitSpec, CombatSpec};
+    use loremaster::dsl::project::SourceFile;
+    let yaml = Pack::from_files(vec![
+        SourceFile {
+            path: "story.yaml".into(),
+            text: FIGHT_STORY_YAML.into(),
+        },
+        SourceFile {
+            path: "rules/fight.yaml".into(),
+            text: FIGHT_RULES_YAML.into(),
+        },
+    ])
+    .unwrap();
+    let mut built = Pack::new("built");
+    built
+        .story("Fight", "gate")
+        .stat("stamina", "STAMINA")
+        .stat_short("stamina", "ST")
+        .stat_max("stamina", "stamina_initial")
+        .stat("skill", "SKILL")
+        .stat_max("skill", 12)
+        .stat("luck", "LUCK");
+    built
+        .rule("test_luck", on::enter("gate"))
+        .awaits(AwaitSpec {
+            roll: Some("2d6".into()),
+            into: Some("r".into()),
+            against: Some("luck".into()),
+            ..Default::default()
+        })
+        .awaits(AwaitSpec {
+            choice: vec![
+                AwaitOption::Id("left".into()),
+                AwaitOption::Labeled {
+                    id: "right".into(),
+                    text: "the right door".into(),
+                },
+            ],
+            into: Some("path".into()),
+            ..Default::default()
+        })
+        .combat(CombatSpec {
+            enemies: vec!["warden".into()],
+            win: "yard".into(),
+            loss: "fallen".into(),
+            escape: Some("road".into()),
+            together: true,
+        });
+    let p = fight::pack();
+    let stats = |p: &Pack| p.header.as_ref().unwrap().stats.clone();
+    assert_eq!(stats(&p), stats(&yaml));
+    assert_eq!(stats(&built), stats(&yaml));
+    assert_eq!(p.rules[0].then, yaml.rules[0].then);
+    assert_eq!(built.rules[0].then, yaml.rules[0].then);
+    assert_eq!(p.rules[1].then, yaml.rules[1].then);
+    // The pack builds: the runtime checks accept the awaits, the combat and the sheet.
+    Loremaster::new().pack(p).build().unwrap();
+}

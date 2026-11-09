@@ -294,6 +294,25 @@ fn story(st: &Story, vars: &[&Var], world: &World) -> TokenStream {
             chain.extend(quote_spanned!(span=> .rank(#from, #rank)));
         }
     }
+    for (_, stat) in &st.stats {
+        let (var, label) = (s(&stat.var, span), s(&stat.label, span));
+        chain.extend(quote_spanned!(span=> .stat(#var, #label)));
+        if let Some(short) = &stat.short {
+            let short = s(short, span);
+            chain.extend(quote_spanned!(span=> .stat_short(#var, #short)));
+        }
+        match &stat.max {
+            Some(loremaster_model::Limit::Value(n)) => {
+                let n = lit(Literal::i64_suffixed(*n), span);
+                chain.extend(quote_spanned!(span=> .stat_max(#var, #n)));
+            }
+            Some(loremaster_model::Limit::Var(v)) => {
+                let v = s(v.as_str(), span);
+                chain.extend(quote_spanned!(span=> .stat_max(#var, #v)));
+            }
+            None => {}
+        }
+    }
     for v in vars {
         let id = name(&v.id);
         chain.extend(match (&v.ty, &v.initial) {
@@ -662,9 +681,89 @@ fn effects(list: &[Effect], span: Span) -> TokenStream {
                     ::loremaster::dsl::model::Id::new(#b)
                 )))
             }
+            EffectKind::Await(a) => await_spec(a, span),
+            EffectKind::Combat(c) => {
+                let enemies = c.enemies.iter().map(|e| id(e.as_str(), span));
+                let (win, loss) = (id(c.win.as_str(), span), id(c.loss.as_str(), span));
+                let escape = opt(c.escape.as_ref().map(|e| id(e.as_str(), span)), span);
+                let together = c.together;
+                quote_spanned!(span=> .combat(::loremaster::dsl::model::CombatSpec {
+                    enemies: ::std::vec![#(#enemies),*],
+                    win: #win,
+                    loss: #loss,
+                    escape: #escape,
+                    together: #together,
+                }))
+            }
         });
     }
     out
+}
+
+fn id(v: &str, span: Span) -> TokenStream {
+    let v = s(v, span);
+    quote_spanned!(span=> ::loremaster::dsl::model::Id::new(#v))
+}
+
+fn opt(v: Option<TokenStream>, span: Span) -> TokenStream {
+    match v {
+        Some(v) => quote_spanned!(span=> ::std::option::Option::Some(#v)),
+        None => quote_spanned!(span=> ::std::option::Option::None),
+    }
+}
+
+fn await_spec(a: &loremaster_model::AwaitSpec, span: Span) -> TokenStream {
+    let string = |v: &Option<String>| {
+        opt(
+            v.as_ref().map(|v| {
+                let v = s(v, span);
+                quote_spanned!(span=> ::std::string::String::from(#v))
+            }),
+            span,
+        )
+    };
+    let choice = a.choice.iter().map(|o| match o {
+        loremaster_model::AwaitOption::Id(i) => {
+            let i = id(i.as_str(), span);
+            quote_spanned!(span=> ::loremaster::dsl::model::AwaitOption::Id(#i))
+        }
+        loremaster_model::AwaitOption::Labeled { id: i, text } => {
+            let (i, text) = (id(i.as_str(), span), s(text, span));
+            quote_spanned!(span=> ::loremaster::dsl::model::AwaitOption::Labeled {
+                id: #i,
+                text: ::std::string::String::from(#text),
+            })
+        }
+    });
+    let args = a.args.iter().map(|(k, v)| {
+        let k = s(k, span);
+        let v = match v {
+            loremaster_model::Value::Bool(b) => quote_spanned!(span=> Bool(#b)),
+            loremaster_model::Value::Int(i) => {
+                let l = lit(Literal::i64_suffixed(*i), span);
+                quote_spanned!(span=> Int(#l))
+            }
+            loremaster_model::Value::Text(t) => {
+                let t = s(t, span);
+                quote_spanned!(span=> Text(::std::string::String::from(#t)))
+            }
+        };
+        quote_spanned!(span=> (::std::string::String::from(#k), ::loremaster::dsl::model::Value::#v))
+    });
+    let results = a.results.iter().map(|r| id(r.as_str(), span));
+    let action = opt(a.action.as_ref().map(|v| id(v.as_str(), span)), span);
+    let walk_to = opt(a.walk_to.as_ref().map(|v| id(v.as_str(), span)), span);
+    let (roll, into, against) = (string(&a.roll), string(&a.into), string(&a.against));
+    quote_spanned!(span=> .awaits(::loremaster::dsl::model::AwaitSpec {
+        choice: ::std::vec![#(#choice),*],
+        action: #action,
+        args: ::std::collections::BTreeMap::from([#(#args),*]),
+        results: ::std::vec![#(#results),*],
+        roll: #roll,
+        walk_to: #walk_to,
+        into: #into,
+        against: #against,
+    }))
 }
 
 fn rule(r: &Rule) -> TokenStream {
