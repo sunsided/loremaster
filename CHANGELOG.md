@@ -14,7 +14,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Changed
 
-- An order step is the player's action, decided in #209: the rules for the player fire for it (with `bilge.active` true), and it counts in `action.*`, `.interactions`, `.talked` and `once`, as a step after a switch does. `docs/writing-stories.md` says so. A rule with `actor: bilge` for a playable actor now gets an error that says to test `bilge.active` instead; before, the error said to give it an agenda, which a playable actor cannot have.
+- An order step is the player's action, decided in #209: the rules for the player fire for it (with `bilge.active` true), and it counts in `action.*`, `.interactions`, `.talked` and `once`, as a step after a switch does. `docs/writing-stories.md` says so. A rule with `actor: bilge` for a playable actor now gets an error that says to declare `active` in its `props` and test `bilge.active` instead; before, the error said to give it an agenda, which a playable actor cannot have.
 
 ### Fixed
 
