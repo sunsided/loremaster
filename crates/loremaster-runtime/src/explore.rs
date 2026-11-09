@@ -204,7 +204,8 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             // `*` tries each verb that takes that many objects; moves come below.
             let fits = |v: &&loremaster_model::VerbDef| match objects.len() {
                 0 => v.slots == VerbSlots::None,
-                1 => v.slots == VerbSlots::One,
+                // The parser takes `unlock darkness` with one object, too.
+                1 => v.slots != VerbSlots::None,
                 _ => v.slots == VerbSlots::Two,
             };
             let verbs: Vec<Id> = if p.any_verb() {
@@ -710,8 +711,9 @@ mod tests {
             "- id: any\n  on: { verb: [\"*\", darkness] }\n  then: []\n",
         ));
         assert!(found.contains(&"push darkness".to_string()), "{found:?}");
-        // `unlock` needs two objects; the parser refuses it with one.
-        assert!(!found.contains(&"unlock darkness".to_string()), "{found:?}");
+        // A two-object verb runs with one object, as the parser takes it.
+        assert!(found.contains(&"unlock darkness".to_string()), "{found:?}");
+        assert!(!found.contains(&"look darkness".to_string()), "{found:?}");
         // With full hands, a `*` rule on the darkness does not handle `take coin`.
         assert!(!found.contains(&"take coin".to_string()), "{found:?}");
         let found = labels(&game(

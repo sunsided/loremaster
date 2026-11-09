@@ -137,7 +137,9 @@ fn an_exact_rule_that_already_passed_does_not_hold_a_star_rule_back() {
 #[test]
 fn a_machine_step_that_cannot_run_does_not_hold_a_star_rule_back() {
     // The machine takes one step per event: after `dim`, `bright` holds but
-    // does not run.
+    // does not run. `late` sorts after the machine's steps, so this covers
+    // an exact step ahead of it; the `stepped` guard is for an order with the
+    // step after the `*` rule, which only the builder can give.
     let machine = r#"
 start: dark
 states: [{ name: dark }, { name: dim }, { name: bright }]
