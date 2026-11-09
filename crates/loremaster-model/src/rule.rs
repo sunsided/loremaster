@@ -14,6 +14,11 @@ pub struct Rule {
     /// Fire at most once per game.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub once: bool,
+    /// For verb and check events: when the rule fires for the player's
+    /// command, the command takes no time: the clock, the turn count, the
+    /// timers and the agendas do not move. For a refusal that changes nothing.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub free: bool,
     /// For verb events: the rule's text replaces the default response.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub instead: bool,

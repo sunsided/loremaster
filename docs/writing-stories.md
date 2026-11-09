@@ -366,7 +366,7 @@ The effects:
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
-More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
+More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `free: true` on a `verb` or `check` rule lets the player's command that fires it take no time: the clock, the turn count, the timers and the agendas stay, as for a command that the game refuses ("You can't see that here."). Use it for a refusal that changes nothing, such as "It is already open."; other refusals still take a turn. A free command still counts as an action and an interaction (`action.*`, `.interactions`, the repeat count), so a "you already tried that" variant works; only the time stays. An `enter`, `leave` or `event` rule that the command sets off does not make it free. Walkthroughs and the explorer play the command as the game does, so a free refusal leads back into the state it came from. `loremaster check` warns about `free` on a rule for another event. In `world!`, write `free` after the event; the builder has `.free()`. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
 
 ### The Command record
 
@@ -601,7 +601,7 @@ Then a later rule tests `total >= 9`.
 
 A verb goes through these phases:
 
-1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes. A check rule that waits for the host (`await`) also holds the action: the later phases do not run, also after the answer. For an actor's command, the step of its agenda still counts as done, and its `then` runs at once, before the answer. Such a rule must do the move or the action itself.
+1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes, unless the rule has `free: true`. A check rule that waits for the host (`await`) also holds the action: the later phases do not run, also after the answer. For an actor's command, the step of its agenda still counts as done, and its `then` runs at once, before the answer. Such a rule must do the move or the action itself.
 2. `instead` rules (verb rules with `instead: true`). If one fires, it replaces the default response.
 3. The default response of the verb, or an `instead` frame.
 4. The other verb rules. They can read the result of the default response, for example `lamp.lit`.
@@ -898,7 +898,7 @@ A door can be concealed too: the player can not name it, but the exit stays. Goi
 
 ## Action cost
 
-A turn moves the clock by `minutes_per_turn`. `costs` in the clock gives a verb its own number of minutes, for the standard verbs and for custom ones. A cost of 0 lets a verb take no time; the turn still counts.
+A turn moves the clock by `minutes_per_turn`. `costs` in the clock gives a verb its own number of minutes, for the standard verbs and for custom ones. A cost of 0 lets a verb take no time; the turn still counts. For one response of a verb, give its rule `free: true` (read [Rules](#rules)): then the turn does not count either.
 
 ```yaml
 # story.yaml

@@ -275,6 +275,7 @@ pub struct Rule {
     pub on: Event,
     pub instead: bool,
     pub once: bool,
+    pub free: bool,
     pub priority: Option<i32>,
     pub within: Option<Name>,
     pub when: Option<Cond>,
