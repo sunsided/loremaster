@@ -8,6 +8,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+## [0.4.0] - 2026-11-09
+
 ### Upgrading from 0.3
 
 Stories and saves from 0.3 load unchanged. Library code: `Workbench::reload` returns `Result<Reloaded, ReloadError>` instead of `()`; handle or ignore the result.
@@ -224,7 +226,8 @@ Saves from 0.2 load unchanged. Stories from 0.2 load unchanged, with two excepti
 - The public API of `loremaster-lang` and `loremaster-runtime` uses types from dramaturge 0.2. A new major version of dramaturge thus can also be a breaking change of loremaster.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/sunsided/loremaster/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/sunsided/loremaster/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/sunsided/loremaster/releases/tag/v0.4.0
 [0.3.0]: https://github.com/sunsided/loremaster/releases/tag/v0.3.0
 [0.2.0]: https://github.com/sunsided/loremaster/releases/tag/v0.2.0
 [0.1.0]: https://github.com/sunsided/loremaster/releases/tag/v0.1.0
