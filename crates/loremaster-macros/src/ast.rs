@@ -108,6 +108,9 @@ pub struct Story {
     pub score: Option<i64>,
     pub score_var: Option<Name>,
     pub ranks: Vec<(i64, Text)>,
+    /// `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }`:
+    /// the var's name (for the span) and the sheet line.
+    pub stats: Vec<(Name, loremaster_model::Stat)>,
     pub tokens: TokenStream,
 }
 
@@ -320,6 +323,11 @@ pub enum EffectKind {
     Start(Name, Option<u32>),
     Cancel(Name),
     Call(Name),
+    /// `await roll "2d6" into r;`, `await choice [..]`, `await walk_to ..`
+    /// or `await action ..`.
+    Await(loremaster_model::AwaitSpec),
+    /// `combat [warden] win yard loss fallen [escape road] [together];`
+    Combat(loremaster_model::CombatSpec),
     /// `rust |cx| { .. }`: Rust code at this place of a rule.
     Rust(RustBlock),
 }

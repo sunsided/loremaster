@@ -172,12 +172,32 @@ fn undo_and_saves_keep_the_active_actor_and_the_orders() {
 #[test]
 fn explorer_terminates_and_every_ending_is_reachable() {
     let (project, world) = demo();
-    let explored = authoring::explore(world, authoring::Budget::default());
+    // The water clock multiplies the states by its turns left: more than
+    // the default budget of 2000.
+    let budget = authoring::Budget {
+        max_states: 20_000,
+        ..Default::default()
+    };
+    let explored = authoring::explore(world, budget);
     assert!(!explored.truncated, "{} states", explored.states);
     let checks = &explored.ending_checks;
     assert!(checks.ran && checks.proven, "{checks:#?}");
     assert!(checks.dead_ends.is_empty(), "{:#?}", checks.dead_ends);
     assert!(checks.stale.is_empty(), "{:#?}", checks.stale);
+    // The water clock runs out, and its `closes` accepts the slow turns.
+    assert!(
+        !explored.never_fired.iter().any(|r| r == "river_wins"),
+        "{:?}",
+        explored.never_fired
+    );
+    assert!(
+        checks
+            .no_return
+            .iter()
+            .any(|p| p.accepted_by.iter().any(|a| a == "river_wins")),
+        "{:#?}",
+        checks.no_return
+    );
     let diagnostics: Vec<_> = checks
         .diagnostics()
         .into_iter()

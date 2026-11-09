@@ -1,0 +1,5 @@
+# The river rises: the robots have eight turns to open the live main.
+turns: 8
+running: true
+at:
+  3: [{ say: "The water is over the gallery floor now. The pumps cough." }]

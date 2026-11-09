@@ -2,6 +2,7 @@
 //! does: `undo` undoes, unless a talk or a waiting rule takes the text.
 
 use crate::{Host, example, lighthouse};
+use loremaster_model::Value;
 
 #[test]
 fn typed_undo_undoes_the_last_input() {
@@ -39,4 +40,73 @@ fn typed_undo_during_a_talk_goes_to_the_talk() {
     );
     assert!(game.session().talk().is_some(), "the talk stays open");
     assert!(game.session().undo_steps() >= steps, "nothing was undone");
+}
+
+#[test]
+fn explorer_paths_replay_through_talks_and_answers() {
+    let mut kinds = std::collections::BTreeSet::new();
+    for name in [
+        "cantina",
+        "gatehouse",
+        "lighthouse",
+        "salt-tower",
+        "two-robots",
+    ] {
+        let mut game = example(name);
+        game.start();
+        let found = game.explore(loremaster_workbench::Budget::default());
+        // A stage host answers rolls and walks itself; a replay plays as the walk did.
+        game.session_mut().set_host_rolls(true);
+        game.session_mut().set_host_walks(true);
+        // The paths to the endings end the game; the paths to room texts end
+        // in their room, with the facts of the variant.
+        let endings = found.endings.iter().map(|e| (&e.path, None));
+        let rooms = found.rooms.iter().flat_map(|r| {
+            r.variants
+                .iter()
+                .map(move |v| (&v.path, Some((r.id.as_str(), &v.facts))))
+        });
+        for (path, room) in endings.chain(rooms) {
+            game.restart();
+            for step in path {
+                kinds.insert(step.split(' ').next().unwrap_or_default().to_string());
+                assert!(
+                    game.replay_step(step).is_some(),
+                    "{name}: no step `{step}` in {path:?}"
+                );
+            }
+            let errors = loremaster_runtime::authoring::forced_roll_errors(game.session_mut());
+            assert!(errors.is_empty(), "{name}: forced rolls left: {errors:?}");
+            match room {
+                Some((room, facts)) => {
+                    assert_eq!(game.scene().room, room, "{name}: {path:?}");
+                    let now: Vec<String> = game
+                        .state()
+                        .facts
+                        .iter()
+                        .filter(|(_, v)| !matches!(v, Value::Bool(false)))
+                        .map(|(k, v)| format!("{k} = {v}"))
+                        .collect();
+                    assert_eq!(&now, facts, "{name}: {path:?}");
+                }
+                None => {
+                    assert!(game.session().state().ended, "{name}: {path:?}");
+                    // Nothing plays after the end.
+                    let first = path.first().unwrap();
+                    assert!(game.replay_step(first).is_none(), "{name}: {path:?}");
+                }
+            }
+        }
+    }
+    for kind in ["say", "answer"] {
+        assert!(kinds.contains(kind), "no `{kind}` step: {kinds:?}");
+    }
+    // No shortest path above leaves a talk.
+    let mut game = example("cantina");
+    game.start();
+    for step in ["go in", "talk blackbeard", "leave"] {
+        assert!(game.replay_step(step).is_some(), "no step `{step}`");
+    }
+    assert!(game.session().talk().is_none(), "the talk is over");
+    assert!(game.replay_step("leave").is_none(), "no talk to leave");
 }

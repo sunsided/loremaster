@@ -463,6 +463,7 @@ fn story(input: ParseStream) -> Result<Story> {
         score: None,
         score_var: None,
         ranks: Vec::new(),
+        stats: Vec::new(),
         tokens,
     };
     let content;
@@ -471,6 +472,41 @@ fn story(input: ParseStream) -> Result<Story> {
         let field = name(&content)?;
         match field.value.as_str() {
             "clock" => clock(&content, &mut story)?,
+            "stats" => {
+                let list;
+                braced!(list in content);
+                while !list.is_empty() {
+                    let var = path(&list)?;
+                    let mut stat = loremaster_model::Stat {
+                        var: var.value.clone(),
+                        label: text(&list)?.value,
+                        short: None,
+                        max: None,
+                    };
+                    while let Some(key @ ("short" | "max")) = peek_word(&list).as_deref() {
+                        let at = name(&list)?.span;
+                        let taken = if key == "short" {
+                            stat.short.replace(text(&list)?.value).is_some()
+                        } else {
+                            let max = if list.peek(LitInt) || list.peek(Token![-]) {
+                                loremaster_model::Limit::Value(int(&list)?)
+                            } else {
+                                loremaster_model::Limit::Var(loremaster_model::Id::new(
+                                    path(&list)?.value,
+                                ))
+                            };
+                            stat.max.replace(max).is_some()
+                        };
+                        if taken {
+                            return Err(Error::new(at, format!("`{key}` is given twice")));
+                        }
+                    }
+                    story.stats.push((var, stat));
+                    if !list.is_empty() {
+                        list.parse::<Token![,]>()?;
+                    }
+                }
+            }
             "ranks" => {
                 let list;
                 braced!(list in content);
@@ -507,7 +543,7 @@ fn story(input: ParseStream) -> Result<Story> {
                     _ => {
                         return Err(Error::new(
                             field.span,
-                            "expected `author`, `start`, `seed`, `intro`, `death_prompt`, `reload_rolls`, `relations`, `score`, `score_var`, `ranks` or `clock`",
+                            "expected `author`, `start`, `seed`, `intro`, `death_prompt`, `reload_rolls`, `relations`, `score`, `score_var`, `ranks`, `stats` or `clock`",
                         ));
                     }
                 }
@@ -1598,6 +1634,8 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
         }
         "cancel" => EffectKind::Cancel(name(input)?),
         "call" => EffectKind::Call(name(input)?),
+        "await" => EffectKind::Await(await_spec(input)?),
+        "combat" => EffectKind::Combat(combat(input)?),
         "rust" if dialogue => {
             return Err(Error::new(
                 word.span,
@@ -1624,7 +1662,7 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
             let last = if dialogue {
                 " or `call`"
             } else {
-                ", `call` or `rust`"
+                ", `await`, `combat`, `call` or `rust`"
             };
             return Err(Error::new(
                 word.span,
@@ -1637,6 +1675,131 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
     Ok(Effect {
         kind,
         tokens: since(start, input),
+    })
+}
+
+/// The rest of `await <kind> .. [into <var>] [against <var>]`.
+fn await_spec(input: ParseStream) -> Result<loremaster_model::AwaitSpec> {
+    use loremaster_model::{AwaitOption, Id};
+    let mut spec = loremaster_model::AwaitSpec::default();
+    let kind = name(input)?;
+    match kind.value.as_str() {
+        "roll" => spec.roll = Some(text(input)?.value),
+        "walk_to" => spec.walk_to = Some(Id::new(name(input)?.value)),
+        "choice" => {
+            let list;
+            bracketed!(list in input);
+            while !list.is_empty() {
+                let id = Id::new(name(&list)?.value);
+                spec.choice.push(if list.peek(LitStr) {
+                    AwaitOption::Labeled {
+                        id,
+                        text: text(&list)?.value,
+                    }
+                } else {
+                    AwaitOption::Id(id)
+                });
+                if !list.is_empty() {
+                    list.parse::<Token![,]>()?;
+                }
+            }
+        }
+        "action" => {
+            spec.action = Some(Id::new(name(input)?.value));
+            if input.peek(syn::token::Brace) {
+                let args;
+                braced!(args in input);
+                while !args.is_empty() {
+                    let arg = name(&args)?;
+                    args.parse::<Token![=]>()?;
+                    let v = match value(&args)? {
+                        Value::Bool(b) => loremaster_model::Value::Bool(b),
+                        Value::Int(i) => loremaster_model::Value::Int(i),
+                        Value::Text(t) => loremaster_model::Value::Text(t),
+                    };
+                    if spec.args.insert(arg.value.clone(), v).is_some() {
+                        return Err(Error::new(
+                            arg.span,
+                            format!("the argument `{}` is given twice", arg.value),
+                        ));
+                    }
+                    if !args.is_empty() {
+                        args.parse::<Token![,]>()?;
+                    }
+                }
+            }
+            if peek_kw(input, "results") {
+                name(input)?;
+                spec.results = names(input)?
+                    .into_iter()
+                    .map(|n| Id::new(n.value))
+                    .collect();
+            }
+        }
+        _ => {
+            return Err(Error::new(
+                kind.span,
+                "expected `roll`, `choice`, `walk_to` or `action` after `await`",
+            ));
+        }
+    }
+    while let Some(key @ ("into" | "against")) = peek_word(input).as_deref() {
+        let at = name(input)?.span;
+        let var = Some(path(input)?.value);
+        let slot = if key == "into" {
+            &mut spec.into
+        } else {
+            &mut spec.against
+        };
+        if std::mem::replace(slot, var).is_some() {
+            return Err(Error::new(at, format!("`{key}` is given twice")));
+        }
+    }
+    Ok(spec)
+}
+
+/// The rest of `combat [enemies] win <room> loss <room> [escape <room>] [together]`.
+fn combat(input: ParseStream) -> Result<loremaster_model::CombatSpec> {
+    use loremaster_model::Id;
+    let at = input.span();
+    let enemies = names(input)?
+        .into_iter()
+        .map(|n| Id::new(n.value))
+        .collect();
+    let (mut win, mut loss, mut escape, mut together) = (None, None, None, false);
+    loop {
+        match peek_word(input).as_deref() {
+            Some("together") => {
+                name(input)?;
+                together = true;
+            }
+            Some(w @ ("win" | "loss" | "escape")) => {
+                let at = name(input)?.span;
+                let room = Some(Id::new(name(input)?.value));
+                let slot = match w {
+                    "win" => &mut win,
+                    "loss" => &mut loss,
+                    _ => &mut escape,
+                };
+                if std::mem::replace(slot, room).is_some() {
+                    return Err(Error::new(at, format!("`{w}` is given twice")));
+                }
+            }
+            _ => break,
+        }
+    }
+    let (Some(win), Some(loss)) = (win, loss) else {
+        return Err(Error::new(
+            at,
+            "`combat` needs `win <room>` and `loss <room>`",
+        ));
+    };
+    Ok(loremaster_model::CombatSpec {
+        enemies,
+        win,
+        loss,
+        escape,
+        together,
     })
 }
 

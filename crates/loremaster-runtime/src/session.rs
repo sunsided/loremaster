@@ -435,6 +435,20 @@ impl Session {
         self.game.forced.totals = totals.iter().copied().collect();
     }
 
+    /// One step of an explorer path as a whole turn, or `None` when the game
+    /// has no such step now. The turn runs as the walk ran it: a combat
+    /// round gets the rolls the walk forced, and the session answers rolls
+    /// and walks itself, also on a stage host. No forced roll is left over.
+    pub(crate) fn explorer_turn(&mut self, step: &str) -> Option<Turn> {
+        let cmd = crate::explore::step_command(&mut self.game, step)?;
+        let hosts = (self.game.host_rolls, self.game.host_walks);
+        (self.game.host_rolls, self.game.host_walks) = (false, false);
+        let turn = self.turn(Input::Command(cmd));
+        (self.game.host_rolls, self.game.host_walks) = hosts;
+        self.game.forced = Default::default();
+        Some(turn)
+    }
+
     /// What went wrong with the forced rolls: totals out of the range of
     /// their dice, and totals that no roll took. Clears the forced rolls.
     pub(crate) fn forced_roll_errors(&mut self) -> Vec<String> {

@@ -390,7 +390,34 @@ A `verb` or `check` event can name the slots:
 - A slot that the event does not name matches any command.
 - `actor` is different: an event without `actor` matches only the player's commands. Then the rules for the player do not fire when a character acts. `actor: player` says the same, and `actor: keeper` matches the commands of the keeper's agenda. Read [Actors and agendas](#actors-and-agendas).
 - The list form `verb: [unlock, door, key]` is the same as `{ verb: unlock, direct: door, indirect: key }`. Both forms load into one model.
-- The parser fills `preposition` with the word that you typed. Nothing fills `topic` yet; it is for a later `ask … about …`.
+- The verb `"*"` (with quotes: a bare `*` is YAML syntax) matches any verb. `verb: ["*", darkness]` fires for each command on the darkness. When a rule with an exact verb, such as `[examine, darkness]`, fires in the same scope (the same thing, room or region, or the rules folder) and phase (`check`, `instead` or `after`), the `*` rule does not fire for that command. A `*` rule with `once` fires once for all verbs. It also matches verbs that the story adds later. An agenda step's `do` takes one verb, not `*`.
+- The parser fills `preposition` with the word that you typed.
+- The parser fills `topic` with the words after `about`, in lower case, with punctuation as spaces and without articles: `ask Bert about the Lantern!` has the direct object `bert` and the topic `lantern`. The topic is words, not a thing, so it can name things that are not here. Write `topic:` in that form; `loremaster check` reports a topic such as `the lantern` that the parser never gives. A verb without objects has no topic, and for a two-object verb whose `preposition` is `about`, the words after it are the second object; `loremaster check` reports a `topic:` on such verbs. The explorer tries the topics that rules name.
+
+`ask` and `show` are custom verbs. `show` is a verb with two objects, as `give`:
+
+```yaml
+# verbs/ask.yaml
+label: Ask
+words: [ask]
+default: "They have nothing to say about that."
+
+# verbs/show.yaml
+label: Show
+words: [show]
+slots: two
+preposition: to
+default: "They look at it and say nothing."
+```
+
+```yaml
+- id: bert_lantern
+  on: { verb: ask, direct: bert, topic: lantern }
+  then: [{ say: "Two lights on the gate, sir." }]
+- id: bert_boots
+  on: { verb: show, direct: boots, indirect: bert }
+  then: [{ say: "Those are Mr Marsh's, sir." }]
+```
 
 ### Wait for the host
 
@@ -457,7 +484,22 @@ The effect `combat` runs a fight by built-in rules. The player needs the number 
 
 `win`, `loss` and `escape` are rooms. `escape` is optional. With `together: true`, all enemies fight in the same round; without it, they fight one after the other. Effects after `combat` run in the room where the combat ends.
 
-In each round, the player selects "Attack" or, if the combat has `escape`, "Escape". The enemy and the player each roll 2d6 and add their `skill`. The enemy rolls first. The higher total hits and takes 2 `stamina`. In an all-at-once combat, each enemy rolls and the player rolls once. The player attacks the first living enemy, and the other enemies only attack.
+In each round, the player selects "Attack" or, if the combat has `escape`, "Escape". The enemy and the player each roll 2d6 and add their `skill`. The enemy rolls first. The higher total hits and takes 2 `stamina`, unless the enemy has a special rule (`deals` or `takes`, below). In an all-at-once combat, each enemy rolls and the player rolls once. While more than one enemy lives, the player selects the target: "Attack GATE WARDEN" (`attack`, the first living enemy) or "Attack HOUND" (`attack.hound`). The other enemies only attack.
+
+Special rules of one enemy are its number properties `deals` (the `stamina` a hit of the enemy costs the player, instead of 2) and `takes` (the `stamina` a hit of the player costs the enemy, instead of 2). Both are 0 or more: `loremaster check` rejects a negative value, and the combat counts a negative value that a rule sets as 0. A Luck test shifts these values as it shifts the 2, and is not offered for a wound that costs nothing. For a rule of one combat, a rule sets the property before the combat starts, for example "the troll takes 1 extra damage from fire". The troll declares `takes: 2` in its `props`, and:
+
+```yaml
+- id: torch_burns_troll
+  on: { enter: bridge }
+  when: "carried(torch)"
+  priority: 1
+  then:
+    - set: { troll.takes: 3 }
+- id: fight_troll
+  on: { enter: bridge }
+  then:
+    - combat: { enemies: [troll], win: far_bank, loss: fallen }
+```
 
 After a hit, the player can select "Test your Luck" or "Go on", when `luck` is more than 0. The roll is 2d6 against `luck`, and the test costs 1 `luck`. A lucky result on a hit: the enemy loses 2 more. An unlucky one: the enemy loses 1 less. A lucky result on a wound: the player loses 1 less. An unlucky one: the player loses 1 more. If more than one hit happens in a round, the test changes the last one. A test is not offered for a hit that already kills the enemy, or for a wound when the player has 1 `stamina`.
 
@@ -469,6 +511,10 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: attack, rolls: [5, 11] }
 - { do: "Test your Luck", rolls: [4] }
 ```
+
+With `set_host_rolls(true)`, the host rolls the dice of a combat too: after the answer to the round, the session waits for one `roll` await (2d6) for each enemy that fights, in the order of `enemies`, then one for the player. "Test your Luck" waits for one more. The dice display shows the totals when the round is over.
+
+In `world!`, the effects are `await roll "2d6" into r against luck;`, `await choice [left, right "the right door"] into path;`, `await walk_to dock;`, `await action open_sluice { force = 2 } results [open, stuck] into sluice;` and `combat [warden] win yard loss fallen escape road;` (with `together` for all at once). The builder has `.awaits(AwaitSpec { .. })` and `.combat(CombatSpec { .. })`.
 
 `combat` works only in rules. The `min` of `stamina` must be a number of 0 or less, not a variable, and an enemy can be named only once. The explorer tries the win and the loss of a round and the escape. It does not try Luck tests, and it does not force rounds of an all-at-once combat in which the player hits and an enemy hits too.
 
@@ -482,6 +528,8 @@ stats:
   - { var: gold, label: Gold }
   - { var: hearth, label: HEARTH }
 ```
+
+In `world!`, the header takes `stats { stamina "STAMINA" short "ST" max stamina_initial, gold "Gold" }`; the builder has `.stat("stamina", "STAMINA").stat_short("stamina", "ST").stat_max("stamina", "stamina_initial")`.
 
 `var` is a number or a true/false variable, or a number or true/false property of a thing. Each variable can show one time only. A number shows as its value, with "/ max" when the stat has `max` (a number or a number variable). A true/false value shows as a codeword when it is true. A number with `short` also shows in the one-line sheet on a phone. The equipment on the sheet is the inventory of the player.
 
@@ -665,6 +713,7 @@ Some points of no return are on purpose. Name the endings that a rule or a machi
 - `loremaster check` gives an error for an unknown ending in `closes`, and for `closes` without a `reason`.
 - Agenda steps (`agendas/`, P4-02) take the same `closes` and `reason`.
 - When the budget stopped the walk, the checks are **not proven**: the explorer reports only dead ends and points of no return that it proved, and says that the rest is not proven. "No dead end" holds only for a walk that finished.
+- The explorer tells states apart by the turns left of each running timer, because a timer that runs out can change the story. A timer of n turns can make the walk up to n times larger: a story with a long timer needs a bigger budget, or a shorter timer, for proven checks.
 
 ## Timers
 

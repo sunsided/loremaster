@@ -533,6 +533,14 @@ impl Checker<'_> {
         self.frames(&header, "frames", &story.frames);
         let mut seen = BTreeSet::new();
         for v in &story.verbs {
+            if v.id.as_str() == loremaster_model::ANY_VERB {
+                let file = self.file_of(&format!("verb:{}", v.id));
+                self.error(
+                    &file,
+                    "id",
+                    "`*` is the verb of rules that match any verb; name the verb otherwise",
+                );
+            }
             if !seen.insert(v.id.as_str()) {
                 let file = self.file_of(&format!("verb:{}", v.id));
                 self.error(&file, "id", format!("verb `{}` is defined twice", v.id));
@@ -1667,8 +1675,37 @@ impl Checker<'_> {
         let verb = pattern.verb.as_str();
         if verb.is_empty() {
             self.error(file, at, "name the verb");
-        } else if !verbs.contains(verb) {
+        } else if !verbs.contains(verb) && !pattern.any_verb() {
             self.error(file, at, format!("unknown verb `{verb}`"));
+        }
+        if let Some(topic) = &pattern.topic {
+            // The parser gives the topic in this form; another one never matches.
+            let words = loremaster_model::topic_words(topic);
+            let at = format!("{at}.topic");
+            let def = standard_verbs()
+                .into_iter()
+                .chain(self.story().verbs.iter().cloned())
+                .find(|v| v.id.as_str() == verb);
+            if words.is_empty() {
+                self.error(
+                    file,
+                    &at,
+                    "the parser never gives an empty topic: name what the command is about",
+                );
+            } else if !words.eq_ignore_ascii_case(topic) {
+                self.error(
+                    file,
+                    &at,
+                    format!("the parser reads this topic as `{words}`: write `topic: {words}`"),
+                );
+            }
+            if def.is_some_and(|v| !v.takes_topic()) {
+                self.error(
+                    file,
+                    &at,
+                    format!("`{verb}` takes no topic: it has no objects, or `about` names its second object"),
+                );
+            }
         }
         if pattern.indirect.is_some() && pattern.direct.is_none() {
             // A command has its objects in order; a rule could never match it.
@@ -1810,6 +1847,13 @@ impl Checker<'_> {
                             "the agenda's actor runs the command; leave `actor` out",
                         );
                     }
+                    if cmd.any_verb() {
+                        self.error(
+                            &file,
+                            &at,
+                            "an agenda step runs one verb; `*` is for the events of rules",
+                        );
+                    }
                     // The actor is reported above; check the other slots.
                     let mut cmd = cmd.clone();
                     cmd.actor = None;
@@ -1845,6 +1889,27 @@ impl Checker<'_> {
             for stat in ["skill", "stamina"] {
                 if !matches!(self.ty_of(&format!("{e}.{stat}")), Some(Ty::Int)) {
                     self.error(file, at, format!("the enemy `{e}` needs a number `{stat}`"));
+                }
+            }
+            // Special rules of the enemy: optional, but numbers of 0 or more.
+            for prop in ["deals", "takes"] {
+                if self
+                    .ty_of(&format!("{e}.{prop}"))
+                    .is_some_and(|t| t != Ty::Int)
+                {
+                    self.error(
+                        file,
+                        at,
+                        format!("`{prop}` of the enemy `{e}` is not a number"),
+                    );
+                }
+                let value = (self.story().thing(e.as_str())).and_then(|t| t.props.get(prop));
+                if let Some(loremaster_model::Value::Int(n @ ..0)) = value {
+                    self.error(
+                        file,
+                        at,
+                        format!("`{prop}` of the enemy `{e}` is {n}: it must be 0 or more"),
+                    );
                 }
             }
         }

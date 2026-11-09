@@ -92,9 +92,11 @@ pub struct Exploration {
 
 /// A state as the explorer compares it: the parts that change what can happen.
 /// The clock counts only by phase, and by the minutes until each agenda's
-/// next step is due. Counters count only up to 3, and only when the story
-/// reads them.
-fn fingerprint(game: &Game, counters: bool) -> String {
+/// next step is due. Timers count by the turns they have left. Counters
+/// count only up to 3, and only when the story reads them. Of the rules
+/// that fired, only the `once` rules count: the game reads `fired` only to
+/// keep them from firing again.
+fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
         if !counters {
@@ -105,13 +107,15 @@ fn fingerprint(game: &Game, counters: bool) -> String {
             .collect()
     };
     let visited: BTreeSet<&Id> = s.visits.keys().collect();
+    let fired_once: Vec<&Id> = s.fired.iter().filter(|id| once_ids.contains(id)).collect();
     serde_json::to_string(&(
         &s.room,
         &s.facts,
         &s.locations,
-        &s.fired,
+        fired_once,
         game.eval().phase(),
-        s.ended,
+        // Two endings from one state are two states.
+        (s.ended, &s.ending),
         visited,
         cap(&s.talked),
         cap(&s.interactions),
@@ -125,7 +129,14 @@ fn fingerprint(game: &Game, counters: bool) -> String {
         // Only the hit that waits for its Luck test; round and log are history.
         s.combat.as_ref().map(|c| (true, &c.pending)),
         // In one tuple: serde serializes tuples of 16 at most.
-        (&s.actors, game.agenda_waits(), &s.active, &s.orders),
+        // The turns left of each timer: a timer that runs out can end the game.
+        (
+            &s.actors,
+            game.agenda_waits(),
+            &s.active,
+            &s.orders,
+            &s.timers,
+        ),
     ))
     .unwrap_or_default()
 }
@@ -157,14 +168,14 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             if combat && c.text == LUCK_TEXT {
                 continue;
             }
-            if combat && c.text == ATTACK_TEXT {
+            if combat && c.text.starts_with(ATTACK_TEXT) {
                 out.push((format!("answer {}{WIN_ROUND}", c.text), cmd.clone()));
                 out.push((format!("answer {}{LOSE_ROUND}", c.text), cmd));
             } else {
                 out.push((format!("answer {}", c.text), cmd));
             }
         }
-        return out;
+        return unique(out);
     }
     // In a talk, only the answers and leaving run.
     if game.talk().is_some() {
@@ -175,7 +186,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             )
         }));
         out.push(("leave".into(), Command::Leave));
-        return out;
+        return unique(out);
     }
     let verb = |v: &str, objects: Vec<Id>| Command::verb(v, objects);
     let label = |v: &str, objects: &[Id]| {
@@ -201,32 +212,62 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
             if !objects.iter().all(|o| scope.contains(o)) {
                 continue;
             }
-            // The label is the dedup key: keep the slots that tell rules apart.
-            let mut text = label(p.verb.as_str(), &objects);
-            if let Some(prep) = &p.preposition {
-                text.push_str(&format!(" ({prep})"));
+            // `*` tries each verb that takes that many objects; moves come below.
+            let fits = |v: &&loremaster_model::VerbDef| match objects.len() {
+                0 => v.slots == VerbSlots::None,
+                // The parser takes `unlock darkness` with one object, too.
+                1 => v.slots != VerbSlots::None,
+                _ => v.slots == VerbSlots::Two,
+            };
+            let verbs: Vec<Id> = if p.any_verb() {
+                world
+                    .verbs
+                    .iter()
+                    .filter(|v| v.id.as_str() != "go")
+                    .filter(fits)
+                    .map(|v| v.id.clone())
+                    .collect()
+            } else {
+                vec![p.verb.clone()]
+            };
+            for v in verbs {
+                // The label is the dedup key: keep the slots that tell rules apart.
+                let mut text = label(v.as_str(), &objects);
+                if let Some(prep) = &p.preposition {
+                    text.push_str(&format!(" ({prep})"));
+                }
+                if let Some(topic) = &p.topic {
+                    text.push_str(&format!(" about {topic}"));
+                }
+                out.push((
+                    text,
+                    Command::Verb {
+                        verb: v,
+                        objects: objects.clone(),
+                        actor: None,
+                        preposition: p.preposition.clone(),
+                        topic: p.topic.clone(),
+                    },
+                ));
             }
-            if let Some(topic) = &p.topic {
-                text.push_str(&format!(" about {topic}"));
-            }
-            out.push((
-                text,
-                Command::Verb {
-                    verb: p.verb.clone(),
-                    objects,
-                    actor: None,
-                    preposition: p.preposition.clone(),
-                    topic: p.topic.clone(),
-                },
-            ));
         }
     }
     // The standard verbs that change state.
-    let take_rules = story.rules.iter().any(|r| {
-        matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
-            if p.verb.as_str() == "take"
-                && for_player(p))
-    });
+    // A `*` rule counts for the things whose `take` it can match.
+    let take_shaped = |p: &loremaster_model::CommandPattern, thing: &Id| {
+        p.verb.as_str() == "take"
+            || (p.any_verb()
+                && p.direct.as_ref().is_none_or(|d| d == thing)
+                && p.indirect.is_none()
+                && p.preposition.is_none()
+                && p.topic.is_none())
+    };
+    let take_rules = |thing: &Id| {
+        story.rules.iter().any(|r| {
+            matches!(&r.on, EventPattern::Verb(p) | EventPattern::Check(p)
+                if take_shaped(p, thing) && for_player(p))
+        })
+    };
     for t in scope.iter().filter_map(|id| story.thing(id.as_str())) {
         let id = t.id.clone();
         if story.dialogue_with(id.as_str()).is_some() {
@@ -251,7 +292,7 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
                 verb("drop", vec![id.clone()]),
             ));
         }
-        if t.portable && !carried && (!full || take_rules) {
+        if t.portable && !carried && (!full || take_rules(&id)) {
             out.push((
                 label("take", std::slice::from_ref(&id)),
                 verb("take", vec![id.clone()]),
@@ -310,6 +351,20 @@ fn commands(game: &Game) -> Vec<(String, Command)> {
     out
 }
 
+/// Labels that a path can replay: of two answers with one text, the second
+/// gets ` (2)`, the third ` (3)`, and so on.
+fn unique(mut out: Vec<(String, Command)>) -> Vec<(String, Command)> {
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    for (label, _) in &mut out {
+        let n = seen.entry(label.clone()).or_insert(0);
+        *n += 1;
+        if *n > 1 {
+            label.push_str(&format!(" ({n})"));
+        }
+    }
+    out
+}
+
 /// Force the rolls of a combat round for its label in [`commands`], so that
 /// the walk sees both outcomes. The extreme rolls keep impossible outcomes
 /// out: with a big gap in SKILL, a forced "win" still loses.
@@ -328,6 +383,18 @@ fn force_round(game: &mut Game, label: &str) {
     let mut totals = vec![enemy; game.combat_fighters()];
     totals.push(player);
     game.forced.totals = totals.into();
+}
+
+/// The command of one step of an explorer path in this state, with the rolls
+/// of a combat round forced as the walk saw them. `None` when the state has
+/// no such step, also when the story has ended.
+pub(crate) fn step_command(game: &mut Game, step: &str) -> Option<Command> {
+    if game.state().ended {
+        return None;
+    }
+    let (label, cmd) = commands(game).into_iter().find(|(l, _)| l == step)?;
+    force_round(game, &label);
+    Some(cmd)
 }
 
 /// A pattern that matches the player's commands: no `actor`, or the player.
@@ -374,6 +441,14 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     game.host_walks = false;
     let opening = game.start();
     let counters = reads_counters(&game);
+    let once_ids: BTreeSet<&Id> = start
+        .world()
+        .story
+        .rules
+        .iter()
+        .filter(|r| crate::game::reads_fired(r))
+        .map(|r| &r.id)
+        .collect();
 
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut nodes: Vec<(Game, Vec<String>)> = Vec::new();
@@ -454,7 +529,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         entry.states += 1;
     };
 
-    seen.insert(fingerprint(&game, counters), 0);
+    seen.insert(fingerprint(&game, counters, &once_ids), 0);
     record(&game, &[], &mut variants, &mut shown);
     histories.push(beats_of(
         &opening,
@@ -495,7 +570,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
                 fired.insert(entry.text.clone());
             }
-            let key = fingerprint(&next, counters);
+            let key = fingerprint(&next, counters, &once_ids);
             let mut next_path = path.clone();
             next_path.push(label);
             let history = beats_of(
@@ -629,5 +704,138 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
                 payoffs: crate::threads::payoff_labels(&beats, t),
             })
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::World;
+    use loremaster_project::{SourceFile, load};
+    use std::path::Path;
+    use std::sync::Arc;
+
+    fn game(rules: &str) -> Game {
+        let files: Vec<SourceFile> = [
+            ("story.yaml", "title: Dark\nstart: cellar\ncarry_limit: 1\n"),
+            (
+                "rooms/cellar.yaml",
+                "name: Cellar\ndescription: [\"A cellar.\"]\n",
+            ),
+            (
+                "things/darkness.yaml",
+                "name: darkness\nlocation: { room: cellar }\n",
+            ),
+            (
+                "things/lamp.yaml",
+                "name: lamp\nlocation: carried\nportable: true\n",
+            ),
+            (
+                "things/coin.yaml",
+                "name: coin\nlocation: { room: cellar }\nportable: true\n",
+            ),
+            ("rules/rules.yaml", rules),
+        ]
+        .map(|(path, text)| SourceFile {
+            path: path.into(),
+            text: text.into(),
+        })
+        .into();
+        let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
+        let mut game = Game::new(world);
+        game.start();
+        game
+    }
+
+    fn labels(game: &Game) -> Vec<String> {
+        commands(game).into_iter().map(|(label, _)| label).collect()
+    }
+
+    #[test]
+    fn a_star_rule_tries_the_verbs_that_fit_its_objects() {
+        let found = labels(&game(
+            "- id: any\n  on: { verb: [\"*\", darkness] }\n  then: []\n",
+        ));
+        assert!(found.contains(&"push darkness".to_string()), "{found:?}");
+        // A two-object verb runs with one object, as the parser takes it.
+        assert!(found.contains(&"unlock darkness".to_string()), "{found:?}");
+        assert!(!found.contains(&"look darkness".to_string()), "{found:?}");
+        // With full hands, a `*` rule on the darkness does not handle `take coin`.
+        assert!(!found.contains(&"take coin".to_string()), "{found:?}");
+        let found = labels(&game(
+            "- id: any\n  on: { verb: [\"*\", coin] }\n  then: []\n",
+        ));
+        assert!(found.contains(&"take coin".to_string()), "{found:?}");
+    }
+
+    /// Every read of `State.fired` that changes play goes through
+    /// `reads_fired`, and the explorer builds its set from it: the
+    /// fingerprint keeps only those rules, so another read would merge
+    /// states that play differently.
+    #[test]
+    fn the_game_reads_fired_only_for_once_rules() {
+        fn walk(dir: &Path, out: &mut Vec<(String, String)>) {
+            for entry in std::fs::read_dir(dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    walk(&path, out);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    let text = std::fs::read_to_string(&path).unwrap();
+                    out.push((path.display().to_string(), text));
+                }
+            }
+        }
+        let mut files = Vec::new();
+        walk(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut files,
+        );
+        let mut reads = Vec::new();
+        for (path, text) in &files {
+            let fingerprint = path.ends_with("explore.rs");
+            // Not this test.
+            let code = text.split("#[cfg(test)]").next().unwrap();
+            for (at, _) in code.match_indices(".fired") {
+                let line_start = code[..at].rfind('\n').map_or(0, |n| n + 1);
+                if code[line_start..at].trim_start().starts_with("//") {
+                    continue;
+                }
+                let after = &code[at + ".fired".len()..];
+                if after.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
+                    continue; // `.fired_x`, not the field
+                }
+                let next = after.trim_start();
+                let mut from = at.saturating_sub(60);
+                while !code.is_char_boundary(from) {
+                    from -= 1;
+                }
+                let before = &code[from..at];
+                let allowed = next.starts_with(".insert(")
+                    || next.starts_with(".retain(")
+                    || before.contains("reads_fired(rule) &&")
+                    || (fingerprint && next.starts_with(".iter().filter(|id| once_ids.contains"));
+                if !allowed {
+                    let line = code[..at].lines().count();
+                    reads.push(format!("{path}:{line}"));
+                }
+            }
+        }
+        assert!(reads.is_empty(), "reads of `fired`: {reads:#?}");
+        let explore = &files
+            .iter()
+            .find(|(p, _)| p.ends_with("src/explore.rs"))
+            .unwrap()
+            .1;
+        assert!(explore.contains(".filter(|r| crate::game::reads_fired(r))"));
+    }
+
+    #[test]
+    fn two_answers_with_one_text_get_two_labels() {
+        let choose = |index| ("say Yes.".to_string(), Command::Choose { index });
+        let labels: Vec<String> = unique(vec![choose(0), choose(1), choose(2)])
+            .into_iter()
+            .map(|(l, _)| l)
+            .collect();
+        assert_eq!(labels, ["say Yes.", "say Yes. (2)", "say Yes. (3)"]);
     }
 }
