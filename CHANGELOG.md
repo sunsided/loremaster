@@ -8,6 +8,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+## [0.3.0] - 2026-11-09
+
 ### Upgrading from 0.2
 
 Saves from 0.2 load unchanged. Stories from 0.2 load unchanged, with two exceptions that `loremaster check` now reports as errors: an id `combat_hit`, `combat_round` or `combat_end` (rename it), and a host event read like a thing, such as `present(killed)`, `seen_by(killed)` or `killed.name` (read its arguments, `killed.boss`, instead; #208). Library code that builds these types with a struct literal, or matches them exhaustively, needs the changes:
@@ -207,6 +209,7 @@ Saves from 0.2 load unchanged. Stories from 0.2 load unchanged, with two excepti
 - The public API of `loremaster-lang` and `loremaster-runtime` uses types from dramaturge 0.2. A new major version of dramaturge thus can also be a breaking change of loremaster.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/sunsided/loremaster/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/sunsided/loremaster/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sunsided/loremaster/releases/tag/v0.3.0
 [0.2.0]: https://github.com/sunsided/loremaster/releases/tag/v0.2.0
 [0.1.0]: https://github.com/sunsided/loremaster/releases/tag/v0.1.0
