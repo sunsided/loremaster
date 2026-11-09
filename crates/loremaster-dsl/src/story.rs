@@ -32,6 +32,7 @@ impl<'a> StoryBuilder<'a> {
             relations: Vec::new(),
             frames: Frames::default(),
             seed: 0,
+            reload_rolls: Default::default(),
             death_prompt: true,
             carry_limit: None,
             playable: Vec::new(),
@@ -73,6 +74,13 @@ impl<'a> StoryBuilder<'a> {
     /// restart or restore.
     pub fn no_death_prompt(mut self) -> Self {
         self.header().death_prompt = false;
+        self
+    }
+
+    /// `reload_rolls: fresh`: after a load, the next roll is new when the
+    /// host reseeds (`Session::reseed`). Without it, `same`.
+    pub fn fresh_rolls(mut self) -> Self {
+        self.header().reload_rolls = loremaster_model::ReloadRolls::Fresh;
         self
     }
 

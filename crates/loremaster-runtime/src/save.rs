@@ -50,7 +50,16 @@ impl StoryStamp {
         // A story is plain data with string keys (or integer keys, which JSON
         // writes as strings), so it always serializes. A fallback hash would let
         // a changed story pass as unchanged.
-        let content = serde_json::to_vec(&world.story).expect("a story always serializes to JSON");
+        // `reload_rolls` is a policy of the host on load, not part of the
+        // state: switching it must not make old saves look like another story.
+        let content = if world.story.reload_rolls.is_same() {
+            serde_json::to_vec(&world.story)
+        } else {
+            let mut story = world.story.clone();
+            story.reload_rolls = Default::default();
+            serde_json::to_vec(&story)
+        }
+        .expect("a story always serializes to JSON");
         let digest = Sha256::digest(&content);
         let hash = digest[..8].iter().map(|b| format!("{b:02x}")).collect();
         Self {

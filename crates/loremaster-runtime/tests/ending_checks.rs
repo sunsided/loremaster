@@ -288,6 +288,39 @@ fn closes_accepts_the_turns_before_a_timed_step() {
 }
 
 #[test]
+fn only_fired_once_rules_tell_states_apart() {
+    // A rule that can fire again changes nothing by firing: burning in the
+    // cell is the same state as before. A `once` rule cannot fire again, so
+    // having fired is a new state.
+    let mutter = "- id: mutter\n  on: { verb: [burn] }\n  then: [{ say: You mutter. }]\n";
+    let (again, _) = full(&cell(&format!("{ESCAPE}{mutter}"), &[]));
+    let once = mutter.replace("  then:", "  once: true\n  then:");
+    let (once, _) = full(&cell(&format!("{ESCAPE}{once}"), &[]));
+    // The start and the end. With `once`, the start and the end each come
+    // twice: before and after the rule fired.
+    assert_eq!((again.states, once.states), (2, 4));
+}
+
+#[test]
+fn a_timer_reaches_its_ending() {
+    // The guards come when the fuse runs out. The walk gets there only when
+    // it tells the turns left of the timer apart.
+    let timer = "turns: 3\nrunning: true\n";
+    let rules =
+        format!("{ESCAPE}- id: guards\n  on: {{ timer: fuse }}\n  then: [{{ end: caught }}]\n");
+    let (result, diagnostics) = full(&cell(&rules, &[("timers/fuse.yaml", timer)]));
+    assert!(result.ending_checks.proven, "{:#?}", result.ending_checks);
+    let caught = result
+        .endings
+        .iter()
+        .find(|e| e.text.starts_with("Caught"))
+        .unwrap_or_else(|| panic!("{:#?}", result.endings));
+    // Three turns of anything but `escape`.
+    assert_eq!(caught.path.len(), 3, "{:?}", caught.path);
+    assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+}
+
+#[test]
 fn a_stopped_walk_proves_nothing() {
     let rules = format!(
         "{ESCAPE}- id: burn_map\n  on: {{ verb: [burn] }}\n  when: not burned\n  then: [{{ set: {{ burned: true }} }}]\n"
@@ -454,8 +487,9 @@ fn two_commands_into_one_state_are_two_turns() {
             .map(|p| (p.accepted(), p.turns))
             .collect::<Vec<_>>()
     };
-    assert_eq!(turns("burn_map"), [(true, 3)], "{checks:#?}");
-    assert_eq!(turns("torch_map"), [(false, 2)], "{checks:#?}");
+    // `burn` at heat 1, before and after `cool`; `torch` only after it.
+    assert_eq!(turns("burn_map"), [(true, 2)], "{checks:#?}");
+    assert_eq!(turns("torch_map"), [(false, 1)], "{checks:#?}");
 }
 
 const BURN: &str = "- id: burn_map\n  on: { verb: [burn] }\n  when: not burned\n  then: [{ set: { burned: true } }]\n";

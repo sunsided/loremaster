@@ -35,7 +35,7 @@ mod walkthrough;
 pub use agenda::{Agenda, AgendaStep};
 pub use awaits::{AwaitOption, AwaitSpec, CombatSpec, Dice};
 pub use clock::{ClockConfig, Phase, TimeOfDay};
-pub use command::CommandPattern;
+pub use command::{ANY_VERB, ARTICLES, CommandPattern, topic_words};
 pub use diagnostic::{Diagnostic, Severity};
 pub use dialogue::{Dialogue, DialogueId, DialogueNode, DialogueOption, DialogueTarget, Outcomes};
 /// The dialogue AST of dramaturge (decision D3).
@@ -52,7 +52,7 @@ pub use note::{Note, NoteRole, Thread, ThreadStatus};
 pub use plan::{ChartStep, SERIAL_RUN, StepChart, step_chart};
 pub use room::{Direction, Exit, Room};
 pub use rule::{Effect, EventPattern, Rule, SumError, SumTerm, Term, parse_sum};
-pub use story::{EpisodeItems, Limit, Rank, Score, Stat, Story, VarDef, VarType};
+pub use story::{EpisodeItems, Limit, Rank, ReloadRolls, Score, Stat, Story, VarDef, VarType};
 pub use thing::{Location, NameStage, Thing};
 pub use timer::{StartTimers, Timer};
 pub use value::Value;

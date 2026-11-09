@@ -25,10 +25,15 @@ pub(crate) fn lex(src: &str) -> Result<Vec<(Tok, Span)>, LangError> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
-        let c = bytes[i] as char;
+        // The char, not the byte: a byte of a multi-byte char is no char of its own.
+        // Each step below moves `i` by whole chars, so it stays on a char boundary.
+        let c = src[i..]
+            .chars()
+            .next()
+            .expect("`i` is on a char boundary before the end");
         let start = i;
         if c.is_whitespace() {
-            i += 1;
+            i += c.len_utf8();
             continue;
         }
         let two = src.get(i..i + 2).unwrap_or("");
@@ -112,4 +117,19 @@ pub(crate) fn lex(src: &str) -> Result<Vec<(Tok, Span)>, LangError> {
         ));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The first byte of `€` or `😀` read as a letter once made an empty
+    /// name and a loop for ever.
+    #[test]
+    fn a_char_that_is_no_letter_is_refused_at_its_bytes() {
+        assert_eq!(lex("d\u{102c22}").unwrap_err().span, 1..5);
+        assert_eq!(lex("x €").unwrap_err().span, 2..5);
+        assert_eq!(lex("😀").unwrap_err().span, 0..4);
+        assert_eq!(lex("à\u{a0}b").unwrap().len(), 2);
+    }
 }

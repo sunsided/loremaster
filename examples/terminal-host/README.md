@@ -51,4 +51,6 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
 7. Save with `Session::save`, and load with `Session::load`. After a load, set
    `set_host_rolls` again: it belongs to the session, not to the save. `load`
    returns no step, so restore the session's own `snapshot` to show the room.
+   Then call `Session::reseed` with a fresh, unpredictable number: for a story with
+   `reload_rolls: fresh` the next roll is new; for `same` it changes nothing.
    `snapshot` and `restore` also keep a state in memory.
