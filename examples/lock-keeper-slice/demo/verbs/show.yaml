@@ -1,4 +1,5 @@
-# `show <thing> to <person>`: rules match `{ verb: show, direct: <clue>, indirect: marsh }`.
+# `show <thing> to <person>`. The demo's only show rules are
+# `{ verb: show, direct: casebook, indirect: marsh }` (rules/marsh.yaml).
 label: Show
 words: [show]
 slots: two

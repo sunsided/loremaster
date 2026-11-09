@@ -33,7 +33,7 @@ The walkthroughs are the three paths of the design, `best` (committed for trial)
 | Talks with Bert, Crane, Hester and Marsh | `dialogues/` | 3 |
 | Agendas: Marsh, Hester, Bert, Crane | `agendas/` | 4 |
 | The lock machine, the drain timer, the pages and the stove | `machines/lock.yaml`, `timers/`, `things/pages.yaml`, `things/stove.yaml` | 5 |
-| The accusation, five ranked endings, the case notebook (quests) | `rules/accuse.yaml`, `endings/`, `machines/means.yaml`, `machines/opportunity.yaml`, `machines/motive.yaml` | 6 |
+| The accusation, six ranked endings, the case notebook (quests) | `rules/accuse.yaml`, `endings/`, `machines/means.yaml`, `machines/opportunity.yaml`, `machines/motive.yaml` | 6 |
 | Walkthroughs, hints, the ending checks | `tests/`, `closes` in `agendas/` | 7 |
 | "He ran", `show` and `stop`, Hester's trust and alibi (#216) | `verbs/show.yaml`, `verbs/stop.yaml`, `things/casebook.yaml`, `rules/marsh.yaml`, `timers/marsh_flight.yaml`, `endings/ran.yaml`, `dialogues/hester.yaml`, `rules/hester.yaml`, `agendas/hester.yaml` | 4, 6 |
 

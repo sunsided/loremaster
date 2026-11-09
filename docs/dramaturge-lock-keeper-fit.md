@@ -12,7 +12,7 @@ Versions:
 
 What was looked at:
 
-- The demo `examples/lock-keeper-slice/demo/`: nine rooms, four suspects with agendas, a coroner agenda, three quests, five endings, three walkthroughs. `crates/loremaster-runtime/tests/demo.rs` plays the walkthroughs and runs the ending checks over the night.
+- The demo `examples/lock-keeper-slice/demo/`: nine rooms, four suspects with agendas, a coroner agenda, three quests, six endings, seven walkthroughs. `crates/loremaster-runtime/tests/demo.rs` plays the walkthroughs and runs the ending checks over the night.
 - The golden slice `examples/lock-keeper-slice/yaml/` (and `dsl/`, `mixed/`), with its feel log in `PENDING.md`.
 - The loremaster glue: the talk runtime, the text host types, the pool lowering, the checks and the `world!` dialogue host.
 - The PR threads of #96, #97, #158, #164 and #166.
