@@ -29,6 +29,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 - Host event arguments are their own namespace in conditions and text (#208). Before, an event read like a thing, so `present(killed)`, `killed.name` or `seen_by(killed)` passed the check. Now they are errors, and `killed.bos` says the event has no such argument, with a hint to `killed.boss`. An event still cannot have the id of a thing, a variable, a room or a built-in path: `killed.level` would still read as a thing's property or a room's `visits`, and the fact keys would clash.
 - **Breaking (library):** `loremaster_lang::Scope` has the new field `events`, and `Scope::things` no longer has the host events.
 
+### Changed
+
+- An order step is the player's action, decided in #209: the rules for the player fire for it (with `bilge.active` true), and it counts in `action.*`, `.interactions`, `.talked` and `once`, as a step after a switch does. `docs/writing-stories.md` says so. A rule with `actor: bilge` for a playable actor now gets an error that says to declare `active` in its `props` and test `bilge.active` instead; before, the error said to give it an agenda, which a playable actor cannot have.
+
 ### Fixed
 
 - A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.

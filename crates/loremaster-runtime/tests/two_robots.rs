@@ -365,3 +365,42 @@ fn a_dropped_actor_fact_stays_dropped() {
     );
     assert_eq!(restored.state().active.as_ref().unwrap().as_str(), "wick");
 }
+
+#[test]
+fn an_order_step_is_the_players_action() {
+    // Bilge acts for the player (WO-5): the rules for the player fire, with
+    // `bilge.active`, and the action counts as the player's.
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/two-robots");
+    let mut files = read_dir(&dir).unwrap();
+    files.push(SourceFile {
+        path: "rules/stiff.yaml".into(),
+        text: "- id: stiff\n  on: { check: [hold] }\n  once: true\n  then:\n    - say: \"The lever is stiff.\"\n".into(),
+    });
+    let world = Arc::new(World::compile(load(files.clone()).unwrap().story).unwrap());
+    let mut s = session(world);
+    let turn = say(&mut s, "bilge, hold lever");
+    assert!(turn.contains("The lever is stiff."), "{turn}");
+    assert_eq!(
+        s.state().facts.get("bilge_holds"),
+        Some(&loremaster_model::Value::Bool(true))
+    );
+    assert_eq!(s.state().action_counts.get("hold"), Some(&1));
+    assert_eq!(s.state().interactions.get("lever"), Some(&1));
+    // The player read the `once` rule in the order step: it is used up.
+    let turn = say(&mut s, "hold lever");
+    assert!(!turn.contains("The lever is stiff."), "{turn}");
+    assert_eq!(s.state().interactions.get("lever"), Some(&2));
+    // A rule that names Bilge as its actor never fires: the check says how
+    // to write it.
+    files.push(SourceFile {
+        path: "rules/probe.yaml".into(),
+        text: "- id: probe\n  on: { verb: hold, actor: bilge }\n  then: [stop]\n".into(),
+    });
+    let found = errors(files);
+    assert!(
+        found.iter().any(|d| d
+            .message
+            .contains("declare `active` in its `props` and test `bilge.active`")),
+        "{found:#?}"
+    );
+}
