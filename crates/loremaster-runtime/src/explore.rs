@@ -93,8 +93,9 @@ pub struct Exploration {
 /// A state as the explorer compares it: the parts that change what can happen.
 /// The clock counts only by phase, and by the minutes until each agenda's
 /// next step is due. Counters count only up to 3, and only when the story
-/// reads them.
-fn fingerprint(game: &Game, counters: bool) -> String {
+/// reads them. Of the rules that fired, only the `once` rules count: the
+/// game reads `fired` only to keep them from firing again.
+fn fingerprint(game: &Game, counters: bool, once: &BTreeSet<&Id>) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
         if !counters {
@@ -105,13 +106,15 @@ fn fingerprint(game: &Game, counters: bool) -> String {
             .collect()
     };
     let visited: BTreeSet<&Id> = s.visits.keys().collect();
+    let once: Vec<&Id> = s.fired.iter().filter(|id| once.contains(id)).collect();
     serde_json::to_string(&(
         &s.room,
         &s.facts,
         &s.locations,
-        &s.fired,
+        once,
         game.eval().phase(),
-        s.ended,
+        // Two endings from one state are two states.
+        (s.ended, &s.ending),
         visited,
         cap(&s.talked),
         cap(&s.interactions),
@@ -374,6 +377,14 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
     game.host_walks = false;
     let opening = game.start();
     let counters = reads_counters(&game);
+    let once: BTreeSet<&Id> = start
+        .world()
+        .story
+        .rules
+        .iter()
+        .filter(|r| r.once)
+        .map(|r| &r.id)
+        .collect();
 
     let mut seen: HashMap<String, usize> = HashMap::new();
     let mut nodes: Vec<(Game, Vec<String>)> = Vec::new();
@@ -454,7 +465,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
         entry.states += 1;
     };
 
-    seen.insert(fingerprint(&game, counters), 0);
+    seen.insert(fingerprint(&game, counters, &once), 0);
     record(&game, &[], &mut variants, &mut shown);
     histories.push(beats_of(
         &opening,
@@ -495,7 +506,7 @@ pub fn explore(start: &Game, budget: Budget) -> Exploration {
             for entry in turn.log.iter().filter(|l| l.kind == "rule") {
                 fired.insert(entry.text.clone());
             }
-            let key = fingerprint(&next, counters);
+            let key = fingerprint(&next, counters, &once);
             let mut next_path = path.clone();
             next_path.push(label);
             let history = beats_of(
