@@ -1,4 +1,4 @@
-use loremaster_model::{Direction, Id, VerbDef, VerbSlots};
+use loremaster_model::{ARTICLES, Direction, Id, VerbDef, VerbSlots, topic_words};
 use serde::{Deserialize, Serialize};
 
 /// A resolved player action. The parser produces these from typed text; the
@@ -160,7 +160,8 @@ fn back(scope: &ParseScope, phrase: &str) -> Option<Option<String>> {
 
 const NO_WAY_BACK: &str = "You can't go back the way you came.";
 
-const ARTICLES: [&str; 6] = ["the", "a", "an", "some", "my", "this"];
+/// The word before the topic of a command.
+const TOPIC: &str = "about";
 const PREPOSITIONS: [&str; 7] = ["with", "on", "to", "in", "into", "at", "using"];
 
 pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Result<Command, String> {
@@ -196,6 +197,10 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
             .ok_or_else(|| "You can't go that way.".to_string());
     }
 
+    let (rest, topic) = split_topic(verb, &rest);
+    if topic.as_deref() == Some("") {
+        return Err(format!("What do you want to {} about?", verb.words[0]));
+    }
     let (first, second) = split_objects(verb, &rest);
     let preposition = (!second.is_empty())
         .then(|| rest.get(first_len(&rest, verb)).cloned())
@@ -232,8 +237,26 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
         objects,
         actor: None,
         preposition,
-        topic: None,
+        topic,
     })
+}
+
+/// The words before `about`, and the topic after it ([`topic_words`]):
+/// `ask bert about the lantern` is about `lantern`. Empty when nothing
+/// follows. A verb without objects, or with `about` as its preposition,
+/// has no topic.
+fn split_topic(verb: &VerbDef, rest: &[String]) -> (Vec<String>, Option<String>) {
+    match rest
+        .iter()
+        .position(|w| w == TOPIC)
+        .filter(|_| verb.takes_topic())
+    {
+        Some(i) => (
+            rest[..i].to_vec(),
+            Some(topic_words(&rest[i + 1..].join(" "))),
+        ),
+        None => (rest.to_vec(), None),
+    }
 }
 
 /// The place of the preposition in the words after a two-object verb.
@@ -465,6 +488,7 @@ pub(crate) fn preview(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Pre
         return out;
     }
 
+    let (rest, topic) = split_topic(verb, &rest);
     let (first, second) = split_objects(verb, &rest);
     let has_second_slot = verb.slots == VerbSlots::Two && rest.len() > first.len();
     for (i, words) in [first, second].iter().enumerate() {
@@ -489,6 +513,9 @@ pub(crate) fn preview(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Pre
         VerbSlots::Two => 1,
     };
     out.complete = out.candidates.is_empty()
+        && topic.as_deref() != Some("")
+        // A verb without objects refuses any words after it.
+        && !(verb.slots == VerbSlots::None && !rest.is_empty())
         && out.objects.len() >= wanted
         && !(has_second_slot && out.objects.len() < 2);
     out
@@ -615,5 +642,70 @@ mod tests {
         check!(parse(&v, &s, "take lamp") == Err("You see no lamp here.".to_string()));
         check!(parse(&v, &s, "dance") == Err("I don't know how to \"dance\".".to_string()));
         check!(parse(&v, &s, "open") == Err("What do you want to open?".to_string()));
+        check!(
+            parse(&v, &s, "push door about") == Err("What do you want to push about?".to_string())
+        );
+        // A verb without objects has no topic either.
+        check!(
+            parse(&v, &s, "wait about the storm")
+                == Err("\"wait\" doesn't need anything after it.".to_string())
+        );
+    }
+
+    #[test]
+    fn about_fills_the_topic() {
+        let v = standard_verbs();
+        let s = scope();
+        check!(
+            parse(&v, &s, "push the oak door about the old key")
+                == Ok(Command::Verb {
+                    verb: Id::new("push"),
+                    objects: vec![Id::new("door")],
+                    actor: None,
+                    preposition: None,
+                    topic: Some("old key".into()),
+                })
+        );
+        let p = preview(&v, &s, "push door about the bra");
+        check!(p.objects == vec![Id::new("door")]);
+        check!(p.complete);
+        check!(!preview(&v, &s, "push door about ").complete);
+        check!(!preview(&v, &s, "push door about").complete);
+        check!(!preview(&v, &s, "wait about the storm").complete);
+    }
+
+    #[test]
+    fn about_as_the_preposition_names_the_second_object() {
+        let inform = VerbDef {
+            id: Id::new("inform"),
+            label: "Inform".into(),
+            words: vec!["inform".into()],
+            slots: VerbSlots::Two,
+            preposition: Some("about".into()),
+            bar: false,
+            default: None,
+        };
+        let parsed = parse(&[inform], &scope(), "inform door about the brass key");
+        let Ok(Command::Verb { objects, topic, .. }) = parsed else {
+            panic!("{parsed:?}");
+        };
+        check!(objects == vec![Id::new("door"), Id::new("brass_key")]);
+        check!(topic == None);
+        // With one object, `about` is the topic again.
+        let listen = VerbDef {
+            id: Id::new("listen"),
+            label: "Listen".into(),
+            words: vec!["listen".into()],
+            slots: VerbSlots::One,
+            preposition: Some("about".into()),
+            bar: false,
+            default: None,
+        };
+        let parsed = parse(&[listen], &scope(), "listen door about the storm");
+        let Ok(Command::Verb { objects, topic, .. }) = parsed else {
+            panic!("{parsed:?}");
+        };
+        check!(objects == vec![Id::new("door")]);
+        check!(topic.as_deref() == Some("storm"));
     }
 }

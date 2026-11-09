@@ -1670,6 +1670,35 @@ impl Checker<'_> {
         } else if !verbs.contains(verb) {
             self.error(file, at, format!("unknown verb `{verb}`"));
         }
+        if let Some(topic) = &pattern.topic {
+            // The parser gives the topic in this form; another one never matches.
+            let words = loremaster_model::topic_words(topic);
+            let at = format!("{at}.topic");
+            let def = standard_verbs()
+                .into_iter()
+                .chain(self.story().verbs.iter().cloned())
+                .find(|v| v.id.as_str() == verb);
+            if words.is_empty() {
+                self.error(
+                    file,
+                    &at,
+                    "the parser never gives an empty topic: name what the command is about",
+                );
+            } else if !words.eq_ignore_ascii_case(topic) {
+                self.error(
+                    file,
+                    &at,
+                    format!("the parser reads this topic as `{words}`: write `topic: {words}`"),
+                );
+            }
+            if def.is_some_and(|v| !v.takes_topic()) {
+                self.error(
+                    file,
+                    &at,
+                    format!("`{verb}` takes no topic: it has no objects, or `about` names its second object"),
+                );
+            }
+        }
         if pattern.indirect.is_some() && pattern.direct.is_none() {
             // A command has its objects in order; a rule could never match it.
             self.error(

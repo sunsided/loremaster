@@ -35,6 +35,18 @@ pub struct VerbDef {
     pub default: Option<String>,
 }
 
+impl VerbDef {
+    /// Can a command of this verb have a topic (`ask bert about the lantern`)?
+    /// Not without objects, and not when `about` names the second object.
+    pub fn takes_topic(&self) -> bool {
+        match self.slots {
+            VerbSlots::None => false,
+            VerbSlots::One => true,
+            VerbSlots::Two => self.preposition.as_deref() != Some("about"),
+        }
+    }
+}
+
 fn yes() -> bool {
     true
 }

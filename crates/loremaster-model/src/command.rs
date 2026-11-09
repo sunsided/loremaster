@@ -30,9 +30,32 @@ pub struct CommandPattern {
     pub indirect: Option<Id>,
     /// The word between the objects, such as `with`, `on` or `in`.
     pub preposition: Option<String>,
-    /// What a command is about, for `ask keeper about stove`. Free text; the
-    /// parser does not fill it yet.
+    /// What a command is about, for `ask keeper about stove`: the words after
+    /// `about`, as [`topic_words`] gives them.
     pub topic: Option<String>,
+}
+
+/// The words that the parser drops from a noun phrase or a topic.
+pub const ARTICLES: [&str; 6] = ["the", "a", "an", "some", "my", "this"];
+
+/// A topic as the parser reads it: lower case, punctuation as spaces, no
+/// articles. `ask bert about The Lantern!` is about `lantern`, so a rule
+/// writes `topic: lantern`.
+pub fn topic_words(text: &str) -> String {
+    text.to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '\'' {
+                c
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .filter(|w| !ARTICLES.contains(w))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// The names of the slots, in the order of the record.
