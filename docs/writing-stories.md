@@ -381,7 +381,7 @@ The effects:
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
-More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
+More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `free: true` on a `verb` or `check` rule lets the player's command that fires it take no time: the clock, the turn count, the timers and the agendas stay, as for a command that the game refuses ("You can't see that here."). Use it for a refusal that changes nothing, such as "It is already open."; other refusals still take a turn. A free command still counts as an action and an interaction (`action.*`, `.interactions`, the repeat count), so a "you already tried that" variant works; only the time stays. An `enter`, `leave` or `event` rule that the command sets off does not make it free. Walkthroughs and the explorer play the command as the game does, so a free refusal leads back into the state it came from. `loremaster check` warns about `free` on a rule for another event. In `world!`, write `free` after the event; the builder has `.free()`. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
 
 ### The Command record
 
@@ -527,7 +527,7 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: "Test your Luck", rolls: [4] }
 ```
 
-With `set_host_rolls(true)`, the host rolls the dice of a combat too: after the answer to the round, the session waits for one `roll` await (2d6) for each enemy that fights, in the order of `enemies`, then one for the player. "Test your Luck" waits for one more. The dice display shows the totals when the round is over.
+With `set_host_rolls(true)`, the host rolls the dice of a combat too: after the answer to the round, the session waits for one `roll` await (2d6) for each enemy that fights, in the order of `enemies`, then one for the player. "Test your Luck" waits for one more. The dice display shows the totals when the round is over. Each `roll` await says whom it is for in `who`: the enemy's name, `You`, or `LUCK`.
 
 In `world!`, the effects are `await roll "2d6" into r against luck;`, `await choice [left, right "the right door"] into path;`, `await walk_to dock;`, `await action open_sluice { force = 2 } results [open, stuck] into sluice;` and `combat [warden] win yard loss fallen escape road;` (with `together` for all at once). The builder has `.awaits(AwaitSpec { .. })` and `.combat(CombatSpec { .. })`.
 
@@ -569,13 +569,13 @@ Conditions compare a variable with a constant. For `$r + skill >= 9`, write the 
 
 Then a later rule tests `total >= 9`.
 
-`against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). It names a number variable and changes nothing else: the story still compares the values.
+`against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). When the host rolls, the `roll` await has `against: luck` and `who` with the label of the stat (`LUCK`), so the host can show "Roll for LUCK" before the roll. It names a number variable and changes nothing else: the story still compares the values.
 
 ### Action phases
 
 A verb goes through these phases:
 
-1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes. A check rule that waits for the host (`await`) also holds the action: the later phases do not run, also after the answer. For an actor's command, the step of its agenda still counts as done, and its `then` runs at once, before the answer. Such a rule must do the move or the action itself.
+1. `check` rules. A check rule with `stop` refuses the action. Then no other phase runs, but the turn passes, unless the rule has `free: true`. A check rule that waits for the host (`await`) also holds the action: the later phases do not run, also after the answer. For an actor's command, the step of its agenda still counts as done, and its `then` runs at once, before the answer. Such a rule must do the move or the action itself.
 2. `instead` rules (verb rules with `instead: true`). If one fires, it replaces the default response.
 3. The default response of the verb, or an `instead` frame.
 4. The other verb rules. They can read the result of the default response, for example `lamp.lit`.
@@ -797,6 +797,7 @@ How a turn goes for an actor, after the clock moved and the timers and time rule
 - An actor does one thing per turn: it walks one room, runs one step, or tries a `do` that a `check` rule refuses. A step skipped for its `when` takes no time.
 - While the player talks with the actor, the actor waits. Its step runs late, in the turn that ends the talk.
 - The player sees an actor come into the room and leave it ("The lock-keeper comes in.").
+- Each walk gives the host an `Effect::Moved` (`{ "type": "moved", "moved": { "actor", "name", "from", "to" } }`, ids of the rooms, `from` missing when the actor was in no room). The `move` notice `<actor> -> <room>` comes in the same step, but not always right before it: match the two by `actor`, not by position. A host that shows actors reads it instead of parsing the text. It comes also when the player does not see the walk.
 - A step runs once. A save game keeps which steps ran and which were skipped.
 
 `closes` marks a point of no return, for the ending checks. It is not a dead end: after the keeper burns the pages, the best ending (`committed`) is gone, but the game can still end (`ashes`). A drop in the best reachable ending is a warning, unless the step names the ending in `closes`; a dead end, where no ending can be reached at all, is an error. `loremaster check` checks today that `closes` names known endings.
@@ -872,7 +873,7 @@ A door can be concealed too: the player can not name it, but the exit stays. Goi
 
 ## Action cost
 
-A turn moves the clock by `minutes_per_turn`. `costs` in the clock gives a verb its own number of minutes, for the standard verbs and for custom ones. A cost of 0 lets a verb take no time; the turn still counts.
+A turn moves the clock by `minutes_per_turn`. `costs` in the clock gives a verb its own number of minutes, for the standard verbs and for custom ones. A cost of 0 lets a verb take no time; the turn still counts. For one response of a verb, give its rule `free: true` (read [Rules](#rules)): then the turn does not count either.
 
 ```yaml
 # story.yaml

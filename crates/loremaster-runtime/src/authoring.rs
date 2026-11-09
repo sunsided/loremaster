@@ -228,8 +228,10 @@ pub fn play(session: &mut Session, input: Input) -> Turn {
 
 /// One step of an explorer path (`go north`, `say …`, `answer …`, `leave`)
 /// as a whole turn, with the rule log. `None` when the game has no such step
-/// now, for example after an edit of the story.
-pub fn replay_step(session: &mut Session, step: &str) -> Option<Turn> {
+/// now, for example after an edit of the story. Next to the turn come the
+/// errors of the rolls that the walk forced for the step, as in
+/// [`forced_roll_errors`]; empty when the replay took them all.
+pub fn replay_step(session: &mut Session, step: &str) -> Option<(Turn, Vec<String>)> {
     session.explorer_turn(step)
 }
 

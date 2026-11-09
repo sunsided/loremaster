@@ -991,6 +991,9 @@ fn rule(p: &mut Pack, r: &Rule, spans: &mut Spans) {
     if r.instead {
         b = b.instead();
     }
+    if r.free {
+        b = b.free();
+    }
     if let Some(w) = &r.within {
         spans.add(&key, "within", name_tokens(w));
         b = b.within(w.value.as_str());

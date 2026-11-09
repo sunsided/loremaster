@@ -23,6 +23,9 @@
 	let roll = $state<number | undefined>();
 	const rollOk = $derived(request.kind === 'roll' && typeof roll === 'number' && Number.isInteger(roll) && roll >= request.min && roll <= request.max);
 
+	/** "Your roll" for the player's own combat roll, "Roll for GATE WARDEN" for another, or just "Roll". */
+	const rollHead = $derived(request.kind !== 'roll' || !request.who ? 'Roll' : request.who === 'You' ? 'Your roll' : `Roll for ${request.who}`);
+
 	function submitRoll(event: SubmitEvent) {
 		event.preventDefault();
 		if (rollOk && roll !== undefined) onanswer(roll);
@@ -58,7 +61,7 @@
 	{:else if request.kind === 'roll'}
 		<form class="roll" onsubmit={submitRoll}>
 			<label>
-				<span class="head">Roll {request.dice} ({request.min} to {request.max}):</span>
+				<span class="head">{rollHead} {request.dice} ({request.min} to {request.max}):</span>
 				<input type="number" min={request.min} max={request.max} step="1" bind:value={roll} />
 			</label>
 			<Button size="compact" type="submit" disabled={!rollOk}>Answer</Button>

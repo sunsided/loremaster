@@ -61,6 +61,9 @@ pub enum Effect {
     /// A roll of the dice: the dice, the total and any test. A `roll` notice
     /// has the same total as text.
     Roll { roll: RollDetail },
+    /// An actor walked to a room (an agenda step). The `move` notice has
+    /// the same move as text.
+    Moved { moved: crate::MoveDetail },
     /// Play this sound once. Show its caption when the sound is off.
     Sound { sound: crate::MediaCue },
     /// The story has ended.
@@ -438,15 +441,18 @@ impl Session {
     /// One step of an explorer path as a whole turn, or `None` when the game
     /// has no such step now. The turn runs as the walk ran it: a combat
     /// round gets the rolls the walk forced, and the session answers rolls
-    /// and walks itself, also on a stage host. No forced roll is left over.
-    pub(crate) fn explorer_turn(&mut self, step: &str) -> Option<Turn> {
+    /// and walks itself, also on a stage host. Next to the turn come the
+    /// errors of its forced rolls ([`Self::forced_roll_errors`]), so a total
+    /// that the step did not take shows at that step. No forced roll is left
+    /// over, also not when there is no such step.
+    pub(crate) fn explorer_turn(&mut self, step: &str) -> Option<(Turn, Vec<String>)> {
+        self.game.forced = Default::default();
         let cmd = crate::explore::step_command(&mut self.game, step)?;
         let hosts = (self.game.host_rolls, self.game.host_walks);
         (self.game.host_rolls, self.game.host_walks) = (false, false);
         let turn = self.turn(Input::Command(cmd));
         (self.game.host_rolls, self.game.host_walks) = hosts;
-        self.game.forced = Default::default();
-        Some(turn)
+        Some((turn, self.forced_roll_errors()))
     }
 
     /// What went wrong with the forced rolls: totals out of the range of
@@ -629,6 +635,7 @@ impl Session {
                 .map(|entry| Effect::Notice { entry }),
         );
         effects.extend(turn.rolls.into_iter().map(|roll| Effect::Roll { roll }));
+        effects.extend(turn.moves.into_iter().map(|moved| Effect::Moved { moved }));
         effects.extend(turn.sounds.into_iter().map(|sound| Effect::Sound { sound }));
         // While a rule waits, its answers come with `Status::Await`, not as
         // the choices of a talk.
