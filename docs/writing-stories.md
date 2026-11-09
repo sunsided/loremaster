@@ -520,6 +520,47 @@ After a hit, the player can select "Test your Luck" or "Go on", when `luck` is m
 
 Escape costs 2 `stamina`. If that is the last `stamina`, the combat ends in `loss`.
 
+Special rules that react to what happens in a round are rules on the combat events. They work as host events: `on: { event: combat_hit }`, and the arguments read as `combat_hit.damage`.
+
+| Event | When | Arguments |
+| --- | --- | --- |
+| `combat_hit` | A hit, before it counts, after a Luck test | `enemy`, `target` (`player` or the enemy), `damage`, `round` |
+| `combat_round` | The end of a round, before the end check | `enemy` (the enemy that the player attacked), `round`, `won` (the player hit it) |
+| `combat_end` | The combat is over, in its last room | `enemy` (the first of `enemies`), `outcome`: `win`, `loss`, `escape` or `ended` |
+
+`enemy` and `target` are text: `combat_hit.target == "troll"`. A rule on `combat_hit` can change the damage of this hit: `set: { combat_hit.damage: 0 }` (a negative value counts as 0). The effect `end_combat: <room>` ends the combat at once and moves the player to the room, any room; the hit of a `combat_hit` rule still counts, and `combat_end` has the outcome `ended`. The rule with `combat` goes on there, as after a win. When a `combat_hit` rule ends the combat, the other hits of the same round still count (without a Luck test), then the combat ends. Rules on the events can `set`, `add`, `say` and `end_combat`; `loremaster check` rejects `goto`, `await` and `combat` in them, and warns about `end_combat` outside a rule on `combat_hit` or `combat_round`. The ids `combat_hit`, `combat_round` and `combat_end` are reserved: no room, thing, variable or host event can take them.
+
+```yaml
+- id: troll_weakens
+  on: { event: combat_hit }
+  when: combat_hit.target == "troll"
+  then:
+    - add: { troll.skill: -1 }
+- id: count_wins
+  on: { event: combat_round }
+  when: combat_round.won
+  then:
+    - add: { streak: 1 }
+- id: reset_wins
+  on: { event: combat_round }
+  when: not combat_round.won
+  then:
+    - set: { streak: 0 }
+- id: two_in_a_row
+  on: { event: combat_round }
+  when: streak >= 2
+  then:
+    - end_combat: section_7
+- id: fog_lifts
+  on: { event: combat_round }
+  when: combat_round.round == 3
+  then:
+    - say: "The fog lifts, and the troll flees."
+    - end_combat: far_bank
+```
+
+The rules of an event run in rule order, so `two_in_a_row` sees the `streak` of this round. A combat sets the arguments only when a rule listens for the event, and `loremaster check` warns about a rule on one in a story without `combat`. In `world!`, the effect is `end_combat far_bank;`, and the builder has `.end_combat("far_bank")`.
+
 In a walkthrough, each step answers one question. `rolls:` has the enemy totals, then the player total:
 
 ```yaml

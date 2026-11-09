@@ -1634,6 +1634,7 @@ fn effect_body(input: ParseStream, dialogue: bool) -> Result<Effect> {
             EffectKind::Move(list)
         }
         "goto" => EffectKind::Goto(name(input)?),
+        "end_combat" => EffectKind::EndCombat(name(input)?),
         "end" => {
             if input.peek(LitStr) {
                 return Err(input.error(

@@ -318,6 +318,7 @@ pub enum EffectKind {
     /// `carried` or `nowhere`.
     Move(Vec<(Name, String)>),
     Goto(Name),
+    EndCombat(Name),
     End(Name),
     Stop,
     Emit(Name),

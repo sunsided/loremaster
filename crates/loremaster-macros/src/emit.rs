@@ -656,6 +656,10 @@ fn effects(list: &[Effect], span: Span) -> TokenStream {
                 let r = name(r);
                 quote_spanned!(span=> .end(#r))
             }
+            EffectKind::EndCombat(r) => {
+                let r = name(r);
+                quote_spanned!(span=> .end_combat(#r))
+            }
             EffectKind::Stop => quote_spanned!(span=> .stop()),
             EffectKind::Emit(r) => {
                 let r = name(r);

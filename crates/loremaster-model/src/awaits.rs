@@ -62,6 +62,47 @@ pub struct CombatSpec {
     pub together: bool,
 }
 
+/// The rule events of a combat (#230): `on: { event: combat_hit }`. A
+/// combat sends an event only when a rule listens for it.
+pub const COMBAT_HIT: &str = "combat_hit";
+pub const COMBAT_ROUND: &str = "combat_round";
+pub const COMBAT_END: &str = "combat_end";
+
+/// The combat events with their arguments, which read as `combat_hit.damage`
+/// as the arguments of a host event do. `enemy` and `target` are thing ids,
+/// and `target` is `player` when the enemy hits the player. `won` is true
+/// when the player hit the enemy of the round.
+pub fn combat_events() -> Vec<crate::EventDecl> {
+    use crate::ArgType::{Bool, Enum, Int, Text};
+    let decl = |id: &str, args: Vec<(&str, crate::ArgType)>| crate::EventDecl {
+        id: Id::new(id),
+        args: (args.into_iter())
+            .map(|(a, t)| (a.to_string(), t))
+            .collect(),
+        when: None,
+    };
+    let outcomes = ["win", "loss", "escape", "ended"].map(String::from);
+    vec![
+        decl(
+            COMBAT_HIT,
+            vec![
+                ("enemy", Text),
+                ("target", Text),
+                ("damage", Int),
+                ("round", Int),
+            ],
+        ),
+        decl(
+            COMBAT_ROUND,
+            vec![("enemy", Text), ("round", Int), ("won", Bool)],
+        ),
+        decl(
+            COMBAT_END,
+            vec![("enemy", Text), ("outcome", Enum(outcomes.into()))],
+        ),
+    ]
+}
+
 /// An option of a choice: an id, or an id with a text to show.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
