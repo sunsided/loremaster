@@ -1578,7 +1578,8 @@ impl Game {
         let Some(t) = self.world.thing(id) else {
             return Vec::new();
         };
-        if !self.reachable(id) {
+        let scope = self.in_scope();
+        if !scope.iter().any(|t| t.as_str() == id) {
             return Vec::new();
         }
         let named = |o: &Option<Id>| o.as_ref().is_some_and(|o| o.as_str() == id);
@@ -1603,8 +1604,6 @@ impl Game {
                 "lock"
             }
         };
-        let scope = self.in_scope();
-        let in_scope = |o: &Id| scope.contains(o);
         ids.insert("examine");
         // As the default take: not behind a closed container, hands not full.
         if t.portable
@@ -1627,8 +1626,13 @@ impl Game {
                 ids.insert("open");
             }
         }
-        // A lock and its key, both in scope (in_scope leaves out concealed things).
-        if t.key.as_ref().is_some_and(in_scope) && has("locked") {
+        // A lock whose key the player carries: the one-object `unlock <lock>`
+        // finds the key the same way.
+        if t.key
+            .as_ref()
+            .is_some_and(|k| self.state.is_carried(k.as_str()))
+            && has("locked")
+        {
             ids.extend([lock_verb(id), "use"]);
         }
         for door in scope.iter().filter_map(|d| self.world.thing(d.as_str())) {

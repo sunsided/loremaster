@@ -4,8 +4,8 @@ use loremaster_lang::{
     LangError, SEEN_BY_ELSEWHERE, Scope, compile_condition, compile_markup, has_seen_by,
 };
 use loremaster_model::{
-    COMBAT_END, COMBAT_HIT, COMBAT_ROUND, DialogueId, Effect, EventPattern, Fragment, Line,
-    LineSegment, Location, PLAYER_SPEAKER, Story, ThreadStatus, standard_verbs,
+    COMBAT_END, DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location,
+    PLAYER_SPEAKER, Story, ThreadStatus, standard_verbs,
 };
 use std::collections::BTreeSet;
 
@@ -790,10 +790,20 @@ impl Checker<'_> {
                             Effect::Combat(_) => "combat",
                             _ => continue,
                         };
+                        let when = if name.as_str() == COMBAT_END {
+                            "after the combat"
+                        } else {
+                            "while the combat runs"
+                        };
+                        let hint = if what == "goto" && name.as_str() != COMBAT_END {
+                            "; use `end_combat` to leave the combat for a room"
+                        } else {
+                            ""
+                        };
                         self.error(
                             &file,
                             &format!("then[{i}]"),
-                            format!("a rule on `{name}` cannot `{what}` while the combat runs; use `end_combat`"),
+                            format!("a rule on `{name}` cannot `{what}` {when}{hint}"),
                         );
                     }
                 }
@@ -2177,7 +2187,9 @@ fn ended_endings(story: &Story) -> BTreeSet<String> {
 
 /// One of the rule events that a combat sends (#230).
 fn is_combat_event(name: &str) -> bool {
-    [COMBAT_HIT, COMBAT_ROUND, COMBAT_END].contains(&name)
+    loremaster_model::combat_events()
+        .iter()
+        .any(|e| e.id.as_str() == name)
 }
 
 /// The names of the custom events that some `emit` sends.
