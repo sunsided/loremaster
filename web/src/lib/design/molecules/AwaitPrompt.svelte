@@ -58,7 +58,7 @@
 	{:else if request.kind === 'roll'}
 		<form class="roll" onsubmit={submitRoll}>
 			<label>
-				<span class="head">Roll {request.dice} ({request.min} to {request.max}):</span>
+				<span class="head">Roll {request.who ? `for ${request.who} ` : ''}{request.dice} ({request.min} to {request.max}):</span>
 				<input type="number" min={request.min} max={request.max} step="1" bind:value={roll} />
 			</label>
 			<Button size="compact" type="submit" disabled={!rollOk}>Answer</Button>

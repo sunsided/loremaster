@@ -3,7 +3,7 @@
 
 use loremaster_model::{Value, Walkthrough};
 use loremaster_project::{Severity, SourceFile, check, load};
-use loremaster_runtime::{Effect, Input, Session, Status, World, run_walkthrough};
+use loremaster_runtime::{AwaitRequest, Effect, Input, Session, Status, World, run_walkthrough};
 use std::sync::Arc;
 
 fn file(path: &str, text: &str) -> SourceFile {
@@ -310,6 +310,33 @@ fn a_roll_against_a_variable_names_its_target() {
         .expect("a roll");
     assert_eq!(roll.who.as_deref(), Some("SKILL"));
     assert_eq!(roll.target, Some(3));
+
+    // When the host rolls, the await names the target before the roll.
+    s.set_host_rolls(true);
+    let step = s.submit(Input::Text("prod lever".into()));
+    let Status::Await { awaiting } = &step.status else {
+        panic!("no await: {:?}", step.status)
+    };
+    let AwaitRequest::Roll { who, target, .. } = &awaiting.request else {
+        panic!("not a roll: {:?}", awaiting.request)
+    };
+    assert_eq!(who.as_deref(), Some("SKILL"));
+    assert_eq!(target.as_deref(), Some("skill"));
+}
+
+#[test]
+fn a_roll_await_without_labels_still_loads() {
+    let old = serde_json::json!({ "kind": "roll", "dice": "2d6", "min": 2, "max": 12 });
+    let request: AwaitRequest = serde_json::from_value(old.clone()).unwrap();
+    assert!(matches!(
+        &request,
+        AwaitRequest::Roll {
+            who: None,
+            target: None,
+            ..
+        }
+    ));
+    assert_eq!(serde_json::to_value(&request).unwrap(), old);
 }
 
 #[test]

@@ -130,11 +130,19 @@ impl Game {
             && (self.state.combat.as_ref()).is_some_and(|c| c.rolls.len() < needed)
     }
 
-    fn combat_roll_await(&mut self, turn: &mut Turn, rule: &Id, next: usize) -> AwaitStep {
+    fn combat_roll_await(
+        &mut self,
+        turn: &mut Turn,
+        rule: &Id,
+        next: usize,
+        who: String,
+    ) -> AwaitStep {
         let request = AwaitRequest::Roll {
             dice: "2d6".into(),
             min: ROLL.min(),
             max: ROLL.max(),
+            who: Some(who),
+            target: None,
         };
         self.open_await(turn, rule, next, request, None)
     }
@@ -286,7 +294,11 @@ impl Game {
             return self.combat_go_on(turn, rule, next, 1);
         };
         if self.combat_waits_for_rolls(fighting.len() + 1) {
-            return self.combat_roll_await(turn, rule, next);
+            // The rolls come in the order of `named_roll` below: the enemies, then you.
+            let done = self.state.combat.as_ref().map_or(0, |c| c.rolls.len());
+            let who =
+                (fighting.get(done)).map_or_else(|| "You".to_string(), |e| self.enemy_name(e));
+            return self.combat_roll_await(turn, rule, next, who);
         }
         let mut enemies = BTreeMap::new();
         for e in &fighting {
@@ -371,7 +383,7 @@ impl Game {
     /// damage. When the host rolls, it first waits for the total.
     fn combat_luck(&mut self, turn: &mut Turn, rule: &Id, next: usize) -> AwaitStep {
         if self.combat_waits_for_rolls(1) {
-            return self.combat_roll_await(turn, rule, next);
+            return self.combat_roll_await(turn, rule, next, "LUCK".into());
         }
         let Some(hit) = self.pending_hit() else {
             return self.combat_go_on(turn, rule, next, 1);

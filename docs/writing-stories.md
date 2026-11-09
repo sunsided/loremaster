@@ -512,7 +512,7 @@ In a walkthrough, each step answers one question. `rolls:` has the enemy totals,
 - { do: "Test your Luck", rolls: [4] }
 ```
 
-With `set_host_rolls(true)`, the host rolls the dice of a combat too: after the answer to the round, the session waits for one `roll` await (2d6) for each enemy that fights, in the order of `enemies`, then one for the player. "Test your Luck" waits for one more. The dice display shows the totals when the round is over.
+With `set_host_rolls(true)`, the host rolls the dice of a combat too: after the answer to the round, the session waits for one `roll` await (2d6) for each enemy that fights, in the order of `enemies`, then one for the player. "Test your Luck" waits for one more. The dice display shows the totals when the round is over. Each `roll` await says whom it is for in `who`: the enemy's name, `You`, or `LUCK`.
 
 In `world!`, the effects are `await roll "2d6" into r against luck;`, `await choice [left, right "the right door"] into path;`, `await walk_to dock;`, `await action open_sluice { force = 2 } results [open, stuck] into sluice;` and `combat [warden] win yard loss fallen escape road;` (with `together` for all at once). The builder has `.awaits(AwaitSpec { .. })` and `.combat(CombatSpec { .. })`.
 
@@ -554,7 +554,7 @@ Conditions compare a variable with a constant. For `$r + skill >= 9`, write the 
 
 Then a later rule tests `total >= 9`.
 
-`against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). It names a number variable and changes nothing else: the story still compares the values.
+`against: luck` on a roll shows the target on the dice display of the web player ("7 against LUCK 9"). When the host rolls, the `roll` await has `target: luck` and `who` with the label of the stat (`LUCK`), so the host can show "Roll for LUCK" before the roll. It names a number variable and changes nothing else: the story still compares the values.
 
 ### Action phases
 

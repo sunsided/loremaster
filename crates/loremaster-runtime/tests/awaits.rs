@@ -168,7 +168,9 @@ fn the_session_answers_a_roll_unless_the_host_asks_to() {
         AwaitRequest::Roll {
             dice: "2d6".into(),
             min: 2,
-            max: 12
+            max: 12,
+            who: None,
+            target: None,
         }
     );
     assert!(s.resume(&id, Value::Int(13)).is_err());
