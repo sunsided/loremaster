@@ -28,6 +28,10 @@ pub const RESERVED_NAMES: &[&str] = &[
     "time",
     "action",
     "timer",
+    // The rule events of a combat: `combat_hit.damage`.
+    "combat_hit",
+    "combat_round",
+    "combat_end",
     // Functions.
     "in",
     "carried",
@@ -67,7 +71,9 @@ pub fn reserved(name: &str) -> Option<Reserved> {
     Some(match name {
         "and" | "or" | "not" | "true" | "false" => Reserved::Keyword,
         "here" | "turns" | "level" | "first_visit" => Reserved::Derived,
-        "time" | "action" | "timer" => Reserved::Path,
+        "time" | "action" | "timer" | "combat_hit" | "combat_round" | "combat_end" => {
+            Reserved::Path
+        }
         "in" | "carried" | "present" | "visited" | "visits" | "chance" | "remembers"
         | "seen_by" => Reserved::Function,
         _ => return None,
@@ -125,6 +131,9 @@ mod tests {
             "time",
             "action",
             "timer",
+            "combat_hit",
+            "combat_round",
+            "combat_end",
             "in",
             "carried",
             "present",

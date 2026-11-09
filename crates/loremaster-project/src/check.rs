@@ -4,8 +4,8 @@ use loremaster_lang::{
     LangError, SEEN_BY_ELSEWHERE, Scope, compile_condition, compile_markup, has_seen_by,
 };
 use loremaster_model::{
-    DialogueId, Effect, EventPattern, Fragment, Line, LineSegment, Location, PLAYER_SPEAKER, Story,
-    ThreadStatus, standard_verbs,
+    COMBAT_END, COMBAT_HIT, COMBAT_ROUND, DialogueId, Effect, EventPattern, Fragment, Line,
+    LineSegment, Location, PLAYER_SPEAKER, Story, ThreadStatus, standard_verbs,
 };
 use std::collections::BTreeSet;
 
@@ -699,6 +699,7 @@ impl Checker<'_> {
                 .flat_map(|i| &i.events)
                 .map(|e| e.id.to_string()),
         );
+        let has_combat = all_effects(&story).any(|e| matches!(e, Effect::Combat(_)));
         let (mut seen, mut reported) = (BTreeSet::new(), BTreeSet::new());
         for rule in &story.rules {
             let file = self.file_of(&format!("rule:{}", rule.id));
@@ -743,6 +744,28 @@ impl Checker<'_> {
                     },
                     None => self.error(&file, "on.talk", "name the dialogue"),
                 },
+                EventPattern::Event(name) if is_combat_event(name.as_str()) => {
+                    if !has_combat {
+                        self.warning(
+                            &file,
+                            "on.event",
+                            format!("rule on `{name}`, but the story has no `combat`"),
+                        );
+                    }
+                    for (i, e) in rule.then.iter().enumerate() {
+                        let what = match e {
+                            Effect::Goto(_) => "goto",
+                            Effect::Await(_) => "await",
+                            Effect::Combat(_) => "combat",
+                            _ => continue,
+                        };
+                        self.error(
+                            &file,
+                            &format!("then[{i}]"),
+                            format!("a rule on `{name}` cannot `{what}` while the combat runs; use `end_combat`"),
+                        );
+                    }
+                }
                 EventPattern::Event(name) => {
                     if !emitted.contains(name.as_str()) {
                         self.warning(
@@ -779,6 +802,18 @@ impl Checker<'_> {
                 self.condition(&file, "when", when);
             }
             self.effects(&file, "then", &rule.then);
+            // At `combat_end` the combat is over already.
+            let on_combat = matches!(&rule.on, EventPattern::Event(e)
+                if is_combat_event(e.as_str()) && e.as_str() != COMBAT_END);
+            for (i, e) in rule.then.iter().enumerate() {
+                if matches!(e, Effect::EndCombat(_)) && (!on_combat || !has_combat) {
+                    self.warning(
+                        &file,
+                        &format!("then[{i}]"),
+                        "`end_combat` works only in a rule on a combat event (`combat_hit`, `combat_round`) of a story with a `combat`",
+                    );
+                }
+            }
         }
         self.walkthroughs();
         self.media();
@@ -2022,11 +2057,14 @@ impl Checker<'_> {
     /// Only a rule can wait for the host: a timer or a dialogue has no place to go on from.
     fn no_await(&mut self, file: &str, at: &str, effects: &[Effect]) {
         for (i, e) in effects.iter().enumerate() {
-            if matches!(e, Effect::Await(_) | Effect::Combat(_)) {
+            if matches!(
+                e,
+                Effect::Await(_) | Effect::Combat(_) | Effect::EndCombat(_)
+            ) {
                 self.error(
                     file,
                     &format!("{at}[{i}]"),
-                    "`await` and `combat` work only in rules",
+                    "`await`, `combat` and `end_combat` work only in rules",
                 );
             }
         }
@@ -2106,16 +2144,17 @@ fn ended_endings(story: &Story) -> BTreeSet<String> {
         .collect()
 }
 
-/// The names of the custom events that some `emit` or `combat` sends.
+/// One of the rule events that a combat sends (#230).
+fn is_combat_event(name: &str) -> bool {
+    [COMBAT_HIT, COMBAT_ROUND, COMBAT_END].contains(&name)
+}
+
+/// The names of the custom events that some `emit` sends.
 fn emitted_events(story: &Story) -> BTreeSet<String> {
     all_effects(story)
-        .flat_map(|e| match e {
-            Effect::Emit(name) => vec![name.to_string()],
-            // A combat sends its rule events (#230).
-            Effect::Combat(_) => (loremaster_model::combat_events().into_iter())
-                .map(|d| d.id.to_string())
-                .collect(),
-            _ => Vec::new(),
+        .filter_map(|e| match e {
+            Effect::Emit(name) => Some(name.to_string()),
+            _ => None,
         })
         .collect()
 }
