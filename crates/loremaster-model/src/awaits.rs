@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 /// - await: { roll: 2d6, into: total }
 /// - await: { walk_to: harbour }
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AwaitSpec {
     /// A choice: the ids of the options, or `{ id, text }`.

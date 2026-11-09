@@ -86,6 +86,35 @@
 //! takes `seed 42;`, and a step takes `rolls 4, 11` for the totals of its
 //! rolls.
 //!
+//! `await` waits for the host: `await roll "2d6" into r against luck;`,
+//! `await choice [left, right "the right door"] into path;`,
+//! `await walk_to dock;` or
+//! `await action pick_lock { difficulty = 3 } results [open, broken] into lock;`.
+//! `combat [warden, hound] win yard loss fallen escape road together;` is a
+//! fight (`escape` and `together` are optional). The story header takes the
+//! adventure sheet, `stats { stamina "STAMINA" short "ST" max stamina_initial, gold "Gold" }`.
+//!
+//! ```
+//! use loremaster::prelude::*;
+//!
+//! world! {
+//!     story "Gate" { start: gate, stats { stamina "STAMINA" short "ST" max 12, luck "LUCK" } }
+//!     var skill = 9;
+//!     var stamina = 12 min 0 max 12;
+//!     var luck = 9;
+//!     var r = 0;
+//!     room gate "Gate" {}
+//!     room yard "Yard" {}
+//!     room fallen "Fallen" {}
+//!     thing warden "warden" in gate { prop skill = 7; prop stamina = 6; }
+//!     rule fight on enter(gate) {
+//!         await roll "2d6" into r against luck;
+//!         combat [warden] win yard loss fallen;
+//!     }
+//! }
+//! Loremaster::new().pack(pack()).build().unwrap();
+//! ```
+//!
 //! A `line` is one string, or speech segments (P3-15, #111): bare strings
 //! and `narrate "…"` are narration, `says "…"` and `keeper says "…"` are
 //! speech, and `when <cond> then <segment>` shows the one segment after

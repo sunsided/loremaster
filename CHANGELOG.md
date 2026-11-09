@@ -8,9 +8,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Combat (#190): in an all-at-once combat with more than one living enemy, the player selects the target ("Attack HOUND", `attack.hound`; `attack` is still the first living enemy). The enemy properties `deals` and `takes` are special rules of one enemy: the STAMINA a hit costs the player or the enemy, instead of 2; Luck shifts them as it shifts the 2, and `loremaster check` rejects a value that is not a number. With `set_host_rolls(true)`, the host answers the dice of a combat as `roll` awaits: one per enemy that fights, then the player, and one for "Test your Luck". A save while a round waits for its rolls keeps the totals so far.
+- **Breaking (library):** `CombatState` has the new fields `by`, `target` and `rolls`. Saves stay compatible: the fields default to empty.
+- `await`, `combat` and `stats` in `world!` and the builder (#191), so a story with rolls or fights does not need YAML. `world!` has the effects `await roll "2d6" into r against luck;`, `await choice [..] into ..;`, `await walk_to ..;`, `await action .. { .. } results [..] into ..;` and `combat [warden] win yard loss fallen escape road together;` (`escape` and `together` are optional), and `stats { stamina "STAMINA" short "ST" max stamina_initial, .. }` in the story header. The builder has `Effects::awaits`, `Effects::combat` and `StoryBuilder::stat`, `stat_short` and `stat_max`. `AwaitSpec` now derives `Default`.
+
 ### Changed
 
-- The state explorer tells states apart only by the `once` rules that fired, not by every rule that ever fired: the game reads `fired` only to keep a `once` rule from firing again, so the results stay exact. A rule that only says a text no longer splits states. The id of the ending is in the key now, so two endings reached from one state stay two (before, the fired rules kept them apart). The explore output of the examples changes: lighthouse has 119 states instead of 287, and the Lock-Keeper demo 38,885 instead of about 60,000. The demo keeps its 15-minute turns; time bands wait for a decision (#168, #239).
+- The state explorer tells states apart only by the `once` rules that fired, not by every rule that ever fired: the game reads `fired` only to keep a `once` rule from firing again, so the results stay exact. A rule that only says a text no longer splits states. The id of the ending is in the key now, so two endings reached from one state stay two (before, the fired rules kept them apart). The explore output of the examples changes: lighthouse has 119 states instead of 287, and the Lock-Keeper demo 38,885 instead of about 60,000. The demo keeps its 15-minute turns; time bands wait for a decision (#239). (#168)
+
+### Fixed
+
+- A cancelled job no longer shows as failed, with the error of the killed agent, before it shows as cancelled (#185). A loom test (`task test:loom`) checks all orders of cancel and the end of a job.
 
 ## [0.2.0] - 2026-11-09
 
