@@ -18,6 +18,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 ### Changed
 
 - The two-robot demo has its water clock: the timer `water` floods the station after eight turns, and its rule `river_wins` names `closes: [drained]`. The explorer needs more than the default budget for it now (#210).
+- The state explorer tells states apart only by the `once` rules that fired, not by every rule that ever fired: the game reads `fired` only to keep a `once` rule from firing again, so the results stay exact. A rule that only says a text no longer splits states. The id of the ending is in the key now, so two endings reached from one state stay two (before, the fired rules kept them apart). The explore output of the examples changes: lighthouse has 119 states instead of 287, and the Lock-Keeper demo 38,885 instead of about 60,000. The demo keeps its 15-minute turns; time bands wait for a decision (#239). (#168)
 
 ### Fixed
 
