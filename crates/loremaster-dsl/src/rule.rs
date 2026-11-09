@@ -3,7 +3,7 @@
 
 use crate::convert::{IntoValue, id, ids};
 use crate::pack::{register, with_notes};
-use loremaster_model::{Effect, EventPattern, Id, Rule, StartTimers};
+use loremaster_model::{AwaitSpec, CombatSpec, Effect, EventPattern, Id, Rule, StartTimers};
 use loremaster_project::Pack;
 
 /// A rule of a pack, from [`BuildPack::rule`](crate::BuildPack::rule).
@@ -293,6 +293,18 @@ pub trait Effects: Sized {
     /// `cancel:` a timer.
     fn cancel(self, timer: impl AsRef<str>) -> Self {
         self.effect(Effect::Cancel(id(timer)))
+    }
+
+    /// `await:` stop the rule and ask the host, for example
+    /// `.awaits(AwaitSpec { roll: Some("2d6".into()), into: Some("r".into()), ..Default::default() })`.
+    /// Only a rule can wait.
+    fn awaits(self, spec: AwaitSpec) -> Self {
+        self.effect(Effect::Await(Box::new(spec)))
+    }
+
+    /// `combat:` a fight by the built-in rules. Only a rule can fight.
+    fn combat(self, spec: CombatSpec) -> Self {
+        self.effect(Effect::Combat(Box::new(spec)))
     }
 
     /// Play a sound asset once: `play sound gate_creak`.
