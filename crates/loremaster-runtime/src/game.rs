@@ -228,6 +228,7 @@ impl Game {
             turns: 0,
             progress: Default::default(),
             fired: Default::default(),
+            once_groups: Default::default(),
             rng: story.seed,
             ended: false,
             ending: None,
@@ -390,6 +391,9 @@ impl Game {
         state
             .fired
             .retain(|id| world.story.rules.iter().any(|r| r.id == *id));
+        state
+            .once_groups
+            .retain(|g| world.story.rules.iter().any(|r| r.once.group() == Some(g)));
         if state.previous.as_ref().is_some_and(|r| !has_room(r)) {
             state.previous = None;
         }
@@ -1765,7 +1769,7 @@ impl Game {
                 break;
             }
             let rule = &world.story.rules[i];
-            if !event.matches(rule) || (reads_fired(rule) && self.state.fired.contains(&rule.id)) {
+            if !event.matches(rule) || self.used_up(rule) {
                 continue;
             }
             if rule.machine.as_ref().is_some_and(|m| stepped.contains(&m)) {
@@ -1785,6 +1789,9 @@ impl Game {
                 text: rule.id.to_string(),
             });
             self.state.fired.insert(rule.id.clone());
+            if let Some(group) = rule.once.group() {
+                self.state.once_groups.insert(group.clone());
+            }
             out.instead |= rule.instead;
             stepped.extend(rule.machine.as_ref());
             // A paused rule waits; the other rules of the event still run.
@@ -1835,10 +1842,19 @@ impl Game {
                 let rule = &world.story.rules[j];
                 exact(j)
                     && event.matches(rule)
-                    && !(reads_fired(rule) && self.state.fired.contains(&rule.id))
+                    && !self.used_up(rule)
                     && !rule.machine.as_ref().is_some_and(|m| stepped.contains(&m))
                     && self.eval().holds_opt(&world.rules[j].when)
             })
+    }
+
+    /// A `once` rule that fired, or a rule of a once-group that a rule closed.
+    pub(crate) fn used_up(&self, rule: &loremaster_model::Rule) -> bool {
+        (reads_fired(rule) && self.state.fired.contains(&rule.id))
+            || rule
+                .once
+                .group()
+                .is_some_and(|g| self.state.once_groups.contains(g))
     }
 
     /// Does the scope of a rule hold for the event? A thing rule needs the
@@ -2574,13 +2590,14 @@ impl Game {
     }
 }
 
-/// True when the game reads `State.fired` for this rule: a `once` rule that
-/// fired does not fire again. This is the only read of `fired` that changes
+/// True when the game reads `State.fired` for this rule: a `once: true` rule
+/// that fired does not fire again. (A once-group is read from
+/// `State.once_groups`, which the explorer keeps whole.) This is the only read of `fired` that changes
 /// what happens (the others only drop ids of rules that are gone), and the
 /// explorer relies on that to leave the other fired rules out of its state
 /// key.
 pub(crate) fn reads_fired(rule: &loremaster_model::Rule) -> bool {
-    rule.once
+    rule.once == loremaster_model::Once::Rule(true)
 }
 
 pub(crate) fn rule_run(text: String, rule: &Id) -> Run {

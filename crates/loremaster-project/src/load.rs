@@ -1248,7 +1248,7 @@ fn machine_rules(m: &Machine) -> Vec<Rule> {
                 on: step.on.clone(),
                 when: Some(when),
                 then,
-                once: false,
+                once: Default::default(),
                 instead: step.instead,
                 within: None,
                 priority: 0,

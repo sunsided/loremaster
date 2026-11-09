@@ -984,7 +984,9 @@ fn rule(p: &mut Pack, r: &Rule, spans: &mut Spans) {
         spans.add(&key, "when", w.tokens.clone());
         b = b.when(w.source.as_str());
     }
-    if r.once {
+    if let Some(g) = &r.once_group {
+        b = b.once_group(g.value.as_str());
+    } else if r.once {
         b = b.once();
     }
     if r.instead {

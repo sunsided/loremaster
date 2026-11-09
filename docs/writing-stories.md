@@ -366,7 +366,24 @@ The effects:
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
-More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
+More fields: `once: true` lets the rule fire only one time in a game. `once: <key>` puts the rule in a once-group: all rules with the same key fire one time in total, and the first that fires closes the group for the others. Two variants of one event share a key, so the pair needs no extra variable:
+
+```yaml
+- id: greet_day
+  on: { verb: [talk, keeper] }
+  when: "!late"
+  once: greet
+  then: [{ say: "Good day, stranger." }]
+- id: greet_late
+  on: { verb: [talk, keeper] }
+  when: late
+  once: greet
+  then: [{ say: "Late for a visit." }]
+```
+
+A save keeps the closed groups. `loremaster check` warns about a group with only one rule. In `world!`, write `once(greet)`; the builder has `.once_group("greet")`.
+
+`instead: true` makes a verb rule replace the default response. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
 
 ### The Command record
 

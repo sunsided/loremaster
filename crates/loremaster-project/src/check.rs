@@ -706,6 +706,22 @@ impl Checker<'_> {
             if !seen.insert(rule.id.as_str()) && reported.insert(rule.id.as_str()) {
                 self.error(&file, "id", format!("rule `{}` is defined twice", rule.id));
             }
+            if let Some(g) = rule.once.group()
+                && story
+                    .rules
+                    .iter()
+                    .filter(|r| r.once.group() == Some(g))
+                    .count()
+                    == 1
+            {
+                self.warning(
+                    &file,
+                    "once",
+                    format!(
+                        "only this rule is in the once-group `{g}`; `once: true` does the same"
+                    ),
+                );
+            }
             self.closes(
                 &file,
                 "",

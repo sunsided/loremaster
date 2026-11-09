@@ -780,7 +780,10 @@ fn rule(r: &Rule) -> TokenStream {
         let c = s(&when.source, span);
         chain.extend(quote_spanned!(span=> .when(#c)));
     }
-    if r.once {
+    if let Some(g) = &r.once_group {
+        let g = name(g);
+        chain.extend(quote_spanned!(span=> .once_group(#g)));
+    } else if r.once {
         chain.extend(quote_spanned!(span=> .once()));
     }
     if r.instead {

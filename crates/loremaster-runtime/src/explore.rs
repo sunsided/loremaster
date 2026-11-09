@@ -95,7 +95,7 @@ pub struct Exploration {
 /// next step is due. Timers count by the turns they have left. Counters
 /// count only up to 3, and only when the story reads them. Of the rules
 /// that fired, only the `once` rules count: the game reads `fired` only to
-/// keep them from firing again.
+/// keep them from firing again. The closed once-groups all count.
 fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String {
     let s = game.state();
     let cap = |m: &BTreeMap<Id, u32>| -> BTreeMap<String, u32> {
@@ -136,6 +136,7 @@ fn fingerprint(game: &Game, counters: bool, once_ids: &BTreeSet<&Id>) -> String 
             &s.active,
             &s.orders,
             &s.timers,
+            &s.once_groups,
         ),
     ))
     .unwrap_or_default()

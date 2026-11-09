@@ -10,6 +10,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ### Added
 
+- Once-groups (#225): `once: <key>` on a rule puts it in a once-group; all rules with the same key fire at most once in total, and the first that fires closes the group. `once: true` and `once: false` stay as they were. The save keeps the closed groups in the new state field `once_groups` (old saves load with none), and the explorer counts them in its state key. `loremaster check` warns about a group with only one rule. `world!` writes `once(greet)`, the builder `.once_group("greet")`.
+- **Breaking (library):** `Rule::once` is now `Once` (`Once::Rule(bool)` or `Once::Group(key)`) instead of `bool`, and `State` has the new field `once_groups`; code that builds them with a struct literal needs them.
 - `world!` writes the wildcard verb bare (#220): `rule grope on verb(*, darkness) { .. }` and `on check(*)`, the same as `on::verb(["*", "darkness"])` in the builder. `*` goes only in the verb place.
 - Each output block has a `cause` (#178): `command` for the player's input (its response, the rules it fired, the room after a move, an answer), `world` for the opening, the turn passing (`on: turn`, timers, time rules, agendas, orders) and the rules of a host event. A graphical host can draw the player's own text over the player and the rest as ambient narration.
 - `Session::thing(id)` (#178): any thing of the story with its current name and its location, also outside the player's room. Like `snapshot`, it sees everything, also concealed things. Protocol mode has `session/thing { id }`, the WASM binding `thing(id)`.

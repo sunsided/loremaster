@@ -1438,6 +1438,7 @@ fn rule(input: ParseStream) -> Result<Rule> {
         on,
         instead: false,
         once: false,
+        once_group: None,
         priority: None,
         within: None,
         when: None,
@@ -1452,6 +1453,11 @@ fn rule(input: ParseStream) -> Result<Rule> {
             Some("once") => {
                 name(input)?;
                 rule.once = true;
+                if input.peek(syn::token::Paren) {
+                    let content;
+                    parenthesized!(content in input);
+                    rule.once_group = Some(name(&content)?);
+                }
             }
             Some("priority") => {
                 name(input)?;

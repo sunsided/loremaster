@@ -2,8 +2,8 @@
 //! each entity gets an origin at its id in the block.
 
 use loremaster::dsl::model::{
-    Effect, EndingKind, EventPattern, FragmentMode, Layer, Location, States, Value, VerbSlots,
-    WalkStep,
+    Effect, EndingKind, EventPattern, FragmentMode, Layer, Location, Once, States, Value,
+    VerbSlots, WalkStep,
 };
 use loremaster::prelude::*;
 
@@ -72,7 +72,7 @@ mod lock {
             end drowned;
         }
 
-        rule talk on verb(examine, chest) {
+        rule talk on verb(examine, chest) once(greet) {
             line "He shrugs." keeper says "Prove it," narrate "he says.";
             line says "Who is there?" player says "Me." when lock_open then "Water drips."
                 when coins > 1 then keeper says "Pay up.";
@@ -84,7 +84,7 @@ mod lock {
         thing narrate "narrator" in chamber {}
         thing says "parrot" in chamber {}
 
-        rule odd_speakers on verb(examine, says) {
+        rule odd_speakers on verb(examine, says) once(greet) {
             line narrate says "I tell the story." says says "Squawk.";
         }
 
@@ -215,7 +215,8 @@ fn rules_and_effects() {
     let p = lock::pack();
     let jump = &p.rules[0];
     assert_eq!(jump.on, EventPattern::Verb("jump".into()));
-    assert!(jump.instead && jump.once);
+    assert!(jump.instead && jump.once == Once::Rule(true));
+    assert_eq!(p.rules[1].once, Once::Group("greet".into()));
     assert_eq!(jump.priority, 2);
     assert_eq!(jump.when.as_deref(), Some("in(chamber) and not lock_open"));
     assert!(

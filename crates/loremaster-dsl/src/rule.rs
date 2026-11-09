@@ -33,7 +33,7 @@ impl<'a> RuleBuilder<'a> {
             on,
             when: None,
             then: Vec::new(),
-            once: false,
+            once: Default::default(),
             instead: false,
             within: None,
             priority: 0,
@@ -58,7 +58,13 @@ impl<'a> RuleBuilder<'a> {
 
     /// `once: true`: fire at most once per game.
     pub fn once(mut self) -> Self {
-        self.rule().once = true;
+        self.rule().once = loremaster_model::Once::Rule(true);
+        self
+    }
+
+    /// `once: <key>`: all rules with this key fire at most once in total.
+    pub fn once_group(mut self, key: impl AsRef<str>) -> Self {
+        self.rule().once = loremaster_model::Once::Group(id(key));
         self
     }
 
