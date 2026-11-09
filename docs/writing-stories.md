@@ -1240,6 +1240,13 @@ A save game keeps the state of a game, together with the version of its format a
 
 Before loremaster 1.0 there is no promise that every save loads, but the engine tries. Read `docs/adr/0001-save-compatibility.md`.
 
+The save keeps the state of the RNG. `reload_rolls` in story.yaml decides what the next roll gives after the player loads a save:
+
+- `same` (strict, the default): the roll from before the save. The player cannot reload for a better roll.
+- `fresh` (forgiving): a new roll. The host calls `Session::reseed` after `load`, `from_save` or `restore`, with a fresh, unpredictable value for each load; a constant value gives the same roll on each reload. The web engine wrapper (`web/src/lib/engine`) and the terminal host do this.
+
+`loremaster new` writes `reload_rolls: same` into story.yaml, so that the author decides. The setting is not part of the story's fingerprint in the save: switching it does not make old saves look like saves of a changed story.
+
 ## Episodes
 
 A series of stories can carry facts, relations and memories from one story to the next, as Zork II starts with what the player did in Zork I. The first story lists in `export:` what its episode carries. The next story lists in `import:` what it takes:
