@@ -686,6 +686,7 @@ Some points of no return are on purpose. Name the endings that a rule or a machi
 - `loremaster check` gives an error for an unknown ending in `closes`, and for `closes` without a `reason`.
 - Agenda steps (`agendas/`, P4-02) take the same `closes` and `reason`.
 - When the budget stopped the walk, the checks are **not proven**: the explorer reports only dead ends and points of no return that it proved, and says that the rest is not proven. "No dead end" holds only for a walk that finished.
+- The explorer tells states apart by the turns left of each running timer, because a timer that runs out can change the story. A timer of n turns can make the walk up to n times larger: a story with a long timer needs a bigger budget, or a shorter timer, for proven checks.
 
 ## Timers
 
