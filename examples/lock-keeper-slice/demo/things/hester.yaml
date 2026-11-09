@@ -2,6 +2,8 @@ name: Hester Reed
 aliases: [hester, daughter, girl]
 proper: true
 location: { room: kitchen }
+# Set in her talk (dialogues/hester.yaml): she stays in the kitchen.
+props: { trusts: false }
 presence:
   - "Hester Reed, Amos's daughter, is here."
 description:

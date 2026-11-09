@@ -1,0 +1,17 @@
+# He ran (design: "Clues and endings"): two clues in the case notebook,
+# the wet boots and Amos's note, and the player shows it to Marsh. He makes
+# for the door, and nobody stops him.
+name: He ran
+steps:
+  - w
+  - { do: examine boots, facts: { opportunity: proven } }
+  - up
+  - { do: examine notebook, facts: { motive: weak } }
+  - down
+  - w
+  - { do: show notes to marsh, see: "his eyes on the door", facts: { marsh_fled: true } }
+  - { do: wait, see: "Running feet go east" }
+expect:
+  ending: ran
+  ended: true
+  see: "He ran from what he read in your notebook: no weapon, the chance, and a motive, but not the pages."

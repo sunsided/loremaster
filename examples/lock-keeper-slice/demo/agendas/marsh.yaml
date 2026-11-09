@@ -1,21 +1,25 @@
-# Ivo Marsh, the murderer, with the times of the design.
+# Ivo Marsh, the murderer, with the times of the design. Once he has run
+# (rules/marsh.yaml), no step runs: he leaves his agenda for good, either
+# gone or held in the parlour.
 actor: marsh
 steps:
   - id: boots
     at: "23:00"
     place: kitchen
+    when: not marsh_fled
     then:
       - set: { boots.wet: false }
       - say: "{in(kitchen) ? Marsh cleans a pair of boots by the stove, quickly, and does not look at you. | }"
   - id: parlour
     at: "23:30"
     place: parlour
+    when: not marsh_fled
   # He walks to the lock when the step is due, so the pages are safe only
   # if the player takes them before he gets there.
   - id: lock
     at: "01:00"
     place: lock_side
-    when: in(pages, gear_housing)
+    when: in(pages, gear_housing) and not marsh_fled
     then:
       - set: { lock: empty, marsh_has_pages: true }
       - move: { pages: nowhere }
@@ -32,7 +36,7 @@ steps:
   - id: burn
     at: "01:30"
     place: kitchen
-    when: marsh_has_pages
+    when: marsh_has_pages and not marsh_fled
     then:
       - set: { stove.ash: true, marsh_has_pages: false }
       - say: "{in(kitchen) ? Marsh feeds an oilcloth packet into the stove. | You smell burning paper from the cottage.}"

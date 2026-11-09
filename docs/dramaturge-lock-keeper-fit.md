@@ -12,7 +12,7 @@ Versions:
 
 What was looked at:
 
-- The demo `examples/lock-keeper-slice/demo/`: nine rooms, four suspects with agendas, a coroner agenda, three quests, five endings, three walkthroughs. `crates/loremaster-runtime/tests/demo.rs` plays the walkthroughs and runs the ending checks over the night.
+- The demo `examples/lock-keeper-slice/demo/`: nine rooms, four suspects with agendas, a coroner agenda, three quests, six endings, seven walkthroughs. `crates/loremaster-runtime/tests/demo.rs` plays the walkthroughs and runs the ending checks over the night.
 - The golden slice `examples/lock-keeper-slice/yaml/` (and `dsl/`, `mixed/`), with its feel log in `PENDING.md`.
 - The loremaster glue: the talk runtime, the text host types, the pool lowering, the checks and the `world!` dialogue host.
 - The PR threads of #96, #97, #158, #164 and #166.
@@ -147,7 +147,7 @@ This is loremaster's grammar, not dramaturge's. `texts` and `agenda` are compile
 
 #### 4.9 The explorer limits (loremaster, not dramaturge)
 
-The design first wanted 5-minute turns to four o'clock. With them, the explorer did not finish the night in 600,000 states (feel log, 2026-11-08, P4-07). Its fingerprint then kept the rooms visited, every rule fired and the minutes to each agenda step. The demo takes 15-minute turns, the coroner comes at three, and Bert's trust is not a stored relation. Then the night had 60,275 states; the test sets `max_states: 70_000` and took about 23 s in debug (#167). The cuts are loremaster's: dramaturge's state (talk, relations, memories) is in the fingerprint, but the relation was cut for the state count, not because dramaturge could not hold it. The feel log proposed time bands or a smaller fingerprint. The smaller fingerprint came with #168: it keeps only the `once` rules that fired, besides the rooms visited and the minutes to each agenda step (`fingerprint` in `explore.rs`), and the night now has 39,047 states (the ending-check test takes about 12 s in a release build). Time bands were rejected (#239), because they are not exact, and the design was changed to the demo's 15-minute turns with the coroner at three.
+The design first wanted 5-minute turns to four o'clock. With them, the explorer did not finish the night in 600,000 states (feel log, 2026-11-08, P4-07). Its fingerprint then kept the rooms visited, every rule fired and the minutes to each agenda step. The demo takes 15-minute turns, the coroner comes at three, and Bert's trust is not a stored relation. Then the night had 60,275 states; the test sets `max_states: 70_000` and took about 23 s in debug (#167). The cuts are loremaster's: dramaturge's state (talk, relations, memories) is in the fingerprint, but the relation was cut for the state count, not because dramaturge could not hold it. The feel log proposed time bands or a smaller fingerprint. The smaller fingerprint came with #168: it keeps only the `once` rules that fired, besides the rooms visited and the minutes to each agenda step (`fingerprint` in `explore.rs`), and the night now has 39,047 states (the ending-check test takes about 12 s in a release build). Time bands were rejected (#239), because they are not exact, and the design was changed to the demo's 15-minute turns with the coroner at three. With "He ran" and Hester's alibi (#216), the night has 72,148 states, and the test sets `max_states: 80_000`. Hester's trust is again a cut: one stored fact (`hester.trusts`), not a relation with levels, and Marsh's suspicion is one fact too.
 
 ## 5. Recommendations for dramaturge 0.3.0 final
 

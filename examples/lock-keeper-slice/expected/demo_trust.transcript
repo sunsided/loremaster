@@ -1,0 +1,99 @@
+Autumn 1923. At half past nine they found Amos Reed, the lock-keeper, drowned in his own lock. It looks like a fall from the gate in the dark. You are the county constable. The coroner comes at three. By then you need a case, or it goes down as an accident.
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
+
+Exits: west, north, south.
+
+> w
+w
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots dries by the stove. Hester Reed, Amos's daughter, is here.
+
+Exits: east, west, up.
+
+> talk to hester
+talk to hester
+
+"I was in my room all evening. I heard nothing." She does not meet your eye.
+
+> 1
+"I am sorry about your father, Miss Reed."
+
+"Thank you. Nobody else has said it." She looks at you properly for the first time, and then at the stove. "I was not in my room. I was on the *Kestrel*, with Silas Crane, from nine until the shouting. He never left the cabin. Father did not know about us."
+
+> wait
+wait
+
+Time passes.
+
+Ivo Marsh comes in.
+
+> wait
+wait
+
+Time passes.
+
+Marsh cleans a pair of boots by the stove, quickly, and does not look at you.
+
+> wait
+wait
+
+Time passes.
+
+Ivo Marsh goes west.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+> wait
+wait
+
+Time passes.
+
+Ivo Marsh comes in.
+
+> look
+look
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots stands by the stove, clean. Hester Reed, Amos's daughter, is here. Ivo Marsh, the toll clerk, is here.
+
+Exits: east, west, up.
+
+Ivo Marsh goes east.
+
+> talk to hester
+talk to hester
+
+"I told you the truth, constable. I was on the *Kestrel*, with Silas."

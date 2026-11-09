@@ -1,0 +1,15 @@
+# Follow Hester (design: "Clock and agendas"): wait on the barge, and at
+# midnight she is there with Crane. That is her alibi and his, without her
+# trust.
+name: Hester's alibi, seen
+steps:
+  - n
+  - e
+  - wait
+  - wait
+  - wait
+  - wait
+  - { do: wait, see: "Hester Reed comes in." }
+  - { do: wait, see: "Hester's alibi clears Crane.", facts: { opportunity: proven, hester.trusts: false } }
+expect:
+  ended: false

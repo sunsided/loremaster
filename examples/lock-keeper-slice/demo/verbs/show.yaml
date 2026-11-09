@@ -1,0 +1,7 @@
+# `show <thing> to <person>`. The demo's only show rules are
+# `{ verb: show, direct: casebook, indirect: marsh }` (rules/marsh.yaml).
+label: Show
+words: [show]
+slots: two
+preposition: to
+default: "You hold it up. Nobody has anything to say about it."

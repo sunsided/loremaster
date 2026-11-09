@@ -1,0 +1,11 @@
+# Follow Hester to the barge (design: "Clock and agendas"): at midnight she
+# is with Crane, and that is her alibi and his, without her trust. It
+# clears Crane, so only Marsh had the chance: the opportunity is proven.
+- id: hester_seen_on_the_barge
+  on: { time: "00:00" }
+  when: in(barge_cabin) and present(hester)
+  then:
+    - say: "Hester sits close by Crane on the bunk, his hand over hers, as if she has done it many times. She sees you, and goes white."
+    - say: [{ says: "I was here at nine too, with Silas. He never left the cabin.", by: hester }]
+    - say: [{ narrate: "You write it in your notebook: Hester's alibi clears Crane.", when: opportunity == open }]
+    - set: { opportunity: proven }

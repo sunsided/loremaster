@@ -1,5 +1,26 @@
+# As with Bert, one kind word opens her, in the same talk. Unlike Bert's,
+# her trust is stored (`hester.trusts`): her agenda reads it, and she stays
+# in the kitchen. The word comes before eleven, while she is still in the
+# kitchen by the stove: then a talk that stays open cannot hold back a step
+# of her agenda (she leaves at a quarter past), which would multiply the
+# states of the night. Later, the talk is one line, as before.
 with: hester
-start: [meet]
+start: [trusted, meet]
 nodes:
+  trusted:
+    when: hester.trusts
+    say: [{ says: "I told you the truth, constable. I was on the *Kestrel*, with Silas." }]
   meet:
     say: [{ says: "I was in my room all evening. I heard nothing." }, { narrate: "She does not meet your eye." }]
+    options:
+      - say: [{ says: "I am sorry about your father, Miss Reed." }]
+        when: time.hour == 22
+        go: sorry
+  # The kind word and the truth in one node: a talk with fewer turns in it
+  # gives the explorer fewer states.
+  sorry:
+    say:
+      - says: "Thank you. Nobody else has said it."
+      - narrate: "She looks at you properly for the first time, and then at the stove."
+      - says: "I was not in my room. I was on the *Kestrel*, with Silas Crane, from nine until the shouting. He never left the cabin. Father did not know about us."
+    set: { hester.trusts: true, opportunity: proven }

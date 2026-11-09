@@ -1,0 +1,6 @@
+# Marsh makes for the door. The timer starts on the turn on which he reads
+# the case notebook and runs out on the next one: the player has one
+# command to `stop marsh`, in the room where he read it. A longer flight
+# (to the towpath, with time to follow him) multiplies the states of the
+# night.
+turns: 2

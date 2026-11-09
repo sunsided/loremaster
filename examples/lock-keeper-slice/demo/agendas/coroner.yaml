@@ -14,6 +14,10 @@ steps:
     then:
       - say: "The coroner's trap stops on the towpath. He reads your notebook, frowns, and sends for the county."
       - end: charged
+    # With Marsh held (rules/marsh.yaml), his step at the lock never comes,
+    # and only the clock keeps the pages from a slow player.
+    closes: [committed]
+    reason: "The coroner comes at three: a player who has not brought up the true pages by then has a weak case."
   - id: accident
     at: "03:00"
     then:
@@ -22,5 +26,5 @@ steps:
     # The night ends here: a case that is not whole by three is lost, and
     # so is an accusation that comes too late. The steps of Marsh and Bert
     # close the case earlier, for their own reasons.
-    closes: [committed, charged, released, wrong_man]
+    closes: [committed, charged, ran, released, wrong_man]
     reason: "The coroner comes at three: what the notebook holds then is the case, and nobody can be accused after it."

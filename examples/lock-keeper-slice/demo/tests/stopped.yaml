@@ -1,0 +1,27 @@
+# Stop him (design: "Clues and endings"): as in ran.yaml, the player shows
+# Marsh the boots and Amos's note in the case notebook. He makes for the
+# door, and the player stops him and holds him in the parlour. Held, he
+# never goes to the lock. The weapon from the chest makes the case, weak
+# without the pages.
+name: Stopped at the door
+steps:
+  - w
+  - { do: examine boots, facts: { opportunity: proven } }
+  - up
+  - { do: examine notebook, facts: { motive: weak } }
+  - down
+  - w
+  - { do: show notes to marsh, see: "his eyes on the door" }
+  - { do: stop marsh, see: "turn the key on him", facts: { marsh_fled: true } }
+  - { do: e, not_see: "Running feet" }
+  - e
+  - s
+  - { do: search chest, facts: { means: proven } }
+  - n
+  - w
+  - w
+  - { do: accuse marsh, see: "Charged, case weak" }
+expect:
+  ending: charged
+  ended: true
+  not_see: "burning paper"

@@ -1,0 +1,85 @@
+Autumn 1923. At half past nine they found Amos Reed, the lock-keeper, drowned in his own lock. It looks like a fall from the gate in the dark. You are the county constable. The coroner comes at three. By then you need a case, or it goes down as an accident.
+
+Towpath
+
+A cinder path along the canal. The cottage door is west, the lock north, the lock hut south. Water knocks against the lock gate.
+
+Exits: west, north, south.
+
+> w
+w
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots dries by the stove. Hester Reed, Amos's daughter, is here.
+
+Exits: east, west, up.
+
+> examine boots
+examine boots
+
+Town boots, wet to the ankle, with canal mud in the welts. Marsh said he never left the parlour.
+
+You write it in your notebook: Marsh was out in the wet.
+
+> up
+up
+
+Amos's Room
+
+Amos Reed lies on his bed under a sheet, where they carried him. His coat hangs on the door. Hester's room is west.
+
+The coat contains a pocket notebook.
+
+Exits: down, west.
+
+> examine notebook
+examine notebook
+
+Amos's notebook, in a careful hand. The last line: "Ledger p. 41 to 44 wrong. Told M."
+
+You write it in your notebook: the ledger, and "M".
+
+> down
+down
+
+Kitchen
+
+The cottage kitchen, low and warm, with a black iron stove. The door to the towpath is east, the parlour west, the stairs go up.
+
+A pair of town boots dries by the stove. Hester Reed, Amos's daughter, is here. Ivo Marsh, the toll clerk, is here.
+
+Exits: east, west, up.
+
+Hester Reed goes east.
+
+Marsh cleans a pair of boots by the stove, quickly, and does not look at you.
+
+> w
+w
+
+Parlour
+
+A cold best room. The company's toll ledger lies open on the table under the lamp.
+
+Exits: east.
+
+Ivo Marsh comes in.
+
+> show notes to marsh
+show notes to marsh
+
+Marsh reads the page, and his hands go still for the first time tonight. Then he is on his feet, his eyes on the door. In a moment he will be out on the towpath.
+
+> wait
+wait
+
+Time passes.
+
+Marsh is out of the door before you can turn. Running feet go east along the towpath, into the dark.
+
+He ran
+
+By dawn Ivo Marsh is on a train to the coast, and nobody stops him. He ran from what he read in your notebook: no weapon, the chance, and a motive, but not the pages.

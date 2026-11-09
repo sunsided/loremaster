@@ -22,3 +22,6 @@ vars:
   - { id: marsh_has_pages, type: bool, initial: false }
   - { id: bert_asleep, type: bool, initial: false }
   - { id: crane_asleep, type: bool, initial: false }
+  # Marsh's suspicion (rules/marsh.yaml): one fact, set when he reads two
+  # clues in the case notebook. He runs, and leaves his agenda for good.
+  - { id: marsh_fled, type: bool, initial: false }

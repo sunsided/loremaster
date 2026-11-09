@@ -1,0 +1,7 @@
+# Marsh runs once he has read two clues in the case notebook
+# (rules/marsh.yaml). A loss, but his flight says what the case could not:
+# it ranks just above the coroner's verdict.
+kind: loss
+rank: 3
+title: He ran
+text: "By dawn Ivo Marsh is on a train to the coast, and nobody stops him. He ran from what he read in your notebook: {means == proven ? the weapon | no weapon}, {opportunity == proven ? the chance | no proof that he was out}, and {motive == strong ? the true pages | }{motive == weak ? a motive, but not the pages | }{motive == open ? no motive | }."

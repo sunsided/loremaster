@@ -6,8 +6,20 @@ states:
   - { name: weak, journal: "Amos found something wrong in the toll ledger. The proof is still missing." }
   - { name: strong, journal: "The true ledger pages: Marsh stole the tolls.", done: true }
 steps:
+  # Two steps for one note: only the one that completes the case (with
+  # the weapon and the chance) closes the endings without a case.
   - from: open
     on: { verb: [examine, notebook] }
+    when: means == proven and opportunity == proven
+    to: weak
+    say: "You write it in your notebook: the ledger, and \"M\"."
+    # The case is made: no accusation of Marsh releases him now, and the
+    # coroner charges him.
+    closes: [accident, released]
+    reason: "With means and opportunity proven, a motive makes the case against Marsh."
+  - from: open
+    on: { verb: [examine, notebook] }
+    when: not (means == proven and opportunity == proven)
     to: weak
     say: "You write it in your notebook: the ledger, and \"M\"."
   - from: open

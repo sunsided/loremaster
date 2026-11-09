@@ -1,0 +1,4 @@
+# `stop marsh`: only while he runs (rules/marsh.yaml).
+label: Stop
+words: [stop, catch, seize, tackle]
+default: "Nobody is running."
