@@ -229,7 +229,7 @@ impl Run {
 
 /// Split the runs of each block at `*emphasis*`: the text between a pair
 /// of stars on one line, with no space just inside them, becomes a run with
-/// `emphasis`, without the stars. Other stars stay text.
+/// `emphasis`, without the stars. Other stars stay text, and so does `**`.
 pub(crate) fn split_emphasis(blocks: &mut [Block]) {
     for block in blocks {
         if matches!(block.kind, BlockKind::Command | BlockKind::Author) {
@@ -243,7 +243,12 @@ pub(crate) fn split_emphasis(blocks: &mut [Block]) {
 }
 
 fn emphasis_of(run: Run, out: &mut Vec<Run>) {
-    let stars: Vec<usize> = run.text.match_indices('*').map(|(i, _)| i).collect();
+    // A star next to another star (`**`) is no delimiter, so two spans
+    // never touch and `plain_text` can put every star back.
+    let bytes = run.text.as_bytes();
+    let stars: Vec<usize> = (run.text.match_indices('*').map(|(i, _)| i))
+        .filter(|&i| bytes.get(i + 1) != Some(&b'*') && (i == 0 || bytes[i - 1] != b'*'))
+        .collect();
     // As in Markdown, `2 * 3 * 4` is no emphasis: the stars touch the word.
     let pair = stars
         .windows(2)

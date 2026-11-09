@@ -524,6 +524,7 @@ impl Game {
         let mut copy = self.clone();
         let mut turn = Turn::default();
         copy.describe_room(&mut turn);
+        crate::output::split_emphasis(&mut turn.blocks);
         turn
     }
 

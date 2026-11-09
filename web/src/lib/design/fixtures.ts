@@ -99,7 +99,11 @@ export const endTurn: Turn = {
 		},
 		{
 			kind: 'end',
-			runs: [{ text: "Far below, the *Marigold*'s masthead light turns, and steadies, and comes home." }]
+			runs: [
+				{ text: 'Far below, the ' },
+				{ text: 'Marigold', emphasis: true },
+				{ text: "'s masthead light turns, and steadies, and comes home." }
+			]
 		}
 	]
 };

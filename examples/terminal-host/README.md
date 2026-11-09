@@ -17,7 +17,8 @@ Lines that start with `:` are the host's: `:save <file>`, `:load <file>`, `:quit
    A host that ships the story in its binary writes a `Bundle` in its
    `build.rs` (`Bundle::new(project.story, project.walkthroughs).to_json()`),
    and at run time calls `Bundle::from_json(..)?.session()`: the format
-   version is checked and the hint ladder is set.
+   version is checked and the hint ladder is set. A story with Rust behaviors
+   uses `session_with(|world| { world.register(..); })`.
 2. Show each `Effect` of the `Step`, in order:
    - `Text`: a block of runs. A run in speech names its `speaker`. A run
      with `emphasis` is `*emphasis*` in the story; its text has no stars.
