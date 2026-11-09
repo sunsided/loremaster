@@ -336,7 +336,6 @@ fn reconcile(
     mut state: State,
     stamp: Option<&StoryStamp>,
 ) -> (State, Vec<String>) {
-    let story = &world.story;
     let start = Game::new(world.clone()).state().clone();
     let mut dropped = Vec::new();
 
@@ -361,20 +360,13 @@ fn reconcile(
             .or_insert_with(|| value.clone());
     }
 
-    let has_room = |id: &Id| story.room(id.as_str()).is_some();
     let old_locations = std::mem::take(&mut state.locations);
     for (thing, location) in old_locations {
         let Some(begin) = start.locations.get(&thing) else {
             dropped.push(format!("thing:{thing}"));
             continue;
         };
-        // `in` needs a container and `on` a supporter, as in the loader.
-        let valid = match &location {
-            Location::Room(r) => has_room(r),
-            Location::In(h) => story.thing(h.as_str()).is_some_and(|t| t.container),
-            Location::On(h) => story.thing(h.as_str()).is_some_and(|t| t.supporter),
-            Location::Carried | Location::Nowhere => true,
-        };
+        let valid = location_valid(world, &location);
         state
             .locations
             .insert(thing, if valid { location } else { begin.clone() });
@@ -386,11 +378,50 @@ fn reconcile(
             .or_insert_with(|| location.clone());
     }
 
+    drop_unknown(world, &mut state, &mut dropped);
+    // A timer that the story did not have at the save starts as at the start
+    // of a game. A save without a stamp (version 0) cannot tell, so it starts
+    // no timer.
+    if let Some(stamp) = stamp {
+        for (id, turns) in &start.timers {
+            if !stamp.timers.contains(id) {
+                state.timers.insert(id.clone(), *turns);
+            }
+        }
+    }
+
+    dropped.sort();
+    dropped.dedup();
+    (state, dropped)
+}
+
+/// Whether a thing can stay at `location` in `world`: the room exists, and
+/// `in` needs a container and `on` a supporter, as in the loader.
+pub(crate) fn location_valid(world: &World, location: &Location) -> bool {
+    let story = &world.story;
+    match location {
+        Location::Room(r) => story.room(r.as_str()).is_some(),
+        Location::In(h) => story.thing(h.as_str()).is_some_and(|t| t.container),
+        Location::On(h) => story.thing(h.as_str()).is_some_and(|t| t.supporter),
+        Location::Carried | Location::Nowhere => true,
+    }
+}
+
+/// Forget what a changed story no longer has, past the values and the
+/// things: the current room (it becomes the start room), visits, timers,
+/// fired rules, once groups, the talk, the ending, relations, memories, the
+/// actors and their agendas. Adds what it drops to `dropped`, as
+/// `room:…`, `timer:…`, `rule:…`, `once:…`, `dialogue:…`, `ending:…`,
+/// `relation:…`, `memories:…` and `agenda:…`. Shared by the save reconcile
+/// and the carry-over of a running game.
+pub(crate) fn drop_unknown(world: &World, state: &mut State, dropped: &mut Vec<String>) {
+    let story = &world.story;
+    let has_room = |id: &Id| story.room(id.as_str()).is_some();
     if !has_room(&state.room) {
         dropped.push(format!("room:{}", state.room));
         state.room = story.start.clone();
     }
-    keep_known_actors(world, &mut state);
+    keep_known_actors(world, state);
     if state.previous.as_ref().is_some_and(|r| !has_room(r)) {
         state.previous = None;
     }
@@ -409,17 +440,6 @@ fn reconcile(
         }
         keep
     });
-    // A timer that the story did not have at the save starts as at the start
-    // of a game. A save without a stamp (version 0) cannot tell, so it starts
-    // no timer.
-    if let Some(stamp) = stamp {
-        for (id, turns) in &start.timers {
-            if !stamp.timers.contains(id) {
-                state.timers.insert(id.clone(), *turns);
-            }
-        }
-    }
-
     let rules: std::collections::BTreeSet<&str> =
         story.rules.iter().map(|r| r.id.as_str()).collect();
     state.fired.retain(|id| {
@@ -483,8 +503,4 @@ fn reconcile(
         keep
     });
     dropped.extend(keep_known_steps(world, &mut state.actors));
-
-    dropped.sort();
-    dropped.dedup();
-    (state, dropped)
 }

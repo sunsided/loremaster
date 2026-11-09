@@ -176,6 +176,40 @@ impl Session {
         self.set_hints(book);
     }
 
+    /// Build the hint book again in the world of a reload, and fit the
+    /// player's progress to it: steps the book no longer has are forgotten,
+    /// and a shorter ladder must not show its command unasked. A command stays
+    /// shown only when the player saw this same command before. Adds the done
+    /// steps it forgets to `dropped`, as `step:<key>`.
+    pub(super) fn rebuild_hints(
+        &mut self,
+        walks: &[(String, Walkthrough)],
+        dropped: &mut Vec<String>,
+    ) {
+        let old = self.hints.clone();
+        self.set_hints_from(walks);
+        let book = self.hints.clone();
+        let find = |b: &'_ HintBook, key: &str| b.steps.iter().position(|s| s.key == key);
+        self.revealed.retain(|key, level| {
+            let Some(i) = find(&book, key) else {
+                return false;
+            };
+            let step = &book.steps[i];
+            let saw_command = find(&old, key)
+                .map(|o| &old.steps[o])
+                .is_some_and(|o| *level > o.hints.len() && o.command == step.command);
+            *level = (*level).min(step.hints.len() + usize::from(saw_command));
+            true
+        });
+        self.game.state_mut().steps_done.retain(|key| {
+            let keep = find(&book, key).is_some();
+            if !keep {
+                dropped.push(format!("step:{key}"));
+            }
+            keep
+        });
+    }
+
     /// The story has hints at all, also when none is open in this room now.
     pub fn has_hints(&self) -> bool {
         !self.hints.is_empty()

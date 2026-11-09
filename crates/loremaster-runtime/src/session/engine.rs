@@ -16,11 +16,13 @@ impl Session {
         session
     }
 
-    /// This game in a changed world (SE-14). The seed, the undo depth and
-    /// whether the host answers rolls and walks stay. The undo history does not: its
-    /// states belong to the old world.
-    pub(crate) fn carried_over(&self, world: Arc<World>) -> Self {
-        let mut game = self.game.carry_over(world);
+    /// This game in a changed world (SE-14), and what was dropped. The seed,
+    /// the undo depth and whether the host answers rolls and walks stay. The
+    /// undo history does not: its states belong to the old world. The core of
+    /// [`Session::reload`]. This path does not refuse another interface: the
+    /// session is then no longer bound to the host it was made for.
+    pub(crate) fn carried_over(&self, world: Arc<World>) -> (Self, Vec<String>) {
+        let (mut game, dropped) = self.game.carry_over(world);
         game.host_rolls = self.game.host_rolls;
         game.host_walks = self.game.host_walks;
         let mut next = Self::of(game, self.seed);
@@ -28,7 +30,8 @@ impl Session {
         next.started = self.started;
         next.hints = self.hints.clone();
         next.revealed = self.revealed.clone();
-        next
+        next.built_for = (self.built_for.clone()).filter(|b| next.check_interface(b).is_ok());
+        (next, dropped)
     }
 
     pub(crate) fn engine(&self) -> &Game {

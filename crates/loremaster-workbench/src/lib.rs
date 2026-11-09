@@ -33,7 +33,7 @@ mod rules;
 
 use loremaster_model::{Value, Walkthrough, step_chart};
 use loremaster_runtime::authoring::{self, Inspector};
-use loremaster_runtime::{Input, Session, State, Turn, World};
+use loremaster_runtime::{Input, ReloadError, Reloaded, Session, State, Turn, World};
 use std::sync::Arc;
 
 pub use atlas::{AtlasRoom, MapEnd, MapLink, MapRoom, MapView};
@@ -162,11 +162,12 @@ impl Workbench {
     /// over. A value still at its start value takes the new start value, so an
     /// edit of a start value shows at once. What the new world does not have
     /// is dropped; a room that is gone becomes the start room. The undo
-    /// history of the session does not carry over.
-    pub fn reload(&mut self, world: Arc<World>) {
-        self.session = authoring::carry_over(&self.session, world);
-        // The hint book plays the walkthroughs in its world: build it again.
-        self.session.set_hints_from(&self.walkthroughs);
+    /// history of the session does not carry over. This is
+    /// [`Session::reload`] with the walkthroughs of this workbench: it says
+    /// what was dropped, and a session from [`Session::for_host`] refuses a
+    /// world with another interface and keeps its old world.
+    pub fn reload(&mut self, world: Arc<World>) -> Result<Reloaded, ReloadError> {
+        self.session.reload(world, &self.walkthroughs)
     }
 
     /// A new workbench with the game of this one in a changed world. This one
