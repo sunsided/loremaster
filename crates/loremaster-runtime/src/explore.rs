@@ -188,47 +188,88 @@ fn fingerprint(
 
 /// What the timeless key of [`fingerprint`] keeps of the parts time changes.
 struct Timeless {
-    /// The story reads the visits (`first_visit`, `visits`, `visited`).
+    /// The story reads the visits: `first_visit`, `visits`, `visited`, or a
+    /// first-visit text.
     visits: bool,
-    /// The agenda actors that no `move` effect moves: their places are time.
+    /// The agenda actors that only their agenda moves: their places are time.
     actors: BTreeSet<Id>,
 }
 
 impl Timeless {
     fn new(game: &Game) -> Self {
-        let story = &game.world().story;
+        let world = game.world();
+        let story = &world.story;
         let json = serde_json::to_value(story).unwrap_or_default();
-        let text = json.to_string();
         let mut moved: BTreeSet<String> = BTreeSet::new();
-        moves(&json, &mut moved);
+        let mut calls = false;
+        effects(&json, &mut moved, &mut calls);
+        // A behavior can move any thing: then every actor's place counts.
+        let behaviors = calls || !world.behaviors.is_empty();
+        let only_agenda = |a: &Id| {
+            !behaviors
+                && !moved.contains(a.as_str())
+                // An actor that takes orders walks, and a portable one is carried.
+                && !story.playable.contains(a)
+                && !world.thing(a.as_str()).is_some_and(|t| t.portable)
+        };
         Self {
-            visits: ["first_visit", "visits", "visited"]
-                .iter()
-                .any(|w| text.contains(w)),
+            visits: reads_visits(world),
             actors: story
                 .agendas
                 .iter()
                 .map(|a| a.actor.clone())
-                .filter(|a| !moved.contains(a.as_str()))
+                .filter(only_agenda)
                 .collect(),
         }
     }
 }
 
-/// The things that a `move` effect anywhere in the story moves.
-fn moves(value: &serde_json::Value, into: &mut BTreeSet<String>) {
+/// The things that a `move` effect anywhere in the story moves, and whether
+/// a `call` effect runs a behavior.
+fn effects(value: &serde_json::Value, moved: &mut BTreeSet<String>, calls: &mut bool) {
     match value {
         serde_json::Value::Object(map) => {
             for (k, v) in map {
-                if let (true, Some(targets)) = (k == "move", v.as_object()) {
-                    into.extend(targets.keys().cloned());
+                match (k.as_str(), v.as_object()) {
+                    ("move", Some(targets)) => moved.extend(targets.keys().cloned()),
+                    ("call", _) => *calls = true,
+                    _ => {}
                 }
-                moves(v, into);
+                effects(v, moved, calls);
             }
         }
-        serde_json::Value::Array(list) => list.iter().for_each(|v| moves(v, into)),
+        serde_json::Value::Array(list) => list.iter().for_each(|v| effects(v, moved, calls)),
         _ => {}
     }
+}
+
+/// True when a compiled condition, markup operand or text mode of the world
+/// reads the visits: `first_visit`, `room.visits`, `visited(room)`, or a
+/// first-visit text. Prose that says "visited" does not count.
+///
+/// shortcut: reads the `Debug` form of the compiled world, so that a new
+/// place for conditions is covered without a walker. A derived condition is
+/// matched with its quotes, which escaped prose can not hold; the type names
+/// could only match prose that spells them, and that just keeps the visits.
+/// A change of that `Debug` form (here or in dramaturge) would miss visits
+/// in the unsafe direction, so `reads_visits_sees_every_place_that_reads_them`
+/// guards each place. A new derived value or text mode that reads the
+/// visits must be added to the markers here and to that test. Upgrade to a
+/// walker when the compiled conditions get a visitor.
+fn reads_visits(world: &crate::World) -> bool {
+    let compiled = format!("{world:?}");
+    let custom = |name: &str| {
+        format!(
+            "key: \"{}\", args: [Text(\"{name}\")",
+            loremaster_lang::CUSTOM_KEY
+        )
+    };
+    ["first_visit", "visits", "visited"]
+        .iter()
+        .any(|n| compiled.contains(&custom(n)))
+        || ["FirstVisit", "FirstTime", "Visits(", "Visited("]
+            .iter()
+            .any(|m| compiled.contains(m))
 }
 
 /// True when any condition or markup in the story reads the talk or interaction counters.
@@ -822,7 +863,13 @@ mod tests {
     use std::sync::Arc;
 
     fn game(rules: &str) -> Game {
-        let files: Vec<SourceFile> = [
+        game_with(rules, &[])
+    }
+
+    /// The dark cellar of [`game`], with `extra` files added or put in
+    /// place of the files with their path.
+    fn game_with(rules: &str, extra: &[(&str, &str)]) -> Game {
+        let mut files: Vec<SourceFile> = [
             ("story.yaml", "title: Dark\nstart: cellar\ncarry_limit: 1\n"),
             (
                 "rooms/cellar.yaml",
@@ -847,7 +894,15 @@ mod tests {
             text: text.into(),
         })
         .into();
-        let world = Arc::new(World::compile(load(files).unwrap().story).unwrap());
+        for (path, text) in extra {
+            files.retain(|f| f.path != *path);
+            files.push(SourceFile {
+                path: (*path).into(),
+                text: (*text).into(),
+            });
+        }
+        let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
+        let world = Arc::new(World::compile(project.story).unwrap());
         let mut game = Game::new(world);
         game.start();
         game
@@ -855,6 +910,83 @@ mod tests {
 
     fn labels(game: &Game) -> Vec<String> {
         commands(game).into_iter().map(|(label, _)| label).collect()
+    }
+
+    #[test]
+    fn only_conditions_and_text_modes_read_the_visits() {
+        // Prose and a note that say "visited", "visits" or "first_visit" do not count.
+        let prose = "- id: look\n  on: { verb: [examine, coin] }\n  notes: [\"first_visit: visits\"]\n  then: [{ say: You visited the cellar. Your visits are many. }]\n";
+        assert!(!reads_visits(game(prose).world()));
+        for when in ["visited(cellar)", "cellar.visits > 1", "first_visit"] {
+            let rule = format!(
+                "- id: look\n  on: {{ verb: [examine, coin] }}\n  when: {when}\n  then: [{{ say: Hm. }}]\n"
+            );
+            assert!(reads_visits(game(&rule).world()), "{when}");
+        }
+        // In markup, too.
+        let markup = "- id: look\n  on: { verb: [examine, coin] }\n  then: [{ say: \"{visited(cellar) ? Again. | New.}\" }]\n";
+        assert!(reads_visits(game(markup).world()));
+    }
+
+    /// The drift guard of the `Debug` scan in [`reads_visits`]: every place
+    /// that can read the visits, in a story of its own. If the `Debug` form
+    /// of a compiled condition, operand or text mode changes (here or in
+    /// dramaturge), the scan misses it, and this test fails instead of the
+    /// timeless key dropping the visits.
+    #[test]
+    fn reads_visits_sees_every_place_that_reads_them() {
+        let room = |fragment: &str| {
+            format!("name: Cellar\ndescription:\n  - \"A cellar.\"\n  - {fragment}\n")
+        };
+        let rooms = "rooms/cellar.yaml";
+        let cases: Vec<(&str, String, String)> = vec![
+            (
+                "a room fragment's condition",
+                rooms.into(),
+                room("{ when: visited(cellar), text: Again. }"),
+            ),
+            (
+                "a room fragment in first-visit mode",
+                rooms.into(),
+                room("{ mode: first_visit, text: New. }"),
+            ),
+            (
+                "markup in a room fragment",
+                rooms.into(),
+                room("\"{cellar.visits > 2 ? Old. | New.}\""),
+            ),
+            (
+                "a presence text in first-visit mode",
+                "things/coin.yaml".into(),
+                "name: coin\nlocation: { room: cellar }\nportable: true\npresence:\n  - { mode: first_visit, text: A coin glints. }\n".into(),
+            ),
+            (
+                "a pool candidate's condition",
+                "texts/remark.yaml".into(),
+                "one_of:\n  - \"Hm.\"\n  - { when: first_visit, text: Hello. }\n".into(),
+            ),
+            (
+                "a pool candidate in first-time mode",
+                "texts/remark.yaml".into(),
+                "one_of:\n  - \"Hm.\"\n  - { mode: first_time, text: Hello. }\n".into(),
+            ),
+            (
+                "a dialogue option's condition",
+                "dialogues/coin.yaml".into(),
+                "with: coin\nstart: [a]\nnodes:\n  a:\n    say: [\"Hm.\"]\n    options:\n      - { say: [\"Again?\"], when: visited(cellar), go: end }\n      - { say: [\"Bye.\"], go: end }\n".into(),
+            ),
+            (
+                "markup in a dialogue node",
+                "dialogues/coin.yaml".into(),
+                "with: coin\nstart: [a]\nnodes:\n  a:\n    say: [\"{first_visit ? Hello. | Hm.}\"]\n    options:\n      - { say: [\"Bye.\"], go: end }\n".into(),
+            ),
+        ];
+        let plain = "- id: look\n  on: { verb: [examine, coin] }\n  then: [{ say: Hm. }]\n";
+        assert!(!reads_visits(game(plain).world()));
+        for (place, path, text) in &cases {
+            let game = game_with(plain, &[(path.as_str(), text.as_str())]);
+            assert!(reads_visits(game.world()), "{place} is not seen");
+        }
     }
 
     #[test]

@@ -21,7 +21,7 @@ mod markup;
 mod reserved;
 mod scope;
 
-pub use derived::{CmpOp, Derived, NameForm, Operand};
+pub use derived::{CUSTOM_KEY, CmpOp, Derived, NameForm, Operand};
 pub use dialogue::{CompiledDialogue, DialogueError, compile_dialogue};
 pub use error::{LangError, Span};
 pub use expr::{Expr, parse_expr};

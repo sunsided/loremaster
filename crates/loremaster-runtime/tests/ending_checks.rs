@@ -288,6 +288,167 @@ fn closes_accepts_the_turns_before_a_timed_step() {
 }
 
 #[test]
+fn moving_a_portable_agenda_actor_is_no_lateness() {
+    // The cat has an agenda, but the player can carry it, and it will not
+    // be put down. Taking it loses `purred`, which only the curfew at
+    // midnight names. The cat's place is the player's doing, not time: the
+    // twin with the cat still in the cell must not prove lateness (#262).
+    let files = vec![
+        file(
+            "story.yaml",
+            "title: Cat\nstart: cell\nclock:\n  start: \"23:45\"\n  minutes_per_turn: 5\nvars:\n  - { id: curfew, type: bool, initial: false }\n",
+        ),
+        file("rooms/cell.yaml", "name: Cell\ndescription: [\"Straw.\"]\n"),
+        file(
+            "things/cat.yaml",
+            "name: cat\nlocation: { room: cell }\nportable: true\n",
+        ),
+        file(
+            "agendas/cat.yaml",
+            "actor: cat\nsteps:\n  - at: \"01:00\"\n    then: [{ say: The cat yawns. }]\n",
+        ),
+        file("endings/purred.yaml", "kind: win\nrank: 1\ntitle: Purred\n"),
+        file(
+            "endings/caught.yaml",
+            "kind: loss\nrank: 3\ntitle: Caught\n",
+        ),
+        file("verbs/pet.yaml", "label: Pet\nwords: [pet]\nslots: none\n"),
+        file(
+            "verbs/surrender.yaml",
+            "label: Surrender\nwords: [surrender]\nslots: none\n",
+        ),
+        file(
+            "rules/cat.yaml",
+            "- id: pet\n  on: { verb: [pet] }\n  when: cat.location == cell and not curfew\n  then: [{ end: purred }]\n- id: clings\n  on: { check: [drop, cat] }\n  then: [{ say: The cat clings to you. }, stop]\n- id: surrender\n  on: { verb: [surrender] }\n  then: [{ end: caught }]\n- id: midnight\n  on: { time: \"00:00\" }\n  then: [{ set: { curfew: true } }]\n  closes: [purred]\n  reason: The curfew starts at midnight.\n",
+        ),
+    ];
+    let project = load(files).unwrap_or_else(|e| panic!("{e:#?}"));
+    let (result, diagnostics) = full(&project);
+    let checks = &result.ending_checks;
+    assert!(checks.proven, "{checks:#?}");
+    let take = checks
+        .no_return
+        .iter()
+        .find(|p| p.path.last().is_some_and(|c| c.starts_with("take")))
+        .unwrap_or_else(|| panic!("{checks:#?}"));
+    assert!(take.accepted(), "{take:#?}");
+    assert_eq!(take.only_ahead, ["purred"], "{take:#?}");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Info && d.message.contains("`purred`")),
+        "{diagnostics:#?}"
+    );
+    assert!(
+        diagnostics.iter().all(|d| d.severity == Severity::Info),
+        "{diagnostics:#?}"
+    );
+}
+
+/// The vault story of the inconclusive test: the left room lights a fuse,
+/// a quick and fully explored way; the right rooms are a long way with no
+/// clock. Both have a lever that jams the vault door, and both reach the
+/// vault.
+fn vault() -> Project {
+    let mut files = vec![
+        file(
+            "story.yaml",
+            "title: Vault\nstart: hall\nvars:\n  - { id: jammed, type: bool, initial: false }\n  - { id: smashed, type: bool, initial: false }\n",
+        ),
+        file(
+            "rooms/hall.yaml",
+            "name: Hall\ndescription: [\"A hall.\"]\nexits:\n  - { direction: west, to: left }\n  - { direction: east, to: r1 }\n",
+        ),
+        file(
+            "rooms/left.yaml",
+            "name: Left\ndescription: [\"A fuse.\"]\nexits:\n  - { direction: north, to: vault }\n",
+        ),
+        file(
+            "rooms/vault.yaml",
+            "name: Vault\ndescription: [\"A door.\"]\n",
+        ),
+        file("timers/fuse.yaml", "turns: 4\nrunning: false\n"),
+        file(
+            "endings/escaped.yaml",
+            "kind: win\nrank: 1\ntitle: Escaped\n",
+        ),
+        file(
+            "endings/caught.yaml",
+            "kind: loss\nrank: 3\ntitle: Caught\n",
+        ),
+        file(
+            "verbs/escape.yaml",
+            "label: Escape\nwords: [escape]\nslots: none\n",
+        ),
+        file(
+            "verbs/pull.yaml",
+            "label: Pull\nwords: [pull]\nslots: none\n",
+        ),
+        file(
+            "verbs/smash.yaml",
+            "label: Smash\nwords: [smash]\nslots: none\n",
+        ),
+        file(
+            "verbs/surrender.yaml",
+            "label: Surrender\nwords: [surrender]\nslots: none\n",
+        ),
+        file(
+            "rules/vault.yaml",
+            "- id: escape\n  on: { verb: [escape] }\n  when: in(vault) and not jammed and not smashed\n  then: [{ end: escaped }]\n- id: pull\n  on: { verb: [pull] }\n  when: (in(left) or in(r4)) and not jammed\n  then: [{ set: { jammed: true } }]\n- id: smash\n  on: { verb: [smash] }\n  when: in(left) and not jammed and not smashed\n  then: [{ set: { smashed: true } }]\n- id: surrender\n  on: { verb: [surrender] }\n  then: [{ end: caught }]\n- id: light\n  on: { enter: left }\n  then: [{ start: fuse }]\n- id: blast\n  on: { timer: fuse }\n  then: [{ end: caught }]\n  closes: [escaped]\n  reason: The fuse burns down.\n",
+        ),
+    ];
+    for (n, to) in [(1, "r2"), (2, "r3"), (3, "r4"), (4, "vault")] {
+        let dir = if to == "vault" { "north" } else { "east" };
+        files.push(file(
+            &format!("rooms/r{n}.yaml"),
+            &format!(
+                "name: R{n}\ndescription: [\"A corridor.\"]\nexits:\n  - {{ direction: {dir}, to: {to} }}\n"
+            ),
+        ));
+    }
+    load(files).unwrap_or_else(|e| panic!("{e:#?}"))
+}
+
+#[test]
+fn a_timeless_path_into_a_cut_twin_group_is_inconclusive() {
+    // Pulling the lever on the left jams the vault door: `escaped` drops,
+    // and only the fuse that burns down later names it. The jammed left room
+    // and its way on are explored in full. But its timeless path leads into
+    // the jammed vault, whose twin from the long right way the depth cut:
+    // what that twin could still do is not known, so the drop proves
+    // nothing (#262). Smashing the door on the left drops `escaped` too, but
+    // the smashed rooms have no twin on the right: that drop stays an info.
+    // So the closure runs backwards, from the cut group to the groups with
+    // a path into it. Forwards, from the cut start, it would reach every
+    // group and hide the smash as well.
+    let project = vault();
+    let drop_at = |budget, last: &str| {
+        let (result, _) = run(&project, budget);
+        result
+            .ending_checks
+            .no_return
+            .into_iter()
+            .find(|p| p.path == ["go west", last])
+            .unwrap_or_else(|| panic!("no drop at `{last}` on the left"))
+    };
+    let cut = Budget {
+        max_states: 2000,
+        max_depth: 6,
+    };
+    // In full, neither drop is lateness: infos.
+    for last in ["pull", "smash"] {
+        let full = drop_at(Budget::default(), last);
+        assert_eq!(full.only_ahead, ["escaped"], "{full:#?}");
+    }
+    // Cut on the right, the pull is inconclusive, the smash is not.
+    let pulled = drop_at(cut, "pull");
+    assert!(pulled.accepted(), "{pulled:#?}");
+    assert!(pulled.only_ahead.is_empty(), "{pulled:#?}");
+    let smashed = drop_at(cut, "smash");
+    assert_eq!(smashed.only_ahead, ["escaped"], "{smashed:#?}");
+}
+
+#[test]
 fn only_fired_once_rules_tell_states_apart() {
     // A rule that can fire again changes nothing by firing: burning in the
     // cell is the same state as before. A `once` rule cannot fire again, so
