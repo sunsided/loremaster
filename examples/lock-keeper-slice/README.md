@@ -34,7 +34,7 @@ The walkthroughs are the three paths of the design: `best` (committed for trial)
 | The accusation, five ranked endings, the case notebook (quests) | `rules/accuse.yaml`, `endings/`, `machines/means.yaml`, `machines/opportunity.yaml`, `machines/motive.yaml` | 6 |
 | Walkthroughs, hints, the ending checks | `tests/`, `closes` in `agendas/` | 7 |
 
-What changed from the first draft of the design, so that the ending checks can walk every state of the night (about 39,000 with these choices; with the design's 5-minute turns and the coroner at three it takes 432,000 states and a minute, too slow for the tests):
+What changed from the first draft of the design, so that the ending checks can walk every state of the night (39,047 with these choices; with 5-minute turns and the coroner at three it takes 432,000 states and a minute, too slow for the tests):
 
 - A turn is 15 minutes, not 5, and the coroner comes at three, not at four.
 - The coroner reads the case at three; with no case, the verdict is "accidental death". That ending ranks above a wrong accusation and above "released at dawn".
