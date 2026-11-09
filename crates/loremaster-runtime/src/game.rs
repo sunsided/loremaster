@@ -93,6 +93,12 @@ pub struct ThingInfo {
     /// of `name` ("reed" for "Hester Reed").
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// The main word of the current name, for a host that marks it: the
+    /// `head` of the name stage that holds now (or of the thing without a
+    /// stage), else the last word of `name` ("lamp" for "oil lamp"). An
+    /// author sets `head` where the last word is wrong ("bottle of wine").
+    #[serde(default)]
+    pub head: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1206,8 +1212,16 @@ impl Game {
     /// A thing of the story, wherever it is: its current name, its aliases
     /// and its location. `None` for an unknown id.
     pub(crate) fn thing_info(&self, id: &str) -> Option<ThingInfo> {
-        let id = &self.world.thing(id)?.id;
+        let thing = self.world.thing(id)?;
+        let id = &thing.id;
         let name = self.name_of(id);
+        let declared = match self.eval().name_stage(id.as_str()) {
+            Some(i) => thing.names[i].head.clone(),
+            None => thing.head.clone(),
+        };
+        let head = (declared.filter(|h| !h.trim().is_empty()))
+            .or_else(|| name.split_whitespace().last().map(str::to_string))
+            .unwrap_or_default();
         let lower = name.to_lowercase();
         let mut aliases = Vec::new();
         for noun in (self.world.thing(id.as_str()).into_iter())
@@ -1222,6 +1236,7 @@ impl Game {
             id: id.to_string(),
             name,
             aliases,
+            head,
             location: (self.state.location_of(id.as_str()).cloned()).unwrap_or(Location::Nowhere),
         })
     }
