@@ -513,7 +513,7 @@ Special rules that react to what happens in a round are rules on the combat even
 | `combat_round` | The end of a round, before the end check | `enemy` (the enemy that the player attacked), `round`, `won` (the player hit it) |
 | `combat_end` | The combat is over, in its last room | `enemy` (the first of `enemies`), `outcome`: `win`, `loss`, `escape` or `ended` |
 
-`enemy` and `target` are text: `combat_hit.target == "troll"`. A rule on `combat_hit` can change the damage of this hit: `set: { combat_hit.damage: 0 }` (a negative value counts as 0). The effect `end_combat: <room>` ends the combat at once and moves the player to the room, any room; the hit of a `combat_hit` rule still counts, and `combat_end` has the outcome `ended`. The rule with `combat` goes on there, as after a win. Rules on the events can `set`, `add`, `say` and `end_combat`; do not `await`, start another `combat` or `goto` in them.
+`enemy` and `target` are text: `combat_hit.target == "troll"`. A rule on `combat_hit` can change the damage of this hit: `set: { combat_hit.damage: 0 }` (a negative value counts as 0). The effect `end_combat: <room>` ends the combat at once and moves the player to the room, any room; the hit of a `combat_hit` rule still counts, and `combat_end` has the outcome `ended`. The rule with `combat` goes on there, as after a win. When a `combat_hit` rule ends the combat, the other hits of the same round still count (without a Luck test), then the combat ends. Rules on the events can `set`, `add`, `say` and `end_combat`; `loremaster check` rejects `goto`, `await` and `combat` in them, and warns about `end_combat` outside a rule on `combat_hit` or `combat_round`. The ids `combat_hit`, `combat_round` and `combat_end` are reserved: no room, thing, variable or host event can take them.
 
 ```yaml
 - id: troll_weakens
@@ -544,7 +544,7 @@ Special rules that react to what happens in a round are rules on the combat even
     - end_combat: far_bank
 ```
 
-The rules of an event run in rule order, so `two_in_a_row` sees the `streak` of this round. A combat sets the arguments only when a rule listens for the event. In `world!`, the effect is `end_combat far_bank;`, and the builder has `.end_combat("far_bank")`.
+The rules of an event run in rule order, so `two_in_a_row` sees the `streak` of this round. A combat sets the arguments only when a rule listens for the event, and `loremaster check` warns about a rule on one in a story without `combat`. In `world!`, the effect is `end_combat far_bank;`, and the builder has `.end_combat("far_bank")`.
 
 In a walkthrough, each step answers one question. `rolls:` has the enemy totals, then the player total:
 

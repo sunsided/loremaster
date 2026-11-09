@@ -14,25 +14,55 @@ fn file(path: &str, text: &str) -> SourceFile {
     }
 }
 
-/// A fight with the warden (SKILL 7, STAMINA 8) and the rules `hooks`.
-fn project(hooks: &str, extra: Vec<SourceFile>) -> Project {
-    let story = "title: Fight\nstart: gate\nvars:\n  - { id: skill, type: int, initial: 10 }\n  - { id: stamina, type: int, initial: 12 }\n  - { id: luck, type: int, initial: 0 }\n  - { id: streak, type: int, initial: 0 }\n  - { id: ended, type: bool, initial: false }\n";
-    let fight = "- id: fight\n  on: start\n  then:\n    - combat: { enemies: [warden], win: yard, loss: fallen, escape: road }\n    - say: \"After.\"\n";
+const STORY: &str = "title: Fight\nstart: gate\nvars:\n  - { id: skill, type: int, initial: 10 }\n  - { id: stamina, type: int, initial: 12 }\n  - { id: luck, type: int, initial: 0 }\n  - { id: streak, type: int, initial: 0 }\n  - { id: ended, type: bool, initial: false }\n  - { id: how, type: { enum: [none, win, loss, escape, ended] }, initial: none }\n";
+
+fn fight(combat: &str) -> SourceFile {
+    file(
+        "rules/fight.yaml",
+        &format!(
+            "- id: fight\n  on: start\n  then:\n    - combat: {combat}\n    - say: \"After.\"\n"
+        ),
+    )
+}
+
+/// A fight with the warden (SKILL 7, STAMINA 8) and the rules `hooks`:
+/// story.yaml, the warden, the fight and the hooks first, then the rooms.
+fn files(hooks: &str) -> Vec<SourceFile> {
     let room = |name: &str| format!("name: {name}\ndescription: [\"{name}.\"]\n");
     let mut files = vec![
-        file("story.yaml", story),
+        file("story.yaml", STORY),
         file(
             "things/warden.yaml",
             "name: GATE WARDEN\nlocation: { room: gate }\nprops: { skill: 7, stamina: 8 }\n",
         ),
-        file("rules/fight.yaml", fight),
+        fight("{ enemies: [warden], win: yard, loss: fallen, escape: road }"),
         file("rules/hooks.yaml", hooks),
     ];
+    if hooks.is_empty() {
+        files[3] = file("rooms/hall.yaml", "name: Hall\ndescription: [\"Hall.\"]\n");
+    }
     for r in ["gate", "yard", "road", "fallen", "section_7", "shore"] {
         files.push(file(&format!("rooms/{r}.yaml"), &room(r)));
     }
-    files.extend(extra);
-    load(files).unwrap()
+    files
+}
+
+fn project(hooks: &str, extra: Vec<SourceFile>) -> Project {
+    let mut f = files(hooks);
+    f.extend(extra);
+    load(f).unwrap()
+}
+
+fn compile(f: Vec<SourceFile>) -> Arc<World> {
+    Arc::new(World::compile(load(f).unwrap().story).unwrap())
+}
+
+/// The messages of the diagnostics of `severity`.
+fn messages(f: Vec<SourceFile>, severity: Severity) -> Vec<String> {
+    (check(&load(f).unwrap()).iter())
+        .filter(|d| d.severity == severity)
+        .map(|d| d.message.clone())
+        .collect()
 }
 
 fn world(hooks: &str) -> Arc<World> {
@@ -47,9 +77,13 @@ fn await_id(step: &Step) -> String {
 }
 
 fn play(s: &mut Session, step: &Step, rolls: &[i64]) -> Step {
+    answer(s, step, "attack", rolls)
+}
+
+fn answer(s: &mut Session, step: &Step, answer: &str, rolls: &[i64]) -> Step {
     force_rolls(s, rolls);
     let done = s
-        .resume(&await_id(step), Value::Text("attack".into()))
+        .resume(&await_id(step), Value::Text(answer.into()))
         .unwrap();
     assert_eq!(forced_roll_errors(s), Vec::<String>::new());
     done
@@ -150,7 +184,75 @@ fn hooks_work_when_the_host_rolls() {
         step = s.resume(&await_id(&step), Value::Int(total)).unwrap();
     }
     assert_eq!(int(&s, "stamina"), 12);
+    assert_eq!(
+        int(&s, "warden.stamina"),
+        8,
+        "the first total is the warden's"
+    );
     assert_eq!(int(&s, "combat_hit.round"), 1);
+}
+
+const OUTCOMES: &str = "- id: won\n  on: { event: combat_end }\n  when: combat_end.outcome == win and combat_end.enemy == \"warden\"\n  then:\n    - set: { how: win }\n- id: lost\n  on: { event: combat_end }\n  when: combat_end.outcome == loss\n  then:\n    - set: { how: loss }\n- id: fled\n  on: { event: combat_end }\n  when: combat_end.outcome == escape\n  then:\n    - set: { how: escape }\n- id: ended\n  on: { event: combat_end }\n  when: combat_end.outcome == ended\n  then:\n    - set: { how: ended }\n";
+
+fn how(s: &Session) -> &Value {
+    s.state().facts.get("how").unwrap()
+}
+
+#[test]
+fn combat_end_tells_win_loss_and_escape() {
+    let mut s = Session::new(world(OUTCOMES));
+    let mut step = s.start();
+    for _ in 0..4 {
+        step = play(&mut s, &step, &WIN);
+    }
+    assert_eq!(s.state().room.as_str(), "yard");
+    assert_eq!(how(&s), &Value::Text("win".into()));
+    assert!(step.plain_text().contains("After."));
+
+    let mut s = Session::new(world(OUTCOMES));
+    let mut step = s.start();
+    for _ in 0..6 {
+        step = play(&mut s, &step, &LOSE);
+    }
+    assert_eq!(s.state().room.as_str(), "fallen");
+    assert_eq!(how(&s), &Value::Text("loss".into()));
+
+    let mut s = Session::new(world(OUTCOMES));
+    let step = s.start();
+    answer(&mut s, &step, "escape", &[]);
+    assert_eq!(s.state().room.as_str(), "road");
+    assert_eq!(how(&s), &Value::Text("escape".into()));
+}
+
+const HIT_ENDS: &str = "- id: warden_yields\n  on: { event: combat_hit }\n  when: combat_hit.target == \"warden\"\n  then:\n    - end_combat: shore\n";
+
+#[test]
+fn end_combat_from_a_hit_counts_the_hit_then_ends() {
+    let mut s = Session::new(world(&format!("{HIT_ENDS}{OUTCOMES}")));
+    let step = s.start();
+    let step = play(&mut s, &step, &WIN);
+    assert_eq!(s.state().room.as_str(), "shore");
+    assert!(s.state().combat.is_none());
+    assert_eq!(int(&s, "warden.stamina"), 6, "the hit still counts");
+    assert_eq!(how(&s), &Value::Text("ended".into()));
+    assert!(step.plain_text().contains("After."));
+}
+
+#[test]
+fn end_combat_from_a_hit_counts_every_hit_of_the_round() {
+    let ends = "- id: give_up\n  on: { event: combat_hit }\n  when: combat_hit.target == \"player\"\n  then:\n    - end_combat: shore\n";
+    let mut f = files(ends);
+    f[2] = fight("{ enemies: [warden, hound], win: yard, loss: fallen, together: true }");
+    f.push(file(
+        "things/hound.yaml",
+        "name: HOUND\nlocation: { room: gate }\nprops: { skill: 5, stamina: 4 }\n",
+    ));
+    let mut s = Session::new(compile(f));
+    let step = s.start();
+    // Both enemies hit the player in one round.
+    play(&mut s, &step, &[12, 12, 2]);
+    assert_eq!(s.state().room.as_str(), "shore");
+    assert_eq!(int(&s, "stamina"), 8, "both hits count");
 }
 
 #[test]
@@ -197,4 +299,96 @@ fn the_checks_know_the_combat_events() {
         "{errors:?}"
     );
     assert!(errors.iter().any(|m| m.contains("nowhere")), "{errors:?}");
+}
+
+#[test]
+fn the_checks_reject_flow_effects_in_combat_hooks() {
+    let bad = "- id: bad\n  on: { event: combat_round }\n  then:\n    - goto: shore\n    - await: { roll: 2d6 }\n";
+    let errors = messages(files(bad), Severity::Error);
+    for what in ["`goto`", "`await`"] {
+        assert!(
+            errors.iter().any(|m| m.contains(&format!("cannot {what}"))),
+            "{errors:?}"
+        );
+    }
+}
+
+#[test]
+fn the_checks_warn_about_end_combat_without_a_combat_event() {
+    let stray = "- id: stray\n  on: { enter: shore }\n  then:\n    - end_combat: yard\n";
+    let warnings = messages(files(stray), Severity::Warning);
+    assert!(
+        warnings
+            .iter()
+            .any(|m| m.contains("`end_combat` works only")),
+        "{warnings:?}"
+    );
+    let mut f = files("");
+    f.push(file(
+        "timers/t.yaml",
+        "turns: 2\nat:\n  0:\n    - end_combat: yard\n",
+    ));
+    let errors = messages(f, Severity::Error);
+    assert!(
+        errors
+            .iter()
+            .any(|m| m.contains("`end_combat` work only in rules")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn the_checks_warn_about_a_combat_hook_without_a_combat() {
+    let mut f = files(SKILL_LOSS);
+    f[2] = file(
+        "rules/fight.yaml",
+        "- id: fight\n  on: start\n  then:\n    - say: \"No fight.\"\n",
+    );
+    let warnings = messages(f, Severity::Warning);
+    assert!(
+        warnings
+            .iter()
+            .any(|m| m == "rule on `combat_hit`, but the story has no `combat`"),
+        "{warnings:?}"
+    );
+}
+
+#[test]
+fn the_combat_event_ids_are_reserved() {
+    let mut f = files("");
+    f.push(file(
+        "rooms/combat_hit.yaml",
+        "name: Hit\ndescription: [\"Hit.\"]\n",
+    ));
+    let errors = messages(f, Severity::Error);
+    assert!(
+        errors.iter().any(|m| m.contains("the room `combat_hit`")),
+        "{errors:?}"
+    );
+    let mut f = files("");
+    f[0] = file(
+        "story.yaml",
+        &format!("{STORY}interface:\n  events:\n    - {{ id: combat_end }}\n"),
+    );
+    let errors = messages(f, Severity::Error);
+    assert!(
+        errors.iter().any(|m| m.contains("the event `combat_end`")),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn an_emitted_combat_event_with_a_listener_is_no_contract_error() {
+    let hooks = "- id: send\n  on: { enter: shore }\n  then:\n    - emit: combat_hit\n- id: hear\n  on: { event: combat_hit }\n  then:\n    - add: { streak: 1 }\n";
+    let mut f = files(hooks);
+    f[0] = file(
+        "story.yaml",
+        &format!("{STORY}interface:\n  events:\n    - {{ id: other }}\n"),
+    );
+    f.push(file(
+        "rules/other.yaml",
+        "- id: other\n  on: { event: other }\n  then:\n    - add: { streak: 1 }\n",
+    ));
+    let errors = messages(f, Severity::Error);
+    assert_eq!(errors, Vec::<String>::new());
 }

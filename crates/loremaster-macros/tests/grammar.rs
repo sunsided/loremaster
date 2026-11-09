@@ -1051,6 +1051,7 @@ fn await_combat_and_stats_are_the_yaml_and_the_builder() {
         });
     built
         .rule("flee", on::event("combat_round"))
+        .when("combat_round.round == 3")
         .end_combat("road");
     let p = fight::pack();
     let stats = |p: &Pack| p.header.as_ref().unwrap().stats.clone();
@@ -1062,6 +1063,10 @@ fn await_combat_and_stats_are_the_yaml_and_the_builder() {
     assert_eq!(built.rules[1].then, yaml.rules[1].then);
     assert_eq!(p.rules[2].then, yaml.rules[2].then);
     assert_eq!(built.rules[2].then, yaml.rules[2].then);
+    for r in [&p.rules[2], &built.rules[2]] {
+        assert_eq!(r.on, yaml.rules[2].on);
+        assert_eq!(r.when, yaml.rules[2].when);
+    }
     // The pack builds: the runtime checks accept the awaits, the combat and the sheet.
     Loremaster::new().pack(p).build().unwrap();
 }
