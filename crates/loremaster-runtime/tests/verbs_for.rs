@@ -43,6 +43,14 @@ fn session() -> Session {
             "name: iron key\nportable: true\nlocation: carried\n",
         ),
         (
+            "things/cupboard.yaml",
+            "name: cupboard\ncontainer: true\nkey: tin_key\nprops: { open: false, locked: true }\nlocation: { room: hall }\n",
+        ),
+        (
+            "things/tin_key.yaml",
+            "name: tin key\nportable: true\nlocation: { room: hall }\n",
+        ),
+        (
             "things/jar.yaml",
             "name: jar\ncontainer: true\nprops: { open: false, transparent: true }\nlocation: { room: hall }\n",
         ),
@@ -104,6 +112,8 @@ fn a_lock_needs_its_key_in_scope_and_a_key_its_lock() {
     assert_eq!(ids(&s, "safe"), ["examine", "put"]);
     // The trunk of the iron key is in the cellar.
     assert_eq!(ids(&s, "iron_key"), ["drop", "examine", "put"]);
+    // The tin key lies in the hall: `unlock cupboard` only uses a carried key.
+    assert_eq!(ids(&s, "cupboard"), ["examine", "put"]);
 }
 
 #[test]
