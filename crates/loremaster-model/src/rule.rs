@@ -11,9 +11,10 @@ pub struct Rule {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
     pub then: Vec<Effect>,
-    /// Fire at most once per game.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub once: bool,
+    /// Fire at most once per game: `once: true` for this rule, or
+    /// `once: <key>` for all rules with that key together.
+    #[serde(default, skip_serializing_if = "Once::is_off")]
+    pub once: Once,
     /// For verb and check events: when the rule fires for the player's
     /// command, the command takes no time: the clock, the turn count, the
     /// timers and the agendas do not move. For a refusal that changes nothing.
@@ -46,6 +47,41 @@ pub struct Rule {
     /// Author notes. The player never sees them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<Note>,
+}
+
+/// The `once` of a rule: `true`, `false`, or the key of a once-group. All
+/// rules of a group fire at most once in total: the first that fires closes
+/// the group.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged, expecting = "`true`, `false` or the key of a once-group")]
+pub enum Once {
+    Rule(bool),
+    Group(Id),
+}
+
+impl Default for Once {
+    fn default() -> Self {
+        Once::Rule(false)
+    }
+}
+
+impl Once {
+    /// The rule fires at most once, alone or in a group.
+    pub fn is_on(&self) -> bool {
+        !self.is_off()
+    }
+
+    pub fn is_off(&self) -> bool {
+        *self == Once::Rule(false)
+    }
+
+    /// The key of the once-group, if the rule is in one.
+    pub fn group(&self) -> Option<&Id> {
+        match self {
+            Once::Group(key) => Some(key),
+            Once::Rule(_) => None,
+        }
+    }
 }
 
 /// What a rule listens for.
@@ -190,6 +226,26 @@ fn is_zero(n: &i32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn once_reads_a_bool_or_a_group_key() {
+        let once = |v| serde_json::from_value::<Once>(v).unwrap();
+        assert_eq!(once(serde_json::json!(true)), Once::Rule(true));
+        assert_eq!(once(serde_json::json!(false)), Once::Rule(false));
+        assert_eq!(
+            once(serde_json::json!("greet")),
+            Once::Group("greet".into())
+        );
+        assert_eq!(
+            serde_json::to_value(Once::Rule(true)).unwrap(),
+            serde_json::json!(true)
+        );
+        assert_eq!(
+            serde_json::to_value(Once::Group("greet".into())).unwrap(),
+            serde_json::json!("greet")
+        );
+        assert!(serde_json::from_value::<Once>(serde_json::json!(3)).is_err());
+    }
 
     #[test]
     fn a_sum_reads_numbers_and_names_with_signs() {

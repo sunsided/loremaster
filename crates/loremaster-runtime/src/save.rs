@@ -430,6 +430,14 @@ fn reconcile(
         keep
     });
 
+    state.once_groups.retain(|g| {
+        let keep = story.rules.iter().any(|r| r.once.group() == Some(g));
+        if !keep {
+            dropped.push(format!("once:{g}"));
+        }
+        keep
+    });
+
     let talk_ok = state.talk.as_ref().is_none_or(|t| {
         story
             .dialogue(t.dialogue.as_str())

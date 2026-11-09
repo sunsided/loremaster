@@ -95,7 +95,8 @@ pub struct Exploration {
 /// next step is due. Timers count by the turns they have left. Counters
 /// count only up to 3, and only when the story reads them. Of the rules
 /// that fired, only the `once` rules count: the game reads `fired` only to
-/// keep them from firing again.
+/// keep them from firing again. The closed once-groups all count, also
+/// in the timeless key: time does not open a group again.
 ///
 /// With `timeless`, the key leaves out what only time changes: the clock,
 /// the timers, what the agendas have done, and the places of agenda actors
@@ -147,7 +148,7 @@ fn fingerprint(
                 .as_ref()
                 .map(|a| (&a.rule, a.next, &a.request, &a.into)),
             s.combat.as_ref().map(|c| (true, &c.pending)),
-            (&s.active, &s.orders),
+            (&s.active, &s.orders, &s.once_groups),
         ))
         .unwrap_or_default();
     }
@@ -179,6 +180,7 @@ fn fingerprint(
             &s.active,
             &s.orders,
             &s.timers,
+            &s.once_groups,
         ),
     ))
     .unwrap_or_default()

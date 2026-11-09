@@ -381,7 +381,24 @@ The effects:
 | `call: thief` | Runs a behavior in Rust here, at this place in the rule. Read [Behaviors in Rust](#behaviors-in-rust). |
 | `await: { … }` | Stops the rule until the host answers. Read [Wait for the host](#wait-for-the-host). |
 
-More fields: `once: true` lets the rule fire only one time in a game. `instead: true` makes a verb rule replace the default response. `free: true` on a `verb` or `check` rule lets the player's command that fires it take no time: the clock, the turn count, the timers and the agendas stay, as for a command that the game refuses ("You can't see that here."). Use it for a refusal that changes nothing, such as "It is already open."; other refusals still take a turn. A free command still counts as an action and an interaction (`action.*`, `.interactions`, the repeat count), so a "you already tried that" variant works; only the time stays. An `enter`, `leave` or `event` rule that the command sets off does not make it free. Walkthroughs and the explorer play the command as the game does, so a free refusal leads back into the state it came from. `loremaster check` warns about `free` on a rule for another event. In `world!`, write `free` after the event; the builder has `.free()`. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
+More fields: `once: true` lets the rule fire only one time in a game. `once: <key>` puts the rule in a once-group: all rules with the same key fire at most once in total, and the first that fires closes the group for the others. Two variants of one event share a key, so the pair needs no extra variable:
+
+```yaml
+- id: greet_day
+  on: { verb: [talk, keeper] }
+  when: "!late"
+  once: greet
+  then: [{ say: "Good day, stranger." }]
+- id: greet_late
+  on: { verb: [talk, keeper] }
+  when: late
+  once: greet
+  then: [{ say: "Late for a visit." }]
+```
+
+A save keeps the closed groups. `loremaster check` warns about a group with only one rule. In `world!`, write `once(greet)`; the builder has `.once_group("greet")`.
+
+`instead: true` makes a verb rule replace the default response. `free: true` on a `verb` or `check` rule lets the player's command that fires it take no time: the clock, the turn count, the timers and the agendas stay, as for a command that the game refuses ("You can't see that here."). Use it for a refusal that changes nothing, such as "It is already open."; other refusals still take a turn. A free command still counts as an action and an interaction (`action.*`, `.interactions`, the repeat count), so a "you already tried that" variant works; only the time stays. An `enter`, `leave` or `event` rule that the command sets off does not make it free. Walkthroughs and the explorer play the command as the game does, so a free refusal leads back into the state it came from. `loremaster check` warns about `free` on a rule for another event. In `world!`, write `free` after the event; the builder has `.free()`. `closes: [<ending ids>]` with a `reason` names the endings that the rule closes on purpose (read [Dead ends and points of no return](#dead-ends-and-points-of-no-return)).
 
 ### The Command record
 
