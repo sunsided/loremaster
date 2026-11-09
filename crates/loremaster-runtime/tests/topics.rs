@@ -89,3 +89,28 @@ fn a_topic_that_the_parser_never_gives_is_reported() {
         "{found:#?}"
     );
 }
+
+#[test]
+fn topics_that_no_command_can_have_are_reported() {
+    for (topic, rule, message) in [
+        ("lantern", "verb: look", "`look` takes no topic"),
+        (
+            "the",
+            "verb: ask, direct: bert",
+            "never gives an empty topic",
+        ),
+        ("Über", "verb: ask, direct: bert", "write `topic: über`"),
+    ] {
+        let mut files = files();
+        files
+            .iter_mut()
+            .find(|f| f.path == "rules/rules.yaml")
+            .unwrap()
+            .text = format!("- id: r\n  on: {{ {rule}, topic: \"{topic}\" }}\n  then: []\n");
+        let found = check(&load(files).unwrap());
+        assert!(
+            found.iter().any(|d| d.to_string().contains(message)),
+            "{topic}: {found:#?}"
+        );
+    }
+}

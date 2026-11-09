@@ -246,8 +246,11 @@ pub(crate) fn parse(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Resul
 /// follows. A verb without objects, or with `about` as its preposition,
 /// has no topic.
 fn split_topic(verb: &VerbDef, rest: &[String]) -> (Vec<String>, Option<String>) {
-    let takes_topic = verb.slots != VerbSlots::None && verb.preposition.as_deref() != Some(TOPIC);
-    match rest.iter().position(|w| w == TOPIC).filter(|_| takes_topic) {
+    match rest
+        .iter()
+        .position(|w| w == TOPIC)
+        .filter(|_| verb.takes_topic())
+    {
         Some(i) => (
             rest[..i].to_vec(),
             Some(topic_words(&rest[i + 1..].join(" "))),
@@ -511,6 +514,8 @@ pub(crate) fn preview(verbs: &[VerbDef], scope: &ParseScope, input: &str) -> Pre
     };
     out.complete = out.candidates.is_empty()
         && topic.as_deref() != Some("")
+        // A verb without objects refuses any words after it.
+        && !(verb.slots == VerbSlots::None && !rest.is_empty())
         && out.objects.len() >= wanted
         && !(has_second_slot && out.objects.len() < 2);
     out
@@ -666,6 +671,7 @@ mod tests {
         check!(p.complete);
         check!(!preview(&v, &s, "push door about ").complete);
         check!(!preview(&v, &s, "push door about").complete);
+        check!(!preview(&v, &s, "wait about the storm").complete);
     }
 
     #[test]
@@ -685,5 +691,21 @@ mod tests {
         };
         check!(objects == vec![Id::new("door"), Id::new("brass_key")]);
         check!(topic == None);
+        // With one object, `about` is the topic again.
+        let listen = VerbDef {
+            id: Id::new("listen"),
+            label: "Listen".into(),
+            words: vec!["listen".into()],
+            slots: VerbSlots::One,
+            preposition: Some("about".into()),
+            bar: false,
+            default: None,
+        };
+        let parsed = parse(&[listen], &scope(), "listen door about the storm");
+        let Ok(Command::Verb { objects, topic, .. }) = parsed else {
+            panic!("{parsed:?}");
+        };
+        check!(objects == vec![Id::new("door")]);
+        check!(topic.as_deref() == Some("storm"));
     }
 }
