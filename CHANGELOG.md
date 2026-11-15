@@ -8,6 +8,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The proj
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+
+- Live reload for web builds (#267). `loremaster serve` has `GET /story/events`, a Server-Sent Events stream: an event `files` with all story files, at the start and after each change. A wasm game listens and reloads with `Session.reload(files)` (JavaScript) or `LiveStory::apply(files)` plus `Session::reload` (Rust). `LiveStory` now builds on `wasm32`; there it has `apply` but not `poll`. Saves in the web editor reach the game this way when the editor has the folder linked.
+
 ## [0.4.0] - 2026-11-09
 
 ### Upgrading from 0.3

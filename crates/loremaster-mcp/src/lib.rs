@@ -122,6 +122,11 @@ impl Server {
         &self.ws
     }
 
+    /// The project folder.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// Run one tool as an MCP call would: refresh first, save the proposals after.
     pub fn call_tool(&mut self, name: &str, args: Value) -> Result<Value, String> {
         self.refresh();
@@ -559,7 +564,7 @@ fn is_empty_story(files: &[loremaster_project::SourceFile]) -> bool {
 }
 
 /// The project files in a fixed order, so that two reads of an unchanged folder compare equal.
-fn read_sorted(root: &Path) -> io::Result<Vec<loremaster_project::SourceFile>> {
+pub(crate) fn read_sorted(root: &Path) -> io::Result<Vec<loremaster_project::SourceFile>> {
     let mut files = read_dir(root)?;
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(files)

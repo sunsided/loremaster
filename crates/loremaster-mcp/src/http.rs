@@ -13,6 +13,7 @@
 //! | `GET /jobs`, `GET /jobs/<id>` | The jobs, with status, progress events, result and proposals. |
 //! | `POST /jobs/<id>/cancel` | Stop a running job. |
 //! | `POST /bootstrap` | Start a new story from an idea: `{ "title": "...", "idea": "...", "rooms": 3 }`. Writes the new story, then starts a `seed_story` job. 409 when the folder has a story. |
+//! | `GET /story/events` | Server-Sent Events for live reload: an event `files` with all story files (`[{ "path", "text" }]`) at the start and after each change, or `story-error` (`{ "error": "..." }`) when the folder cannot be read. At most 8 streams at once; more get 503. |
 //! | `GET /health` | `{ "loremaster": "<version>", "ui": true }`. The editor uses it to find the server. |
 //!
 //! Each endpoint is also at `/api/...`, for example `GET /api/proposals`. With the
@@ -27,8 +28,10 @@ use crate::jobs::{Agent, Jobs};
 use crate::{Refusal, Server};
 use loremaster_tools::{render_prompt, render_prompt_with_context};
 use serde_json::{Value, json};
-use std::io;
-use std::path::Path;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response};
 
 /// The port when the command line gives none.
@@ -154,6 +157,15 @@ fn handle(server: &mut Server, jobs: &mut Jobs, allowed: &[String], mut request:
     if api {
         parts.remove(0);
     }
+    if *request.method() == Method::Get && parts == ["story", "events"] {
+        match StreamSlot::take() {
+            Some(slot) => story_events(server.root().to_path_buf(), origin, request, slot),
+            None => {
+                let _ = request.respond(cors(error(503, "Too many open story streams.")));
+            }
+        }
+        return;
+    }
     let response = match (is_post, parts.as_slice()) {
         (false, ["health"]) => ok(json!({ "loremaster": env!("CARGO_PKG_VERSION"), "ui": HAS_UI })),
         (true, ["mcp"]) => match server.handle_line(&body) {
@@ -219,6 +231,87 @@ fn handle(server: &mut Server, jobs: &mut Jobs, allowed: &[String], mut request:
         _ => error(404, "Not found."),
     };
     let _ = request.respond(cors(response));
+}
+
+/// How often a `GET /story/events` stream reads the project folder.
+const STORY_POLL: Duration = Duration::from_millis(500);
+
+/// A comment line this often, so that the stream of a closed page ends.
+const KEEPALIVE: Duration = Duration::from_secs(15);
+
+/// At most this many `GET /story/events` streams at once: each has a thread
+/// and reads the folder, and a page that stops reading keeps its thread.
+const MAX_STREAMS: usize = 8;
+
+static OPEN_STREAMS: AtomicUsize = AtomicUsize::new(0);
+
+/// One of the [`MAX_STREAMS`] places, given back on drop.
+struct StreamSlot;
+
+impl StreamSlot {
+    fn take() -> Option<Self> {
+        let open = OPEN_STREAMS.fetch_add(1, Ordering::SeqCst);
+        if open < MAX_STREAMS {
+            Some(Self)
+        } else {
+            OPEN_STREAMS.fetch_sub(1, Ordering::SeqCst);
+            None
+        }
+    }
+}
+
+impl Drop for StreamSlot {
+    fn drop(&mut self) {
+        OPEN_STREAMS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// `GET /story/events`: stream the story files to a running game, in a thread
+/// of its own, so that the other endpoints keep answering. The thread ends
+/// when a write fails because the page is gone. When no thread can start, the
+/// request is dropped, which answers 500.
+fn story_events(root: PathBuf, origin: Option<String>, request: Request, slot: StreamSlot) {
+    let _ = std::thread::Builder::new().name("story-events".into()).spawn(move || {
+        let _slot = slot;
+        let mut out = request.into_writer();
+        let mut head = String::from(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n",
+        );
+        if let Some(o) = &origin {
+            head += &format!("Access-Control-Allow-Origin: {o}\r\nVary: Origin\r\n");
+        }
+        head += "\r\n";
+        let mut last = None;
+        let mut quiet = Duration::ZERO;
+        let mut chunk = head;
+        loop {
+            // shortcut: re-reads all files per poll, like LiveStory; switch to notify if stories get large
+            let read = crate::read_sorted(&root).map_err(|e| e.to_string());
+            if last.as_ref() != Some(&read) {
+                chunk += &match &read {
+                    Ok(files) => format!("event: files\ndata: {}\n\n", json!(files)),
+                    // Not `error`: EventSource fires that name itself when the connection drops.
+                    Err(e) => format!("event: story-error\ndata: {}\n\n", json!({ "error": e })),
+                };
+                last = Some(read);
+            } else if quiet >= KEEPALIVE {
+                chunk += ":\n\n";
+            }
+            if !chunk.is_empty() {
+                if out
+                    .write_all(chunk.as_bytes())
+                    .and_then(|()| out.flush())
+                    .is_err()
+                {
+                    return;
+                }
+                chunk.clear();
+                quiet = Duration::ZERO;
+            }
+            std::thread::sleep(STORY_POLL);
+            quiet += STORY_POLL;
+        }
+    });
 }
 
 /// Start a job from a body `{ "task": "imagine_exit", "args": { ... }, "state": { ... } }`.
@@ -355,7 +448,102 @@ fn error(status: u16, message: &str) -> Response<io::Cursor<Vec<u8>>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{local_origin, origin_of};
+    use super::{handle, local_origin, origin_of};
+    use crate::Server;
+    use crate::jobs::{Agent, Jobs};
+    use std::io::{BufRead, BufReader, Write};
+
+    /// The data of the next event `name` on an SSE stream.
+    fn next_event(lines: &mut impl BufRead, name: &str) -> String {
+        let mut event = String::new();
+        loop {
+            let mut line = String::new();
+            assert!(lines.read_line(&mut line).unwrap() > 0, "the stream ended");
+            let line = line.trim_end();
+            if let Some(e) = line.strip_prefix("event: ") {
+                event = e.to_string();
+            } else if let Some(data) = line.strip_prefix("data: ")
+                && event == name
+            {
+                return data.to_string();
+            }
+        }
+    }
+
+    #[test]
+    fn story_events_stream_the_files_and_each_change() {
+        let dir =
+            std::env::temp_dir().join(format!("loremaster-story-events-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for f in loremaster_project::scaffold("Events") {
+            let path = dir.join(&f.path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, f.text).unwrap();
+        }
+        let http = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let addr = http.server_addr().to_ip().unwrap();
+        let root = dir.clone();
+        std::thread::spawn(move || {
+            let mut server = Server::new(root).unwrap();
+            let mut jobs = Jobs::new(Agent::from_env(), "http://127.0.0.1/mcp");
+            for request in http.incoming_requests() {
+                handle(&mut server, &mut jobs, &[], request);
+            }
+        });
+
+        let mut stream = std::net::TcpStream::connect(addr).unwrap();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+            .unwrap();
+        write!(
+            stream,
+            "GET /api/story/events HTTP/1.1\r\nHost: x\r\nOrigin: http://localhost:8080\r\n\r\n"
+        )
+        .unwrap();
+        let mut lines = BufReader::new(stream.try_clone().unwrap());
+        let mut head = String::new();
+        while !head.ends_with("\r\n\r\n") {
+            assert!(lines.read_line(&mut head).unwrap() > 0);
+        }
+        assert!(head.contains("text/event-stream"), "{head}");
+        assert!(
+            head.contains("Access-Control-Allow-Origin: http://localhost:8080"),
+            "{head}"
+        );
+        let first: Vec<loremaster_project::SourceFile> =
+            serde_json::from_str(&next_event(&mut lines, "files")).unwrap();
+        assert!(first.iter().any(|f| f.path == "story.yaml"), "{first:?}");
+
+        // The other endpoints still answer while the stream is open.
+        let mut health = std::net::TcpStream::connect(addr).unwrap();
+        write!(
+            health,
+            "GET /health HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
+        let mut reply = String::new();
+        std::io::Read::read_to_string(&mut health, &mut reply).unwrap();
+        assert!(reply.contains("loremaster"), "{reply}");
+
+        std::fs::write(dir.join("extra.yaml"), "# changed\n").unwrap();
+        let second: Vec<loremaster_project::SourceFile> =
+            serde_json::from_str(&next_event(&mut lines, "files")).unwrap();
+        assert!(second.iter().any(|f| f.path == "extra.yaml"), "{second:?}");
+
+        std::fs::remove_dir_all(&dir).unwrap();
+        let failed: serde_json::Value =
+            serde_json::from_str(&next_event(&mut lines, "story-error")).unwrap();
+        assert!(failed["error"].is_string(), "{failed}");
+
+        // A page on another site gets no stream.
+        let mut foreign = std::net::TcpStream::connect(addr).unwrap();
+        write!(foreign, "GET /api/story/events HTTP/1.1\r\nHost: x\r\nOrigin: https://evil.example\r\nConnection: close\r\n\r\n").unwrap();
+        let mut reply = String::new();
+        std::io::Read::read_to_string(&mut foreign, &mut reply).unwrap();
+        assert!(reply.starts_with("HTTP/1.1 403"), "{reply}");
+        assert!(!reply.contains("text/event-stream"), "{reply}");
+    }
 
     #[test]
     fn origin_of_drops_the_path() {

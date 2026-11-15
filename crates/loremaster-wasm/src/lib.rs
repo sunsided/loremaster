@@ -299,6 +299,22 @@ impl JsSession {
         Ok(loaded)
     }
 
+    /// Live reload: build the changed project files (`[{ path, text }]`, for
+    /// example of an event `files` of `loremaster serve`'s `/story/events`) and
+    /// carry the game over to them. Returns `{ dropped }`, the state the new
+    /// story no longer has. Throws an array of diagnostics when the files have
+    /// errors; the game is unchanged then.
+    pub fn reload(&mut self, files: JsValue) -> Result<JsValue, JsValue> {
+        let story = compile(files)?;
+        let reloaded = self
+            .session
+            .reload(story.world.clone(), &story.walkthroughs)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.hints = HintBook::new(story.world.clone(), &story.walkthroughs);
+        self.world = story.world;
+        to_js(&reloaded)
+    }
+
     /// What the session waits for now.
     pub fn status(&self) -> Result<JsValue, JsValue> {
         to_js(&self.session.status())
