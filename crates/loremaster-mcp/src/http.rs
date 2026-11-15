@@ -13,7 +13,7 @@
 //! | `GET /jobs`, `GET /jobs/<id>` | The jobs, with status, progress events, result and proposals. |
 //! | `POST /jobs/<id>/cancel` | Stop a running job. |
 //! | `POST /bootstrap` | Start a new story from an idea: `{ "title": "...", "idea": "...", "rooms": 3 }`. Writes the new story, then starts a `seed_story` job. 409 when the folder has a story. |
-//! | `GET /story/events` | Server-Sent Events for live reload: an event `files` with all story files (`[{ "path", "text" }]`) at the start and after each change, or `error` when the folder cannot be read. |
+//! | `GET /story/events` | Server-Sent Events for live reload: an event `files` with all story files (`[{ "path", "text" }]`) at the start and after each change, or `story-error` (`{ "error": "..." }`) when the folder cannot be read. At most 8 streams at once; more get 503. |
 //! | `GET /health` | `{ "loremaster": "<version>", "ui": true }`. The editor uses it to find the server. |
 //!
 //! Each endpoint is also at `/api/...`, for example `GET /api/proposals`. With the
@@ -30,6 +30,7 @@ use loremaster_tools::{render_prompt, render_prompt_with_context};
 use serde_json::{Value, json};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response};
 
@@ -156,8 +157,13 @@ fn handle(server: &mut Server, jobs: &mut Jobs, allowed: &[String], mut request:
     if api {
         parts.remove(0);
     }
-    if !is_post && parts == ["story", "events"] {
-        story_events(server.root().to_path_buf(), origin, request);
+    if *request.method() == Method::Get && parts == ["story", "events"] {
+        match StreamSlot::take() {
+            Some(slot) => story_events(server.root().to_path_buf(), origin, request, slot),
+            None => {
+                let _ = request.respond(cors(error(503, "Too many open story streams.")));
+            }
+        }
         return;
     }
     let response = match (is_post, parts.as_slice()) {
@@ -233,11 +239,40 @@ const STORY_POLL: Duration = Duration::from_millis(500);
 /// A comment line this often, so that the stream of a closed page ends.
 const KEEPALIVE: Duration = Duration::from_secs(15);
 
+/// At most this many `GET /story/events` streams at once: each has a thread
+/// and reads the folder, and a page that stops reading keeps its thread.
+const MAX_STREAMS: usize = 8;
+
+static OPEN_STREAMS: AtomicUsize = AtomicUsize::new(0);
+
+/// One of the [`MAX_STREAMS`] places, given back on drop.
+struct StreamSlot;
+
+impl StreamSlot {
+    fn take() -> Option<Self> {
+        let open = OPEN_STREAMS.fetch_add(1, Ordering::SeqCst);
+        if open < MAX_STREAMS {
+            Some(Self)
+        } else {
+            OPEN_STREAMS.fetch_sub(1, Ordering::SeqCst);
+            None
+        }
+    }
+}
+
+impl Drop for StreamSlot {
+    fn drop(&mut self) {
+        OPEN_STREAMS.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 /// `GET /story/events`: stream the story files to a running game, in a thread
 /// of its own, so that the other endpoints keep answering. The thread ends
-/// when a write fails because the page is gone.
-fn story_events(root: PathBuf, origin: Option<String>, request: Request) {
-    std::thread::spawn(move || {
+/// when a write fails because the page is gone. When no thread can start, the
+/// request is dropped, which answers 500.
+fn story_events(root: PathBuf, origin: Option<String>, request: Request, slot: StreamSlot) {
+    let _ = std::thread::Builder::new().name("story-events".into()).spawn(move || {
+        let _slot = slot;
         let mut out = request.into_writer();
         let mut head = String::from(
             "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n",
@@ -255,7 +290,8 @@ fn story_events(root: PathBuf, origin: Option<String>, request: Request) {
             if last.as_ref() != Some(&read) {
                 chunk += &match &read {
                     Ok(files) => format!("event: files\ndata: {}\n\n", json!(files)),
-                    Err(e) => format!("event: error\ndata: {}\n\n", json!({ "error": e })),
+                    // Not `error`: EventSource fires that name itself when the connection drops.
+                    Err(e) => format!("event: story-error\ndata: {}\n\n", json!({ "error": e })),
                 };
                 last = Some(read);
             } else if quiet >= KEEPALIVE {
@@ -494,7 +530,19 @@ mod tests {
         let second: Vec<loremaster_project::SourceFile> =
             serde_json::from_str(&next_event(&mut lines, "files")).unwrap();
         assert!(second.iter().any(|f| f.path == "extra.yaml"), "{second:?}");
-        let _ = std::fs::remove_dir_all(&dir);
+
+        std::fs::remove_dir_all(&dir).unwrap();
+        let failed: serde_json::Value =
+            serde_json::from_str(&next_event(&mut lines, "story-error")).unwrap();
+        assert!(failed["error"].is_string(), "{failed}");
+
+        // A page on another site gets no stream.
+        let mut foreign = std::net::TcpStream::connect(addr).unwrap();
+        write!(foreign, "GET /api/story/events HTTP/1.1\r\nHost: x\r\nOrigin: https://evil.example\r\nConnection: close\r\n\r\n").unwrap();
+        let mut reply = String::new();
+        std::io::Read::read_to_string(&mut foreign, &mut reply).unwrap();
+        assert!(reply.starts_with("HTTP/1.1 403"), "{reply}");
+        assert!(!reply.contains("text/event-stream"), "{reply}");
     }
 
     #[test]

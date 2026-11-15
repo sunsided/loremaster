@@ -256,7 +256,7 @@ To play a proposal before you accept it, use `session_start` with `proposal`.
 | `GET /jobs/<id>` | Gives one job, with its status, events, result and proposals. |
 | `POST /jobs/<id>/cancel` | Stops a running job. |
 | `GET /health` | Gives `{ "loremaster": "<version>", "ui": true }`. The editor uses it to find the server. |
-| `GET /story/events` | Live reload for a running game: a Server-Sent Events stream. An event `files` has all story files as `[{ "path": "...", "text": "..." }]`, once at the start and again after each change. An event `error` has `{ "error": "..." }` when the folder cannot be read. The server reads the folder twice a second. |
+| `GET /story/events` | Live reload for a running game: a Server-Sent Events stream. An event `files` has all story files as `[{ "path": "...", "text": "..." }]`, once at the start and again after each change. An event `story-error` has `{ "error": "..." }` when the folder cannot be read. The server reads the folder twice a second. At most 8 streams are open at once; one more gets status 503. |
 | `POST /bootstrap` | Starts a new story from an idea. The body is `{ "title": "...", "idea": "...", "rooms": 3 }`; `title`, `rooms` and `model` are optional. The server writes the new story (the same files as `loremaster new`), then starts a `seed_story` job. The reply is `{ "id": "j1" }` with status 202. When the folder has a story, the reply has status 409. |
 
 Each endpoint is also at `/api/...`, for example `GET /api/proposals`. The editor uses these paths.
