@@ -815,6 +815,12 @@ export interface Loaded {
 	dropped: string[];
 }
 
+/** What a live reload (`Session.reload`) had to change. */
+export interface Reloaded {
+	/** What the changed story no longer has, for example `fact:lamp.lit` or `step:…` for a done walkthrough step. */
+	dropped: string[];
+}
+
 /** The state of a running game, to put back with `restore`. Opaque to the host. */
 export type Snapshot = { readonly story: string; readonly state: unknown };
 

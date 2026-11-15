@@ -2,6 +2,7 @@
 //! diagnostics, once.
 
 use loremaster_dsl::prelude::*;
+use loremaster_project::SourceFile;
 use std::fs;
 use std::path::PathBuf;
 
@@ -152,4 +153,44 @@ fn registers_pack_and_host_behaviors() {
 fn can_move_to_a_watcher_thread() {
     fn send<T: Send>() {}
     send::<LiveStory>();
+}
+
+fn file(path: &str, text: &str) -> SourceFile {
+    SourceFile {
+        path: path.into(),
+        text: text.into(),
+    }
+}
+
+/// `apply`, as a wasm game calls it with the files of `/story/events`: the
+/// files replace the YAML source, and the Rust packs stay.
+#[test]
+fn applies_served_files_in_place_of_the_yaml() {
+    let story = |hall: &str| {
+        vec![
+            file("story.yaml", "title: Live\nstart: hall\n"),
+            file(
+                "rooms/hall.yaml",
+                &format!("name: Hall\ndescription:\n  - \"{hall}\"\n"),
+            ),
+        ]
+    };
+    let mut pack = Pack::new("rust");
+    pack.register(Noop("from_pack"));
+    let live = LiveStory::new(
+        Loremaster::new()
+            .pack(pack)
+            .yaml_files(story("An empty hall.")),
+    );
+
+    let rebuilt = live.apply(story("A served hall.")).expect("it builds");
+    assert!(text(&rebuilt.world).contains("A served hall."));
+    assert!(!text(&rebuilt.world).contains("An empty hall."));
+    let ids = &rebuilt.world.story.behaviors;
+    assert!(ids.iter().any(|id| id.as_str() == "from_pack"), "{ids:?}");
+
+    let diags = live
+        .apply(vec![file("story.yaml", "title: [unclosed\n")])
+        .unwrap_err();
+    assert_eq!(diags[0].file, "story.yaml", "{diags:?}");
 }

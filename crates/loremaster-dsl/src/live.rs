@@ -1,5 +1,6 @@
 //! [`LiveStory`]: rebuild the world when the YAML files change, for live
-//! reload in dev builds. Native only.
+//! reload in dev builds. Natively it watches the folders; without a file
+//! system (wasm) the host hands it the changed files.
 
 use crate::Loremaster;
 use loremaster_model::Walkthrough;
@@ -21,11 +22,17 @@ use std::sync::Arc;
 ///     }
 /// }
 /// ```
+///
+/// Without a file system, for example in a wasm game, take the files of the
+/// event `files` of `loremaster serve`'s `GET /api/story/events` and call
+/// [`apply`](Self::apply).
 pub struct LiveStory {
     builder: Loremaster,
     behaviors: Vec<HostBehaviors>,
+    #[cfg(not(target_family = "wasm"))]
     files: Vec<Result<Vec<SourceFile>, String>>,
     /// A folder could not be read at the start, and no poll has said so yet.
+    #[cfg(not(target_family = "wasm"))]
     report_unreadable: bool,
 }
 
@@ -46,13 +53,15 @@ impl LiveStory {
     /// change against these files; the first poll reports a folder that
     /// could not be read.
     pub fn new(builder: Loremaster) -> Self {
+        #[cfg(not(target_family = "wasm"))]
         let files = builder.read_dirs();
-        let report_unreadable = files.iter().any(Result::is_err);
         Self {
+            #[cfg(not(target_family = "wasm"))]
+            report_unreadable: files.iter().any(Result::is_err),
+            #[cfg(not(target_family = "wasm"))]
+            files,
             builder,
             behaviors: Vec::new(),
-            files,
-            report_unreadable,
         }
     }
 
@@ -67,6 +76,7 @@ impl LiveStory {
     /// world, or the diagnostics when it does not build: an error of the
     /// check or the compile, or a behavior that nothing registered. The same
     /// broken files are reported once, not on every poll.
+    #[cfg(not(target_family = "wasm"))]
     pub fn poll(&mut self) -> Option<Result<Rebuilt, Vec<Diagnostic>>> {
         // shortcut: re-reads all files per poll; switch to notify if stories get large
         let files = self.builder.read_dirs();
@@ -74,16 +84,21 @@ impl LiveStory {
         if files == self.files && !report_unreadable {
             return None;
         }
-        let rebuilt = self.rebuild(&files);
+        let rebuilt = self.rebuild(self.builder.with_read_dirs(&files));
         self.files = files;
         Some(rebuilt)
     }
 
-    fn rebuild(
-        &self,
-        files: &[Result<Vec<SourceFile>, String>],
-    ) -> Result<Rebuilt, Vec<Diagnostic>> {
-        let (mut world, project, warnings) = self.builder.with_read_dirs(files).built()?;
+    /// Build a new world from `files`, the whole project as a server sends
+    /// it (paths relative to the project folder). They replace the YAML
+    /// sources of the builder; the Rust packs stay. The diagnostics as for
+    /// [`poll`](Self::poll).
+    pub fn apply(&self, files: Vec<SourceFile>) -> Result<Rebuilt, Vec<Diagnostic>> {
+        self.rebuild(self.builder.with_yaml_files(files))
+    }
+
+    fn rebuild(&self, builder: Loremaster) -> Result<Rebuilt, Vec<Diagnostic>> {
+        let (mut world, project, warnings) = builder.built()?;
         for f in &self.behaviors {
             f(&mut world);
         }

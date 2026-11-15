@@ -19,6 +19,7 @@ import type {
 	Input,
 	JournalEntry,
 	Loaded,
+	Reloaded,
 	Snapshot,
 	Status,
 	Step,
@@ -219,6 +220,20 @@ export class Session {
 		const loaded = this.#session.load(save);
 		this.#session.reseed(entropy());
 		return loaded;
+	}
+
+	/**
+	 * Live reload: carry the game over to changed files, for example of an event `files` of
+	 * `loremaster serve`'s `/api/story/events`. Throws a `ProjectError` when the files have errors;
+	 * the game is unchanged then.
+	 */
+	reload(files: SourceFile[]): Reloaded {
+		try {
+			return this.#session.reload(files);
+		} catch (e) {
+			if (Array.isArray(e)) throw new ProjectError(e as Diagnostic[]);
+			throw e;
+		}
 	}
 
 	/** What the session waits for now. */

@@ -119,8 +119,23 @@ if let Some(r) = live.poll() {
 
 `poll` gives `None` when no file changed. A broken change reports its
 diagnostics once, and the session keeps the old world until a fix builds.
-Release and web builds load the story as before (`LiveStory` is not on
-`wasm32`).
+Release builds load the story as before.
+
+A web build has no story folder to poll. Run `loremaster serve story/` and
+listen to `GET /api/story/events`. Its event `files` has all story files,
+at the start and after each change. A JavaScript game hands them to
+`Session.reload(files)` of the engine package. A Rust game on `wasm32`
+builds with `live.apply(files)` in place of `poll`, then calls
+`Session::reload` as above:
+
+```js
+const events = new EventSource('http://127.0.0.1:4710/api/story/events');
+events.addEventListener('files', (e) => session.reload(JSON.parse(e.data)));
+```
+
+A page that is not on `localhost` needs `--allow-origin <its origin>`.
+When the web editor has the folder linked, its saves reach the game
+the same way.
 
 This host does it with `--watch`. Edit a YAML file of the story while it
 runs: it prints `story reloaded`, what the new world no longer has, and the
