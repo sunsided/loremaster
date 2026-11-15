@@ -225,7 +225,8 @@ export class Session {
 	/**
 	 * Live reload: carry the game over to changed files, for example of an event `files` of
 	 * `loremaster serve`'s `/api/story/events`. Throws a `ProjectError` when the files have errors;
-	 * the game is unchanged then.
+	 * the game is unchanged then. A reload clears the undo history, and it returns no step: query
+	 * `scene()` and `status()` again to redraw.
 	 */
 	reload(files: SourceFile[]): Reloaded {
 		try {

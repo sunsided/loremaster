@@ -124,13 +124,32 @@ Release builds load the story as before.
 A web build has no story folder to poll. Run `loremaster serve story/` and
 listen to `GET /api/story/events`. Its event `files` has all story files,
 at the start and after each change. A JavaScript game hands them to
-`Session.reload(files)` of the engine package. A Rust game on `wasm32`
-builds with `live.apply(files)` in place of `poll`, then calls
-`Session::reload` as above:
+`Session.reload(files)` of the engine package. A reload gives no step and
+clears the undo history, so redraw from `scene()` and `status()`. A broken
+save throws a `ProjectError`, and the game stays on the last good version:
 
 ```js
 const events = new EventSource('http://127.0.0.1:4710/api/story/events');
-events.addEventListener('files', (e) => session.reload(JSON.parse(e.data)));
+events.addEventListener('files', (e) => {
+  try {
+    session.reload(JSON.parse(e.data));
+    redraw(session.scene(), session.status());
+  } catch (err) {
+    if (err instanceof ProjectError) showDiagnostics(err.diagnostics);
+    else throw err;
+  }
+});
+```
+
+A Rust game on `wasm32` gets the same event data through `web-sys` and
+builds with `apply` in place of `poll`:
+
+```rust
+let files: Vec<SourceFile> = serde_json::from_str(&event_data)?;
+match live.apply(files) {
+    Ok(b) => { session.reload(b.world, &b.walkthroughs)?; /* redraw */ }
+    Err(d) => { /* show d, keep playing */ }
+}
 ```
 
 A page that is not on `localhost` needs `--allow-origin <its origin>`.
