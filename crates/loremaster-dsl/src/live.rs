@@ -91,8 +91,9 @@ impl LiveStory {
 
     /// Build a new world from `files`, the whole project as a server sends
     /// it (paths relative to the project folder). They replace the YAML
-    /// sources of the builder; the Rust packs stay. The diagnostics as for
-    /// [`poll`](Self::poll).
+    /// sources of the builder, in the place of the first one; the Rust packs
+    /// stay. A YAML source after a pack thus moves before it. The diagnostics
+    /// as for [`poll`](Self::poll).
     pub fn apply(&self, files: Vec<SourceFile>) -> Result<Rebuilt, Vec<Diagnostic>> {
         self.rebuild(self.builder.with_yaml_files(files))
     }

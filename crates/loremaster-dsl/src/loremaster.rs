@@ -292,7 +292,8 @@ impl Loremaster {
     /// A copy that builds from `files` in place of the YAML sources, for a
     /// live reload without a file system. The files are the whole served
     /// project: they take the place and the root of the first YAML source,
-    /// and the other YAML sources are dropped.
+    /// and the other YAML sources are dropped. So with a pack between two
+    /// YAML sources, the files of the later one now come before that pack.
     pub(crate) fn with_yaml_files(&self, files: Vec<SourceFile>) -> Self {
         let mut copy = self.clone();
         let at = copy

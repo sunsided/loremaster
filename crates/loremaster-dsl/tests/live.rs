@@ -193,4 +193,8 @@ fn applies_served_files_in_place_of_the_yaml() {
         .apply(vec![file("story.yaml", "title: [unclosed\n")])
         .unwrap_err();
     assert_eq!(diags[0].file, "story.yaml", "{diags:?}");
+    assert!(
+        diags[0].line.is_some() && !diags[0].message.contains("no story.yaml"),
+        "the parse error: {diags:?}"
+    );
 }
